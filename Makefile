@@ -1,17 +1,32 @@
 # SICO GRC Platform Makefile
 
-.PHONY: help install dev test clean docker-up docker-down
+.PHONY: help install dev test clean docker-up docker-down security security-deps security-sast security-scan
 
 help:
 	@echo "SICO GRC Platform - Available Commands"
 	@echo "======================================"
-	@echo "install       - Install all dependencies"
-	@echo "dev           - Start development environment"
-	@echo "test          - Run all tests"
-	@echo "lint          - Run linters"
-	@echo "docker-up     - Start Docker containers"
-	@echo "docker-down   - Stop Docker containers"
-	@echo "clean         - Clean build artifacts"
+	@echo ""
+	@echo "📦 Setup & Installation:"
+	@echo "  install       - Install all dependencies"
+	@echo ""
+	@echo "🚀 Development:"
+	@echo "  dev           - Start development environment"
+	@echo "  docker-up     - Start Docker containers"
+	@echo "  docker-down   - Stop Docker containers"
+	@echo ""
+	@echo "🧪 Testing & Quality:"
+	@echo "  test          - Run all tests"
+	@echo "  lint          - Run linters"
+	@echo ""
+	@echo "🔒 Security:"
+	@echo "  security      - Run all security scans"
+	@echo "  security-deps - Scan dependencies for vulnerabilities"
+	@echo "  security-sast - Run static application security testing"
+	@echo ""
+	@echo "🧹 Maintenance:"
+	@echo "  clean         - Clean build artifacts"
+	@echo ""
+	@echo "📖 Documentation: See docs/SECURITY_PIPELINE.md for security details"
 
 install:
 	@echo "Installing backend dependencies..."
@@ -49,3 +64,25 @@ clean:
 	find . -type f -name "*.pyc" -delete
 	rm -rf src/frontend/.next
 	rm -rf src/frontend/node_modules
+
+security: security-deps security-sast
+	@echo "✅ All security scans completed"
+
+security-deps:
+	@echo "Running dependency vulnerability scans..."
+	@echo "Checking Python dependencies..."
+	cd src/backend && pip install safety 2>/dev/null || true
+	cd src/backend && safety check --json || true
+	@echo "Checking Node.js dependencies..."
+	cd src/frontend && npm audit --json || true
+
+security-sast:
+	@echo "Running SAST (Static Application Security Testing)..."
+	@echo "Installing Bandit for Python SAST..."
+	pip install bandit 2>/dev/null || true
+	@echo "Scanning backend for security issues..."
+	bandit -r src/backend -f json -o bandit-report.json || true
+	@echo "Report saved to bandit-report.json"
+
+security-scan: security
+	@echo "Security scan complete. Check reports for details."

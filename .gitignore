@@ -1,68 +1,114 @@
-# Environment file - DO NOT COMMIT
+# =========================
+# Environment / secrets
+# =========================
 .env
 .env.local
 .env.*.local
 
+# =========================
 # Python
-# Byte-compiled / optimized / DLL files
+# =========================
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+
+# Virtual environments
 env/
 venv/
 ENV/
-.venv
-# Distribution / packaging
-*.egg-info/
-.dist-info/
-# Pytest cache directory
-.pytest_cache/
+.venv/
+env.bak/
+venv.bak/
 
-# Node.js
-# Packages
-node_modules/
-# Build output
-.next/
-out/
+# Distribution / packaging
 build/
 dist/
+wheels/
+*.egg-info/
+*.egg
+.installed.cfg
+MANIFEST
+*.dist-info/
 
-# IDEs
-.vscode/
+# Test / tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# =========================
+# Node.js
+# =========================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Next.js build outputs
+.next/
+out/
+.cache/
+
+# =========================
+# OS / editors
+# =========================
+.DS_Store
 .idea/
+.vscode/
 *.swp
 *.swo
 *~
-
-# OS
-.DS_Store
 Thumbs.db
 
+# =========================
 # Logs
+# =========================
 *.log
 logs/
-*tmp*
 
+# =========================
 # Database
+# =========================
 *.db
 *.sqlite
 
+# =========================
 # Vector DB
+# =========================
 vectordb/
 *.index
 
+# =========================
 # Docker
+# =========================
 .dockerignore
 
+# =========================
 # Testing
+# =========================
 .coverage
 htmlcov/
 .pytest_cache/
 coverage/
 
-# Build artifacts
-*.egg-info/
-dist/
-build/
+# =========================
+# Temporary files
+# =========================
+*tmp*
+*.tmp
+temp/
+.temp/
+
+# =========================
+# Security scan reports
+# =========================
+bandit-report.json
+bandit-*.json
+safety-report.json
+npm-audit.json
+sbom-*.json
+*.sarif
