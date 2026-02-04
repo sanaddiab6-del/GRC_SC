@@ -5,10 +5,20 @@
 :root {
   --font-inter: 'Inter', sans-serif;
   --font-cairo: 'Cairo', sans-serif;
+  
+  --primary: #2563eb;
+  --secondary: #64748b;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --background: #ffffff;
+  --foreground: #0f172a;
 }
 
 body {
   font-family: var(--font-inter);
+  background-color: var(--background);
+  color: var(--foreground);
 }
 
 [dir="rtl"] body {
@@ -18,5 +28,19 @@ body {
 @layer base {
   h1, h2, h3, h4, h5, h6 {
     font-weight: 600;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors;
+  }
+  
+  .btn-secondary {
+    @apply bg-slate-500 text-white px-4 py-2 rounded-lg hover:bg-slate-600 transition-colors;
+  }
+  
+  .card {
+    @apply bg-white border border-gray-200 rounded-lg shadow-sm p-6;
   }
 }
