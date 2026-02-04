@@ -183,8 +183,43 @@ npm run dev
 
 ### 3. Docker Setup (Recommended)
 ```bash
-docker-compose up -d
+docker-compose -f deployment/docker-compose.yml up -d
 ```
+
+---
+
+## 🔒 Security Pipeline
+
+The repository includes a comprehensive automated security scanning pipeline:
+
+### Available Security Commands
+
+```bash
+# Run all security scans locally
+make security
+
+# Individual scans
+make security-deps    # Check dependency vulnerabilities
+make security-sast    # Static application security testing
+```
+
+### Automated Security Scans
+
+Every commit and pull request automatically runs:
+
+- ✅ **Dependency Scanning**: Safety (Python) + npm audit (Node.js)
+- ✅ **SAST**: Bandit + CodeQL for static code analysis  
+- ✅ **Secret Detection**: Gitleaks for hardcoded credentials
+- ✅ **SBOM Generation**: Software Bill of Materials for supply chain security
+
+### Security Reports
+
+View security findings in:
+- **GitHub Security Tab**: CodeQL and code scanning alerts
+- **Actions Artifacts**: Detailed JSON/SARIF reports
+- **Pull Request Checks**: Automated status checks
+
+📖 **Full Documentation**: See [docs/SECURITY_PIPELINE.md](docs/SECURITY_PIPELINE.md)
 
 ---
 
