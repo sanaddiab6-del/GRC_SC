@@ -2,13 +2,22 @@
 
 **Date**: 2026-02-04  
 **Status**: ✅ All vulnerabilities resolved  
-**Version**: 0.1.2
+**Version**: 0.1.3
 
 ## Summary
 
 Fixed all identified security vulnerabilities in project dependencies by updating to patched versions.
 
-## Latest Updates (v0.1.2)
+## Latest Updates (v0.1.3)
+
+### Frontend (Node.js)
+- **Next.js**: 15.0.8 → 15.2.3
+  - Fixed: DoS via cache poisoning
+  - Fixed: Authorization bypass in middleware (multiple versions)
+  - Severity: High to Critical
+  - Status: ✅ Fixed
+
+## Previous Updates (v0.1.2)
 
 ### Backend (Python)
 - **python-multipart**: 0.0.20 → 0.0.22
@@ -20,7 +29,7 @@ Fixed all identified security vulnerabilities in project dependencies by updatin
 - **Next.js**: 14.2.35 → 15.0.8
   - Fixed: HTTP request deserialization DoS vulnerabilities
   - Severity: High
-  - Status: ✅ Fixed
+  - Status: ✅ Fixed (updated again in v0.1.3)
 
 ## Previous Updates (v0.1.1)
 
@@ -55,13 +64,13 @@ Fixed all identified security vulnerabilities in project dependencies by updatin
 ### 1. Next.js - Multiple Vulnerabilities
 - **Vulnerabilities**:
   - HTTP request deserialization DoS (fully resolved)
-  - Authorization bypass
+  - DoS via cache poisoning (fully resolved)
+  - Authorization bypass in middleware (fully resolved)
   - Cache poisoning
   - Server-Side Request Forgery
-  - Authorization bypass in middleware
 - **Old Version**: 14.1.0
-- **Intermediate Version**: 14.2.35
-- **Final Version**: 15.0.8
+- **Intermediate Versions**: 14.2.35 → 15.0.8
+- **Final Version**: 15.2.3
 - **Severity**: High to Critical
 - **Status**: ✅ Fixed
 
@@ -105,5 +114,5 @@ gh-advisory-database check
 ---
 
 **Security Status**: 🟢 SECURE  
-**Total Vulnerabilities Fixed**: 40+  
-**Current Version**: 0.1.2
+**Total Vulnerabilities Fixed**: 45+  
+**Current Version**: 0.1.3
