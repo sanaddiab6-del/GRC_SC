@@ -1,0 +1,26 @@
+{
+  "control_id": "ECC-GV-1",
+  "framework": "ECC",
+  "domain": "Governance",
+  "title_en": "Governance Framework",
+  "title_ar": "إطار الحوكمة",
+  "description_en": "The institution shall establish and maintain a comprehensive governance framework that ensures effective oversight, accountability, and decision-making processes.",
+  "description_ar": "يجب على المؤسسة إنشاء والحفاظ على إطار حوكمة شامل يضمن الرقابة الفعالة والمساءلة وعمليات اتخاذ القرار.",
+  "policy_guidance_en": "Develop a board-approved governance policy that defines roles, responsibilities, and reporting structures. Include cybersecurity governance in the framework.",
+  "policy_guidance_ar": "تطوير سياسة حوكمة معتمدة من مجلس الإدارة تحدد الأدوار والمسؤوليات وهياكل الإبلاغ. تضمين حوكمة الأمن السيبراني في الإطار.",
+  "procedure_guidance_en": "1. Document organizational structure\n2. Define decision-making authority\n3. Establish reporting lines\n4. Conduct quarterly governance reviews",
+  "procedure_guidance_ar": "1. توثيق الهيكل التنظيمي\n2. تحديد سلطة اتخاذ القرار\n3. إنشاء خطوط الإبلاغ\n4. إجراء مراجعات ربع سنوية للحوكمة",
+  "priority": "critical",
+  "status": "compliant",
+  "maturity_level": 4,
+  "evidence_types": [
+    "governance_policy",
+    "organizational_chart",
+    "board_minutes",
+    "governance_review_reports"
+  ],
+  "related_controls": {
+    "CCC": ["CCC-GOV-01"],
+    "PDPL": ["PDPL-1"]
+  }
+}

@@ -1,9 +1,20 @@
+# Environment file - DO NOT COMMIT
+.env
+.env.local
+.env.*.local
+
 # Python
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
-# Distribution / packaging
+*$py.class
+*.so
 .Python
+env/
+venv/
+ENV/
+.venv
+# Distribution / packaging
 *.egg-info/
 .dist-info/
 # Pytest cache directory
@@ -17,30 +28,41 @@ node_modules/
 out/
 build/
 dist/
-# Logs
-*.log
 
-# Environment variables
-.env
-.env.local
-.env.*.local
-
-# IDE files
+# IDEs
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
+
+# OS
 .DS_Store
+Thumbs.db
 
-# Docker
-# Docker ignore specifics (add relevant patterns)
-.dockerignore
+# Logs
+*.log
+logs/
+*tmp*
 
-# Database files
+# Database
 *.db
 *.sqlite
 
-# Logs and temp files
-*.log
-*~
-*tmp*
+# Vector DB
+vectordb/
+*.index
+
+# Docker
+.dockerignore
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+coverage/
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
