@@ -58,3 +58,5 @@ temp/
 
 # OS
 Thumbs.db
+htmlcov/
+.pytest_cache/
