@@ -1,13 +1,30 @@
 # Security Update - Dependency Vulnerabilities Fixed
 
 **Date**: 2026-02-04  
-**Status**: ✅ All vulnerabilities resolved
+**Status**: ✅ All vulnerabilities resolved  
+**Version**: 0.1.2
 
 ## Summary
 
 Fixed all identified security vulnerabilities in project dependencies by updating to patched versions.
 
-## Backend (Python) Vulnerabilities Fixed
+## Latest Updates (v0.1.2)
+
+### Backend (Python)
+- **python-multipart**: 0.0.20 → 0.0.22
+  - Fixed: Arbitrary File Write via Non-Default Configuration
+  - Severity: High
+  - Status: ✅ Fixed
+
+### Frontend (Node.js)
+- **Next.js**: 14.2.35 → 15.0.8
+  - Fixed: HTTP request deserialization DoS vulnerabilities
+  - Severity: High
+  - Status: ✅ Fixed
+
+## Previous Updates (v0.1.1)
+
+### Backend (Python) Vulnerabilities Fixed
 
 ### 1. FastAPI - ReDoS Vulnerability
 - **Vulnerability**: Content-Type Header ReDoS
@@ -18,11 +35,11 @@ Fixed all identified security vulnerabilities in project dependencies by updatin
 
 ### 2. python-multipart - Multiple Vulnerabilities
 - **Vulnerabilities**:
-  - Arbitrary File Write via Non-Default Configuration
+  - Arbitrary File Write via Non-Default Configuration (initially 0.0.20, now 0.0.22)
   - Denial of Service (DoS) via deformation multipart/form-data boundary
   - Content-Type Header ReDoS
 - **Old Version**: 0.0.6
-- **New Version**: 0.0.20
+- **Final Version**: 0.0.22
 - **Severity**: High
 - **Status**: ✅ Fixed
 
@@ -37,13 +54,14 @@ Fixed all identified security vulnerabilities in project dependencies by updatin
 
 ### 1. Next.js - Multiple Vulnerabilities
 - **Vulnerabilities**:
-  - HTTP request deserialization DoS
+  - HTTP request deserialization DoS (fully resolved)
   - Authorization bypass
   - Cache poisoning
   - Server-Side Request Forgery
   - Authorization bypass in middleware
 - **Old Version**: 14.1.0
-- **New Version**: 14.2.35
+- **Intermediate Version**: 14.2.35
+- **Final Version**: 15.0.8
 - **Severity**: High to Critical
 - **Status**: ✅ Fixed
 
@@ -86,4 +104,6 @@ gh-advisory-database check
 
 ---
 
-**Security Status**: 🟢 SECURE
+**Security Status**: 🟢 SECURE  
+**Total Vulnerabilities Fixed**: 40+  
+**Current Version**: 0.1.2
