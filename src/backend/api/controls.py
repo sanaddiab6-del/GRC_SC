@@ -24,8 +24,7 @@ class Control(ControlBase):
     """Full control model"""
     id: int
     
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 @router.get("/", response_model=List[Control])

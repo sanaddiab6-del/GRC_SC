@@ -5,6 +5,7 @@ SICO GRC Platform - Main FastAPI Application
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from contextlib import asynccontextmanager
 import logging
 
 from api.controls import router as controls_router
@@ -17,13 +18,25 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan event handler for startup and shutdown"""
+    # Startup
+    logger.info("Starting SICO GRC Platform API...")
+    yield
+    # Shutdown
+    logger.info("Shutting down SICO GRC Platform API...")
+
+
 # Initialize FastAPI app
 app = FastAPI(
     title="SICO GRC Platform API",
     description="Saudi Regulatory Compliance Engine (ECC/CCC/PDPL)",
     version="0.1.0",
     docs_url="/api/docs",
-    redoc_url="/api/redoc"
+    redoc_url="/api/redoc",
+    lifespan=lifespan
 )
 
 # CORS middleware
@@ -39,18 +52,6 @@ app.add_middleware(
 # Include routers
 app.include_router(controls_router)
 app.include_router(assessments_router)
-
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize application on startup"""
-    logger.info("Starting SICO GRC Platform API...")
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown"""
-    logger.info("Shutting down SICO GRC Platform API...")
 
 
 @app.get("/")
