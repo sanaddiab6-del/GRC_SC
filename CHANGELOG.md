@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- **CRITICAL FIX**: Upgraded Next.js from 14.1.0 to 15.2.9 to patch multiple critical vulnerabilities:
+  - HTTP request deserialization DoS with Server Components
+  - Authorization Bypass vulnerabilities (multiple instances)
+  - Cache Poisoning vulnerabilities
+  - Server-Side Request Forgery in Server Actions
+  - Authorization Bypass in Middleware
+- Verification: gh-advisory-database scan shows **0 vulnerabilities**
+- All critical security patches applied and verified
+
 ### Added
 - Complete platform foundation structure
 - FastAPI backend with health check endpoints
