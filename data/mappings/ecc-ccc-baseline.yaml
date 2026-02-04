@@ -1,0 +1,46 @@
+# ECC to CCC Baseline Mapping
+# Maps ECC controls to equivalent CCC controls to eliminate redundancy
+
+mapping_name: "ECC to CCC Baseline Mapping"
+version: "1.0"
+last_updated: "2026-02-04"
+description: "Maps ECC controls to equivalent CCC controls for organizations using cloud services"
+
+mappings:
+  - ecc_control: "ECC-GV-1"
+    ccc_controls: ["CCC-GOV-01"]
+    mapping_type: "equivalent"
+    alignment_score: 0.95
+    notes: "Both require comprehensive governance framework. CCC adds cloud-specific oversight."
+
+  - ecc_control: "ECC-RM-1"
+    ccc_controls: ["CCC-RM-01", "CCC-RM-02"]
+    mapping_type: "partial"
+    alignment_score: 0.80
+    notes: "ECC focuses on general risk assessment. CCC extends to cloud-specific risks and vendor management."
+
+  - ecc_control: "ECC-AC-1"
+    ccc_controls: ["CCC-AC-01", "CCC-AC-02"]
+    mapping_type: "equivalent"
+    alignment_score: 0.90
+    notes: "ECC establishes access control foundation. CCC specifies cloud IAM and federation requirements."
+
+  - ecc_control: "ECC-IS-1"
+    ccc_controls: ["CCC-SEC-01", "CCC-SEC-02"]
+    mapping_type: "partial"
+    alignment_score: 0.75
+    notes: "ECC-IS-1 covers broader information security scope than individual CCC security controls."
+
+  - ecc_control: "ECC-DL-1"
+    ccc_controls: ["CCC-DATA-01", "CCC-DATA-02", "CCC-DATA-03"]
+    mapping_type: "partial"
+    alignment_score: 0.85
+    notes: "Data lifecycle management in ECC maps to cloud data classification, encryption, and retention in CCC."
+
+mapping_types:
+  - type: "equivalent"
+    description: "Controls serve the same purpose with minimal differences"
+  - type: "partial"
+    description: "Controls overlap but one provides additional requirements"
+  - type: "related"
+    description: "Controls address similar risks but with different approaches"

@@ -1,0 +1,96 @@
+# ECC (Essential Cybersecurity Controls) - Baseline Controls
+# Saudi National Cybersecurity Authority (NCA)
+
+controls:
+  - control_id: "ECC-GV-1"
+    framework: "ECC"
+    domain: "Governance"
+    title_en: "Governance Framework"
+    title_ar: "إطار الحوكمة"
+    description_en: "The institution shall establish and maintain a comprehensive governance framework that ensures effective oversight, accountability, and decision-making processes."
+    description_ar: "يجب على المؤسسة إنشاء والحفاظ على إطار حوكمة شامل يضمن الرقابة الفعالة والمساءلة وعمليات اتخاذ القرار."
+    policy_guidance_en: "Develop a board-approved governance policy that defines roles, responsibilities, and reporting structures. Include cybersecurity governance in the framework."
+    policy_guidance_ar: "تطوير سياسة حوكمة معتمدة من مجلس الإدارة تحدد الأدوار والمسؤوليات وهياكل الإبلاغ. تضمين حوكمة الأمن السيبراني في الإطار."
+    procedure_guidance_en: |
+      1. Document organizational structure
+      2. Define decision-making authority
+      3. Establish reporting lines
+      4. Conduct quarterly governance reviews
+    procedure_guidance_ar: |
+      1. توثيق الهيكل التنظيمي
+      2. تحديد سلطة اتخاذ القرار
+      3. إنشاء خطوط الإبلاغ
+      4. إجراء مراجعات ربع سنوية للحوكمة
+    priority: "critical"
+    status: "compliant"
+    maturity_level: 4
+    evidence_types:
+      - governance_policy
+      - organizational_chart
+      - board_minutes
+      - governance_review_reports
+    related_controls:
+      CCC: ["CCC-GOV-01"]
+      PDPL: ["PDPL-1"]
+
+  - control_id: "ECC-RM-1"
+    framework: "ECC"
+    domain: "Risk Management"
+    title_en: "Risk Assessment"
+    title_ar: "تقييم المخاطر"
+    description_en: "Conduct regular cybersecurity risk assessments to identify, analyze, and evaluate threats and vulnerabilities."
+    description_ar: "إجراء تقييمات منتظمة لمخاطر الأمن السيبراني لتحديد وتحليل وتقييم التهديدات ونقاط الضعف."
+    policy_guidance_en: "Establish a risk assessment policy with defined methodology, frequency, and responsibilities."
+    policy_guidance_ar: "إنشاء سياسة تقييم المخاطر مع منهجية محددة وتكرار ومسؤوليات."
+    procedure_guidance_en: |
+      1. Identify critical assets
+      2. Assess threat landscape
+      3. Evaluate vulnerabilities
+      4. Calculate risk levels
+      5. Document findings
+    procedure_guidance_ar: |
+      1. تحديد الأصول الحرجة
+      2. تقييم مشهد التهديدات
+      3. تقييم نقاط الضعف
+      4. حساب مستويات المخاطر
+      5. توثيق النتائج
+    priority: "high"
+    status: "partial"
+    maturity_level: 3
+    evidence_types:
+      - risk_assessment_reports
+      - threat_analysis
+      - vulnerability_scans
+    related_controls:
+      CCC: ["CCC-RM-01", "CCC-RM-02"]
+      PDPL: ["PDPL-4"]
+
+  - control_id: "ECC-AC-1"
+    framework: "ECC"
+    domain: "Access Control"
+    title_en: "Access Control Policy"
+    title_ar: "سياسة التحكم في الوصول"
+    description_en: "Implement formal access control policies and procedures to manage user access to information systems and resources."
+    description_ar: "تنفيذ سياسات وإجراءات رسمية للتحكم في الوصول لإدارة وصول المستخدمين إلى أنظمة المعلومات والموارد."
+    policy_guidance_en: "Create and maintain an access control policy based on least privilege principle and need-to-know basis."
+    policy_guidance_ar: "إنشاء والحفاظ على سياسة التحكم في الوصول بناءً على مبدأ الحد الأدنى من الامتيازات والحاجة إلى المعرفة."
+    procedure_guidance_en: |
+      1. Define user roles and permissions
+      2. Implement access request process
+      3. Review access rights regularly
+      4. Revoke access upon termination
+    procedure_guidance_ar: |
+      1. تحديد أدوار المستخدمين والأذونات
+      2. تنفيذ عملية طلب الوصول
+      3. مراجعة حقوق الوصول بانتظام
+      4. إلغاء الوصول عند الإنهاء
+    priority: "critical"
+    status: "non_compliant"
+    maturity_level: 2
+    evidence_types:
+      - access_control_policy
+      - user_access_matrix
+      - access_review_logs
+    related_controls:
+      CCC: ["CCC-AC-01", "CCC-AC-02"]
+      PDPL: ["PDPL-8", "PDPL-9"]

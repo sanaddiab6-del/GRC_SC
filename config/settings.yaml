@@ -1,0 +1,46 @@
+# SICO GRC Platform - Settings Configuration
+# This file provides structured configuration for the platform
+
+application:
+  name: "SICO GRC Platform"
+  version: "1.0.0"
+  environment: "development"
+  debug: true
+
+api:
+  prefix: "/api/v1"
+  cors_origins:
+    - "http://localhost:3000"
+    - "http://localhost:8000"
+  rate_limit:
+    enabled: true
+    requests_per_minute: 60
+
+database:
+  url: "postgresql://postgres:postgres@localhost:5432/sico_grc"
+  pool_size: 10
+  max_overflow: 20
+  echo: false
+
+vector_database:
+  type: "chroma"
+  host: "localhost"
+  port: 8001
+  collection_name: "sico_controls"
+
+cache:
+  url: "redis://localhost:6379/0"
+  ttl: 3600
+  prefix: "sico:"
+
+ai:
+  embedding_model: "intfloat/multilingual-e5-large"
+  llm_model: "gpt-4"
+  rag:
+    chunk_size: 512
+    chunk_overlap: 128
+    max_results: 5
+
+security:
+  jwt_algorithm: "HS256"
+  access_token_expire_minutes: 30

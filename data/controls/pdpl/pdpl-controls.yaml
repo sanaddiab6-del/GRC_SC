@@ -1,0 +1,130 @@
+# PDPL (Personal Data Protection Law) - Baseline Controls
+# Saudi Data & AI Authority (SDAIA)
+
+controls:
+  - control_id: "PDPL-1"
+    framework: "PDPL"
+    domain: "Governance"
+    title_en: "Data Protection Governance"
+    title_ar: "حوكمة حماية البيانات"
+    description_en: "Establish data protection governance framework with designated data protection officer and clear accountability."
+    description_ar: "إنشاء إطار حوكمة حماية البيانات مع مسؤول حماية بيانات معين ومساءلة واضحة."
+    policy_guidance_en: "Appoint Data Protection Officer (DPO) and establish data protection committee with defined responsibilities."
+    policy_guidance_ar: "تعيين مسؤول حماية البيانات (DPO) وإنشاء لجنة حماية البيانات بمسؤوليات محددة."
+    procedure_guidance_en: |
+      1. Designate Data Protection Officer
+      2. Define data protection roles
+      3. Establish oversight committee
+      4. Document accountability framework
+    procedure_guidance_ar: |
+      1. تعيين مسؤول حماية البيانات
+      2. تحديد أدوار حماية البيانات
+      3. إنشاء لجنة الإشراف
+      4. توثيق إطار المساءلة
+    priority: "critical"
+    status: "partial"
+    maturity_level: 3
+    evidence_types:
+      - dpo_appointment_letter
+      - data_protection_policy
+      - committee_charter
+    related_controls:
+      ECC: ["ECC-GV-1"]
+      CCC: ["CCC-GOV-01"]
+
+  - control_id: "PDPL-4"
+    framework: "PDPL"
+    domain: "Risk Management"
+    title_en: "Privacy Impact Assessment"
+    title_ar: "تقييم أثر الخصوصية"
+    description_en: "Conduct privacy impact assessments for processing activities that may pose high risks to personal data."
+    description_ar: "إجراء تقييمات أثر الخصوصية لأنشطة المعالجة التي قد تشكل مخاطر عالية على البيانات الشخصية."
+    policy_guidance_en: "Establish PIA policy defining when assessments are required, methodology, and approval process."
+    policy_guidance_ar: "إنشاء سياسة PIA تحدد متى تكون التقييمات مطلوبة والمنهجية وعملية الموافقة."
+    procedure_guidance_en: |
+      1. Identify high-risk processing
+      2. Conduct PIA using template
+      3. Identify mitigation measures
+      4. Obtain DPO approval
+      5. Document and review annually
+    procedure_guidance_ar: |
+      1. تحديد المعالجة عالية المخاطر
+      2. إجراء PIA باستخدام النموذج
+      3. تحديد تدابير التخفيف
+      4. الحصول على موافقة DPO
+      5. التوثيق والمراجعة سنوياً
+    priority: "high"
+    status: "non_compliant"
+    maturity_level: 2
+    evidence_types:
+      - pia_reports
+      - risk_assessments
+      - mitigation_plans
+    related_controls:
+      ECC: ["ECC-RM-1"]
+      CCC: ["CCC-RM-01"]
+
+  - control_id: "PDPL-8"
+    framework: "PDPL"
+    domain: "Access Control"
+    title_en: "Data Access Controls"
+    title_ar: "ضوابط الوصول إلى البيانات"
+    description_en: "Implement technical and organizational measures to ensure personal data is accessible only to authorized personnel."
+    description_ar: "تنفيذ التدابير التقنية والتنظيمية لضمان أن البيانات الشخصية يمكن الوصول إليها فقط من قبل الموظفين المصرح لهم."
+    policy_guidance_en: "Define access control policy for personal data with role-based permissions and need-to-know basis."
+    policy_guidance_ar: "تحديد سياسة التحكم في الوصول للبيانات الشخصية مع الأذونات القائمة على الدور والحاجة إلى المعرفة."
+    procedure_guidance_en: |
+      1. Classify personal data by sensitivity
+      2. Define access roles and permissions
+      3. Implement access controls
+      4. Log and monitor data access
+      5. Review access rights quarterly
+    procedure_guidance_ar: |
+      1. تصنيف البيانات الشخصية حسب الحساسية
+      2. تحديد أدوار وأذونات الوصول
+      3. تنفيذ ضوابط الوصول
+      4. تسجيل ومراقبة الوصول إلى البيانات
+      5. مراجعة حقوق الوصول ربع سنوياً
+    priority: "critical"
+    status: "non_compliant"
+    maturity_level: 2
+    evidence_types:
+      - access_control_matrix
+      - data_classification_scheme
+      - access_logs
+      - access_review_reports
+    related_controls:
+      ECC: ["ECC-AC-1"]
+      CCC: ["CCC-AC-01"]
+
+  - control_id: "PDPL-9"
+    framework: "PDPL"
+    domain: "Data Subject Rights"
+    title_en: "Data Subject Rights Management"
+    title_ar: "إدارة حقوق صاحب البيانات"
+    description_en: "Establish processes to respond to data subject requests for access, correction, deletion, and portability."
+    description_ar: "إنشاء عمليات للاستجابة لطلبات أصحاب البيانات للوصول والتصحيح والحذف والنقل."
+    policy_guidance_en: "Create data subject rights policy with defined timelines, procedures, and escalation paths."
+    policy_guidance_ar: "إنشاء سياسة حقوق صاحب البيانات مع جداول زمنية وإجراءات ومسارات تصعيد محددة."
+    procedure_guidance_en: |
+      1. Receive and verify requests
+      2. Locate relevant data
+      3. Fulfill request within 30 days
+      4. Document response
+      5. Track and report metrics
+    procedure_guidance_ar: |
+      1. استلام والتحقق من الطلبات
+      2. تحديد موقع البيانات ذات الصلة
+      3. تنفيذ الطلب في غضون 30 يوماً
+      4. توثيق الاستجابة
+      5. تتبع والإبلاغ عن المقاييس
+    priority: "high"
+    status: "non_compliant"
+    maturity_level: 1
+    evidence_types:
+      - dsar_policy
+      - request_logs
+      - response_documentation
+    related_controls:
+      ECC: []
+      CCC: []

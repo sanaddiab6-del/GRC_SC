@@ -1,0 +1,93 @@
+# CCC (Cloud Cybersecurity Controls) - Baseline Controls
+# Saudi National Cybersecurity Authority (NCA)
+
+controls:
+  - control_id: "CCC-GOV-01"
+    framework: "CCC"
+    domain: "Governance"
+    title_en: "Cloud Governance Framework"
+    title_ar: "إطار حوكمة السحابة"
+    description_en: "Establish cloud-specific governance framework including roles, responsibilities, and oversight for cloud services."
+    description_ar: "إنشاء إطار حوكمة خاص بالسحابة بما في ذلك الأدوار والمسؤوليات والإشراف على الخدمات السحابية."
+    policy_guidance_en: "Develop cloud governance policy addressing multi-tenancy, shared responsibility model, and cloud-specific risks."
+    policy_guidance_ar: "تطوير سياسة حوكمة السحابة التي تعالج التعدد المستأجرين ونموذج المسؤولية المشتركة والمخاطر الخاصة بالسحابة."
+    procedure_guidance_en: |
+      1. Define cloud governance structure
+      2. Document shared responsibility model
+      3. Establish cloud risk oversight
+      4. Review cloud service agreements
+    procedure_guidance_ar: |
+      1. تحديد هيكل حوكمة السحابة
+      2. توثيق نموذج المسؤولية المشتركة
+      3. إنشاء إشراف مخاطر السحابة
+      4. مراجعة اتفاقيات الخدمة السحابية
+    priority: "critical"
+    status: "partial"
+    maturity_level: 3
+    evidence_types:
+      - cloud_governance_policy
+      - responsibility_matrix
+      - sla_documents
+    related_controls:
+      ECC: ["ECC-GV-1"]
+      PDPL: ["PDPL-1"]
+
+  - control_id: "CCC-RM-01"
+    framework: "CCC"
+    domain: "Risk Management"
+    title_en: "Cloud Risk Assessment"
+    title_ar: "تقييم مخاطر السحابة"
+    description_en: "Conduct risk assessments specific to cloud services including data sovereignty, vendor lock-in, and service availability."
+    description_ar: "إجراء تقييمات المخاطر الخاصة بالخدمات السحابية بما في ذلك سيادة البيانات وقفل البائع وتوافر الخدمة."
+    policy_guidance_en: "Establish cloud risk assessment methodology addressing cloud-specific threats and compliance requirements."
+    policy_guidance_ar: "إنشاء منهجية تقييم مخاطر السحابة التي تعالج التهديدات الخاصة بالسحابة ومتطلبات الامتثال."
+    procedure_guidance_en: |
+      1. Assess cloud service providers
+      2. Evaluate data location risks
+      3. Review SLA commitments
+      4. Analyze vendor dependencies
+    procedure_guidance_ar: |
+      1. تقييم مزودي الخدمات السحابية
+      2. تقييم مخاطر موقع البيانات
+      3. مراجعة التزامات SLA
+      4. تحليل تبعيات البائعين
+    priority: "high"
+    status: "partial"
+    maturity_level: 3
+    evidence_types:
+      - cloud_risk_register
+      - vendor_assessments
+      - data_location_reports
+    related_controls:
+      ECC: ["ECC-RM-1"]
+      PDPL: ["PDPL-4", "PDPL-5"]
+
+  - control_id: "CCC-AC-01"
+    framework: "CCC"
+    domain: "Access Control"
+    title_en: "Cloud Access Management"
+    title_ar: "إدارة الوصول السحابي"
+    description_en: "Implement cloud-specific access controls using identity federation, multi-factor authentication, and role-based access."
+    description_ar: "تنفيذ ضوابط الوصول الخاصة بالسحابة باستخدام اتحاد الهوية والمصادقة متعددة العوامل والوصول القائم على الدور."
+    policy_guidance_en: "Create access control policy for cloud services including SSO, MFA requirements, and privilege management."
+    policy_guidance_ar: "إنشاء سياسة التحكم في الوصول للخدمات السحابية بما في ذلك SSO ومتطلبات MFA وإدارة الامتيازات."
+    procedure_guidance_en: |
+      1. Configure identity providers
+      2. Enable multi-factor authentication
+      3. Implement least privilege access
+      4. Monitor privileged actions
+    procedure_guidance_ar: |
+      1. تكوين مزودي الهوية
+      2. تمكين المصادقة متعددة العوامل
+      3. تنفيذ الوصول بأقل الامتيازات
+      4. مراقبة الإجراءات المميزة
+    priority: "critical"
+    status: "non_compliant"
+    maturity_level: 2
+    evidence_types:
+      - iam_configuration
+      - mfa_enrollment_reports
+      - access_logs
+    related_controls:
+      ECC: ["ECC-AC-1"]
+      PDPL: ["PDPL-8"]

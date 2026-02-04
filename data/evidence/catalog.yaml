@@ -1,0 +1,86 @@
+# Evidence Catalog - SICO GRC Platform
+# Defines evidence types required for compliance frameworks
+
+catalog_version: "1.0"
+last_updated: "2026-02-04"
+
+evidence_types:
+  - evidence_id: "governance_policy"
+    name_en: "Governance Policy Document"
+    name_ar: "وثيقة سياسة الحوكمة"
+    description_en: "Board-approved governance policy defining organizational structure and decision-making processes"
+    description_ar: "سياسة الحوكمة المعتمدة من مجلس الإدارة التي تحدد الهيكل التنظيمي وعمليات اتخاذ القرار"
+    applicable_frameworks: ["ECC", "CCC"]
+    evidence_format: ["PDF", "DOCX"]
+    retention_period_years: 7
+    collection_frequency: "annual"
+
+  - evidence_id: "security_logs"
+    name_en: "Security Event Logs"
+    name_ar: "سجلات الأحداث الأمنية"
+    description_en: "System logs capturing security events, access attempts, and incident data"
+    description_ar: "سجلات النظام التي تلتقط الأحداث الأمنية ومحاولات الوصول وبيانات الحوادث"
+    applicable_frameworks: ["ECC", "CCC", "PDPL"]
+    evidence_format: ["LOG", "CSV", "JSON"]
+    retention_period_years: 1
+    collection_frequency: "continuous"
+
+  - evidence_id: "access_control_policy"
+    name_en: "Access Control Policy"
+    name_ar: "سياسة التحكم في الوصول"
+    description_en: "Policy defining user access rights, authentication requirements, and authorization procedures"
+    description_ar: "سياسة تحدد حقوق وصول المستخدمين ومتطلبات المصادقة وإجراءات التفويض"
+    applicable_frameworks: ["ECC", "CCC", "PDPL"]
+    evidence_format: ["PDF", "DOCX"]
+    retention_period_years: 7
+    collection_frequency: "annual"
+
+  - evidence_id: "risk_assessment_reports"
+    name_en: "Risk Assessment Reports"
+    name_ar: "تقارير تقييم المخاطر"
+    description_en: "Comprehensive risk assessments identifying threats, vulnerabilities, and mitigation strategies"
+    description_ar: "تقييمات مخاطر شاملة تحدد التهديدات ونقاط الضعف واستراتيجيات التخفيف"
+    applicable_frameworks: ["ECC", "CCC", "PDPL"]
+    evidence_format: ["PDF", "XLSX"]
+    retention_period_years: 5
+    collection_frequency: "annual"
+
+  - evidence_id: "pia_reports"
+    name_en: "Privacy Impact Assessment Reports"
+    name_ar: "تقارير تقييم أثر الخصوصية"
+    description_en: "Privacy impact assessments for high-risk data processing activities"
+    description_ar: "تقييمات أثر الخصوصية لأنشطة معالجة البيانات عالية المخاطر"
+    applicable_frameworks: ["PDPL"]
+    evidence_format: ["PDF", "DOCX"]
+    retention_period_years: 7
+    collection_frequency: "per_project"
+
+  - evidence_id: "user_access_matrix"
+    name_en: "User Access Rights Matrix"
+    name_ar: "مصفوفة حقوق وصول المستخدمين"
+    description_en: "Matrix documenting user roles, permissions, and access levels to systems and data"
+    description_ar: "مصفوفة توثق أدوار المستخدمين والأذونات ومستويات الوصول إلى الأنظمة والبيانات"
+    applicable_frameworks: ["ECC", "CCC", "PDPL"]
+    evidence_format: ["XLSX", "CSV"]
+    retention_period_years: 3
+    collection_frequency: "quarterly"
+
+  - evidence_id: "dpo_appointment_letter"
+    name_en: "Data Protection Officer Appointment Letter"
+    name_ar: "خطاب تعيين مسؤول حماية البيانات"
+    description_en: "Official appointment letter designating the Data Protection Officer"
+    description_ar: "خطاب التعيين الرسمي الذي يعين مسؤول حماية البيانات"
+    applicable_frameworks: ["PDPL"]
+    evidence_format: ["PDF"]
+    retention_period_years: 7
+    collection_frequency: "on_change"
+
+  - evidence_id: "audit_reports"
+    name_en: "Internal Audit Reports"
+    name_ar: "تقارير التدقيق الداخلي"
+    description_en: "Internal audit reports assessing compliance with controls and policies"
+    description_ar: "تقارير التدقيق الداخلي التي تقيم الامتثال للضوابط والسياسات"
+    applicable_frameworks: ["ECC", "CCC", "PDPL"]
+    evidence_format: ["PDF"]
+    retention_period_years: 7
+    collection_frequency: "annual"
