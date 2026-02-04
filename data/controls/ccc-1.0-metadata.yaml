@@ -1,0 +1,103 @@
+# CCC 1.0 - Cloud Cybersecurity Controls
+# ضوابط الأمن السيبراني السحابي
+# Saudi National Cybersecurity Authority (NCA)
+
+metadata:
+  framework: "CCC"
+  version: "1.0"
+  name_en: "Cloud Cybersecurity Controls"
+  name_ar: "ضوابط الأمن السيبراني السحابي"
+  authority: "National Cybersecurity Authority"
+  authority_ar: "الهيئة الوطنية للأمن السيبراني"
+  published_date: "2020"
+  total_controls: 154
+  total_domains: 14
+  language: ["ar", "en"]
+  relationship_to_ecc: "Extends ECC with cloud-specific controls"
+
+domains:
+  - id: "CCC-1"
+    name_en: "Governance and Risk Management"
+    name_ar: "الحوكمة وإدارة المخاطر"
+    control_count: 14
+    
+  - id: "CCC-2"
+    name_en: "Compliance and Legal"
+    name_ar: "الامتثال والقانون"
+    control_count: 8
+    
+  - id: "CCC-3"
+    name_en: "Information Security"
+    name_ar: "أمن المعلومات"
+    control_count: 15
+    
+  - id: "CCC-4"
+    name_en: "Virtualization and Containerization Security"
+    name_ar: "أمن المحاكاة الافتراضية والحاويات"
+    control_count: 11
+    
+  - id: "CCC-5"
+    name_en: "Infrastructure Security"
+    name_ar: "أمن البنية التحتية"
+    control_count: 12
+    
+  - id: "CCC-6"
+    name_en: "Data Security"
+    name_ar: "أمن البيانات"
+    control_count: 13
+    
+  - id: "CCC-7"
+    name_en: "Application Security"
+    name_ar: "أمن التطبيقات"
+    control_count: 10
+    
+  - id: "CCC-8"
+    name_en: "Identity and Access Management"
+    name_ar: "إدارة الهوية والوصول"
+    control_count: 15
+    
+  - id: "CCC-9"
+    name_en: "Encryption and Key Management"
+    name_ar: "التشفير وإدارة المفاتيح"
+    control_count: 12
+    
+  - id: "CCC-10"
+    name_en: "Audit, Assurance, and Monitoring"
+    name_ar: "التدقيق والمراقبة والضمان"
+    control_count: 11
+    
+  - id: "CCC-11"
+    name_en: "Business Continuity and Disaster Recovery"
+    name_ar: "استمرارية الأعمال والتعافي من الكوارث"
+    control_count: 9
+    
+  - id: "CCC-12"
+    name_en: "Incident Response"
+    name_ar: "الاستجابة للحوادث"
+    control_count: 8
+    
+  - id: "CCC-13"
+    name_en: "Security as a Service"
+    name_ar: "الأمن كخدمة"
+    control_count: 10
+    
+  - id: "CCC-14"
+    name_en: "Supply Chain Management"
+    name_ar: "إدارة سلسلة التوريد"
+    control_count: 6
+
+cloud_deployment_models:
+  - "Public Cloud"
+  - "Private Cloud"
+  - "Hybrid Cloud"
+  - "Community Cloud"
+
+cloud_service_models:
+  - "IaaS (Infrastructure as a Service)"
+  - "PaaS (Platform as a Service)"
+  - "SaaS (Software as a Service)"
+
+notes: |
+  CCC 1.0 provides comprehensive controls for organizations using cloud
+  services in Saudi Arabia. It extends ECC with cloud-specific requirements
+  and addresses unique risks in cloud computing environments.

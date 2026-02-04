@@ -1,0 +1,201 @@
+# Bilingual AI/RAG Engine Configuration
+
+metadata:
+  name: "SICO Bilingual Knowledge Engine"
+  version: "1.0"
+  description: "AI-powered Arabic/English compliance assistant with citation-based responses"
+  
+languages:
+  primary: "ar"  # Arabic
+  secondary: "en"  # English
+  supported: ["ar", "en"]
+
+embedding_models:
+  multilingual:
+    model: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    dimensions: 384
+    languages: ["ar", "en"]
+    use_case: "General semantic search"
+    
+  arabic_specialized:
+    model: "CAMeL-Lab/bert-base-arabic-camelbert-msa"
+    dimensions: 768
+    languages: ["ar"]
+    use_case: "Arabic-specific fine-tuning"
+
+llm_configuration:
+  primary_model: "gpt-4"
+  fallback_model: "gpt-3.5-turbo"
+  temperature: 0.1  # Low temperature for factual responses
+  max_tokens: 2000
+  response_format: "structured"
+
+rag_pipeline:
+  retrieval:
+    strategy: "hybrid"
+    semantic_weight: 0.7
+    keyword_weight: 0.3
+    top_k: 5
+    similarity_threshold: 0.75
+    
+  reranking:
+    enabled: true
+    model: "cross-encoder/ms-marco-MiniLM-L-12-v2"
+    
+  generation:
+    prompt_template: |
+      أنت مساعد خبير في الامتثال للأنظمة السعودية (ECC، CCC، PDPL).
+      You are an expert assistant for Saudi compliance frameworks (ECC, CCC, PDPL).
+      
+      استخدم المعلومات التالية للإجابة على السؤال:
+      Use the following information to answer the question:
+      
+      {context}
+      
+      السؤال / Question: {question}
+      
+      تعليمات / Instructions:
+      - أجب باللغة نفسها المستخدمة في السؤال
+      - Answer in the same language as the question
+      - استشهد بالمصادر المحددة (رقم الضابط، المادة)
+      - Cite specific sources (control number, article)
+      - إذا لم تكن متأكداً، قل ذلك
+      - If unsure, say so
+      - قدم إجابات دقيقة وقابلة للتنفيذ
+      - Provide accurate and actionable answers
+
+knowledge_base:
+  sources:
+    - type: "control_library"
+      path: "/data/controls/"
+      frameworks: ["ECC", "CCC", "PDPL"]
+      
+    - type: "evidence_templates"
+      path: "/data/evidence/"
+      
+    - type: "mappings"
+      path: "/data/mappings/"
+      
+    - type: "documentation"
+      path: "/docs/"
+      
+    - type: "playbooks"
+      path: "/playbooks/"
+
+  chunk_strategy:
+    method: "semantic"
+    chunk_size: 500
+    chunk_overlap: 100
+    
+  update_frequency:
+    incremental: "daily"
+    full_refresh: "weekly"
+
+query_understanding:
+  intent_detection:
+    enabled: true
+    categories:
+      - "control_lookup"
+      - "evidence_requirement"
+      - "implementation_guidance"
+      - "gap_analysis"
+      - "report_generation"
+      
+  entity_extraction:
+    enabled: true
+    entities:
+      - "control_id"
+      - "framework"
+      - "domain"
+      - "article_number"
+
+citation_system:
+  format: "[Control: {control_id}] {control_title}"
+  include_confidence: true
+  min_confidence: 0.7
+  
+  example: |
+    "[ECC-3-8] Access Control: Organizations must implement role-based 
+    access control (RBAC) with regular reviews."
+    
+    "[ضابط: ECC-3-8] التحكم في الوصول: يجب على المنظمات تطبيق التحكم 
+    في الوصول القائم على الأدوار مع مراجعات منتظمة."
+
+guardrails:
+  - name: "factual_consistency"
+    description: "Ensure responses are based on source material"
+    enabled: true
+    
+  - name: "hallucination_detection"
+    description: "Detect and prevent made-up information"
+    enabled: true
+    
+  - name: "citation_required"
+    description: "All claims must have citations"
+    enabled: true
+    
+  - name: "language_consistency"
+    description: "Response language matches query language"
+    enabled: true
+
+use_cases:
+  - name: "Control Lookup"
+    description: "Find specific controls by domain or keyword"
+    example_query: "ما هي ضوابط التشفير في ECC؟"
+    
+  - name: "Evidence Requirements"
+    description: "What evidence is needed for a control"
+    example_query: "What evidence do I need for ECC-3-8?"
+    
+  - name: "Implementation Guidance"
+    description: "How to implement a specific control"
+    example_query: "كيف أطبق ضابط إدارة الوصول؟"
+    
+  - name: "Gap Analysis"
+    description: "Identify compliance gaps"
+    example_query: "What controls am I missing for cloud compliance?"
+    
+  - name: "Mapping Query"
+    description: "Relationship between frameworks"
+    example_query: "ما العلاقة بين ECC و CCC؟"
+
+client_dictionary:
+  description: "Custom terminology mapping per client"
+  
+  examples:
+    - client_term: "Information Security Committee"
+      standard_term: "Cybersecurity Governance Committee"
+      framework: "ECC"
+      
+    - client_term: "لجنة أمن المعلومات"
+      standard_term: "لجنة حوكمة الأمن السيبراني"
+      framework: "ECC"
+
+performance_optimization:
+  caching:
+    enabled: true
+    ttl: 3600  # 1 hour
+    
+  batch_processing:
+    enabled: true
+    batch_size: 10
+    
+  async_loading:
+    enabled: true
+
+monitoring:
+  metrics:
+    - "query_response_time"
+    - "retrieval_accuracy"
+    - "citation_rate"
+    - "user_satisfaction"
+    
+  logging:
+    queries: true
+    responses: true
+    feedback: true
+
+notes: |
+  The bilingual AI engine is a key differentiator that makes compliance
+  accessible in both Arabic and English. The citation-based approach
+  ensures accuracy and audit-readiness of AI-generated responses.

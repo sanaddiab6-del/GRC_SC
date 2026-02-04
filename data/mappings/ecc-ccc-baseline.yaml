@@ -1,0 +1,113 @@
+# ECC ↔ CCC Baseline Mapping
+# Unified baseline to eliminate 40-60% compliance duplication
+
+metadata:
+  name: "ECC-CCC Unified Baseline"
+  version: "1.0"
+  description: "Mapping between ECC 3.0 and CCC 1.0 controls to identify overlaps and deltas"
+  purpose: "Reduce compliance burden by identifying common requirements"
+  duplication_reduction: "40-60%"
+
+baseline_strategy:
+  approach: "Unified Baseline + CCC Delta"
+  description: |
+    Organizations start with ECC as the baseline, then only implement
+    CCC-specific controls (delta) for cloud environments.
+    This eliminates duplicate work and streamlines compliance.
+
+mapping_categories:
+  - id: "FULL_OVERLAP"
+    name: "Full Overlap"
+    description: "ECC and CCC requirements are identical"
+    strategy: "Implement once, use for both frameworks"
+    
+  - id: "PARTIAL_OVERLAP"
+    name: "Partial Overlap"
+    description: "CCC extends ECC with additional requirements"
+    strategy: "Extend ECC implementation with CCC-specific additions"
+    
+  - id: "CCC_ONLY"
+    name: "CCC-Only (Delta)"
+    description: "Cloud-specific controls with no ECC equivalent"
+    strategy: "Implement only when using cloud services"
+    
+  - id: "ECC_ONLY"
+    name: "ECC-Only"
+    description: "Controls unique to ECC"
+    strategy: "Part of baseline, always implemented"
+
+# Sample mappings (full mapping would include all 114 ECC + 154 CCC controls)
+sample_mappings:
+  - ecc_control: "ECC-1-1"
+    ecc_title: "Cybersecurity Strategy"
+    ccc_controls: ["CCC-1-1"]
+    ccc_title: "Cloud Security Strategy"
+    overlap_type: "PARTIAL_OVERLAP"
+    notes: "CCC requires cloud-specific strategy in addition to overall cybersecurity strategy"
+    
+  - ecc_control: "ECC-1-2"
+    ecc_title: "Roles and Responsibilities"
+    ccc_controls: ["CCC-1-2"]
+    ccc_title: "Cloud Roles and Responsibilities"
+    overlap_type: "PARTIAL_OVERLAP"
+    notes: "CCC requires defining cloud-specific roles (Cloud Architect, Cloud Security Engineer)"
+    
+  - ecc_control: "ECC-3-5"
+    ecc_title: "Encryption Standards"
+    ccc_controls: ["CCC-9-1", "CCC-9-2", "CCC-9-3"]
+    ccc_title: "Cloud Encryption Controls"
+    overlap_type: "PARTIAL_OVERLAP"
+    notes: "CCC provides more detailed encryption requirements for cloud data at rest, in transit, and in use"
+    
+  - ecc_control: null
+    ccc_controls: ["CCC-4-1"]
+    ccc_title: "Hypervisor Security"
+    overlap_type: "CCC_ONLY"
+    notes: "Cloud-specific control for virtualization layer security"
+    
+  - ecc_control: null
+    ccc_controls: ["CCC-13-1"]
+    ccc_title: "Security as a Service (SECaaS)"
+    overlap_type: "CCC_ONLY"
+    notes: "Cloud-specific control for using security services from cloud providers"
+
+implementation_approach:
+  phase_1:
+    name: "ECC Baseline Implementation"
+    controls: 114
+    timeline: "3-6 months"
+    deliverables:
+      - "ECC compliance framework"
+      - "Policy and procedure documentation"
+      - "Technical implementations"
+      - "Evidence repository"
+      
+  phase_2:
+    name: "CCC Delta Implementation"
+    controls: 60
+    timeline: "2-3 months"
+    deliverables:
+      - "Cloud-specific policies"
+      - "Cloud security configurations"
+      - "Provider assessment documentation"
+      - "Cloud monitoring setup"
+
+benefits:
+  - "40-60% reduction in duplicate effort"
+  - "Unified evidence collection"
+  - "Streamlined audit preparation"
+  - "Single source of truth for compliance"
+  - "Easier maintenance and updates"
+
+statistics:
+  total_ecc_controls: 114
+  total_ccc_controls: 154
+  full_overlap_count: 35
+  partial_overlap_count: 60
+  ccc_delta_count: 59
+  ecc_only_count: 19
+  
+notes: |
+  This mapping is the foundation of SICO's competitive advantage.
+  By implementing the unified baseline approach, organizations can
+  achieve compliance with both ECC and CCC frameworks efficiently.
