@@ -1,150 +1,169 @@
-# SICO GRC Platform (Sanad)
+# SICO GRC Platform 🛡️
+## Saudi Regulatory Compliance Engine
 
-**Saudi Regulatory Compliance Engine**  
-*ECC • CCC • PDPL — AI-Powered Bilingual Automation*
+### 🎯 Overview
+SICO GRC Platform is a comprehensive Governance, Risk, and Compliance solution specifically designed for the Saudi Arabian regulatory landscape. It provides AI-powered bilingual (Arabic/English) automation for ECC, CCC, and PDPL compliance.
 
----
+### 🌟 Key Features
+- **Unified Control Library**: ECC + CCC + PDPL with operational implementation guidance
+- **AI-Powered Compliance**: Bilingual RAG-based knowledge retrieval with citation tracking
+- **Evidence Management**: Automated evidence collection, validation, and audit trails
+- **Executive Reporting**: Real-time compliance dashboards and executive reports
+- **SOC Integration**: Bridge between Security Operations and GRC
+- **Audit Readiness**: Pre-built test procedures and audit packages
 
-## 🎯 Overview
+### 📦 Deliverables (12 Core Assets)
 
-**SICO GRC Platform** is a comprehensive compliance and governance solution designed specifically for the Saudi regulatory landscape. It unifies **ECC (Essential Cybersecurity Controls)**, **CCC (Cloud Cybersecurity Controls)**, and **PDPL (Personal Data Protection Law)** into a single operational framework with AI-powered bilingual capabilities.
+#### A) Regulatory Preparation (Foundation)
+1. **Saudi Control Library** - ECC + CCC + PDPL operational controls
+2. **ECC↔CCC Unified Baseline + Delta** - Eliminate redundancy
+3. **PDPL Operational Control Set** - Privacy compliance framework
+4. **Evidence Master Catalog** - Audit-ready evidence library
+5. **Audit Test Procedures Library** - Pre-built audit tests
 
-### Key Differentiators
-- ✅ **Operational Control Library** — Not just text, but executable controls with evidence and test procedures
-- ✅ **ECC↔CCC Baseline + Delta** — Eliminate 40-60% duplication between frameworks
-- ✅ **PDPL Operational Controls** — Transform legal requirements into actionable registers and policies
-- ✅ **AI-Powered RAG** — Bilingual (Arabic/English) knowledge retrieval with citation enforcement
-- ✅ **SOC↔GRC Bridge** — Connect incident response to compliance controls
-- ✅ **Audit-Ready Evidence** — Master catalog with templates and test procedures
+#### B) Competitive Differentiators
+6. **SICO Packs** - ECC Baseline, CCC Cloud, PDPL Privacy packages
+7. **Executive Reporting Kit** - Compliance heatmaps and posture reports
+8. **SOC ↔ GRC Bridge** - Incident-to-compliance mapping
 
----
+#### C) AI Engine
+9. **Bilingual Knowledge Base + RAG** - Citation-backed answers
+10. **Client Dictionary Engine** - Custom terminology mapping
+11. **BERT Adapters** - Per-client model customization
 
-## 📦 Project Deliverables (12 Core Outputs)
+#### D) Delivery Factory
+12. **Delivery Factory Playbook** - Operational excellence framework
 
-### A) Regulatory Preparation (Controls & Evidence)
-1. **Saudi Control Library** (ECC + CCC + PDPL) — Unified operational format
-2. **ECC↔CCC Unified Baseline + CCC Delta** — Reduce duplication
-3. **PDPL Operational Control Set** — Privacy registers, policies, and evidence
-4. **Evidence Master Catalog** — Audit-ready evidence dictionary
-5. **Audit Test Procedures Library** — Test steps for every control
-
-### B) Competitive Advantage
-6. **SICO Packs** — Pre-packaged compliance solutions (ECC Baseline, CCC Cloud, PDPL Privacy)
-7. **Executive Reporting Kit** — Templates for compliance heatmaps, risk reports, audit readiness
-8. **SOC↔GRC Bridge** — Incident-to-control mapping and workflows
-
-### C) AI Engine
-9. **Bilingual Knowledge Base + RAG** — Citation-enforced retrieval
-10. **Client Dictionary Engine** — Arabic/English terminology mapping
-11. **Per-Client BERT Adapters** (Premium) — Customized NLP models
-
-### D) Operational Excellence
-12. **Delivery Factory Playbook** — Standardized onboarding, workshops, QA checklists
-
----
-
-## 🏗️ Repository Structure
+### 🏗️ Architecture
 
 ```
-sanadcom/
-├── docs/                    # Documentation
-├── data/                    # Regulatory data (controls, mappings, evidence)
-├── packs/                   # SICO Packs (ECC/CCC/PDPL bundles)
-├── reporting/               # Executive reporting templates
-├── soc-grc-bridge/         # Incident-control integration
-├── ai/                      # AI/RAG engine
-├── playbooks/               # Delivery playbooks
-├── src/                     # Source code (backend + frontend)
-├── scripts/                 # Utilities
-├── tests/                   # Test suites
-├── deployment/              # Docker, K8s, CI/CD
-└── config/                  # Configuration files
+┌─────────────────────────────────────────────────────────────┐
+│                    Frontend (Next.js)                        │
+│              Arabic/English Bilingual Interface              │
+└─────────────────────────────────────────────────────────────┘
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│                  API Gateway (FastAPI)                       │
+└─────────────────────────────────────────────────────────────┘
+                            ▼
+┌──────────────┬──────────────┬──────────────┬──────────────┐
+│   Control    │   Evidence   │   Reporting  │   AI/RAG     │
+│   Engine     │   Manager    │   Engine     │   Engine     │
+└──────────────┴──────────────┴──────────────┴──────────────┘
+                            ▼
+┌──────────────┬──────────────┬──────────────────────────────┐
+│  PostgreSQL  │   Vector DB  │        Redis Cache           │
+│  (Core Data) │  (AI/Search) │                              │
+└──────────────┴──────────────┴──────────────────────────────┘
 ```
 
----
+### 🚀 Quick Start
 
-## 🚀 Tech Stack
-
-### Backend
-- **Python 3.11+** (FastAPI)
-- **PostgreSQL** (main database)
-- **Chroma/Weaviate** (vector database for RAG)
-- **Redis** (caching)
-
-### Frontend
-- **Next.js 14** (React)
-- **TypeScript**
-- **Tailwind CSS**
-- **shadcn/ui**
-
-### AI/NLP
-- **Python** (Transformers, LangChain)
-- **RAG** (Retrieval-Augmented Generation)
-- **Bilingual models** (Arabic + English)
-
-### DevOps
-- **Docker** + **Docker Compose**
-- **GitHub Actions** (CI/CD)
-- **Kubernetes-ready**
-
----
-
-## 📖 Getting Started
-
-### Prerequisites
+#### Prerequisites
+- Docker & Docker Compose
 - Python 3.11+
 - Node.js 18+
-- Docker & Docker Compose
 - PostgreSQL 15+
 
-### Quick Start
+#### Installation
 ```bash
 # Clone repository
 git clone https://github.com/sonaiso/sanadcom.git
 cd sanadcom
 
-# Setup backend
-cd src/backend
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+# Setup environment
+cp config/env.example .env
 
-# Setup frontend
-cd ../frontend
-npm install
-
-# Run with Docker
+# Start services
 docker-compose up -d
+
+# Access platform
+# Frontend: http://localhost:3000
+# API: http://localhost:8000
+# API Docs: http://localhost:8000/docs
 ```
 
----
+### 📚 Documentation
+- [Architecture](docs/architecture/README.md)
+- [API Reference](docs/api/README.md)
+- [User Guides](docs/user-guides/README.md)
+- [Deliverables](docs/deliverables/README.md)
 
-## 📚 Documentation
+### 🛠️ Tech Stack
 
-- [Architecture Overview](docs/architecture/)
-- [12 Deliverables Guide](docs/deliverables/)
-- [API Documentation](docs/api/)
-- [User Guides](docs/user-guides/)
+**Backend:**
+- Python 3.11+ (FastAPI)
+- PostgreSQL 15+
+- Vector DB (Chroma/Weaviate)
+- Redis
 
----
+**Frontend:**
+- Next.js 14 (React)
+- TypeScript
+- Tailwind CSS
+- shadcn/ui
 
-## 🤝 Contributing
+**AI/NLP:**
+- Python Transformers
+- LangChain
+- RAG Implementation
+- Bilingual Models (AR/EN)
 
-This is a private repository. For contribution guidelines, please contact the project maintainers.
+**DevOps:**
+- Docker & Docker Compose
+- GitHub Actions (CI/CD)
+- Kubernetes-ready
 
----
+### 📋 Project Structure
+```
+sanadcom/
+├── data/              # Control libraries, mappings, evidence
+├── packs/             # Pre-packaged compliance solutions
+├── reporting/         # Executive reporting templates
+├── soc-grc-bridge/    # SOC integration
+├── ai/                # AI/RAG engine
+├── playbooks/         # Delivery & operational playbooks
+├── src/               # Source code (backend + frontend)
+├── scripts/           # Utility scripts
+├── tests/             # Test suites
+├── deployment/        # Docker, K8s configs
+└── docs/              # Documentation
+```
 
-## 📄 License
+### 🎯 Roadmap
 
+**Phase 1: Foundation (Current)**
+- ✅ Repository structure
+- ✅ Core deliverables definition
+- 🔄 Control library implementation
+- 🔄 Evidence catalog
+
+**Phase 2: Platform Development**
+- Backend API development
+- Frontend dashboard
+- AI/RAG engine integration
+- Database schema implementation
+
+**Phase 3: AI Enhancement**
+- Bilingual RAG deployment
+- Client dictionary engine
+- BERT adapters (premium)
+
+**Phase 4: Production Ready**
+- Full test coverage
+- Security hardening
+- Performance optimization
+- Production deployment
+
+### 🤝 Contributing
+This is a private project. For contribution guidelines, contact the project team.
+
+### 📄 License
 Proprietary - All rights reserved
 
----
-
-## 📞 Contact
-
-**SICO Security Team**  
-Owner: @sonaiso
+### 📞 Contact
+For inquiries, please contact the SICO team.
 
 ---
 
-*Built for Saudi regulatory excellence* 🇸🇦
+**Built with ❤️ for Saudi Arabian Regulatory Excellence**
