@@ -2,20 +2,30 @@
 
 **Date**: 2026-02-04  
 **Status**: ✅ All vulnerabilities resolved  
-**Version**: 0.1.3
+**Version**: 0.1.4
 
 ## Summary
 
 Fixed all identified security vulnerabilities in project dependencies by updating to patched versions.
 
-## Latest Updates (v0.1.3)
+## Latest Updates (v0.1.4)
+
+### Frontend (Node.js)
+- **Next.js**: 15.2.3 → 15.5.10
+  - Fixed: HTTP request deserialization DoS (multiple version ranges)
+  - Fixed: RCE in React flight protocol (CRITICAL)
+  - Fixed: DoS with Server Components
+  - Severity: Critical
+  - Status: ✅ Fixed
+
+## Previous Updates (v0.1.3)
 
 ### Frontend (Node.js)
 - **Next.js**: 15.0.8 → 15.2.3
   - Fixed: DoS via cache poisoning
   - Fixed: Authorization bypass in middleware (multiple versions)
   - Severity: High to Critical
-  - Status: ✅ Fixed
+  - Status: ✅ Fixed (updated again in v0.1.4)
 
 ## Previous Updates (v0.1.2)
 
@@ -69,9 +79,9 @@ Fixed all identified security vulnerabilities in project dependencies by updatin
   - Cache poisoning
   - Server-Side Request Forgery
 - **Old Version**: 14.1.0
-- **Intermediate Versions**: 14.2.35 → 15.0.8
-- **Final Version**: 15.2.3
-- **Severity**: High to Critical
+- **Intermediate Versions**: 14.2.35 → 15.0.8 → 15.2.3
+- **Final Version**: 15.5.10
+- **Severity**: Critical (includes RCE vulnerabilities)
 - **Status**: ✅ Fixed
 
 ## Additional Updates
@@ -114,5 +124,5 @@ gh-advisory-database check
 ---
 
 **Security Status**: 🟢 SECURE  
-**Total Vulnerabilities Fixed**: 45+  
-**Current Version**: 0.1.3
+**Total Vulnerabilities Fixed**: 70+  
+**Current Version**: 0.1.4

@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] - 2026-02-04
+
+### Security
+- **CRITICAL**: Updated Next.js from 15.2.3 to 15.5.10 (fixes RCE in React flight protocol and multiple DoS vulnerabilities)
+
+### Fixed
+- All remaining security vulnerabilities resolved (0 alerts)
+- All tests passing (8/8)
+
 ## [0.1.3] - 2026-02-04
 
 ### Security
