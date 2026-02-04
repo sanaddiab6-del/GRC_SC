@@ -8,11 +8,12 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Header, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.core.database import get_db
+from src.backend.core.auth import get_query_context  # JWT-based authentication
 from ai.rag.bilingual_retriever import BilingualRetriever
 from ai.security.ai_security import (
     AIRole,
@@ -96,53 +97,6 @@ class EvidenceMappingResponse(BaseModel):
     control_mappings: List[dict]
     high_confidence_count: int
     require_human_review: bool
-
-
-# ============================================================================
-# Security Dependencies
-# ============================================================================
-
-async def get_query_context(
-    request: Request,
-    x_user_id: str = Header(..., description="Authenticated user ID"),
-    x_tenant_id: str = Header(..., description="Tenant/client ID"),
-    x_role: str = Header(..., description="User role"),
-    x_session_id: str = Header(..., description="Session identifier"),
-) -> QueryContext:
-    """
-    Extract security context from request
-    
-    CRITICAL: In production, validate JWT token instead of headers
-    This is a placeholder - implement proper OAuth2/Azure AD
-    """
-    
-    # Map role string to enum
-    try:
-        role = AIRole(x_role)
-    except ValueError:
-        raise HTTPException(
-            status_code=403,
-            detail={
-                "message_en": f"Invalid role: {x_role}",
-                "message_ar": f"دور غير صالح: {x_role}",
-            }
-        )
-    
-    # Get permissions for role
-    permissions = rbac_enforcer.ROLE_PERMISSIONS.get(role, set())
-    
-    # Build context
-    context = QueryContext(
-        user_id=x_user_id,
-        tenant_id=x_tenant_id,
-        role=role,
-        permissions=permissions,
-        ip_address=request.client.host,
-        user_agent=request.headers.get("user-agent", "unknown"),
-        session_id=x_session_id,
-    )
-    
-    return context
 
 
 # ============================================================================
