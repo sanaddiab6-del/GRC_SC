@@ -1,0 +1,46 @@
+# Python
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+# Distribution / packaging
+.Python
+*.egg-info/
+.dist-info/
+# Pytest cache directory
+.pytest_cache/
+
+# Node.js
+# Packages
+node_modules/
+# Build output
+.next/
+out/
+build/
+dist/
+# Logs
+*.log
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Docker
+# Docker ignore specifics (add relevant patterns)
+.dockerignore
+
+# Database files
+*.db
+*.sqlite
+
+# Logs and temp files
+*.log
+*~
+*tmp*
