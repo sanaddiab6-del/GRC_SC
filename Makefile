@@ -1,6 +1,6 @@
 # SICO GRC Platform Makefile
 
-.PHONY: help install dev test clean docker-up docker-down security security-deps security-sast security-scan
+.PHONY: help install dev test clean docker-up docker-down security security-deps security-sast security-scan git-setup check-conflicts
 
 help:
 	@echo "SICO GRC Platform - Available Commands"
@@ -23,10 +23,16 @@ help:
 	@echo "  security-deps - Scan dependencies for vulnerabilities"
 	@echo "  security-sast - Run static application security testing"
 	@echo ""
+	@echo "🔀 Git & Merge:"
+	@echo "  git-setup     - Configure git for optimal merge handling"
+	@echo "  check-conflicts - Check for potential merge conflicts with main"
+	@echo ""
 	@echo "🧹 Maintenance:"
 	@echo "  clean         - Clean build artifacts"
 	@echo ""
-	@echo "📖 Documentation: See docs/SECURITY_PIPELINE.md for security details"
+	@echo "📖 Documentation:"
+	@echo "  Security: docs/SECURITY_PIPELINE.md"
+	@echo "  Conflicts: docs/CONFLICT_RESOLUTION_GUIDE.md"
 
 install:
 	@echo "Installing backend dependencies..."
@@ -86,3 +92,11 @@ security-sast:
 
 security-scan: security
 	@echo "Security scan complete. Check reports for details."
+
+git-setup:
+	@echo "Configuring git for optimal merge handling..."
+	@bash scripts/setup_git_config.sh
+
+check-conflicts:
+	@echo "Checking for potential merge conflicts with main..."
+	@bash scripts/check_conflicts.sh main -v
