@@ -121,3 +121,20 @@ models/*.h5
 *.rar
 *.tar
 *.zip
+
+# Security Scan Artifacts
+*.sarif
+*-report.json
+*-report.sarif
+sbom-*.json
+sbom-*.spdx.json
+trivy-*.json
+bandit-*.json
+safety-*.json
+pip-audit-*.json
+npm-audit-*.json
+attestation.json
+security-summary.md
+
+# GitHub Actions Artifacts
+artifacts/
