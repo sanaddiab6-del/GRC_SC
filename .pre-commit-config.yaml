@@ -1,0 +1,188 @@
+# Pre-commit hooks for code quality and security
+# Install: pre-commit install
+# Run manually: pre-commit run --all-files
+
+default_language_version:
+  python: python3.11
+
+repos:
+  # =========================================================================
+  # Code Formatting
+  # =========================================================================
+  
+  - repo: https://github.com/psf/black
+    rev: 24.1.1
+    hooks:
+      - id: black
+        language_version: python3.11
+        args: [--config=pyproject.toml]
+
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: [--settings-path=pyproject.toml]
+
+  # =========================================================================
+  # Linting
+  # =========================================================================
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.14
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+        types_or: [python, pyi]
+
+  # =========================================================================
+  # Type Checking
+  # =========================================================================
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        args: [--config-file=pyproject.toml]
+        additional_dependencies:
+          - pydantic
+          - types-requests
+          - sqlalchemy[mypy]
+        exclude: ^(tests/|migrations/)
+
+  # =========================================================================
+  # Security Scanning
+  # =========================================================================
+
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.6
+    hooks:
+      - id: bandit
+        args: [-c, pyproject.toml]
+        additional_dependencies: ["bandit[toml]"]
+        exclude: ^tests/
+
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: 
+          - --baseline
+          - .secrets.baseline
+        exclude: |
+          (?x)^(
+            .*\.lock$ |
+            .*\.min\.js$ |
+            package-lock\.json$ |
+            yarn\.lock$ |
+            pnpm-lock\.yaml$
+          )$
+
+  - repo: https://github.com/zricethezav/gitleaks
+    rev: v8.18.1
+    hooks:
+      - id: gitleaks
+
+  # =========================================================================
+  # General Checks
+  # =========================================================================
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      # File quality
+      - id: check-yaml
+        args: [--safe]
+      - id: check-json
+      - id: check-toml
+      - id: check-xml
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1000]
+      
+      # Python quality
+      - id: check-ast
+      - id: check-builtin-literals
+      - id: check-docstring-first
+      - id: debug-statements
+      - id: name-tests-test
+        args: [--pytest-test-first]
+      
+      # Whitespace/formatting
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: fix-byte-order-marker
+
+  # =========================================================================
+  # Commit Message Validation
+  # =========================================================================
+
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: 3.13.0
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]
+
+  # =========================================================================
+  # Dockerfile Linting
+  # =========================================================================
+
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint-docker
+        args: [--ignore, DL3008, --ignore, DL3009]
+
+  # =========================================================================
+  # YAML/JSON Schema Validation
+  # =========================================================================
+
+  - repo: https://github.com/python-jsonschema/check-jsonschema
+    rev: 0.27.3
+    hooks:
+      - id: check-github-workflows
+      - id: check-dependabot
+
+  # =========================================================================
+  # Markdown Linting
+  # =========================================================================
+
+  - repo: https://github.com/markdownlint/markdownlint
+    rev: v0.12.0
+    hooks:
+      - id: markdownlint
+        args: [--config, .markdownlint.json]
+
+  # =========================================================================
+  # License Header Check
+  # =========================================================================
+
+  - repo: https://github.com/Lucas-C/pre-commit-hooks
+    rev: v1.5.4
+    hooks:
+      - id: insert-license
+        files: \.py$
+        args:
+          - --license-filepath
+          - LICENSE_HEADER
+          - --comment-style
+          - "#"
+
+# =========================================================================
+# CI/CD Integration
+# =========================================================================
+
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit.com hooks
+    
+    for more information, see https://pre-commit.ci
+  autofix_prs: true
+  autoupdate_branch: ''
+  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_schedule: weekly
+  skip: []
+  submodules: false
