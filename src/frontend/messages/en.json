@@ -1,0 +1,58 @@
+{
+  "home": {
+    "title": "SICO GRC Platform",
+    "subtitle": "Saudi Regulatory Compliance Engine - ECC, CCC, PDPL",
+    "viewControls": "View Controls",
+    "viewReports": "View Reports"
+  },
+  "nav": {
+    "home": "Home",
+    "controls": "Controls",
+    "evidence": "Evidence",
+    "reports": "Reports",
+    "dashboard": "Dashboard"
+  },
+  "controls": {
+    "title": "Compliance Controls",
+    "framework": "Framework",
+    "domain": "Domain",
+    "status": "Status",
+    "maturityLevel": "Maturity Level",
+    "search": "Search controls...",
+    "filter": "Filter",
+    "all": "All",
+    "compliant": "Compliant",
+    "nonCompliant": "Non-Compliant",
+    "inProgress": "In Progress",
+    "notStarted": "Not Started"
+  },
+  "evidence": {
+    "title": "Evidence Management",
+    "type": "Evidence Type",
+    "control": "Related Control",
+    "status": "Status",
+    "collectionDate": "Collection Date",
+    "expiryDate": "Expiry Date",
+    "pending": "Pending",
+    "collected": "Collected",
+    "validated": "Validated",
+    "rejected": "Rejected"
+  },
+  "reports": {
+    "title": "Compliance Reports",
+    "generate": "Generate Report",
+    "type": "Report Type",
+    "complianceSummary": "Compliance Summary",
+    "controlPosture": "Control Posture",
+    "evidenceStatus": "Evidence Status",
+    "riskHeatmap": "Risk Heatmap",
+    "auditReadiness": "Audit Readiness"
+  },
+  "dashboard": {
+    "title": "Executive Dashboard",
+    "complianceRate": "Compliance Rate",
+    "totalControls": "Total Controls",
+    "pendingEvidence": "Pending Evidence",
+    "highPriorityGaps": "High Priority Gaps"
+  }
+}

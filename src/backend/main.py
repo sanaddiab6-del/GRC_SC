@@ -13,6 +13,7 @@ from src.backend.core.database import init_db
 from src.backend.controls import router as controls_router
 from src.backend.evidence import router as evidence_router
 from src.backend.reporting import router as reporting_router
+from src.backend import ai_router
 
 
 @asynccontextmanager
@@ -79,6 +80,7 @@ async def health_check():
 app.include_router(controls_router.router, prefix="/api/v1", tags=["Controls"])
 app.include_router(evidence_router.router, prefix="/api/v1", tags=["Evidence"])
 app.include_router(reporting_router.router, prefix="/api/v1", tags=["Reporting"])
+app.include_router(ai_router.router, prefix="/api/v1", tags=["AI/RAG"])
 
 
 if __name__ == "__main__":

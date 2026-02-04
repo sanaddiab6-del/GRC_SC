@@ -1,8 +1,4 @@
-"""Evidence module - placeholder for evidence management"""
-from fastapi import APIRouter
+"""Evidence module - audit evidence management"""
+from src.backend.evidence.router import router
 
-router = APIRouter()
-
-@router.get("/evidence")
-async def list_evidence():
-    return {"message": "Evidence management - coming soon"}
+__all__ = ["router"]

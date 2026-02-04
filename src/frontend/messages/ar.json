@@ -1,0 +1,58 @@
+{
+  "home": {
+    "title": "منصة سيكو للحوكمة",
+    "subtitle": "محرك الامتثال التنظيمي السعودي - الضوابط الأساسية، ضوابط الحوسبة السحابية، نظام حماية البيانات",
+    "viewControls": "عرض الضوابط",
+    "viewReports": "عرض التقارير"
+  },
+  "nav": {
+    "home": "الرئيسية",
+    "controls": "الضوابط",
+    "evidence": "الأدلة",
+    "reports": "التقارير",
+    "dashboard": "لوحة القيادة"
+  },
+  "controls": {
+    "title": "ضوابط الامتثال",
+    "framework": "الإطار التنظيمي",
+    "domain": "المجال",
+    "status": "الحالة",
+    "maturityLevel": "مستوى النضج",
+    "search": "البحث في الضوابط...",
+    "filter": "تصفية",
+    "all": "الكل",
+    "compliant": "متوافق",
+    "nonCompliant": "غير متوافق",
+    "inProgress": "قيد التنفيذ",
+    "notStarted": "لم يبدأ"
+  },
+  "evidence": {
+    "title": "إدارة الأدلة",
+    "type": "نوع الدليل",
+    "control": "الضابط المرتبط",
+    "status": "الحالة",
+    "collectionDate": "تاريخ الجمع",
+    "expiryDate": "تاريخ الانتهاء",
+    "pending": "معلق",
+    "collected": "تم الجمع",
+    "validated": "تم التحقق",
+    "rejected": "مرفوض"
+  },
+  "reports": {
+    "title": "تقارير الامتثال",
+    "generate": "إنشاء تقرير",
+    "type": "نوع التقرير",
+    "complianceSummary": "ملخص الامتثال",
+    "controlPosture": "وضع الضوابط",
+    "evidenceStatus": "حالة الأدلة",
+    "riskHeatmap": "خريطة المخاطر الحرارية",
+    "auditReadiness": "جاهزية التدقيق"
+  },
+  "dashboard": {
+    "title": "لوحة القيادة التنفيذية",
+    "complianceRate": "معدل الامتثال",
+    "totalControls": "إجمالي الضوابط",
+    "pendingEvidence": "الأدلة المعلقة",
+    "highPriorityGaps": "الفجوات ذات الأولوية العالية"
+  }
+}

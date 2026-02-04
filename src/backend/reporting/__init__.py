@@ -1,8 +1,4 @@
-"""Reporting module - placeholder for reporting engine"""
-from fastapi import APIRouter
+"""Reporting module - executive dashboards and compliance reports"""
+from src.backend.reporting.router import router
 
-router = APIRouter()
-
-@router.get("/reports")
-async def list_reports():
-    return {"message": "Reporting engine - coming soon"}
+__all__ = ["router"]
