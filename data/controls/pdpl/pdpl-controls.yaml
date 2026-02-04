@@ -1,0 +1,73 @@
+# PDPL Control Library - Personal Data Protection Law
+# Saudi Data & AI Authority (SDAIA) - Saudi Arabia
+
+framework:
+  id: pdpl
+  name: "Personal Data Protection Law"
+  version: "2021"
+  authority: "Saudi Data & AI Authority (SDAIA)"
+  country: "Saudi Arabia"
+  total_controls: 42
+
+principles:
+  - principle: "Lawfulness and Transparency"
+    principle_ar: "المشروعية والشفافية"
+    description: "Personal data must be processed lawfully and transparently"
+    
+  - principle: "Purpose Limitation"
+    principle_ar: "تحديد الغرض"
+    description: "Data collected for specified, explicit and legitimate purposes"
+    
+  - principle: "Data Minimization"
+    principle_ar: "تقليل البيانات"
+    description: "Adequate, relevant and limited to what is necessary"
+    
+  - principle: "Accuracy"
+    principle_ar: "الدقة"
+    description: "Keep personal data accurate and up to date"
+    
+  - principle: "Storage Limitation"
+    principle_ar: "حدود التخزين"
+    description: "Keep data only as long as necessary"
+
+sample_controls:
+  - control_id: "PDPL-1.1"
+    title: "Lawful Basis for Processing"
+    title_ar: "الأساس القانوني للمعالجة"
+    description: "Establish lawful basis for personal data processing"
+    description_ar: "إنشاء أساس قانوني لمعالجة البيانات الشخصية"
+    category: "Legal Compliance"
+    priority: "Critical"
+    
+  - control_id: "PDPL-2.1"
+    title: "Privacy Notice"
+    title_ar: "إشعار الخصوصية"
+    description: "Provide clear privacy notices to data subjects"
+    description_ar: "تقديم إشعارات خصوصية واضحة لأصحاب البيانات"
+    category: "Transparency"
+    priority: "Critical"
+    
+  - control_id: "PDPL-3.1"
+    title: "Data Subject Rights"
+    title_ar: "حقوق صاحب البيانات"
+    description: "Implement mechanisms to handle data subject rights requests"
+    description_ar: "تنفيذ آليات للتعامل مع طلبات حقوق أصحاب البيانات"
+    category: "Individual Rights"
+    priority: "High"
+
+registers:
+  - name: "Record of Processing Activities (RoPA)"
+    name_ar: "سجل أنشطة المعالجة"
+    required: true
+    
+  - name: "Data Subject Access Request (DSAR) Log"
+    name_ar: "سجل طلبات الوصول إلى البيانات"
+    required: true
+    
+  - name: "Data Breach Register"
+    name_ar: "سجل خروقات البيانات"
+    required: true
+    
+  - name: "Third Party Processor Register"
+    name_ar: "سجل معالجي الطرف الثالث"
+    required: true

@@ -1,0 +1,65 @@
+# ECC Control Library - Essential Cybersecurity Controls
+# National Cybersecurity Authority (NCA) - Saudi Arabia
+
+framework:
+  id: ecc
+  name: "Essential Cybersecurity Controls"
+  version: "2.0"
+  authority: "National Cybersecurity Authority (NCA)"
+  country: "Saudi Arabia"
+  total_controls: 114
+
+domains:
+  - id: 1
+    name: "Cybersecurity Governance"
+    name_ar: "حوكمة الأمن السيبراني"
+    controls: 15
+    
+  - id: 2
+    name: "Cybersecurity Risk Management"
+    name_ar: "إدارة مخاطر الأمن السيبراني"
+    controls: 12
+    
+  - id: 3
+    name: "Cybersecurity Framework"
+    name_ar: "إطار الأمن السيبراني"
+    controls: 18
+    
+  - id: 4
+    name: "Cybersecurity Asset Management"
+    name_ar: "إدارة أصول الأمن السيبراني"
+    controls: 14
+    
+  - id: 5
+    name: "Third Party and Cloud Computing Cybersecurity"
+    name_ar: "أمن الجهات الخارجية والحوسبة السحابية"
+    controls: 22
+
+sample_controls:
+  - control_id: "ECC-1.1.1"
+    title: "Information Security Policy"
+    title_ar: "سياسة أمن المعلومات"
+    description: "Establish and maintain an approved information security policy"
+    description_ar: "إنشاء والحفاظ على سياسة أمن المعلومات معتمدة"
+    domain: "Cybersecurity Governance"
+    priority: "Critical"
+    implementation_guidance: |
+      Organizations must develop, document, approve, and maintain an information 
+      security policy that addresses the scope, objectives, and approach to managing 
+      information security aligned with business requirements and relevant laws.
+      
+  - control_id: "ECC-1.2.1"
+    title: "Roles and Responsibilities"
+    title_ar: "الأدوار والمسؤوليات"
+    description: "Define and assign cybersecurity roles and responsibilities"
+    description_ar: "تحديد وتعيين أدوار ومسؤوليات الأمن السيبراني"
+    domain: "Cybersecurity Governance"
+    priority: "High"
+    
+  - control_id: "ECC-2.1.1"
+    title: "Risk Assessment"
+    title_ar: "تقييم المخاطر"
+    description: "Conduct regular cybersecurity risk assessments"
+    description_ar: "إجراء تقييمات منتظمة لمخاطر الأمن السيبراني"
+    domain: "Cybersecurity Risk Management"
+    priority: "Critical"

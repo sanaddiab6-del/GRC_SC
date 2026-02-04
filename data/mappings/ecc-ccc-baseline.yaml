@@ -1,0 +1,58 @@
+# ECC ↔ CCC Baseline Mapping
+# This file maps overlapping controls between ECC and CCC frameworks
+
+mappings:
+  - ecc_control: "ECC-1.1.1"
+    ecc_title: "Information Security Policy"
+    ccc_control: "CCC-1.1.2"
+    ccc_title: "Cloud Security Policy"
+    mapping_type: "equivalent"
+    overlap_percentage: 85
+    notes: "CCC extends ECC with cloud-specific policy requirements"
+    
+  - ecc_control: "ECC-1.2.1"
+    ecc_title: "Roles and Responsibilities"
+    ccc_control: "CCC-1.1.5"
+    ccc_title: "Cloud Security Roles"
+    mapping_type: "related"
+    overlap_percentage: 70
+    notes: "CCC adds cloud-specific roles like Cloud Security Architect"
+    
+  - ecc_control: "ECC-2.1.1"
+    ecc_title: "Risk Assessment"
+    ccc_control: "CCC-1.2.1"
+    ccc_title: "Cloud Risk Assessment"
+    mapping_type: "specialized"
+    overlap_percentage: 60
+    notes: "CCC focuses on cloud-specific risks"
+
+statistics:
+  total_ecc_controls: 114
+  total_ccc_controls: 180
+  overlapping_controls: 78
+  ecc_unique_controls: 36
+  ccc_unique_controls: 102
+  average_overlap: 68.5
+
+recommendations:
+  unified_approach: |
+    Organizations can implement a unified baseline covering both ECC and CCC
+    by addressing the 78 overlapping controls once, then focusing on:
+    - 36 ECC-specific controls for general cybersecurity
+    - 102 CCC-specific controls for cloud environments
+    
+  implementation_phases:
+    - phase: 1
+      name: "Core Baseline"
+      controls: 78
+      duration_weeks: 12
+      
+    - phase: 2
+      name: "ECC Extensions"
+      controls: 36
+      duration_weeks: 6
+      
+    - phase: 3
+      name: "CCC Cloud-Specific"
+      controls: 102
+      duration_weeks: 16
