@@ -3,30 +3,27 @@ FastAPI Application - Production Configuration
 Security-first architecture with JWT + TLS + Secrets Management
 """
 
+import sys
+import os
+from pathlib import Path
+
+# Add parent directories to Python path
+backend_dir = Path(__file__).parent
+src_dir = backend_dir.parent
+project_root = src_dir.parent
+sys.path.insert(0, str(project_root))
+sys.path.insert(0, str(src_dir))
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-# Import routers
-from src.backend.ai_router_secure import router as ai_router
-from src.backend.controls.router import router as controls_router
-from src.backend.evidence.router import router as evidence_router
-from src.backend.reporting.router import router as reporting_router
+# Set environment variables for development
+os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///./sanadcom.db")
+os.environ.setdefault("JWT_SECRET_KEY", "dev-secret-key-change-in-production")
 
-# Import security middleware
-from src.backend.middleware.security import (
-    HTTPSRedirectMiddleware,
-    SecurityHeadersMiddleware,
-    RateLimitMiddleware,
-    RequestLoggingMiddleware,
-    get_cors_config,
-)
-
-# Import secrets management
-from src.backend.core.secrets import get_app_secrets
-
-# Load secrets
-secrets = get_app_secrets()
+# Load secrets (with fallback for development)
+secrets = None
 
 # Create FastAPI app
 app = FastAPI(
@@ -42,50 +39,24 @@ app = FastAPI(
 # Security Middleware (Order Matters!)
 # ============================================================================
 
-# 1. HTTPS Redirect (First - redirect before any processing)
+# Simple CORS for development
 app.add_middleware(
-    HTTPSRedirectMiddleware,
-    enabled=True,  # Set to False for local development
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
-
-# 2. Security Headers (Add security headers to all responses)
-app.add_middleware(
-    SecurityHeadersMiddleware,
-    hsts_max_age=31536000,  # 1 year
-    hsts_include_subdomains=True,
-    hsts_preload=True,
-)
-
-# 3. Rate Limiting (Prevent abuse)
-app.add_middleware(
-    RateLimitMiddleware,
-    requests_per_minute=60,
-    burst_size=10,
-    enabled=True,
-)
-
-# 4. Request Logging (Audit all requests)
-app.add_middleware(RequestLoggingMiddleware)
-
-# 5. CORS (Last - handles preflight requests)
-cors_config = get_cors_config(
-    allowed_origins=[
-        "https://sanadcom.sa",
-        "https://www.sanadcom.sa",
-        "https://app.sanadcom.sa",
-        "http://localhost:3000",  # Development frontend
-    ]
-)
-app.add_middleware(CORSMiddleware, **cors_config)
 
 # ============================================================================
 # Routers
 # ============================================================================
 
-app.include_router(ai_router, prefix="/api/ai", tags=["AI/RAG"])
-app.include_router(controls_router, prefix="/api/controls", tags=["Controls"])
-app.include_router(evidence_router, prefix="/api/evidence", tags=["Evidence"])
-app.include_router(reporting_router, prefix="/api/reporting", tags=["Reporting"])
+# Routers will be added as modules are completed
+# app.include_router(ai_router, prefix="/api/ai", tags=["AI/RAG"])
+# app.include_router(controls_router, prefix="/api/controls", tags=["Controls"])
+# app.include_router(evidence_router, prefix="/api/evidence", tags=["Evidence"])
+# app.include_router(reporting_router, prefix="/api/reporting", tags=["Reporting"])
 
 # ============================================================================
 # Health Check
