@@ -1,0 +1,252 @@
+# Incident-to-Control Matrix
+# Maps security incident types to affected compliance controls
+
+version: "1.0"
+last_updated: "2026-02-04"
+
+incident_types:
+  # ===================================================================
+  # Access Control Incidents
+  # ===================================================================
+  - incident_type: "unauthorized_access_attempt"
+    category: "access_control"
+    severity: "high"
+    description: "Attempted unauthorized access to systems or data"
+    
+    controls_affected:
+      - control_id: "ECC-2-2-1"
+        framework: "ECC"
+        control_name: "Access Control Policy"
+        impact: "direct_violation"
+        action_required: "Review policy effectiveness"
+      
+      - control_id: "ECC-2-2-3"
+        framework: "ECC"
+        control_name: "User Access Review"
+        impact: "evidence_required"
+        action_required: "Document access review results"
+      
+      - control_id: "ECC-2-2-4"
+        framework: "ECC"
+        control_name: "Privileged Access Management"
+        impact: "potential_gap"
+        action_required: "Verify privileged access controls"
+    
+    evidence_collected:
+      - "Access logs (30 days prior to incident)"
+      - "User account status and permissions"
+      - "Failed login attempt records"
+      - "Access review documentation"
+      - "Incident response actions taken"
+    
+    response_playbook: "unauthorized-access-response.yaml"
+    notification_required: true
+    notification_recipients: ["soc@company.com", "compliance@company.com"]
+
+  # ===================================================================
+  # Malware Incidents
+  # ===================================================================
+  - incident_type: "malware_detection"
+    category: "malware"
+    severity: "high"
+    description: "Malware detected on endpoint or server"
+    
+    controls_affected:
+      - control_id: "ECC-2-3-1"
+        framework: "ECC"
+        control_name: "Malware Protection"
+        impact: "control_effectiveness"
+        action_required: "Assess malware protection effectiveness"
+      
+      - control_id: "ECC-2-3-2"
+        framework: "ECC"
+        control_name: "Malware Detection and Response"
+        impact: "evidence_required"
+        action_required: "Document detection and response"
+    
+    evidence_collected:
+      - "Malware detection alerts"
+      - "Anti-malware scan results"
+      - "Quarantine records"
+      - "Remediation actions taken"
+      - "System restoration logs"
+    
+    response_playbook: "malware-incident-response.yaml"
+    notification_required: true
+    notification_recipients: ["soc@company.com"]
+
+  # ===================================================================
+  # Data Breach Incidents
+  # ===================================================================
+  - incident_type: "data_breach"
+    category: "data_protection"
+    severity: "critical"
+    description: "Unauthorized disclosure or access to personal data"
+    
+    controls_affected:
+      - control_id: "ECC-2-1-1"
+        framework: "ECC"
+        control_name: "Data Classification"
+        impact: "direct_violation"
+        action_required: "Review data classification and handling"
+      
+      - control_id: "PDPL-6-1"
+        framework: "PDPL"
+        control_name: "Breach Notification to Authority"
+        impact: "regulatory_requirement"
+        action_required: "Notify SDAIA within 72 hours"
+      
+      - control_id: "PDPL-6-2"
+        framework: "PDPL"
+        control_name: "Breach Notification to Data Subjects"
+        impact: "regulatory_requirement"
+        action_required: "Notify affected individuals if high risk"
+    
+    evidence_collected:
+      - "Breach discovery documentation"
+      - "Data categories affected"
+      - "Number of individuals affected"
+      - "Breach cause analysis"
+      - "Remediation actions"
+      - "Authority notification records"
+      - "Data subject notification records"
+    
+    response_playbook: "data-breach-response.yaml"
+    notification_required: true
+    notification_recipients: ["legal@company.com", "dpo@company.com", "ciso@company.com"]
+    regulatory_notification: true
+    regulatory_authority: "SDAIA"
+    notification_deadline: "72 hours"
+
+  # ===================================================================
+  # Vulnerability Incidents
+  # ===================================================================
+  - incident_type: "critical_vulnerability_detected"
+    category: "vulnerability_management"
+    severity: "high"
+    description: "Critical vulnerability identified in production systems"
+    
+    controls_affected:
+      - control_id: "ECC-2-5-1"
+        framework: "ECC"
+        control_name: "Vulnerability Assessment"
+        impact: "evidence_required"
+        action_required: "Document vulnerability assessment"
+      
+      - control_id: "ECC-2-5-2"
+        framework: "ECC"
+        control_name: "Vulnerability Remediation"
+        impact: "action_required"
+        action_required: "Remediate within defined SLA"
+    
+    evidence_collected:
+      - "Vulnerability scan report"
+      - "Risk assessment of vulnerability"
+      - "Remediation plan"
+      - "Patch deployment records"
+      - "Verification testing results"
+    
+    response_playbook: "vulnerability-management.yaml"
+    notification_required: true
+    notification_recipients: ["security-team@company.com"]
+
+  # ===================================================================
+  # Phishing Incidents
+  # ===================================================================
+  - incident_type: "phishing_attempt"
+    category: "social_engineering"
+    severity: "medium"
+    description: "Phishing email or social engineering attempt detected"
+    
+    controls_affected:
+      - control_id: "ECC-2-6-1"
+        framework: "ECC"
+        control_name: "Security Awareness Training"
+        impact: "control_effectiveness"
+        action_required: "Review training effectiveness"
+      
+      - control_id: "ECC-2-4-1"
+        framework: "ECC"
+        control_name: "Email Security"
+        impact: "potential_gap"
+        action_required: "Review email filtering effectiveness"
+    
+    evidence_collected:
+      - "Phishing email samples"
+      - "Email header analysis"
+      - "User reports"
+      - "Email filtering logs"
+      - "User training records"
+      - "Remediation actions"
+    
+    response_playbook: "phishing-incident-response.yaml"
+    notification_required: true
+    notification_recipients: ["soc@company.com"]
+
+  # ===================================================================
+  # Configuration Drift
+  # ===================================================================
+  - incident_type: "security_misconfiguration"
+    category: "configuration_management"
+    severity: "medium"
+    description: "Security configuration does not meet baseline requirements"
+    
+    controls_affected:
+      - control_id: "ECC-2-1-3"
+        framework: "ECC"
+        control_name: "Secure Configuration"
+        impact: "direct_violation"
+        action_required: "Restore secure configuration"
+      
+      - control_id: "CCC-3-2-1"
+        framework: "CCC"
+        control_name: "Cloud Configuration Management"
+        impact: "potential_gap"
+        action_required: "Review cloud configuration baselines"
+    
+    evidence_collected:
+      - "Configuration scan results"
+      - "Baseline comparison"
+      - "Configuration change logs"
+      - "Remediation actions"
+      - "Change approval records"
+    
+    response_playbook: "configuration-remediation.yaml"
+    notification_required: false
+
+# ===================================================================
+# Metadata and Configuration
+# ===================================================================
+severity_levels:
+  critical:
+    response_time: "immediate"
+    escalation_required: true
+  high:
+    response_time: "4 hours"
+    escalation_required: true
+  medium:
+    response_time: "24 hours"
+    escalation_required: false
+  low:
+    response_time: "1 week"
+    escalation_required: false
+
+frameworks:
+  - id: "ECC"
+    name: "Essential Cybersecurity Controls"
+    version: "2.0"
+    authority: "NCA"
+  
+  - id: "CCC"
+    name: "Cloud Cybersecurity Controls"
+    version: "1.0"
+    authority: "NCA"
+  
+  - id: "PDPL"
+    name: "Personal Data Protection Law"
+    version: "1.0"
+    authority: "SDAIA"
+
+automation_enabled: true
+auto_evidence_collection: true
+auto_control_updates: true
