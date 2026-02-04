@@ -235,7 +235,20 @@ View security findings in:
 
 ## 🤝 Contributing
 
-This is a private project. For access requests, contact the project owner.
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for:
+
+- Development workflow
+- Code standards
+- Testing requirements
+- **Merge conflict resolution** - See [Conflict Resolution Guide](docs/CONFLICT_RESOLUTION_GUIDE.md)
+- Pull request process
+
+### Key Resources for Contributors
+
+- **Getting Started**: [CONTRIBUTING.md](CONTRIBUTING.md)
+- **Conflict Resolution**: [docs/CONFLICT_RESOLUTION_GUIDE.md](docs/CONFLICT_RESOLUTION_GUIDE.md)
+- **Security Pipeline**: [docs/SECURITY_PIPELINE.md](docs/SECURITY_PIPELINE.md)
+- **API Documentation**: [docs/api/README.md](docs/api/README.md)
 
 ---
 
