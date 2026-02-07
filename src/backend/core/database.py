@@ -3,8 +3,10 @@ Database connection and session management
 Uses SQLAlchemy 2.0 async pattern
 """
 
+import os
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
+from sqlalchemy.pool import NullPool
 from core.config import settings
 
 # Convert postgresql:// to postgresql+asyncpg://
@@ -13,14 +15,19 @@ DATABASE_URL = settings.DATABASE_URL.replace(
 )
 
 # Create async engine
-engine = create_async_engine(
-    DATABASE_URL,
-    echo=settings.DATABASE_ECHO,
-    future=True,
-    pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
-)
+use_null_pool = bool(os.getenv("PYTEST_RUNNING")) or bool(os.getenv("PYTEST_CURRENT_TEST"))
+engine_kwargs = {
+    "echo": settings.DATABASE_ECHO,
+    "future": True,
+    "pool_pre_ping": True,
+    "pool_size": 10,
+    "max_overflow": 20,
+}
+
+if use_null_pool:
+    engine_kwargs["poolclass"] = NullPool
+
+engine = create_async_engine(DATABASE_URL, **engine_kwargs)
 
 # Session factory
 AsyncSessionLocal = async_sessionmaker(

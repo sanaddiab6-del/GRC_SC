@@ -11,6 +11,24 @@ import uuid
 from core.database import Base
 
 
+# Association tables
+user_roles = Table(
+    "user_roles",
+    Base.metadata,
+    Column("user_id", UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), primary_key=True),
+    Column("role_id", UUID(as_uuid=True), ForeignKey("roles.role_id", ondelete="CASCADE"), primary_key=True),
+    Column("assigned_at", DateTime, default=datetime.utcnow),
+    Column("assigned_by", UUID(as_uuid=True), ForeignKey("users.user_id"))
+)
+
+role_permissions = Table(
+    "role_permissions",
+    Base.metadata,
+    Column("role_id", UUID(as_uuid=True), ForeignKey("roles.role_id", ondelete="CASCADE"), primary_key=True),
+    Column("permission_id", UUID(as_uuid=True), ForeignKey("permissions.permission_id", ondelete="CASCADE"), primary_key=True)
+)
+
+
 class User(Base):
     """User model with bilingual support and security features."""
     __tablename__ = "users"
@@ -29,7 +47,14 @@ class User(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
-    roles = relationship("Role", secondary="user_roles", back_populates="users")
+    roles = relationship(
+        "Role",
+        secondary=user_roles,
+        primaryjoin=user_id == user_roles.c.user_id,
+        secondaryjoin="Role.role_id == user_roles.c.role_id",
+        foreign_keys=[user_roles.c.user_id, user_roles.c.role_id],
+        back_populates="users",
+    )
     refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
     audit_logs = relationship("AuditLog", back_populates="user")
 
@@ -45,7 +70,14 @@ class Role(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
-    users = relationship("User", secondary="user_roles", back_populates="roles")
+    users = relationship(
+        "User",
+        secondary=user_roles,
+        primaryjoin=role_id == user_roles.c.role_id,
+        secondaryjoin="User.user_id == user_roles.c.user_id",
+        foreign_keys=[user_roles.c.role_id, user_roles.c.user_id],
+        back_populates="roles",
+    )
     permissions = relationship("Permission", secondary="role_permissions", back_populates="roles")
 
 
@@ -63,23 +95,6 @@ class Permission(Base):
     # Relationships
     roles = relationship("Role", secondary="role_permissions", back_populates="permissions")
 
-
-# Association tables
-user_roles = Table(
-    'user_roles',
-    Base.metadata,
-    Column('user_id', UUID(as_uuid=True), ForeignKey('users.user_id', ondelete='CASCADE'), primary_key=True),
-    Column('role_id', UUID(as_uuid=True), ForeignKey('roles.role_id', ondelete='CASCADE'), primary_key=True),
-    Column('assigned_at', DateTime, default=datetime.utcnow),
-    Column('assigned_by', UUID(as_uuid=True), ForeignKey('users.user_id'))
-)
-
-role_permissions = Table(
-    'role_permissions',
-    Base.metadata,
-    Column('role_id', UUID(as_uuid=True), ForeignKey('roles.role_id', ondelete='CASCADE'), primary_key=True),
-    Column('permission_id', UUID(as_uuid=True), ForeignKey('permissions.permission_id', ondelete='CASCADE'), primary_key=True)
-)
 
 
 class RefreshToken(Base):
