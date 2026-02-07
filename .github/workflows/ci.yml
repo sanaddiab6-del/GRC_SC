@@ -72,6 +72,7 @@ jobs:
           DATABASE_URL: postgresql://sico:test_password@localhost:5432/sico_test
           REDIS_URL: redis://localhost:6379
           SECRET_KEY: test-secret-key-for-ci
+          PYTHONPATH: ${{ github.workspace }}
         run: |
           pytest tests/backend -v --cov=src/backend --cov-report=xml:src/backend/coverage.xml --cov-report=html:src/backend/htmlcov
 
@@ -194,7 +195,7 @@ jobs:
 
       - name: Test docker-compose
         run: |
-          docker-compose -f deployment/docker-compose.yml config
+          docker compose -f deployment/docker-compose.yml config
 
   integration-check:
     name: Integration Check
