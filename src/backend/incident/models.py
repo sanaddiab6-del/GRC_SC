@@ -1,8 +1,8 @@
 """
 Incident Response models for NCA ECC-IS-5 compliance.
 """
-from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey, Text, Enum as SQLEnum
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey, Text, Enum as SQLEnum, JSON
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -68,7 +68,7 @@ class SecurityIncident(Base):
     closed_at = Column(DateTime)
     
     # Impact assessment
-    affected_systems = Column(JSONB)  # List of affected systems/services
+    affected_systems = Column(JSON)  # List of affected systems/services
     affected_users_count = Column(Integer, default=0)
     business_impact_en = Column(Text)
     business_impact_ar = Column(Text)
@@ -119,15 +119,15 @@ class IncidentPlaybook(Base):
     # Playbook content
     description_en = Column(Text, nullable=False)
     description_ar = Column(Text, nullable=False)
-    detection_steps = Column(JSONB, nullable=False)  # [{step, description}]
-    containment_steps = Column(JSONB, nullable=False)
-    eradication_steps = Column(JSONB, nullable=False)
-    recovery_steps = Column(JSONB, nullable=False)
+    detection_steps = Column(JSON, nullable=False)  # [{step, description}]
+    containment_steps = Column(JSON, nullable=False)
+    eradication_steps = Column(JSON, nullable=False)
+    recovery_steps = Column(JSON, nullable=False)
     
     # Escalation
     escalation_criteria_en = Column(Text)
     escalation_criteria_ar = Column(Text)
-    escalation_contacts = Column(JSONB)  # [{role, contact}]
+    escalation_contacts = Column(JSON)  # [{role, contact}]
     
     # Metadata
     created_by = Column(UUID(as_uuid=True), ForeignKey('users.user_id'), nullable=False)
@@ -137,3 +137,4 @@ class IncidentPlaybook(Base):
     
     # Relationships
     creator = relationship("User", foreign_keys=[created_by])
+

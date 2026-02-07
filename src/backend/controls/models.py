@@ -5,8 +5,7 @@ Handles bilingual control framework operations
 
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import Column, String, Integer, DateTime, Text, Enum
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Column, String, Integer, DateTime, Text, Enum, JSON
 import enum
 
 from core.database import Base
@@ -58,8 +57,8 @@ class Control(Base):
     maturity_level = Column(Integer, default=1)  # 1-5 scale
     
     # Relationships and mappings
-    evidence_types = Column(JSONB)  # List of required evidence types
-    related_controls = Column(JSONB)  # Cross-framework mappings
+    evidence_types = Column(JSON)  # List of required evidence types
+    related_controls = Column(JSON)  # Cross-framework mappings
     
     # Audit trail
     created_at = Column(DateTime, default=datetime.utcnow)

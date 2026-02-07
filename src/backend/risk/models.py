@@ -1,8 +1,8 @@
 """
 Risk Management models for NCA ECC-RM compliance.
 """
-from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey, Text, Enum as SQLEnum, Float
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey, Text, Enum as SQLEnum, Float, JSON
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -98,8 +98,8 @@ class Risk(Base):
     closed_at = Column(DateTime)
     
     # Related items
-    related_controls = Column(JSONB)  # List of control IDs
-    related_incidents = Column(JSONB)  # List of incident IDs
+    related_controls = Column(JSON)  # List of control IDs
+    related_incidents = Column(JSON)  # List of incident IDs
     
     # Relationships
     owner = relationship("User", foreign_keys=[risk_owner])
@@ -161,7 +161,7 @@ class ThirdPartyRisk(Base):
     has_nca_compliance = Column(Boolean, default=False)
     has_iso27001 = Column(Boolean, default=False)
     has_soc2 = Column(Boolean, default=False)
-    compliance_certificates = Column(JSONB)  # [{type, expiry_date, file_url}]
+    compliance_certificates = Column(JSON)  # [{type, expiry_date, file_url}]
     
     # Contract
     contract_start_date = Column(DateTime)
@@ -183,3 +183,4 @@ class ThirdPartyRisk(Base):
     
     # Relationships
     manager = relationship("User", foreign_keys=[vendor_manager])
+

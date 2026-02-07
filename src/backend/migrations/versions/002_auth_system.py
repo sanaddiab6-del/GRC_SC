@@ -4,7 +4,7 @@ Implements NCA ECC-IS-3 and PDPL Article 29 requirements.
 """
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime
 
 
@@ -90,7 +90,7 @@ def upgrade():
         sa.Column('key_hash', sa.String(255), nullable=False, unique=True),
         sa.Column('name', sa.String(100), nullable=False),
         sa.Column('description', sa.String),
-        sa.Column('scopes', JSONB),
+        sa.Column('scopes', sa.JSON()),
         sa.Column('expires_at', sa.DateTime),
         sa.Column('last_used_at', sa.DateTime),
         sa.Column('created_by', UUID(as_uuid=True), sa.ForeignKey('users.user_id')),
@@ -109,7 +109,7 @@ def upgrade():
         sa.Column('ip_address', sa.String(45)),  # IPv6 support
         sa.Column('user_agent', sa.String(500)),
         sa.Column('status', sa.String(20)),
-        sa.Column('details', JSONB),
+        sa.Column('details', sa.JSON()),
         sa.Column('created_at', sa.DateTime, default=datetime.utcnow, index=True)
     )
     
@@ -140,3 +140,4 @@ def downgrade():
     op.drop_table('permissions')
     op.drop_table('roles')
     op.drop_table('users')
+

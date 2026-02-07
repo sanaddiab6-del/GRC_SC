@@ -3,8 +3,9 @@ Initialize RBAC system with default roles and permissions.
 Based on NCA ECC and PDPL requirements.
 """
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, insert
 from auth.models import Role, Permission
+from auth.models import role_permissions  # Import the junction table
 import logging
 
 logger = logging.getLogger(__name__)
@@ -159,18 +160,30 @@ async def initialize_rbac(db: AsyncSession):
                 db.add(new_role)
                 await db.flush()
                 
-                # Assign permissions to role
+                # Assign permissions to role using direct insert
                 for perm_name in role_data["permissions"]:
                     if perm_name in permission_map:
-                        new_role.permissions.append(permission_map[perm_name])
+                        await db.execute(
+                            insert(role_permissions).values(
+                                role_id=new_role.role_id,
+                                permission_id=permission_map[perm_name].permission_id
+                            )
+                        )
                 
                 logger.info(f"Created role: {role_name} with {len(role_data['permissions'])} permissions")
             else:
-                # Update existing role permissions
-                existing_role.permissions.clear()
+                # Update existing role permissions by deleting old and inserting new
+                await db.execute(
+                    role_permissions.delete().where(role_permissions.c.role_id == existing_role.role_id)
+                )
                 for perm_name in role_data["permissions"]:
                     if perm_name in permission_map:
-                        existing_role.permissions.append(permission_map[perm_name])
+                        await db.execute(
+                            insert(role_permissions).values(
+                                role_id=existing_role.role_id,
+                                permission_id=permission_map[perm_name].permission_id
+                            )
+                        )
                 logger.info(f"Updated role: {role_name}")
         
         await db.commit()

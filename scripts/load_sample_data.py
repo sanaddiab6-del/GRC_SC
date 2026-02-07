@@ -13,8 +13,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src" / "backend"))
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.backend.core.database import AsyncSessionLocal, init_db
-from src.backend.controls.models import Control, FrameworkType, ControlStatus
+from core.database import AsyncSessionLocal, init_db
+from controls.models import Control, FrameworkType, ControlStatus
 
 
 SAMPLE_CONTROLS = [

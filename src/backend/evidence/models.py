@@ -5,8 +5,7 @@ Manages audit evidence collection and validation
 
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import Column, String, Integer, DateTime, Text, Enum, ForeignKey
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Column, String, Integer, DateTime, Text, Enum, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 import enum
 
@@ -73,7 +72,7 @@ class Evidence(Base):
     retention_period_days = Column(Integer, default=2555)  # 7 years default
     
     # Additional metadata
-    additional_metadata = Column(JSONB)  # Additional flexible data (renamed from 'metadata' to avoid SQLAlchemy conflict)
+    additional_metadata = Column(JSON)  # Additional flexible data (renamed from 'metadata' to avoid SQLAlchemy conflict)
     
     # Audit trail
     created_at = Column(DateTime, default=datetime.utcnow)

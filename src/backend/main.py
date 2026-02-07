@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 import logging
 
 from core.config import settings
-from core.database import init_db, get_db
+from core.database import init_db, get_db, AsyncSessionLocal
 from core.security_middleware import setup_security_middleware
 from controls import router as controls_router
 from evidence import router as evidence_router
@@ -44,10 +44,9 @@ async def lifespan(app: FastAPI):
         
         # Initialize RBAC system
         try:
-            async for db in get_db():
+            async with AsyncSessionLocal() as db:
                 await initialize_rbac(db)
-                logger.info("✓ RBAC system initialized")
-                break
+            logger.info("✓ RBAC system initialized")
         except Exception as e:
             logger.warning(f"⚠️ RBAC initialization failed: {str(e)}")
             logger.warning("   Server will run with limited functionality")

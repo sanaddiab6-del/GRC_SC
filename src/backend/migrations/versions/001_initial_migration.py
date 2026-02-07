@@ -35,8 +35,8 @@ def upgrade() -> None:
         sa.Column('priority', sa.String(length=20), nullable=True),
         sa.Column('status', sa.Enum('NOT_STARTED', 'IN_PROGRESS', 'COMPLIANT', 'NON_COMPLIANT', 'NOT_APPLICABLE', name='controlstatus'), nullable=True),
         sa.Column('maturity_level', sa.Integer(), nullable=True),
-        sa.Column('evidence_types', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-        sa.Column('related_controls', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column('evidence_types', sa.JSON(), nullable=True),
+        sa.Column('related_controls', sa.JSON(), nullable=True),
         sa.Column('created_at', sa.DateTime(), nullable=True),
         sa.Column('updated_at', sa.DateTime(), nullable=True),
         sa.PrimaryKeyConstraint('id')
@@ -67,7 +67,7 @@ def upgrade() -> None:
         sa.Column('collection_date', sa.DateTime(), nullable=True),
         sa.Column('expiry_date', sa.DateTime(), nullable=True),
         sa.Column('retention_period_days', sa.Integer(), nullable=True),
-        sa.Column('additional_metadata', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column('additional_metadata', sa.JSON(), nullable=True),
         sa.Column('created_at', sa.DateTime(), nullable=True),
         sa.Column('updated_at', sa.DateTime(), nullable=True),
         sa.Column('created_by', sa.String(length=200), nullable=True),
@@ -86,10 +86,10 @@ def upgrade() -> None:
         sa.Column('status', sa.Enum('PENDING', 'GENERATING', 'COMPLETED', 'FAILED', name='reportstatus'), nullable=True),
         sa.Column('title_en', sa.String(length=500), nullable=False),
         sa.Column('title_ar', sa.String(length=500), nullable=False),
-        sa.Column('framework_filter', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column('framework_filter', sa.JSON(), nullable=True),
         sa.Column('date_range_start', sa.DateTime(), nullable=True),
         sa.Column('date_range_end', sa.DateTime(), nullable=True),
-        sa.Column('report_data', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column('report_data', sa.JSON(), nullable=True),
         sa.Column('file_path', sa.String(length=1000), nullable=True),
         sa.Column('file_format', sa.String(length=50), nullable=True),
         sa.Column('generated_by', sa.String(length=200), nullable=True),
@@ -122,3 +122,4 @@ def downgrade() -> None:
     sa.Enum(name='evidencetype').drop(op.get_bind())
     sa.Enum(name='controlstatus').drop(op.get_bind())
     sa.Enum(name='frameworktype').drop(op.get_bind())
+

@@ -1,8 +1,8 @@
 """
 AI Governance models for SDAIA AI Principles compliance.
 """
-from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey, Text, Enum as SQLEnum, Float
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey, Text, Enum as SQLEnum, Float, JSON
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -53,8 +53,8 @@ class AIModel(Base):
     # Technical details
     framework = Column(String(100))  # tensorflow, pytorch, scikit-learn
     algorithm = Column(String(255))
-    input_features = Column(JSONB)  # [{name, type, description}]
-    output_format = Column(JSONB)  # {type, description}
+    input_features = Column(JSON)  # [{name, type, description}]
+    output_format = Column(JSON)  # {type, description}
     
     # Training data
     training_data_source = Column(String(255))
@@ -69,12 +69,12 @@ class AIModel(Base):
     precision = Column(Float)
     recall = Column(Float)
     f1_score = Column(Float)
-    other_metrics = Column(JSONB)  # {metric_name: value}
+    other_metrics = Column(JSON)  # {metric_name: value}
     
     # Bias and fairness (SDAIA AI Principles)
     bias_assessment_completed = Column(Boolean, default=False)
     bias_assessment_date = Column(DateTime)
-    fairness_metrics = Column(JSONB)  # {demographic: {metric: value}}
+    fairness_metrics = Column(JSON)  # {demographic: {metric: value}}
     known_biases_en = Column(Text)
     known_biases_ar = Column(Text)
     mitigation_strategies_en = Column(Text)
@@ -87,7 +87,7 @@ class AIModel(Base):
     
     # Privacy
     processes_personal_data = Column(Boolean, default=False)
-    privacy_enhancing_techniques = Column(JSONB)  # [differential_privacy, federated_learning]
+    privacy_enhancing_techniques = Column(JSON)  # [differential_privacy, federated_learning]
     data_minimization_applied = Column(Boolean, default=False)
     
     # Deployment
@@ -127,13 +127,13 @@ class BiasTestResult(Base):
     
     # Protected attributes tested
     protected_attribute = Column(String(100), nullable=False)  # gender, age, nationality
-    attribute_values = Column(JSONB)  # [male, female] or [18-25, 26-35]
+    attribute_values = Column(JSON)  # [male, female] or [18-25, 26-35]
     
     # Results
     bias_detected = Column(Boolean, nullable=False)
     severity = Column(String(20))  # low, medium, high
     bias_score = Column(Float)  # 0-1 scale
-    fairness_metrics = Column(JSONB)  # {metric_name: value}
+    fairness_metrics = Column(JSON)  # {metric_name: value}
     
     # Details
     test_dataset_size = Column(Integer)
@@ -171,7 +171,7 @@ class ModelAudit(Base):
     performed_by = Column(UUID(as_uuid=True), ForeignKey('users.user_id'), nullable=False)
     
     # Changes
-    changes = Column(JSONB)  # {field: {old_value, new_value}}
+    changes = Column(JSON)  # {field: {old_value, new_value}}
     reason_en = Column(Text)
     reason_ar = Column(Text)
     
@@ -221,3 +221,4 @@ class AIEthicsReview(Base):
     # Relationships
     model = relationship("AIModel")
     reviewer_user = relationship("User", foreign_keys=[reviewer])
+

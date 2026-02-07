@@ -2,8 +2,8 @@
 Authentication models compliant with NCA ECC and PDPL.
 Implements secure password storage and token management.
 """
-from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey, Table
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey, Table, JSON
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -120,7 +120,7 @@ class APIKey(Base):
     key_hash = Column(String(255), nullable=False, unique=True)
     name = Column(String(100), nullable=False)
     description = Column(String)
-    scopes = Column(JSONB)  # ["controls:read", "evidence:write"]
+    scopes = Column(JSON)  # ["controls:read", "evidence:write"]
     expires_at = Column(DateTime)
     last_used_at = Column(DateTime)
     created_by = Column(UUID(as_uuid=True), ForeignKey('users.user_id'))
@@ -140,8 +140,9 @@ class AuditLog(Base):
     ip_address = Column(String(45))  # IPv6 support
     user_agent = Column(String(500))
     status = Column(String(20))  # success, failure
-    details = Column(JSONB)  # Additional context
+    details = Column(JSON)  # Additional context
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
     
     # Relationships
     user = relationship("User", back_populates="audit_logs")
+

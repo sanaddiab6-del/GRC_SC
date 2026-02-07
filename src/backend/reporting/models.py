@@ -4,8 +4,7 @@ Executive dashboards and compliance reports
 """
 
 from datetime import datetime
-from sqlalchemy import Column, String, Integer, DateTime, Text, Float, Enum
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Column, String, Integer, DateTime, Text, Float, Enum, JSON
 import enum
 
 from core.database import Base
@@ -46,12 +45,12 @@ class Report(Base):
     title_ar = Column(String(500), nullable=False)
     
     # Report parameters
-    framework_filter = Column(JSONB)  # List of frameworks included
+    framework_filter = Column(JSON)  # List of frameworks included
     date_range_start = Column(DateTime)
     date_range_end = Column(DateTime)
     
     # Report data
-    report_data = Column(JSONB)  # Structured report data
+    report_data = Column(JSON)  # Structured report data
     file_path = Column(String(1000))
     file_format = Column(String(50))  # PDF, XLSX, JSON
     

@@ -2,8 +2,8 @@
 Privacy models for PDPL compliance.
 Implements consent management, DSAR, and data classification.
 """
-from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey, Text, Enum as SQLEnum
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey, Text, Enum as SQLEnum, JSON
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -112,7 +112,7 @@ class DataSubjectRequest(Base):
     # Response
     response_en = Column(Text)
     response_ar = Column(Text)
-    data_provided = Column(JSONB)  # For access requests
+    data_provided = Column(JSON)  # For access requests
     rejection_reason_en = Column(Text)
     rejection_reason_ar = Column(Text)
     
@@ -155,7 +155,7 @@ class DataBreachIncident(Base):
     
     # Impact assessment
     affected_records_count = Column(Integer, default=0)
-    affected_data_types = Column(JSONB)  # ["email", "phone", "financial_data"]
+    affected_data_types = Column(JSON)  # ["email", "phone", "financial_data"]
     impact_description_en = Column(Text, nullable=False)
     impact_description_ar = Column(Text, nullable=False)
     
@@ -220,14 +220,14 @@ class PrivacyImpactAssessment(Base):
     description_ar = Column(Text, nullable=False)
     
     # Assessment
-    data_types = Column(JSONB, nullable=False)  # Types of personal data processed
+    data_types = Column(JSON, nullable=False)  # Types of personal data processed
     processing_purpose_en = Column(Text, nullable=False)
     processing_purpose_ar = Column(Text, nullable=False)
     legal_basis_en = Column(Text, nullable=False)
     legal_basis_ar = Column(Text, nullable=False)
     
     # Risk assessment
-    privacy_risks = Column(JSONB)  # [{risk, likelihood, impact, mitigation}]
+    privacy_risks = Column(JSON)  # [{risk, likelihood, impact, mitigation}]
     risk_score = Column(Integer)  # 1-10
     risk_level = Column(String(20))  # low, medium, high, critical
     
@@ -248,3 +248,4 @@ class PrivacyImpactAssessment(Base):
     # Relationships
     conductor = relationship("User", foreign_keys=[conducted_by])
     approver = relationship("User", foreign_keys=[approved_by])
+
