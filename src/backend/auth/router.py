@@ -83,7 +83,7 @@ async def register_user(
 @router.post("/login", response_model=schemas.TokenResponse)
 async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
-    request: Optional[Request] = None,
+    request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -128,8 +128,8 @@ async def login(
             resource="auth",
             resource_id=str(user.user_id),
             status="failure",
-            ip_address=request.client.host if request and request.client else None,
-            user_agent=request.headers.get("user-agent") if request else None,
+            ip_address=request.client.host if request.client else None,
+            user_agent=request.headers.get("user-agent"),
             details={"reason": "incorrect_password"}
         )
         
@@ -173,8 +173,8 @@ async def login(
         resource="auth",
         resource_id=str(user.user_id),
         status="success",
-        ip_address=request.client.host if request and request.client else None,
-        user_agent=request.headers.get("user-agent") if request else None
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent")
     )
     
     return {
