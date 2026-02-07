@@ -8,6 +8,23 @@ from src.backend.main import app
 async def test_create_evidence():
     """Test creating new evidence"""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        # First create a control that the evidence can reference
+        control_data = {
+            "control_id": "ECC-GV-1",
+            "framework": "ECC",
+            "domain": "Governance",
+            "title_en": "Test Governance Control",
+            "title_ar": "ضابط حوكمة تجريبي",
+            "description_en": "Test control for evidence testing",
+            "description_ar": "ضابط تجريبي لاختبار الأدلة",
+            "priority": "high",
+            "status": "compliant"
+        }
+        
+        control_response = await client.post("/api/v1/controls", json=control_data)
+        # If control already exists, that's fine - just continue
+        
+        # Now create the evidence
         evidence_data = {
             "evidence_id": "EVD-TEST-001",
             "control_id": "ECC-GV-1",
