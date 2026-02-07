@@ -73,8 +73,7 @@ jobs:
           REDIS_URL: redis://localhost:6379
           SECRET_KEY: test-secret-key-for-ci
         run: |
-          cd src/backend
-          pytest tests/ -v --cov=. --cov-report=xml --cov-report=html
+          pytest tests/backend -v --cov=src/backend --cov-report=xml:src/backend/coverage.xml --cov-report=html:src/backend/htmlcov
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
@@ -186,7 +185,7 @@ jobs:
       - name: Build backend image
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./src/backend
           file: src/backend/Dockerfile
           push: false
           tags: sico-backend:test
