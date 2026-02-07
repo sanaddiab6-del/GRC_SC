@@ -67,7 +67,7 @@ def upgrade() -> None:
         sa.Column('collection_date', sa.DateTime(), nullable=True),
         sa.Column('expiry_date', sa.DateTime(), nullable=True),
         sa.Column('retention_period_days', sa.Integer(), nullable=True),
-        sa.Column('metadata', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column('additional_metadata', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column('created_at', sa.DateTime(), nullable=True),
         sa.Column('updated_at', sa.DateTime(), nullable=True),
         sa.Column('created_by', sa.String(length=200), nullable=True),
