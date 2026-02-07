@@ -20,12 +20,13 @@ engine_kwargs = {
     "echo": settings.DATABASE_ECHO,
     "future": True,
     "pool_pre_ping": True,
-    "pool_size": 10,
-    "max_overflow": 20,
 }
 
 if use_null_pool:
     engine_kwargs["poolclass"] = NullPool
+else:
+    engine_kwargs["pool_size"] = 10
+    engine_kwargs["max_overflow"] = 20
 
 engine = create_async_engine(DATABASE_URL, **engine_kwargs)
 
