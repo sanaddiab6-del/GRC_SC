@@ -18,7 +18,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers
 revision = '003'
-down_revision = '002'
+down_revision = '002_auth_system'
 branch_labels = None
 depends_on = None
 
