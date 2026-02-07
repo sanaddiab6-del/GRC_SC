@@ -239,9 +239,21 @@ def setup_security_middleware(app):
     )
     
     # Trusted Host (prevent host header injection)
+    if settings.is_production:
+        allowed_hosts = ["sico-grc.com", "*.sico-grc.com"]
+    else:
+        allowed_hosts = [
+            "localhost",
+            "127.0.0.1",
+            "test",
+            "testserver",
+            "*.sico-grc.com",
+            "sico-grc.com",
+        ]
+
     app.add_middleware(
         TrustedHostMiddleware,
-        allowed_hosts=["localhost", "*.sico-grc.com", "sico-grc.com"]
+        allowed_hosts=allowed_hosts
     )
     
     # Custom security middleware
