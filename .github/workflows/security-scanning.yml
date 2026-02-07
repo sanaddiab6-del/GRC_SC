@@ -151,6 +151,15 @@ jobs:
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:${{ matrix.language }}"
+          upload: false
+
+      - name: Upload CodeQL SARIF
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeql-sarif-${{ matrix.language }}
+          path: /home/runner/work/sanadcom/results/${{ matrix.language }}.sarif
+          retention-days: 30
 
   sbom-generation:
     name: Generate SBOM
@@ -178,7 +187,7 @@ jobs:
         run: |
           cd src/backend
           pip install -r requirements.txt
-          cyclonedx-py -r -i requirements.txt -o ../../sbom-python.json -F json
+          cyclonedx-py requirements -i requirements.txt -o ../../sbom-python.json -F json
 
       - name: Generate Node.js SBOM
         run: |
