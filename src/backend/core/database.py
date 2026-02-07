@@ -4,6 +4,7 @@ Uses SQLAlchemy 2.0 async pattern
 """
 
 import os
+from typing import Any, Dict
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.pool import NullPool
@@ -16,7 +17,7 @@ DATABASE_URL = settings.DATABASE_URL.replace(
 
 # Create async engine
 use_null_pool = bool(os.getenv("PYTEST_RUNNING")) or bool(os.getenv("PYTEST_CURRENT_TEST"))
-engine_kwargs = {
+engine_kwargs: Dict[str, Any] = {
     "echo": settings.DATABASE_ECHO,
     "future": True,
     "pool_pre_ping": True,
@@ -42,12 +43,26 @@ AsyncSessionLocal = async_sessionmaker(
 Base = declarative_base()
 
 
+def _load_models() -> None:
+    """Import models to register tables with SQLAlchemy metadata."""
+    # Local imports to avoid circular dependencies at module import time.
+    from controls import models as _controls_models  # noqa: F401
+    from evidence import models as _evidence_models  # noqa: F401
+    from reporting import models as _reporting_models  # noqa: F401
+    from auth import models as _auth_models  # noqa: F401
+    from privacy import models as _privacy_models  # noqa: F401
+    from incident import models as _incident_models  # noqa: F401
+    from risk import models as _risk_models  # noqa: F401
+    from ai_governance import models as _ai_governance_models  # noqa: F401
+
+
 async def init_db():
     """
     Initialize database - create tables
     Handles connection errors gracefully for development
     """
     try:
+        _load_models()
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
     except Exception as e:
