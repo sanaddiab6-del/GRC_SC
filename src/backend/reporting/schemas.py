@@ -9,7 +9,7 @@ from datetime import datetime
 
 class ReportRequest(BaseModel):
     """Schema for requesting a report"""
-    report_type: str = Field(..., example="compliance_summary")
+    report_type: str = Field(json_schema_extra={"example": "compliance_summary"})
     framework_filter: Optional[List[str]] = ["ECC", "CCC", "PDPL"]
     date_range_start: Optional[datetime] = None
     date_range_end: Optional[datetime] = None

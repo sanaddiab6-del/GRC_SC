@@ -1,13 +1,13 @@
 # Backend Tests - Evidence Module
 import pytest
-from httpx import AsyncClient
+from httpx import AsyncClient, ASGITransport
 from src.backend.main import app
 
 
 @pytest.mark.asyncio
 async def test_create_evidence():
     """Test creating new evidence"""
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         evidence_data = {
             "evidence_id": "EVD-TEST-001",
             "control_id": "ECC-GV-1",
@@ -27,7 +27,7 @@ async def test_create_evidence():
 @pytest.mark.asyncio
 async def test_list_evidence():
     """Test listing evidence with filters"""
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get("/api/v1/evidence?control_id=ECC-GV-1")
         assert response.status_code == 200
         data = response.json()
@@ -38,7 +38,7 @@ async def test_list_evidence():
 @pytest.mark.asyncio
 async def test_validate_evidence():
     """Test evidence validation"""
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         validation_data = {
             "validated_by": "test_auditor",
             "validation_notes": "Approved for compliance",

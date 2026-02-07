@@ -1,13 +1,13 @@
 # Backend Tests - Reporting Module
 import pytest
-from httpx import AsyncClient
+from httpx import AsyncClient, ASGITransport
 from src.backend.main import app
 
 
 @pytest.mark.asyncio
 async def test_get_dashboard():
     """Test executive dashboard endpoint"""
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get("/api/v1/dashboard")
         assert response.status_code == 200
         data = response.json()
@@ -27,7 +27,7 @@ async def test_get_dashboard():
 @pytest.mark.asyncio
 async def test_generate_report():
     """Test report generation"""
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         report_request = {
             "report_type": "compliance_summary",
             "framework_filter": ["ECC", "CCC"],
@@ -47,7 +47,7 @@ async def test_generate_report():
 @pytest.mark.asyncio
 async def test_list_reports():
     """Test listing generated reports"""
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get("/api/v1/reports")
         assert response.status_code == 200
         data = response.json()

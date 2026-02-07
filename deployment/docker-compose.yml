@@ -57,6 +57,15 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - VECTOR_DB_HOST=chroma
       - VECTOR_DB_PORT=8000
+      # Security settings (NCA ECC-IS-3, PDPL Article 29)
+      - SECRET_KEY=${SECRET_KEY:-change-this-in-production-use-256-bit-key}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
+      - RATE_LIMIT_ENABLED=true
+      - RATE_LIMIT_PER_MINUTE=60
+      - RATE_LIMIT_PER_HOUR=1000
+      - TLS_ENABLED=false  # Set to true in production with valid certificates
+      - AUDIT_LOG_RETENTION_YEARS=7
+      - LOG_LEVEL=INFO
     volumes:
       - ./src/backend:/app
       - ./data:/data

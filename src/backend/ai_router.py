@@ -5,22 +5,37 @@ Bilingual query endpoint with citation tracking
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.backend.core.database import get_db
-from ai.rag.bilingual_retriever import BilingualRetriever
+from core.database import get_db
+
+# Try to import AI module - may not be available in  all environments
+AI_AVAILABLE = False
+
+if TYPE_CHECKING:
+    from ai.rag.bilingual_retriever import BilingualRetriever
+else:
+    try:
+        from ai.rag.bilingual_retriever import BilingualRetriever
+        AI_AVAILABLE = True
+    except ImportError:
+        AI_AVAILABLE = False
+        BilingualRetriever = None
 
 router = APIRouter()
 
 # Initialize retriever (in production, use dependency injection)
-retriever = BilingualRetriever()
+retriever = BilingualRetriever() if AI_AVAILABLE and BilingualRetriever else None
 
 
 class QueryRequest(BaseModel):
     """Schema for RAG query request"""
-    query: str = Field(..., min_length=3, example="What are the governance requirements?")
-    language: str = Field("ar", regex="^(ar|en)$")
+    query: str = Field(
+        min_length=3,
+        json_schema_extra={"example": "What are the governance requirements?"}
+    )
+    language: str = Field("ar", pattern="^(ar|en)$")
     framework_filter: Optional[List[str]] = ["ECC", "CCC", "PDPL"]
     top_k: int = Field(5, ge=1, le=20)
 
@@ -42,6 +57,12 @@ async def query_rag_system(
     Query the bilingual RAG system
     Returns relevant controls with citations
     """
+    if not AI_AVAILABLE or retriever is None:
+        raise HTTPException(
+            status_code=503,
+            detail="AI/RAG system is not available. Please install AI dependencies."
+        )
+    
     try:
         # Perform RAG retrieval
         results = retriever.retrieve(
@@ -70,7 +91,7 @@ async def query_rag_system(
 
 @router.get("/ai/suggestions")
 async def get_query_suggestions(
-    language: str = Query("ar", regex="^(ar|en)$"),
+    language: str = Query("ar", pattern="^(ar|en)$"),
 ):
     """Get suggested queries for users"""
     suggestions = {
@@ -111,3 +132,5 @@ async def rebuild_vector_index(
         "message_en": "Vector index rebuild initiated",
         "message_ar": "تم بدء إعادة بناء فهرس المتجهات",
     }
+
+

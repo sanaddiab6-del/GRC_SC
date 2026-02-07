@@ -9,9 +9,9 @@ from datetime import datetime
 
 class EvidenceBase(BaseModel):
     """Base evidence schema"""
-    evidence_id: str = Field(..., example="EVD-ECC-GV-1-001")
-    control_id: str = Field(..., example="ECC-GV-1")
-    evidence_type: str = Field(..., example="policy")
+    evidence_id: str = Field(json_schema_extra={"example": "EVD-ECC-GV-1-001"})
+    control_id: str = Field(json_schema_extra={"example": "ECC-GV-1"})
+    evidence_type: str = Field(json_schema_extra={"example": "policy"})
     
     title_en: str
     title_ar: str

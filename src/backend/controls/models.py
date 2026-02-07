@@ -9,7 +9,7 @@ from sqlalchemy import Column, String, Integer, DateTime, Text, Enum
 from sqlalchemy.dialects.postgresql import JSONB
 import enum
 
-from src.backend.core.database import Base
+from core.database import Base
 
 
 class FrameworkType(str, enum.Enum):
@@ -67,3 +67,4 @@ class Control(Base):
     
     def __repr__(self):
         return f"<Control {self.control_id}: {self.title_en}>"
+

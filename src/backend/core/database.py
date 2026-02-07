@@ -5,7 +5,7 @@ Uses SQLAlchemy 2.0 async pattern
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
-from src.backend.core.config import settings
+from core.config import settings
 
 # Convert postgresql:// to postgresql+asyncpg://
 DATABASE_URL = settings.DATABASE_URL.replace(
@@ -35,9 +35,16 @@ Base = declarative_base()
 
 
 async def init_db():
-    """Initialize database - create tables"""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    """
+    Initialize database - create tables
+    Handles connection errors gracefully for development
+    """
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    except Exception as e:
+        # Re-raise to let caller handle
+        raise Exception(f"Database initialization failed: {str(e)}") from e
 
 
 async def get_db():

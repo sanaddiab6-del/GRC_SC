@@ -10,7 +10,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 import enum
 
-from src.backend.core.database import Base
+from core.database import Base
 
 
 class EvidenceStatus(str, enum.Enum):
@@ -72,8 +72,8 @@ class Evidence(Base):
     expiry_date = Column(DateTime)
     retention_period_days = Column(Integer, default=2555)  # 7 years default
     
-    # Metadata
-    metadata = Column(JSONB)  # Additional flexible data
+    # Additional metadata
+    additional_metadata = Column(JSONB)  # Additional flexible data (renamed from 'metadata' to avoid SQLAlchemy conflict)
     
     # Audit trail
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -82,3 +82,4 @@ class Evidence(Base):
     
     def __repr__(self):
         return f"<Evidence {self.evidence_id}: {self.title_en}>"
+

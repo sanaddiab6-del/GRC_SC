@@ -8,7 +8,7 @@ from sqlalchemy import Column, String, Integer, DateTime, Text, Float, Enum
 from sqlalchemy.dialects.postgresql import JSONB
 import enum
 
-from src.backend.core.database import Base
+from core.database import Base
 
 
 class ReportType(str, enum.Enum):
@@ -65,3 +65,4 @@ class Report(Base):
     
     def __repr__(self):
         return f"<Report {self.report_id}: {self.report_type.value}>"
+

@@ -3,8 +3,23 @@ Document chunking for control library
 Splits controls into logical sections for RAG
 """
 
-from typing import List, Dict
-from langchain.schema import Document
+from typing import List, Dict, Any, TYPE_CHECKING
+from dataclasses import dataclass
+
+_LANGCHAIN_AVAILABLE = False
+
+if TYPE_CHECKING:
+    from langchain.schema import Document  # type: ignore[import-not-found]
+else:
+    try:
+        from langchain.schema import Document  # type: ignore[import-not-found]
+        _LANGCHAIN_AVAILABLE = True
+    except ImportError:
+        @dataclass
+        class Document:
+            page_content: str
+            metadata: Dict[str, Any]
+        _LANGCHAIN_AVAILABLE = False
 
 
 class ControlChunker:
@@ -27,6 +42,10 @@ class ControlChunker:
         Returns:
             List of Document objects for vector store
         """
+        if not _LANGCHAIN_AVAILABLE:
+            raise ImportError(
+                "AI dependencies are not installed. Install langchain to use chunking."
+            )
         chunks = []
         control_id = control.get("control_id")
         framework = control.get("framework")

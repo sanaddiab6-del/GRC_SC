@@ -1,13 +1,13 @@
 # Backend Tests - AI/RAG Module
 import pytest
-from httpx import AsyncClient
+from httpx import AsyncClient, ASGITransport
 from src.backend.main import app
 
 
 @pytest.mark.asyncio
 async def test_rag_query_english():
     """Test RAG query in English"""
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         query_request = {
             "query": "What are the governance requirements?",
             "language": "en",
@@ -28,7 +28,7 @@ async def test_rag_query_english():
 @pytest.mark.asyncio
 async def test_rag_query_arabic():
     """Test RAG query in Arabic"""
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         query_request = {
             "query": "ما هي متطلبات الحوكمة؟",
             "language": "ar",
@@ -47,7 +47,7 @@ async def test_rag_query_arabic():
 @pytest.mark.asyncio
 async def test_get_query_suggestions():
     """Test getting query suggestions"""
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get("/api/v1/ai/suggestions?language=ar")
         assert response.status_code == 200
         data = response.json()
@@ -61,7 +61,7 @@ async def test_get_query_suggestions():
 @pytest.mark.asyncio
 async def test_invalid_language():
     """Test RAG query with invalid language"""
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         query_request = {
             "query": "test query",
             "language": "fr",  # Invalid language

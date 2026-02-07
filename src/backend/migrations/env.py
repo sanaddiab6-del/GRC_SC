@@ -8,13 +8,13 @@ from pathlib import Path
 # Add src/backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.backend.core.database import Base
-from src.backend.core.config import settings
+from core.database import Base
+from core.config import settings
 
 # Import all models to ensure they're registered with Base.metadata
-from src.backend.controls.models import Control
-from src.backend.evidence.models import Evidence
-from src.backend.reporting.models import Report
+from controls.models import Control
+from evidence.models import Evidence
+from reporting.models import Report
 
 # Alembic Config object
 config = context.config
@@ -65,3 +65,4 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     run_migrations_online()
+

@@ -10,11 +10,11 @@ from typing import List
 from datetime import datetime
 import uuid
 
-from src.backend.core.database import get_db
-from src.backend.controls.models import Control, ControlStatus, FrameworkType
-from src.backend.evidence.models import Evidence, EvidenceStatus
-from src.backend.reporting.models import Report, ReportType, ReportStatus
-from src.backend.reporting.schemas import (
+from core.database import get_db
+from controls.models import Control, ControlStatus, FrameworkType
+from evidence.models import Evidence, EvidenceStatus
+from reporting.models import Report, ReportType, ReportStatus
+from reporting.schemas import (
     ReportRequest,
     ReportResponse,
     ComplianceSummary,
@@ -247,3 +247,4 @@ async def list_reports(
     reports = result.scalars().all()
     
     return reports
+

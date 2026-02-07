@@ -10,9 +10,9 @@ from datetime import datetime
 
 class ControlBase(BaseModel):
     """Base control schema with bilingual fields"""
-    control_id: str = Field(..., example="ECC-GV-1")
-    framework: str = Field(..., example="ECC")
-    domain: str = Field(..., example="Governance")
+    control_id: str = Field(json_schema_extra={"example": "ECC-GV-1"})
+    framework: str = Field(json_schema_extra={"example": "ECC"})
+    domain: str = Field(json_schema_extra={"example": "Governance"})
     
     title_en: str
     title_ar: str

@@ -46,15 +46,70 @@ class Settings(BaseSettings):
     SAMA_API_URL: str = "https://www.sama.gov.sa"
     CITC_API_URL: str = "https://www.citc.gov.sa"
     
-    # Security
-    SECRET_KEY: str = "your-secret-key-change-in-production"
+    # Security (NCA ECC-IS-3, PDPL Article 29)
+    SECRET_KEY: str = ""  # REQUIRED: Must be set via environment variable (min 32 chars)
+    ENCRYPTION_KEY: str = ""  # Fernet key for field-level encryption, from Azure Key Vault
+    JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    
+    @property
+    def is_production(self) -> bool:
+        """Check if running in production mode."""
+        return not self.DEBUG and "localhost" not in self.DATABASE_URL
+    
+    # Azure Key Vault (for production)
+    AZURE_KEY_VAULT_URL: str = ""
+    AZURE_CLIENT_ID: str = ""
+    AZURE_CLIENT_SECRET: str = ""
+    AZURE_TENANT_ID: str = ""
+    
+    # Rate Limiting (NCA ECC-IS-3)
+    RATE_LIMIT_ENABLED: bool = True
+    RATE_LIMIT_PER_MINUTE: int = 60
+    RATE_LIMIT_PER_HOUR: int = 1000
+    
+    # TLS/HTTPS
+    TLS_ENABLED: bool = True
+    TLS_CERT_PATH: str = "/etc/ssl/certs/server.crt"
+    TLS_KEY_PATH: str = "/etc/ssl/private/server.key"
+    
+    # Audit Logging (NCA ECC-IS-5, 7-year retention)
+    AUDIT_LOG_RETENTION_YEARS: int = 7
+    AUDIT_LOG_STORAGE_PATH: str = "/var/log/sico/audit"
+    
+    # Logging
+    LOG_LEVEL: str = "INFO"
     
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        case_sensitive=True
+        case_sensitive=True,
+        extra="allow"
     )
 
 
 settings = Settings()
+
+# Security validation on startup
+if len(settings.SECRET_KEY) < 32:
+    raise ValueError(
+        "CRITICAL SECURITY ERROR: SECRET_KEY must be at least 32 characters. "
+        "Generate a secure key using: openssl rand -hex 32"
+    )
+
+if settings.is_production and settings.SECRET_KEY == "your-secret-key-change-in-production":
+    raise ValueError(
+        "CRITICAL SECURITY ERROR: Default SECRET_KEY detected in production. "
+        "Set a unique SECRET_KEY environment variable."
+    )
+
+if settings.is_production and not settings.TLS_ENABLED:
+    raise ValueError(
+        "NCA ECC COMPLIANCE ERROR: TLS/HTTPS must be enabled in production (NCA ECC-IS-3)"
+    )
+
+if settings.is_production and not settings.ENCRYPTION_KEY:
+    raise ValueError(
+        "PDPL COMPLIANCE ERROR: ENCRYPTION_KEY must be set for PII encryption (PDPL Article 29)"
+    )

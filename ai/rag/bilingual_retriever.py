@@ -3,10 +3,29 @@ Bilingual RAG Retriever
 Supports Arabic and English queries with citation tracking
 """
 
-from typing import List, Dict, Any, Optional
-from langchain.embeddings import HuggingFaceEmbeddings
-from langchain.vectorstores import Chroma
-from langchain.schema import Document
+from typing import List, Dict, Any, Optional, TYPE_CHECKING
+from dataclasses import dataclass
+
+_LANGCHAIN_AVAILABLE = False
+
+if TYPE_CHECKING:
+    from langchain.embeddings import HuggingFaceEmbeddings  # type: ignore[import-not-found]
+    from langchain.vectorstores import Chroma  # type: ignore[import-not-found]
+    from langchain.schema import Document  # type: ignore[import-not-found]
+else:
+    try:
+        from langchain.embeddings import HuggingFaceEmbeddings  # type: ignore[import-not-found]
+        from langchain.vectorstores import Chroma  # type: ignore[import-not-found]
+        from langchain.schema import Document  # type: ignore[import-not-found]
+        _LANGCHAIN_AVAILABLE = True
+    except ImportError:
+        HuggingFaceEmbeddings = None
+        Chroma = None
+        @dataclass
+        class Document:
+            page_content: str
+            metadata: Dict[str, Any]
+        _LANGCHAIN_AVAILABLE = False
 
 
 class BilingualRetriever:
@@ -20,6 +39,13 @@ class BilingualRetriever:
         embedding_model: str = "intfloat/multilingual-e5-large",
         vector_db_path: str = "./vectordb",
     ):
+        if not _LANGCHAIN_AVAILABLE:
+            raise ImportError(
+                "AI dependencies are not installed. Install langchain, "
+                "langchain-community, sentence-transformers, and chromadb."
+            )
+        assert HuggingFaceEmbeddings is not None
+        assert Chroma is not None
         self.embeddings = HuggingFaceEmbeddings(
             model_name=embedding_model,
             model_kwargs={'device': 'cpu'},

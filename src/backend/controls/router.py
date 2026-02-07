@@ -1,6 +1,7 @@
 """
 Controls API Router
 RESTful endpoints for control management with bilingual support
+Protected with NCA ECC-IS-3 authentication and RBAC authorization
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -8,14 +9,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import Optional
 
-from src.backend.core.database import get_db
-from src.backend.controls.models import Control, FrameworkType
-from src.backend.controls.schemas import (
+from core.database import get_db
+from controls.models import Control, FrameworkType
+from controls.schemas import (
     ControlCreate,
     ControlUpdate,
     ControlResponse,
     ControlListResponse,
 )
+# Import authentication dependencies
+from auth.security import get_current_user, require_permission
+from auth.models import User
 
 router = APIRouter()
 
@@ -28,10 +32,12 @@ async def list_controls(
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),  # Requires authentication
 ):
     """
     Get paginated list of controls with filtering
     Supports bilingual results
+    Requires authentication (any authenticated user can read controls)
     """
     query = select(Control)
     
@@ -52,11 +58,12 @@ async def list_controls(
     result = await db.execute(query)
     items = result.scalars().all()
     
+    response_items = [ControlResponse.model_validate(item) for item in items]
     return ControlListResponse(
         total=total or 0,
         offset=offset,
         limit=limit,
-        items=items,
+        items=response_items,
     )
 
 
@@ -64,8 +71,9 @@ async def list_controls(
 async def get_control(
     control_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),  # Requires authentication
 ):
-    """Get a specific control by ID (e.g., ECC-GV-1)"""
+    """Get a specific control by ID (e.g., ECC-GV-1). Requires authentication."""
     query = select(Control).where(Control.control_id == control_id)
     result = await db.execute(query)
     control = result.scalar_one_or_none()
@@ -86,8 +94,9 @@ async def get_control(
 async def create_control(
     control_data: ControlCreate,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission("controls", "create")),  # Requires controls:create permission
 ):
-    """Create a new control"""
+    """Create a new control. Requires controls:create permission (Admin or Compliance Officer)."""
     # Check if control_id already exists
     existing = await db.execute(
         select(Control).where(Control.control_id == control_data.control_id)
@@ -114,8 +123,9 @@ async def update_control(
     control_id: str,
     control_data: ControlUpdate,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission("controls", "update")),  # Requires controls:update permission
 ):
-    """Update an existing control (partial update)"""
+    """Update an existing control (partial update). Requires controls:update permission (Admin or Compliance Officer)."""
     query = select(Control).where(Control.control_id == control_id)
     result = await db.execute(query)
     control = result.scalar_one_or_none()
@@ -144,8 +154,9 @@ async def update_control(
 async def delete_control(
     control_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission("controls", "delete")),  # Requires controls:delete permission
 ):
-    """Delete a control"""
+    """Delete a control. Requires controls:delete permission (Admin or Compliance Officer only)."""
     query = select(Control).where(Control.control_id == control_id)
     result = await db.execute(query)
     control = result.scalar_one_or_none()

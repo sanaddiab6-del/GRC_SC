@@ -9,9 +9,9 @@ from sqlalchemy import select, func
 from typing import Optional
 from datetime import datetime, timedelta
 
-from src.backend.core.database import get_db
-from src.backend.evidence.models import Evidence, EvidenceStatus
-from src.backend.evidence.schemas import (
+from core.database import get_db
+from evidence.models import Evidence, EvidenceStatus
+from evidence.schemas import (
     EvidenceCreate,
     EvidenceUpdate,
     EvidenceResponse,
@@ -53,11 +53,12 @@ async def list_evidence(
     result = await db.execute(query)
     items = result.scalars().all()
     
+    response_items = [EvidenceResponse.model_validate(item) for item in items]
     return EvidenceListResponse(
         total=total or 0,
         offset=offset,
         limit=limit,
-        items=items,
+        items=response_items,
     )
 
 
@@ -171,10 +172,14 @@ async def validate_evidence(
         )
     
     # Update validation status
-    evidence.validated_by = validation.validated_by
-    evidence.validated_at = datetime.utcnow()
-    evidence.validation_notes = validation.validation_notes
-    evidence.status = EvidenceStatus.VALIDATED if validation.approved else EvidenceStatus.REJECTED
+    setattr(evidence, "validated_by", validation.validated_by)
+    setattr(evidence, "validated_at", datetime.utcnow())
+    setattr(evidence, "validation_notes", validation.validation_notes)
+    setattr(
+        evidence,
+        "status",
+        EvidenceStatus.VALIDATED if validation.approved else EvidenceStatus.REJECTED,
+    )
     
     await db.commit()
     await db.refresh(evidence)
@@ -233,3 +238,4 @@ async def get_control_evidence_summary(
         "by_type": by_type,
         "compliance_rate": (by_status.get("validated", 0) / total * 100) if total > 0 else 0,
     }
+
