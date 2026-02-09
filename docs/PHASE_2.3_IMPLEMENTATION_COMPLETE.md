@@ -648,7 +648,6 @@ python -m uvicorn main:app --reload
 # Register AI model
 curl -X POST http://localhost:8000/api/v1/ai-governance/models \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{
     "model_name": "customer_churn_predictor",
     "model_version": "1.0.0",
@@ -664,7 +663,6 @@ curl -X POST http://localhost:8000/api/v1/ai-governance/models \
 
 # Trigger bias test
 curl -X POST http://localhost:8000/api/v1/ai-governance/models/{model_id}/bias-tests \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{
     "test_data": {
       "attributes": {
@@ -682,7 +680,6 @@ curl -X POST http://localhost:8000/api/v1/ai-governance/models/{model_id}/bias-t
 ```bash
 # Submit security event
 curl -X POST http://localhost:8000/api/v1/siem/events \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{
     "event_type": "authentication_failure",
     "severity": "high",
@@ -694,14 +691,13 @@ curl -X POST http://localhost:8000/api/v1/siem/events \
 
 # List security incidents
 curl http://localhost:8000/api/v1/siem/incidents \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+  
 ```
 
 #### 4. Test Vulnerability Management:
 ```bash
 # Submit vulnerability scan
 curl -X POST http://localhost:8000/api/v1/vuln/scans \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{
     "scan_name": "Weekly Production Scan",
     "scan_type": "network",
@@ -722,7 +718,7 @@ curl -X POST http://localhost:8000/api/v1/vuln/scans \
 
 # Get critical vulnerabilities in production
 curl http://localhost:8000/api/v1/vuln/critical-production \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+  
 ```
 
 #### 5. Check Database Migrations:
