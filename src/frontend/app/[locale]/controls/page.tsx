@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl';
 import useSWR from 'swr';
 import { useState } from 'react';
 import apiClient from '@/lib/api-client';
+import Link from 'next/link';
 
 const fetcher = (url: string) => apiClient.get(url).then((res) => res.data);
 
@@ -95,10 +96,11 @@ function ControlCard({ control, t }: { control: any; t: any }) {
   };
 
   return (
-    <div
-      className={`bg-white rounded-lg shadow-md p-6 border-l-4 ${
+    <Link
+      href={`/controls/${control.control_id}`}
+      className={`block bg-white rounded-lg shadow-md p-6 border-l-4 ${
         priorityColors[control.priority] || 'border-gray-300'
-      } hover:shadow-lg transition-shadow`}
+      } hover:shadow-lg transition-shadow cursor-pointer`}
     >
       <div className="flex justify-between items-start mb-3">
         <span className="font-mono text-sm text-primary-600 font-semibold">
@@ -127,6 +129,6 @@ function ControlCard({ control, t }: { control: any; t: any }) {
           <span className="text-xs font-medium text-gray-700">{control.domain}</span>
         </div>
       )}
-    </div>
+    </Link>
   );
 }

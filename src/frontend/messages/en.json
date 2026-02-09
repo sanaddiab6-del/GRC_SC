@@ -10,7 +10,9 @@
     "controls": "Controls",
     "evidence": "Evidence",
     "reports": "Reports",
-    "dashboard": "Dashboard"
+    "dashboard": "Dashboard",
+    "search": "Search",
+    "frameworks": "Frameworks"
   },
   "controls": {
     "title": "Compliance Controls",

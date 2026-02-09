@@ -10,10 +10,13 @@ from sqlalchemy.orm import declarative_base
 from sqlalchemy.pool import NullPool
 from core.config import settings
 
-# Convert postgresql:// to postgresql+asyncpg://
-DATABASE_URL = settings.DATABASE_URL.replace(
-    "postgresql://", "postgresql+asyncpg://"
-)
+# Convert postgresql:// to postgresql+asyncpg:// if needed
+if settings.DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = settings.DATABASE_URL.replace(
+        "postgresql://", "postgresql+asyncpg://"
+    )
+else:
+    DATABASE_URL = settings.DATABASE_URL
 
 # Create async engine
 use_null_pool = bool(os.getenv("PYTEST_RUNNING")) or bool(os.getenv("PYTEST_CURRENT_TEST"))

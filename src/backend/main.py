@@ -5,8 +5,9 @@ Enhanced with NCA ECC-IS-3 and PDPL Article 29 security controls
 """
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.responses import JSONResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 
 from core.config import settings
@@ -22,6 +23,7 @@ from privacy import router as privacy_router
 from incident import router as incident_router
 from risk import router as risk_router
 from ai_governance import router as ai_governance_router
+import enterprise_router
 
 
 # Configure logging
@@ -55,18 +57,50 @@ async def lifespan(app: FastAPI):
         logger.warning("   Server running in API-only mode (no database)")
         logger.warning("   Start PostgreSQL: docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres:15")
     
+    # Start privacy automation background tasks
+    try:
+        from privacy.background_tasks import privacy_scheduler
+        privacy_scheduler.start()
+        logger.info("✓ Privacy automation started (DSAR, consent expiry, breach notifications)")
+    except Exception as e:
+        logger.warning(f"⚠️ Privacy automation failed: {str(e)}")
+    
+    # Start Phase 2.3 automation (AI governance & SIEM)
+    try:
+        from phase23_background_tasks import phase23_scheduler
+        phase23_scheduler.start()
+        logger.info("✓ AI Governance & SIEM automation started (bias testing, performance monitoring, incident detection)")
+    except Exception as e:
+        logger.warning(f"⚠️ Phase 2.3 automation failed: {str(e)}")
+    
     logger.info("✓ SICO GRC Platform started")
     
     yield
     
     # Cleanup on shutdown
     logger.info("Shutting down SICO GRC Platform...")
+    
+    # Stop background tasks
+    try:
+        from privacy.background_tasks import privacy_scheduler
+        privacy_scheduler.shutdown()
+        logger.info("✓ Privacy automation stopped")
+    except Exception as e:
+        logger.warning(f"⚠️ Privacy shutdown warning: {str(e)}")
+    
+    try:
+        from phase23_background_tasks import phase23_scheduler
+        phase23_scheduler.shutdown()
+        logger.info("✓ Phase 2.3 automation stopped")
+    except Exception as e:
+        logger.warning(f"⚠️ Phase 2.3 shutdown warning: {str(e)}")
+
 
 
 app = FastAPI(
     title="SICO GRC Platform API",
-    description="Bilingual Saudi Regulatory Compliance Engine (ECC, CCC, PDPL) with NCA Security Controls",
-    version="2.3.0",  # Phase 2.3 - Full Compliance
+    description="Bilingual Saudi Regulatory Compliance Engine (ECC, CCC, PDPL, SDAIA AI) with NCA Security Controls",
+    version="2.3.0",  # Phase 2.3 - AI Governance & Operations
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -146,27 +180,26 @@ async def health_check():
     )
 
 
-# Register authentication router (public endpoints for login/register)
-app.include_router(auth_router, prefix="/api/v1", tags=["Authentication"])
+# Test Enterprise API Pattern
+@app.get("/api/v1/test-enterprise-orgs", tags=["Test"])
+async def test_enterprise_orgs(db: AsyncSession = Depends(get_db)):
+    """Test endpoint using same pattern as enterprise router"""
+    from sqlalchemy import text
+    result = await db.execute(text("SELECT * FROM organizations"))
+    return [dict(row._mapping) for row in result]
 
-# Register protected routers with versioned prefix
-# Note: Individual routes are protected via dependencies in router files
+
+# Register all routers with versioned prefix
+app.include_router(auth_router, prefix="/api/v1", tags=["Authentication"])
 app.include_router(controls_router, prefix="/api/v1", tags=["Controls"])
 app.include_router(evidence_router, prefix="/api/v1", tags=["Evidence"])
 app.include_router(reporting_router, prefix="/api/v1", tags=["Reporting"])
 app.include_router(ai_router.router, prefix="/api/v1", tags=["AI/RAG"])
-
-# Phase 2.2 - Privacy & Data Protection (PDPL)
-app.include_router(privacy_router, prefix="/api/v1", tags=["Privacy"])
-
-# Phase 2.3 - Incident Response (NCA ECC-IS-5)
+app.include_router(privacy_router, prefix="/api/v1", tags=["Privacy & PDPL"])
 app.include_router(incident_router, prefix="/api/v1", tags=["Incident Response"])
-
-# Phase 2.3 - Risk Management (NCA ECC-RM)
 app.include_router(risk_router, prefix="/api/v1", tags=["Risk Management"])
-
-# Phase 2.3 - AI Governance (SDAIA AI Principles)
 app.include_router(ai_governance_router, prefix="/api/v1", tags=["AI Governance"])
+app.include_router(enterprise_router.router, prefix="/api/v1", tags=["Enterprise GRC"])
 
 
 @app.get("/api/v1/security-status", tags=["Security"])

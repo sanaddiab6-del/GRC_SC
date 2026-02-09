@@ -4,7 +4,8 @@ Supports environment variables and .env file
 """
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import List
+from typing import List, Union
+from pydantic import field_validator
 
 
 class Settings(BaseSettings):
@@ -16,10 +17,18 @@ class Settings(BaseSettings):
     
     # API
     API_V1_PREFIX: str = "/api/v1"
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8000"]
+    CORS_ORIGINS: Union[List[str], str] = "http://localhost:3000,http://localhost:8000"
     
-    # Database
-    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/sico_grc"
+    @field_validator('CORS_ORIGINS', mode='before')
+    @classmethod
+    def parse_cors_origins(cls, v):
+        if isinstance(v, str):
+            return [origin.strip() for origin in v.split(',')]
+        return v
+    
+      # Database
+    DATABASE_URL: str = "sqlite+aiosqlite:///./sico_grc.db"  # Async for application
+    DATABASE_URL_SYNC: str = "sqlite:///./sico_grc.db"  # Synchronous for direct SQL scripts
     DATABASE_ECHO: bool = False
     
     # Vector Database

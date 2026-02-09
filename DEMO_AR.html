@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>منصة سيكو للحوكمة - العرض التوضيحي</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: white;
+            border-radius: 15px;
+            padding: 40px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+        
+        .header h1 {
+            color: #667eea;
+            font-size: 3em;
+            margin-bottom: 15px;
+            font-weight: 900;
+        }
+        
+        .header p {
+            color: #666;
+            font-size: 1.3em;
+            line-height: 1.6;
+        }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+        
+        .status-card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+            border-right: 5px solid #667eea;
+        }
+        
+        .status-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+        
+        .status-card h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+            font-weight: 700;
+        }
+        
+        .status-number {
+            font-size: 3em;
+            font-weight: 900;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 8px 20px;
+            border-radius: 25px;
+            font-weight: 700;
+            font-size: 0.95em;
+        }
+        
+        .status-success {
+            background: #10b981;
+            color: white;
+        }
+        
+        .status-warning {
+            background: #f59e0b;
+            color: white;
+        }
+        
+        .status-danger {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .frameworks-section {
+            background: white;
+            border-radius: 15px;
+            padding: 40px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .frameworks-section h2 {
+            color: #667eea;
+            margin-bottom: 30px;
+            font-size: 2.2em;
+            font-weight: 900;
+            text-align: center;
+        }
+        
+        .framework-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+        
+        .framework-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .framework-card:hover {
+            transform: scale(1.02);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+        }
+        
+        .framework-card.ecc {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .framework-card.ccc {
+            background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+            color: white;
+        }
+        
+        .framework-card.pdpl {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+        
+        .framework-card h3 {
+            font-size: 1.8em;
+            margin-bottom: 15px;
+            font-weight: 900;
+        }
+        
+        .framework-card p {
+            font-size: 1.1em;
+            margin-bottom: 20px;
+            line-height: 1.6;
+            opacity: 0.95;
+        }
+        
+        .framework-stats {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid rgba(255,255,255,0.3);
+        }
+        
+        .framework-stat {
+            text-align: center;
+        }
+        
+        .framework-stat-number {
+            font-size: 2em;
+            font-weight: 900;
+            display: block;
+        }
+        
+        .framework-stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        
+        .controls-section {
+            background: white;
+            border-radius: 15px;
+            padding: 40px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .controls-section h2 {
+            color: #667eea;
+            margin-bottom: 25px;
+            font-size: 2.2em;
+            font-weight: 900;
+        }
+        
+        .control-item {
+            background: #f9fafb;
+            border-right: 4px solid #667eea;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+        }
+        
+        .control-item:hover {
+            background: #f3f4f6;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            transform: translateX(-5px);
+        }
+        
+        .control-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .control-id {
+            background: #667eea;
+            color: white;
+            padding: 6px 15px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 0.9em;
+        }
+        
+        .control-title {
+            font-size: 1.3em;
+            color: #333;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+        
+        .control-description {
+            color: #666;
+            line-height: 1.6;
+            font-size: 1.05em;
+        }
+        
+        .evidence-section {
+            background: white;
+            border-radius: 15px;
+            padding: 40px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .evidence-section h2 {
+            color: #667eea;
+            margin-bottom: 25px;
+            font-size: 2.2em;
+            font-weight: 900;
+        }
+        
+        .evidence-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .evidence-card {
+            background: #f9fafb;
+            border-radius: 8px;
+            padding: 20px;
+            border-right: 4px solid #10b981;
+        }
+        
+        .evidence-card h4 {
+            color: #333;
+            font-size: 1.2em;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        
+        .evidence-meta {
+            color: #666;
+            font-size: 0.95em;
+            margin: 5px 0;
+        }
+        
+        .footer {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .footer p {
+            color: #666;
+            margin: 10px 0;
+            font-size: 1.1em;
+        }
+        
+        .badge-container {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        
+        .compliance-badge {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 10px 25px;
+            border-radius: 25px;
+            font-weight: 700;
+            font-size: 1.05em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🛡️ منصة سيكو للحوكمة</h1>
+            <p style="font-weight: 600; margin-top: 10px;">نظام إدارة الامتثال التنظيمي السعودي الشامل</p>
+            <p>الضوابط الأساسية للأمن السيبراني • ضوابط الحوسبة السحابية • نظام حماية البيانات الشخصية</p>
+        </div>
+        
+        <!-- Status Cards -->
+        <div class="status-grid">
+            <div class="status-card">
+                <h3>📊 معدل الامتثال الإجمالي</h3>
+                <div class="status-number">64%</div>
+                <span class="status-badge status-warning">قيد التحسين</span>
+            </div>
+            
+            <div class="status-card">
+                <h3>✅ الضوابط المتوافقة</h3>
+                <div class="status-number">16</div>
+                <span class="status-badge status-success">نشط</span>
+            </div>
+            
+            <div class="status-card">
+                <h3>⚠️ الضوابط قيد التنفيذ</h3>
+                <div class="status-number">7</div>
+                <span class="status-badge status-warning">قيد العمل</span>
+            </div>
+            
+            <div class="status-card">
+                <h3>❌ الفجوات الحرجة</h3>
+                <div class="status-number">2</div>
+                <span class="status-badge status-danger">يتطلب إجراء</span>
+            </div>
+        </div>
+        
+        <!-- Frameworks Section -->
+        <div class="frameworks-section">
+            <h2>🎯 الأطر التنظيمية السعودية</h2>
+            
+            <div class="framework-grid">
+                <div class="framework-card ecc">
+                    <h3>🛡️ الضوابط الأساسية للأمن السيبراني</h3>
+                    <p>الهيئة الوطنية للأمن السيبراني (NCA) - إطار شامل لحماية الأصول السيبرانية والبنية التحتية الحيوية</p>
+                    <div class="framework-stats">
+                        <div class="framework-stat">
+                            <span class="framework-stat-number">11</span>
+                            <span class="framework-stat-label">ضابط</span>
+                        </div>
+                        <div class="framework-stat">
+                            <span class="framework-stat-number">73%</span>
+                            <span class="framework-stat-label">امتثال</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="framework-card ccc">
+                    <h3>☁️ ضوابط الحوسبة السحابية</h3>
+                    <p>الهيئة الوطنية للأمن السيبراني (NCA) - ضوابط متخصصة لأمن الخدمات السحابية والبيئات الهجينة</p>
+                    <div class="framework-stats">
+                        <div class="framework-stat">
+                            <span class="framework-stat-number">7</span>
+                            <span class="framework-stat-label">ضابط</span>
+                        </div>
+                        <div class="framework-stat">
+                            <span class="framework-stat-number">71%</span>
+                            <span class="framework-stat-label">امتثال</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="framework-card pdpl">
+                    <h3>🔒 نظام حماية البيانات الشخصية</h3>
+                    <p>الهيئة السعودية للبيانات والذكاء الاصطناعي (SDAIA) - حماية خصوصية البيانات وحقوق الأفراد</p>
+                    <div class="framework-stats">
+                        <div class="framework-stat">
+                            <span class="framework-stat-number">7</span>
+                            <span class="framework-stat-label">ضابط</span>
+                        </div>
+                        <div class="framework-stat">
+                            <span class="framework-stat-number">43%</span>
+                            <span class="framework-stat-label">امتثال</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sample Controls -->
+        <div class="controls-section">
+            <h2>📋 أمثلة من الضوابط - ECC</h2>
+            
+            <div class="control-item">
+                <div class="control-header">
+                    <span class="control-id">ECC-GV-1</span>
+                    <span class="status-badge status-success">متوافق</span>
+                </div>
+                <div class="control-title">الحوكمة التنظيمية السيبرانية</div>
+                <div class="control-description">
+                    يجب على المنظمة إنشاء إطار حوكمة للأمن السيبراني يتماشى مع الأهداف الاستراتيجية والمتطلبات التنظيمية. يشمل ذلك تحديد الأدوار والمسؤوليات وإنشاء لجنة الأمن السيبراني.
+                </div>
+            </div>
+            
+            <div class="control-item">
+                <div class="control-header">
+                    <span class="control-id">ECC-AC-1</span>
+                    <span class="status-badge status-success">متوافق</span>
+                </div>
+                <div class="control-title">التحكم في الوصول</div>
+                <div class="control-description">
+                    تنفيذ ضوابط وصول قوية لتقييد الوصول إلى الموارد بناءً على مبدأ الامتياز الأدنى والحاجة إلى المعرفة. يتضمن ذلك المصادقة متعددة العوامل ومراجعة الصلاحيات الدورية.
+                </div>
+            </div>
+            
+            <div class="control-item">
+                <div class="control-header">
+                    <span class="control-id">ECC-IR-1</span>
+                    <span class="status-badge status-danger">غير متوافق</span>
+                </div>
+                <div class="control-title">الاستجابة للحوادث</div>
+                <div class="control-description">
+                    إنشاء قدرة الاستجابة للحوادث مع إجراءات موثقة للكشف والاستجابة والتعافي من حوادث الأمن السيبراني. يجب اختبار خطة الاستجابة بشكل منتظم.
+                </div>
+            </div>
+        </div>
+        
+        <!-- Evidence Section -->
+        <div class="evidence-section">
+            <h2>📎 أمثلة من الأدلة</h2>
+            
+            <div class="evidence-grid">
+                <div class="evidence-card">
+                    <h4>📄 ميثاق الحوكمة السيبرانية</h4>
+                    <div class="evidence-meta">🔸 النوع: سياسة</div>
+                    <div class="evidence-meta">🔸 الضابط: ECC-GV-1</div>
+                    <div class="evidence-meta">🔸 الحالة: <span class="status-badge status-success">محقق</span></div>
+                </div>
+                
+                <div class="evidence-card">
+                    <h4>📊 تقرير تقييم المخاطر Q1 2026</h4>
+                    <div class="evidence-meta">🔸 النوع: تقرير</div>
+                    <div class="evidence-meta">🔸 الضابط: ECC-RM-1</div>
+                    <div class="evidence-meta">🔸 الحالة: <span class="status-badge status-success">محقق</span></div>
+                </div>
+                
+                <div class="evidence-card">
+                    <h4>💾 قاعدة بيانات جرد الأصول</h4>
+                    <div class="evidence-meta">🔸 النوع: قاعدة بيانات</div>
+                    <div class="evidence-meta">🔸 الضابط: ECC-AM-1</div>
+                    <div class="evidence-meta">🔸 الحالة: <span class="status-badge status-success">محقق</span></div>
+                </div>
+                
+                <div class="evidence-card">
+                    <h4>🔐 سياسة التحكم في الوصول v2.0</h4>
+                    <div class="evidence-meta">🔸 النوع: سياسة</div>
+                    <div class="evidence-meta">🔸 الضابط: ECC-AC-1</div>
+                    <div class="evidence-meta">🔸 الحالة: <span class="status-badge status-success">محقق</span></div>
+                </div>
+                
+                <div class="evidence-card">
+                    <h4>📘 دليل الاستجابة للحوادث</h4>
+                    <div class="evidence-meta">🔸 النوع: إجراء</div>
+                    <div class="evidence-meta">🔸 الضابط: ECC-IR-1</div>
+                    <div class="evidence-meta">🔸 الحالة: <span class="status-badge status-warning">معلق</span></div>
+                </div>
+                
+                <div class="evidence-card">
+                    <h4>📝 نماذج موافقة البيانات</h4>
+                    <div class="evidence-meta">🔸 النوع: قالب</div>
+                    <div class="evidence-meta">🔸 الضابط: PDPL-1</div>
+                    <div class="evidence-meta">🔸 الحالة: <span class="status-badge status-success">محقق</span></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            <h3 style="color: #667eea; font-size: 1.8em; margin-bottom: 15px; font-weight: 900;">🎉 تم إنشاء المنصة بنجاح</h3>
+            <p style="font-weight: 600;">منصة شاملة لإدارة الامتثال التنظيمي السعودي</p>
+            <p>إجمالي الضوابط: 25 | الأدلة: 19 | الأطر: 3</p>
+            
+            <div class="badge-container">
+                <span class="compliance-badge">✅ الهيئة الوطنية للأمن السيبراني</span>
+                <span class="compliance-badge">✅ الهيئة السعودية للبيانات والذكاء الاصطناعي</span>
+            </div>
+            
+            <p style="margin-top: 25px; font-weight: 600; color: #667eea;">© 2026 منصة سيكو للحوكمة | جميع الحقوق محفوظة</p>
+        </div>
+    </div>
+</body>
+</html>

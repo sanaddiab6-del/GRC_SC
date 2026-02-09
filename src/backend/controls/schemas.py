@@ -3,7 +3,7 @@ Pydantic schemas for Controls API
 Request/response validation with bilingual support
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List, Dict
 from datetime import datetime
 
@@ -54,8 +54,7 @@ class ControlResponse(ControlBase):
     created_at: datetime
     updated_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
 
 class ControlListResponse(BaseModel):
