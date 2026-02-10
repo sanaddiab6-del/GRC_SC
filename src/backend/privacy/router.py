@@ -4,7 +4,7 @@ Implements consent management, DSAR, breach notification, and data classificatio
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
 from datetime import datetime, timedelta
 from typing import List
 import secrets
@@ -292,10 +292,12 @@ async def report_breach(
     # Generate incident number
     year = datetime.utcnow().year
     count_result = await db.execute(
-        select(DataBreachIncident).where(DataBreachIncident.incident_number.like(f"BR-{year}-%"))
+        select(func.count()).select_from(DataBreachIncident).where(
+            DataBreachIncident.incident_number.like(f"BR-{year}-%")
+        )
     )
-    count = len(count_result.scalars().all()) + 1
-    incident_number = f"BR-{year}-{count:04d}"
+    count = count_result.scalar() or 0
+    incident_number = f"BR-{year}-{count + 1:04d}"
     
     breach = DataBreachIncident(
         incident_number=incident_number,

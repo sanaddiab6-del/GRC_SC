@@ -37,7 +37,7 @@ class Control(Base):
     id = Column(Integer, primary_key=True, index=True)
     control_id = Column(String(50), unique=True, index=True, nullable=False)  # e.g., ECC-GV-1
     framework = Column(Enum(FrameworkType), nullable=False, index=True)
-    domain = Column(String(100), nullable=False)  # e.g., Governance, Security
+    domain = Column(String(100), nullable=False, index=True)  # Added index for filtering
     
     # Bilingual fields
     title_en = Column(String(500), nullable=False)
@@ -53,7 +53,7 @@ class Control(Base):
     
     # Control metadata
     priority = Column(String(20), default="medium")  # low, medium, high, critical
-    status = Column(Enum(ControlStatus), default=ControlStatus.NOT_STARTED)
+    status = Column(Enum(ControlStatus), default=ControlStatus.NOT_STARTED, index=True)  # Added index
     maturity_level = Column(Integer, default=1)  # 1-5 scale
     
     # Relationships and mappings

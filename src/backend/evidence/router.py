@@ -216,20 +216,32 @@ async def get_control_evidence_summary(
     db: AsyncSession = Depends(get_db),
 ):
     """Get evidence summary for a control"""
-    query = select(Evidence).where(Evidence.control_id == control_id)
-    result = await db.execute(query)
-    evidence_list = result.scalars().all()
+    # Get total count efficiently
+    total_query = select(func.count()).select_from(Evidence).where(Evidence.control_id == control_id)
+    total_result = await db.execute(total_query)
+    total = total_result.scalar() or 0
     
-    # Calculate summary statistics
-    total = len(evidence_list)
+    # Get status breakdown with single query
+    status_query = select(
+        Evidence.status,
+        func.count(Evidence.id)
+    ).where(Evidence.control_id == control_id).group_by(Evidence.status)
+    status_result = await db.execute(status_query)
+    
     by_status = {}
-    by_type = {}
+    for status, count in status_result:
+        by_status[status.value] = count
     
-    for evidence in evidence_list:
-        status = evidence.status.value
-        etype = evidence.evidence_type.value
-        by_status[status] = by_status.get(status, 0) + 1
-        by_type[etype] = by_type.get(etype, 0) + 1
+    # Get type breakdown with single query
+    type_query = select(
+        Evidence.evidence_type,
+        func.count(Evidence.id)
+    ).where(Evidence.control_id == control_id).group_by(Evidence.evidence_type)
+    type_result = await db.execute(type_query)
+    
+    by_type = {}
+    for etype, count in type_result:
+        by_type[etype.value] = count
     
     return {
         "control_id": control_id,
