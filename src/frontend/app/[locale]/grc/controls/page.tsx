@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
+import { useDebounce } from '@/lib/hooks';
 
 interface Control {
   control_id: string;
@@ -17,22 +18,53 @@ interface Control {
   evidence_types?: string[];
 }
 
+// Move helper functions outside component to avoid recreation
+const STATUS_COLORS: Record<string, string> = {
+  compliant: 'bg-green-500',
+  in_progress: 'bg-blue-500',
+  not_started: 'bg-gray-500',
+  non_compliant: 'bg-red-500'
+};
+
+const STATUS_TEXTS: Record<string, string> = {
+  compliant: 'منفذ',
+  in_progress: 'قيد التنفيذ',
+  not_started: 'لم يبدأ',
+  non_compliant: 'غير ممتثل'
+};
+
+const FRAMEWORK_COLORS: Record<string, string> = {
+  'ECC': 'from-purple-600 to-purple-800',
+  'CCC': 'from-blue-600 to-blue-800',
+  'PDPL': 'from-green-600 to-green-800'
+};
+
+const PRIORITY_COLORS: Record<string, string> = {
+  critical: 'text-red-400',
+  high: 'text-orange-400',
+  medium: 'text-yellow-400',
+  low: 'text-green-400'
+};
+
+const getStatusColor = (status: string) => STATUS_COLORS[status] || STATUS_COLORS.not_started;
+const getStatusText = (status: string) => STATUS_TEXTS[status] || status;
+const getFrameworkColor = (framework: string) => FRAMEWORK_COLORS[framework] || 'from-gray-600 to-gray-800';
+const getPriorityColor = (priority: string) => PRIORITY_COLORS[priority] || 'text-gray-400';
+
 export default function ControlsManagement() {
   const [allControls, setAllControls] = useState<Control[]>([]);
-  const [filteredControls, setFilteredControls] = useState<Control[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFramework, setSelectedFramework] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [selectedDomain, setSelectedDomain] = useState('ALL');
 
+  // Debounce search term for better performance
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+
   useEffect(() => {
     loadControls();
   }, []);
-
-  useEffect(() => {
-    applyFilters();
-  }, [allControls, searchTerm, selectedFramework, selectedStatus, selectedDomain]);
 
   const loadControls = async () => {
     try {
@@ -40,7 +72,6 @@ export default function ControlsManagement() {
       if (response.ok) {
         const data = await response.json();
         setAllControls(data);
-        setFilteredControls(data);
       }
       setLoading(false);
     } catch (error) {
@@ -49,17 +80,18 @@ export default function ControlsManagement() {
     }
   };
 
-  const applyFilters = () => {
+  // Memoize filtered controls to avoid recalculation on every render
+  const filteredControls = useMemo(() => {
     let filtered = [...allControls];
 
-    // Search filter
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
+    // Search filter - using debounced value
+    if (debouncedSearchTerm) {
+      const term = debouncedSearchTerm.toLowerCase();
       filtered = filtered.filter(c =>
         c.control_id.toLowerCase().includes(term) ||
-        c.title_ar.includes(searchTerm) ||
+        c.title_ar.includes(debouncedSearchTerm) ||
         c.title_en.toLowerCase().includes(term) ||
-        c.description_ar.includes(searchTerm)
+        c.description_ar.includes(debouncedSearchTerm)
       );
     }
 
@@ -78,52 +110,14 @@ export default function ControlsManagement() {
       filtered = filtered.filter(c => c.domain === selectedDomain);
     }
 
-    setFilteredControls(filtered);
-  };
+    return filtered;
+  }, [allControls, debouncedSearchTerm, selectedFramework, selectedStatus, selectedDomain]);
 
-  const getUniqueDomains = () => {
+  // Memoize unique domains calculation
+  const uniqueDomains = useMemo(() => {
     const domains = new Set(allControls.map(c => c.domain));
     return Array.from(domains).sort();
-  };
-
-  const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      compliant: 'bg-green-500',
-      in_progress: 'bg-blue-500',
-      not_started: 'bg-gray-500',
-      non_compliant: 'bg-red-500'
-    };
-    return colors[status] || colors.not_started;
-  };
-
-  const getStatusText = (status: string) => {
-    const texts: Record<string, string> = {
-      compliant: 'منفذ',
-      in_progress: 'قيد التنفيذ',
-      not_started: 'لم يبدأ',
-      non_compliant: 'غير ممتثل'
-    };
-    return texts[status] || status;
-  };
-
-  const getFrameworkColor = (framework: string) => {
-    const colors: Record<string, string> = {
-      'ECC': 'from-purple-600 to-purple-800',
-      'CCC': 'from-blue-600 to-blue-800',
-      'PDPL': 'from-green-600 to-green-800'
-    };
-    return colors[framework] || 'from-gray-600 to-gray-800';
-  };
-
-  const getPriorityColor = (priority: string) => {
-    const colors: Record<string, string> = {
-      critical: 'text-red-400',
-      high: 'text-orange-400',
-      medium: 'text-yellow-400',
-      low: 'text-green-400'
-    };
-    return colors[priority] || 'text-gray-400';
-  };
+  }, [allControls]);
 
   if (loading) {
     return (
@@ -205,7 +199,7 @@ export default function ControlsManagement() {
                 className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
               >
                 <option value="ALL">جميع المجالات</option>
-                {getUniqueDomains().map(domain => (
+                {uniqueDomains.map(domain => (
                   <option key={domain} value={domain}>{domain}</option>
                 ))}
               </select>
