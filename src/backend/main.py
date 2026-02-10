@@ -23,6 +23,7 @@ from privacy import router as privacy_router
 from incident import router as incident_router
 from risk import router as risk_router
 from ai_governance import router as ai_governance_router
+from backup import router as backup_router
 import enterprise_router
 
 
@@ -199,6 +200,7 @@ app.include_router(privacy_router, prefix="/api/v1", tags=["Privacy & PDPL"])
 app.include_router(incident_router, prefix="/api/v1", tags=["Incident Response"])
 app.include_router(risk_router, prefix="/api/v1", tags=["Risk Management"])
 app.include_router(ai_governance_router, prefix="/api/v1", tags=["AI Governance"])
+app.include_router(backup_router, tags=["Backup & Disaster Recovery"])
 app.include_router(enterprise_router.router, prefix="/api/v1", tags=["Enterprise GRC"])
 
 

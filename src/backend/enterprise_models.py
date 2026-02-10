@@ -835,7 +835,15 @@ class ComplianceMetric(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+# ============================================================================
+# BACKUP & DISASTER RECOVERY (NCA ECC-BC-1, BC-2)
+# ============================================================================
+
+# Import backup models
+from backup.models import BackupJob, RecoveryTest, DisasterRecoveryPlan
+
+
 print("✅ Enterprise GRC Database Schema Created")
 print("📊 Entities: 30+")
-print("🔒 Features: Multi-tenancy, RBAC, Full audit trail, Workflow engine")
+print("🔒 Features: Multi-tenancy, RBAC, Full audit trail, Workflow engine, Backup & DR")
 print("✅ Tier-1 Platform Ready")

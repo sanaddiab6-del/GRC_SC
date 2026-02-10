@@ -56,6 +56,26 @@ DEFAULT_PERMISSIONS = [
     # Audit log permissions
     {"name": "audit:read", "resource": "audit", "action": "read",
      "desc_en": "View audit logs", "desc_ar": "عرض سجلات التدقيق"},
+    
+    # Backup and Disaster Recovery permissions (NCA ECC-BC-1, BC-2)
+    {"name": "backup:create", "resource": "backup", "action": "create",
+     "desc_en": "Create backups", "desc_ar": "إنشاء نسخ احتياطية"},
+    {"name": "backup:read", "resource": "backup", "action": "read",
+     "desc_en": "View backups", "desc_ar": "عرض النسخ الاحتياطية"},
+    {"name": "backup:update", "resource": "backup", "action": "update",
+     "desc_en": "Update backup status", "desc_ar": "تحديث حالة النسخ الاحتياطي"},
+    {"name": "backup:delete", "resource": "backup", "action": "delete",
+     "desc_en": "Delete expired backups", "desc_ar": "حذف النسخ الاحتياطية المنتهية"},
+    {"name": "backup:test", "resource": "backup", "action": "test",
+     "desc_en": "Conduct recovery tests", "desc_ar": "إجراء اختبارات الاسترداد"},
+    
+    # ISMS Policy permissions
+    {"name": "isms:read", "resource": "isms", "action": "read",
+     "desc_en": "View ISMS policies", "desc_ar": "عرض سياسات نظام إدارة أمن المعلومات"},
+    {"name": "isms:write", "resource": "isms", "action": "write",
+     "desc_en": "Create/update ISMS policies", "desc_ar": "إنشاء/تحديث سياسات ISMS"},
+    {"name": "isms:approve", "resource": "isms", "action": "approve",
+     "desc_en": "Approve ISMS policies", "desc_ar": "الموافقة على سياسات ISMS"},
 ]
 
 
@@ -69,7 +89,9 @@ DEFAULT_ROLES = {
             "evidence:create", "evidence:read", "evidence:update", "evidence:delete",
             "reports:create", "reports:read", "reports:update", "reports:delete",
             "users:create", "users:read", "users:update", "users:delete",
-            "audit:read"
+            "audit:read",
+            "backup:create", "backup:read", "backup:update", "backup:delete", "backup:test",
+            "isms:read", "isms:write", "isms:approve"
         ]
     },
     "Compliance Officer": {
