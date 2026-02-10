@@ -118,8 +118,18 @@ export default function FrameworkPage({
           <p className="text-gray-700 leading-relaxed">
             {isArabic ? description.ar : description.en}
           </p>
-          <div className={`bg-${highlightColor}-50 border-l-4 border-${highlightColor}-500 p-4 mt-4`}>
-            <p className={`font-semibold text-${highlightColor}-900`}>
+          <div className={
+            highlightColor === 'blue' ? 'bg-blue-50 border-l-4 border-blue-500 p-4 mt-4' :
+            highlightColor === 'purple' ? 'bg-purple-50 border-l-4 border-purple-500 p-4 mt-4' :
+            highlightColor === 'green' ? 'bg-green-50 border-l-4 border-green-500 p-4 mt-4' :
+            'bg-gray-50 border-l-4 border-gray-500 p-4 mt-4'
+          }>
+            <p className={
+              highlightColor === 'blue' ? 'font-semibold text-blue-900' :
+              highlightColor === 'purple' ? 'font-semibold text-purple-900' :
+              highlightColor === 'green' ? 'font-semibold text-green-900' :
+              'font-semibold text-gray-900'
+            }>
               {isArabic 
                 ? `يحتوي ${frameworkName.ar} على ${stats.total} ضابط منظم عبر مجالات متعددة.`
                 : `${frameworkName.en} contains ${stats.total} controls organized across multiple domains.`}
