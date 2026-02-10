@@ -34,17 +34,28 @@ class ControlChunker:
         self.max_chunk_size = max_chunk_size
     
     def _split_long_text(self, text: str, language: str) -> List[str]:
-        """Split text if it exceeds max_chunk_size"""
+        """
+        Split text if it exceeds max_chunk_size.
+        Uses basic sentence splitting that works for both English and Arabic.
+        
+        Note: For production, consider using language-specific tokenizers
+        like nltk.sent_tokenize for English or CAMeL Tools for Arabic.
+        """
         if len(text) <= self.max_chunk_size:
             return [text]
         
-        # Split into sentences (basic splitting)
-        sentences = text.split('. ')
+        # Split on common sentence delimiters (works for both languages)
+        # Arabic uses '.' and English uses '. '
+        import re
+        # Split on period followed by space or newline, or just period at end
+        sentences = re.split(r'\.\s+|\.\n+|\.(?=$)', text)
         chunks = []
         current_chunk = []
         current_size = 0
         
         for sentence in sentences:
+            if not sentence.strip():
+                continue
             sentence_size = len(sentence)
             if current_size + sentence_size > self.max_chunk_size and current_chunk:
                 chunks.append('. '.join(current_chunk) + '.')

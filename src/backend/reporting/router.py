@@ -90,7 +90,6 @@ async def get_executive_dashboard(
     for domain, status, count in domain_result:
         if domain not in by_domain:
             by_domain[domain] = {
-                "controls": [],  # We'll populate this separately if needed
                 "statuses": {
                     "compliant": 0,
                     "non_compliant": 0,

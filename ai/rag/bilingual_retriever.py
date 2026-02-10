@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 import hashlib
 import json
+from collections import OrderedDict
 
 _LANGCHAIN_AVAILABLE = False
 
@@ -44,6 +45,17 @@ class BilingualRetriever:
         use_gpu: bool = True,
         use_smaller_model: bool = False,
     ):
+        """
+        Initialize the bilingual retriever.
+        
+        Args:
+            embedding_model: HuggingFace model name for embeddings
+            vector_db_path: Path to Chroma vector database
+            use_gpu: Whether to use GPU if available (auto-detects)
+            use_smaller_model: Use smaller model (e5-small) for faster but less accurate embeddings.
+                              Recommended for development/testing or resource-constrained environments.
+                              Trade-off: 3-5x faster but ~10-15% lower retrieval quality.
+        """
         if not _LANGCHAIN_AVAILABLE:
             raise ImportError(
                 "AI dependencies are not installed. Install langchain, "
@@ -77,8 +89,9 @@ class BilingualRetriever:
             embedding_function=self.embeddings,
         )
         
-        # Cache for query results
-        self._query_cache: Dict[str, List[Dict[str, Any]]] = {}
+        # LRU cache for query results using OrderedDict
+        self._query_cache: OrderedDict[str, List[Dict[str, Any]]] = OrderedDict()
+        self._cache_max_size = 100
     
     def retrieve(
         self,
@@ -106,6 +119,8 @@ class BilingualRetriever:
         
         # Check cache
         if use_cache and cache_key in self._query_cache:
+            # Move to end to mark as recently used
+            self._query_cache.move_to_end(cache_key)
             return self._query_cache[cache_key]
         
         # Build metadata filter
@@ -136,11 +151,11 @@ class BilingualRetriever:
             }
             formatted_results.append(result)
         
-        # Cache results (limit cache size to 100 entries)
+        # Cache results with proper LRU eviction
         if use_cache:
-            if len(self._query_cache) >= 100:
-                # Remove oldest entry
-                self._query_cache.pop(next(iter(self._query_cache)))
+            if len(self._query_cache) >= self._cache_max_size:
+                # Remove least recently used (first item in OrderedDict)
+                self._query_cache.popitem(last=False)
             self._query_cache[cache_key] = formatted_results
         
         return formatted_results
