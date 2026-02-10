@@ -1,46 +1,83 @@
 # Python
-# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
-# Distribution / packaging
+*$py.class
+*.so
 .Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
 *.egg-info/
-.dist-info/
-# Pytest cache directory
-.pytest_cache/
+.installed.cfg
+*.egg
+venv/
+env/
+ENV/
+.venv
 
 # Node.js
-# Packages
 node_modules/
-# Build output
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
 .next/
 out/
 build/
-dist/
-# Logs
-*.log
+.DS_Store
+*.tsbuildinfo
 
-# Environment variables
+# Environment
 .env
 .env.local
-.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
 
-# IDE files
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
-.DS_Store
+*~
 
 # Docker
-# Docker ignore specifics (add relevant patterns)
-.dockerignore
+*.log
+docker-compose.override.yml
 
-# Database files
+# Database
 *.db
 *.sqlite
+*.sqlite3
 
-# Logs and temp files
-*.log
-*~
-*tmp*
+# AI/ML
+*.pkl
+*.h5
+*.pt
+*.pth
+models/downloads/
+.cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Misc
+*.bak
+*.tmp
+.temp/
