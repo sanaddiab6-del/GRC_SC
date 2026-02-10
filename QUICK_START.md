@@ -14,6 +14,38 @@
 
 ---
 
+## Step 0: Validate System Setup (Recommended)
+
+Before starting, validate your system has all required prerequisites:
+
+```bash
+# Run system validation
+make validate
+
+# Or directly
+./scripts/validate_system.sh
+```
+
+**What it checks:**
+- ✅ Python 3.11+ installation
+- ✅ Node.js 18+ installation
+- ✅ Docker and Docker Compose
+- ✅ Git installation
+- ✅ Required directory structure
+- ✅ Configuration files
+- ✅ Service connectivity (PostgreSQL, Redis, Chroma)
+
+**Expected Output:**
+```
+✓ Passed:   30
+✗ Failed:   0-1 (missing .env is expected before setup)
+⚠ Warnings: 3-5 (services not started yet)
+```
+
+If validation fails, fix the issues before proceeding.
+
+---
+
 ## 5-Minute Setup (Development)
 
 ### Step 1: Clone & Navigate

@@ -1,12 +1,13 @@
 # SICO GRC Platform Makefile
 
-.PHONY: help install dev test clean docker-up docker-down security security-deps security-sast security-scan git-setup check-conflicts
+.PHONY: help install dev test clean docker-up docker-down security security-deps security-sast security-scan git-setup check-conflicts validate
 
 help:
 	@echo "SICO GRC Platform - Available Commands"
 	@echo "======================================"
 	@echo ""
 	@echo "📦 Setup & Installation:"
+	@echo "  validate      - Validate system prerequisites and configuration"
 	@echo "  install       - Install all dependencies"
 	@echo ""
 	@echo "🚀 Development:"
@@ -100,3 +101,7 @@ git-setup:
 check-conflicts:
 	@echo "Checking for potential merge conflicts with main..."
 	@bash scripts/check_conflicts.sh main -v
+
+validate:
+	@echo "Running system validation..."
+	@bash scripts/validate_system.sh
