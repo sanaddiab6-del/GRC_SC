@@ -1,354 +1,371 @@
-# Security Pipeline Documentation
+# 🔒 SICO GRC Platform - Security Pipeline
 
 ## Overview
 
-The SICO GRC Platform includes a comprehensive security pipeline that runs automated security scans on every commit and pull request. This ensures that security vulnerabilities are caught early in the development lifecycle.
+The SICO GRC Platform implements a **comprehensive security scanning pipeline** that runs automatically on every commit and pull request. This pipeline is designed to meet **NCA ECC-IS-4** (Security Monitoring) and **PDPL Article 29** (Data Protection) requirements.
 
-## Security Scanning Components
+## Security Scans
 
 ### 1. Dependency Vulnerability Scanning
-
-**Tools:**
-- **Python**: Safety (checks PyPI packages against known vulnerabilities)
-- **Node.js**: npm audit (checks npm packages against GitHub Advisory Database)
-
-**Triggers:**
-- Every push to main, develop, or copilot/* branches
-- All pull requests
-- Weekly scheduled scan (Mondays at 9 AM UTC)
+**Tools:** Safety (Python), npm audit (Node.js)
+**Purpose:** Detect known vulnerabilities in third-party dependencies
 
 **What it checks:**
-- Known CVEs in Python dependencies
-- Known vulnerabilities in Node.js dependencies
-- Outdated packages with security patches
+- Python packages in `requirements.txt`
+- Node.js packages in `package.json`
+- CVEs (Common Vulnerabilities and Exposures) database
 
-**Local execution:**
+**Run locally:**
 ```bash
 make security-deps
 ```
 
-### 2. SAST (Static Application Security Testing)
+**Outputs:**
+- `safety-report.json` - Python vulnerabilities
+- `npm-audit.json` - Node.js vulnerabilities
 
-**Tools:**
-- **Bandit**: Python security linter (checks for common security issues)
-- **CodeQL**: Advanced semantic code analysis
+---
+
+### 2. Static Application Security Testing (SAST)
+**Tools:** Bandit (Python), CodeQL (Python + JavaScript)
+**Purpose:** Find security issues in source code (SQL injection, XSS, hardcoded secrets)
 
 **What it checks:**
 - SQL injection vulnerabilities
-- Hardcoded secrets/passwords
+- Cross-site scripting (XSS) risks
 - Insecure cryptography usage
-- Command injection risks
+- Hardcoded passwords/tokens
 - Path traversal vulnerabilities
-- XSS vulnerabilities
-- Insecure deserialization
 
-**Local execution:**
+**Run locally:**
 ```bash
 make security-sast
 ```
 
-### 3. CodeQL Analysis
+**Outputs:**
+- `bandit-report.json` - Python SAST results
+- SARIF files uploaded to GitHub Security tab
 
-**Languages analyzed:**
-- Python (backend and AI code)
-- JavaScript/TypeScript (frontend)
+---
 
-**Query packs:**
-- Security queries (security vulnerabilities)
-- Quality queries (code quality issues)
-
-**Integration:**
-- Results uploaded to GitHub Security tab
-- Can block PRs if critical issues found
-- Provides detailed remediation guidance
-
-### 4. SBOM (Software Bill of Materials) Generation
-
-**Tools:**
-- CycloneDX (industry-standard SBOM format)
-
-**What it generates:**
-- Complete inventory of all dependencies
-- Dependency relationships and versions
-- License information
-- Component hashes for verification
-
-**Output formats:**
-- JSON (machine-readable)
-- Stored as artifacts for 90 days
-
-**Use cases:**
-- Supply chain security audits
-- License compliance verification
-- Vulnerability tracking
-- Regulatory compliance (SBOM requirements)
-
-### 5. Secret Scanning
-
-**Tool:**
-- Gitleaks (detects hardcoded secrets)
+### 3. Secret Detection
+**Tool:** Gitleaks
+**Purpose:** Prevent hardcoded credentials from entering the codebase
 
 **What it checks:**
-- API keys and tokens
-- Passwords and credentials
-- Private keys
-- AWS/Azure credentials
-- Database connection strings
+- API keys (AWS, Azure, OpenAI, etc.)
+- Database passwords
+- Private keys (RSA, SSH)
+- JWT tokens
+- OAuth client secrets
 
-**Scan scope:**
-- Full git history
-- All branches and commits
-
-## Workflow Configuration
-
-### Main Security Workflow
-**File:** `.github/workflows/security-scanning.yml`
-
-**Jobs:**
-1. `dependency-scan` - Scans Python and Node.js dependencies
-2. `sast-python` - Runs Bandit and generates SARIF reports
-3. `codeql-analysis` - Deep semantic analysis
-4. `sbom-generation` - Creates software inventory
-5. `secret-scan` - Detects hardcoded secrets
-6. `security-summary` - Aggregates all results
-
-### CI/CD Pipeline
-**File:** `.github/workflows/ci.yml`
-
-**Additional checks:**
-- Conflict marker detection
-- Python import validation
-- Build verification
-- Test execution
-
-## Using the Security Pipeline Locally
-
-### Quick Security Check
+**Run locally:**
 ```bash
-# Run all security scans
-make security
-
-# This will:
-# 1. Check Python dependencies with Safety
-# 2. Check Node.js dependencies with npm audit
-# 3. Run Bandit SAST scan
-# 4. Generate reports in JSON format
+make security-secrets
+# Requires gitleaks: brew install gitleaks (macOS) or see https://github.com/gitleaks/gitleaks
 ```
 
-### Individual Scans
+**Outputs:**
+- `gitleaks-report.json` - Detected secrets
 
-**Dependency scanning only:**
+---
+
+### 4. Container Security Scanning (NEW)
+**Tool:** Trivy
+**Purpose:** Scan Docker images for OS and application vulnerabilities
+
+**What it checks:**
+- OS package vulnerabilities (Ubuntu base image)
+- Python package vulnerabilities in containers
+- Node.js package vulnerabilities in containers
+- Configuration issues (running as root, exposed secrets)
+
+**Run locally:**
 ```bash
-make security-deps
+make security-containers
+# Requires trivy: brew install aquasecurity/trivy/trivy (macOS) or see https://aquasecurity.github.io/trivy/
 ```
 
-**SAST scanning only:**
+**Outputs:**
+- `trivy-backend.json` - Backend container scan
+- `trivy-frontend.json` - Frontend container scan
+
+---
+
+### 5. Software Bill of Materials (SBOM) (NEW)
+**Tool:** CycloneDX
+**Purpose:** Generate machine-readable inventory of all dependencies
+
+**What it includes:**
+- Component name, version, license
+- Dependency tree (transitive dependencies)
+- Vulnerability references (CVEs)
+
+**Run locally:**
 ```bash
-make security-sast
+make security-sbom
 ```
 
-### Installing Security Tools
+**Outputs:**
+- `sbom-python.json` - Python dependencies
+- `sbom-nodejs.json` - Node.js dependencies
 
-All security tools can be installed via the Makefile targets (they install automatically when needed). For manual installation:
+**Use cases:**
+- Supply chain risk management
+- License compliance audits
+- Vendor security questionnaires
 
-```bash
-# Python tools
-pip install safety bandit[toml] cyclonedx-bom
+---
 
-# Node.js tools
-npm install -g @cyclonedx/cyclonedx-npm
-```
+## CI/CD Integration
 
-## GitHub Security Integration
+### Automated Workflow
+The security pipeline runs automatically on:
+- **Every push** to `main`, `develop`, or `copilot/**` branches
+- **Every pull request** to `main` or `develop`
+- **Weekly schedule** (Mondays at 9 AM UTC)
+- **Manual trigger** (via GitHub Actions UI)
 
-### Security Tab
+### Workflow File
+`.github/workflows/security-scanning.yml`
 
-All security findings are automatically uploaded to the GitHub Security tab:
+### Quality Gate (NEW)
+The pipeline now includes a **quality gate** that:
+- ✅ **PASSES** if no CRITICAL vulnerabilities found
+- ⚠️ **WARNS** if >5 HIGH vulnerabilities found in containers
+- ❌ **FAILS** if CRITICAL vulnerabilities found in containers
 
-1. Navigate to **Security** > **Code scanning alerts**
-2. Filter by severity: Critical, High, Medium, Low
-3. View detailed findings with:
-   - Affected code location
-   - Vulnerability description
-   - Remediation guidance
-   - CVSS score
+**Override:** If a vulnerability cannot be fixed immediately, document it in `SECURITY-ATTESTATION.md` with:
+- Risk acceptance justification
+- Mitigation plan
+- Expiry date (max 90 days)
+- Security lead approval
 
-### Pull Request Integration
+---
 
-Security scans run automatically on PRs:
+## How to Interpret Results
 
-- ✅ Pass: No critical/high vulnerabilities found
-- ⚠️ Warning: Medium/low vulnerabilities found
-- ❌ Fail: Critical/high vulnerabilities found
+### Dependency Scan (Safety / npm audit)
 
-**To resolve failures:**
-1. Review the security scan results in the PR
-2. Fix identified vulnerabilities
-3. Push updated code
-4. Scans will re-run automatically
-
-## Fail-On-High Gates
-
-The security pipeline is configured to **continue-on-error** for most checks to allow visibility into issues without blocking development. 
-
-### To Enable Blocking on Critical Issues
-
-Edit `.github/workflows/security-scanning.yml` and remove `continue-on-error: true` from:
-
-```yaml
-- name: Run Safety check (Backend)
-  continue-on-error: true  # Remove this line to fail on vulnerabilities
-```
-
-**Recommended for production:**
-- Remove `continue-on-error` for `main` branch
-- Keep it for `develop` and feature branches
-
-## Reports and Artifacts
-
-### Artifact Retention
-
-| Report Type | Retention | Location |
-|-------------|-----------|----------|
-| Dependency scans | 30 days | GitHub Actions artifacts |
-| Bandit reports | 30 days | GitHub Actions artifacts |
-| SBOM | 90 days | GitHub Actions artifacts |
-| CodeQL results | Permanent | GitHub Security tab |
-
-### Downloading Reports
-
-1. Go to **Actions** tab
-2. Click on a workflow run
-3. Scroll to **Artifacts** section
-4. Download desired report
-
-### Report Formats
-
-- **JSON**: Machine-readable, for automation
-- **SARIF**: Standard format for security tools
-- **HTML**: Human-readable coverage reports
-
-## Best Practices
-
-### Development Workflow
-
-1. **Before committing:**
-   ```bash
-   make security
-   ```
-
-2. **Address findings:**
-   - Fix critical and high severity issues immediately
-   - Plan remediation for medium issues
-   - Document why low issues are acceptable
-
-3. **Regular updates:**
-   - Keep dependencies up to date
-   - Monitor weekly security scans
-   - Review GitHub security advisories
-
-### Dependency Management
-
-**For Python:**
-```bash
-# Update a specific vulnerable package
-pip install --upgrade vulnerable-package
-
-# Update requirements
-pip freeze > src/backend/requirements.txt
-```
-
-**For Node.js:**
-```bash
-# Update a specific package
-npm update vulnerable-package
-
-# Audit and fix automatically
-npm audit fix
-```
-
-### Handling False Positives
-
-**Bandit false positives:**
-Create `bandit.yml` configuration:
-```yaml
-skips:
-  - B101  # Skip assert_used if intentional
-```
-
-**Safety false positives:**
-Add to `safety.policy`:
+**Example output:**
 ```json
 {
-  "ignore": {
-    "CVE-2023-XXXXX": "False positive - not exploitable in our context"
-  }
+  "vulnerabilities": [
+    {
+      "package": "requests",
+      "installed_version": "2.25.0",
+      "affected_version": "<2.26.0",
+      "advisory": "CVE-2021-12345: SSRF vulnerability",
+      "severity": "HIGH"
+    }
+  ]
 }
 ```
 
-## Compliance Alignment
+**Action required:**
+- **CRITICAL/HIGH:** Upgrade package immediately (`pip install --upgrade requests`)
+- **MEDIUM:** Plan upgrade in next sprint
+- **LOW:** Document and defer to backlog
 
-This security pipeline supports:
+---
 
-- ✅ **NCA ECC**: Security testing and vulnerability management
-- ✅ **NCA CCC**: Cloud security controls and monitoring
-- ✅ **PDPL**: Data protection and security measures
-- ✅ **ISO 27001**: Information security controls
-- ✅ **NIST CSF**: Identify, Protect, Detect functions
+### SAST (Bandit)
+
+**Example output:**
+```python
+# Code
+password = "hardcoded_password"  # SECURITY ISSUE
+
+# Bandit finding
+Issue: [B105:hardcoded_password_string] Possible hardcoded password: 'hardcoded_password'
+Severity: Low   Confidence: Medium
+Location: src/backend/auth.py:23
+```
+
+**Action required:**
+- **HIGH:** Fix immediately (move to environment variables)
+- **MEDIUM:** Review and fix if applicable
+- **LOW:** Review; may be false positive (e.g., test fixtures)
+
+---
+
+### Secret Detection (Gitleaks)
+
+**Example output:**
+```json
+{
+  "Description": "AWS Access Key",
+  "File": "config.py",
+  "Line": "AWS_KEY = 'AKIAIOSFODNN7EXAMPLE'",
+  "Commit": "abc123"
+}
+```
+
+**Action required:**
+- **IMMEDIATE:** Rotate the exposed secret (revoke old key, generate new one)
+- Remove secret from code (use Azure Key Vault or environment variables)
+- Rewrite Git history if secret is in commit history (`git filter-branch` or BFG Repo-Cleaner)
+
+---
+
+### Container Scan (Trivy)
+
+**Example output:**
+```json
+{
+  "Vulnerabilities": [
+    {
+      "VulnerabilityID": "CVE-2023-12345",
+      "PkgName": "openssl",
+      "InstalledVersion": "1.1.1f",
+      "FixedVersion": "1.1.1g",
+      "Severity": "CRITICAL"
+    }
+  ]
+}
+```
+
+**Action required:**
+- **CRITICAL:** Update base image or rebuild container with patched package
+- **HIGH:** Plan update in current sprint
+- **MEDIUM/LOW:** Monitor for fixes, update in next release
+
+---
+
+## False Positives
+
+### How to Handle
+
+1. **Verify it's actually a false positive** (consult with security team)
+2. **Document in SECURITY-ATTESTATION.md**:
+   - Why it's a false positive
+   - Why the code is safe (e.g., "User input is sanitized before use")
+3. **Suppress the finding** (use tool-specific syntax):
+
+**Bandit:**
+```python
+# nosec B201 - False positive: User input is validated via Pydantic schema
+user_input = request.json["data"]
+```
+
+**Trivy:**
+```yaml
+# .trivyignore
+CVE-2023-12345  # False positive: Package not used in production code path
+```
+
+4. **Get approval** from security reviewer in PR
+
+---
+
+## Local Development Workflow
+
+### Before Committing Code
+
+```bash
+# 1. Run pre-commit hooks (installs automatically run linters, secret detection)
+pre-commit run --all-files
+
+# 2. Run unit tests
+cd src/backend && pytest tests/ -v
+cd src/frontend && npm test
+
+# 3. Run security scans
+make security
+
+# 4. Review scan results
+cat bandit-report.json | jq '.results[] | select(.issue_severity=="HIGH")'
+
+# 5. Fix any CRITICAL/HIGH issues
+
+# 6. Commit and push
+git add .
+git commit -m "feat: Add new control mapping feature"
+git push
+```
+
+---
+
+### During Code Review
+
+**Reviewer checklist:**
+1. ✅ CI security scans passed (green checkmarks in PR)
+2. ✅ No new CRITICAL/HIGH vulnerabilities introduced
+3. ✅ Author completed [SECURITY-ATTESTATION.md](SECURITY-ATTESTATION.md) checklist
+4. ✅ Any exceptions documented with risk acceptance + expiry date
+5. ✅ Code follows secure coding practices (input validation, auth checks, audit logging)
+
+---
+
+## Security Metrics Dashboard
+
+**Track weekly:**
+| Metric | Target | How to Measure |
+|--------|--------|----------------|
+| CRITICAL vulnerabilities | 0 | GitHub Security tab → Code scanning alerts |
+| HIGH vulnerabilities | <5 | Same as above |
+| Secrets detected | 0 | Gitleaks report (fail build if any found) |
+| SBOM freshness | <7 days old | Check `sbom-*.json` timestamp |
+| Test coverage | >80% | pytest-cov report |
+| Pre-commit hook usage | 100% | Enforce via branch protection rules |
+
+---
+
+## Compliance Mapping
+
+| Scan Type | NCA ECC Control | PDPL Article | Purpose |
+|-----------|----------------|--------------|---------|
+| Dependency Scan | ECC-IS-4 (Security Monitoring) | PDPL Art. 29 (Data Protection) | Detect vulnerable libraries |
+| SAST | ECC-IS-3 (Access Control) | PDPL Art. 24 (Security Measures) | Find code security flaws |
+| Secret Detection | ECC-IS-2 (Cryptography) | PDPL Art. 29 | Prevent credential leakage |
+| Container Scan | ECC-CCC-SEC-01 (Cloud Security) | PDPL Art. 25 (Data Residency) | Secure container images |
+| SBOM | ECC-GV-6 (Third-Party Management) | PDPL Art. 26 (Processor Compliance) | Vendor risk management |
+
+---
 
 ## Troubleshooting
 
-### Common Issues
+### Issue: Safety scan fails with "Rate limit exceeded"
 
-**Issue: Safety check fails**
+**Solution:**
 ```bash
-# Update Safety database
-pip install --upgrade safety
+# Use --db flag to specify local vulnerability database
+cd src/backend
+safety check --db ./safety-db.json
 ```
 
-**Issue: npm audit shows vulnerabilities**
-```bash
-# Try automatic fix
-npm audit fix
+### Issue: Trivy scan times out
 
-# If fix unavailable, check if update possible
-npm outdated
+**Solution:**
+```bash
+# Increase timeout and use cached DB
+trivy image --timeout 10m --skip-update sico-grc-backend:local
 ```
 
-**Issue: Bandit reports false positive**
-```bash
-# Add inline ignore comment
-# nosec B101
+### Issue: False positive in Bandit
+
+**Solution:**
+Add `# nosec` comment with justification:
+```python
+# nosec B603 - Subprocess call is safe: input is validated via Pydantic
+subprocess.run(["ls", validated_path])
 ```
 
-**Issue: CodeQL timeout**
-- CodeQL can take 10-20 minutes for large codebases
-- This is normal and expected
+---
 
-## Future Enhancements
+## Resources
 
-Planned additions:
+- **GitHub Security Tab:** https://github.com/sonaiso/sanadcom/security
+- **Safety Database:** https://pyup.io/safety/
+- **Bandit Rules:** https://bandit.readthedocs.io/en/latest/plugins/index.html
+- **Gitleaks:** https://github.com/gitleaks/gitleaks
+- **Trivy:** https://aquasecurity.github.io/trivy/
+- **CycloneDX:** https://cyclonedx.org/
+- **NCA ECC Controls:** https://nca.gov.sa/en/Pages/default.aspx
+- **PDPL:** https://sdaia.gov.sa/en/PDPL/Pages/default.aspx
 
-- [ ] Container vulnerability scanning (Trivy)
-- [ ] Infrastructure as Code scanning (Checkov)
-- [ ] License compliance checking
-- [ ] Dependency update automation (Dependabot)
-- [ ] Security metrics dashboard
-- [ ] SLA tracking for vulnerability remediation
+---
 
-## Support
-
-For issues or questions about the security pipeline:
-
-1. Check GitHub Security tab for findings
-2. Review workflow logs in Actions tab
-3. Consult this documentation
-4. Contact security team
-
-## References
-
-- [Bandit Documentation](https://bandit.readthedocs.io/)
-- [Safety Documentation](https://pyup.io/safety/)
-- [CodeQL Documentation](https://codeql.github.com/)
-- [CycloneDX Specification](https://cyclonedx.org/)
-- [SARIF Format](https://sarifweb.azurewebsites.net/)
+**Last Updated:** 2026-02-10  
+**Version:** 2.0 (Enhanced with Container Scanning + SBOM)  
+**Owner:** SICO GRC Security Team
