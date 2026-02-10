@@ -12,6 +12,8 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 from typing import Dict, Tuple
 import logging
+import secrets
+import base64
 
 from core.config import settings
 
@@ -23,9 +25,17 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """
     Add security headers to all responses.
     Implements OWASP security best practices and NCA ECC-IS-3 requirements.
+    Uses nonce-based CSP for enhanced security.
     """
     
     async def dispatch(self, request: Request, call_next):
+        # Generate unique nonce for this request
+        nonce_bytes = secrets.token_bytes(16)
+        nonce = base64.b64encode(nonce_bytes).decode('utf-8')
+        
+        # Store nonce in request state for use in templates
+        request.state.csp_nonce = nonce
+        
         response = await call_next(request)
         
         # OWASP recommended security headers (NCA ECC-IS-3)
@@ -36,12 +46,12 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
         
-        # Content Security Policy - Restrictive (adjust for your frontend)
-        # Production: Use nonce-based CSP instead of 'unsafe-inline' and 'unsafe-eval'
+        # Content Security Policy - Nonce-based (OWASP best practice)
+        # Removed 'unsafe-inline' and 'unsafe-eval' for better security
         csp_policy = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "  # TODO: Replace with nonce
-            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            f"script-src 'self' 'nonce-{nonce}'; "  # Nonce-based script loading
+            f"style-src 'self' 'nonce-{nonce}' https://fonts.googleapis.com; "  # Nonce-based styles
             "font-src 'self' https://fonts.gstatic.com; "
             "img-src 'self' data: https:; "
             "connect-src 'self'; "
