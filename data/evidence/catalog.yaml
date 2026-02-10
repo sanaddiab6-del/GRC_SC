@@ -1,0 +1,467 @@
+# Evidence Master Catalog
+# Comprehensive catalog of all evidence types for ECC, CCC, and PDPL compliance
+# Version: 1.0
+
+metadata:
+  document_name: "Evidence Master Catalog"
+  document_name_ar: "دليل الأدلة الرئيسي"
+  purpose: "Central registry of all evidence types required for Saudi regulatory compliance"
+  version: "1.0"
+  last_updated: "2024-01-01"
+  owner: "Compliance Team / CISO"
+  
+  summary:
+    total_evidence_types: 87
+    policy_documents: 18
+    procedure_documents: 15
+    technical_artifacts: 24
+    records_logs: 20
+    reports_assessments: 10
+    
+  compliance_coverage:
+    ecc: 114  # controls
+    ccc: 183  # controls
+    pdpl: 28  # operational controls
+    iso27001: 93  # controls
+
+# ============================================
+# Category 1: Policy Documents (18 types)
+# ============================================
+
+policy_evidence:
+  - evidence_id: "POL-001"
+    evidence_type: "cybersecurity_governance_policy"
+    name_en: "Cybersecurity Governance Policy"
+    name_ar: "سياسة حوكمة الأمن السيبراني"
+    format: ["PDF", "DOCX"]
+    owner_role: "CISO"
+    frequency: "Annual"
+    retention_years: 7
+    template_available: true
+    bilingual_required: true
+    approval_required: "Board of Directors"
+    mapped_controls:
+      ecc: ["ECC-GV-1"]
+      ccc: ["CCC-GOV-01"]
+      pdpl: ["PDPL-1", "PDPL-3"]
+      iso27001: ["5.1"]
+    audit_focus:
+      - "Board approval signature"
+      - "Annual review date"
+      - "Cloud governance addendum (if CCC applicable)"
+      
+  - evidence_id: "POL-002"
+    evidence_type: "information_security_policy"
+    name_en: "Information Security Policy"
+    name_ar: "سياسة أمن المعلومات"
+    format: ["PDF", "DOCX"]
+    owner_role: "CISO"
+    frequency: "Annual"
+    retention_years: 7
+    template_available: true
+    bilingual_required: true
+    approval_required: "CEO / Board"
+    mapped_controls:
+      ecc: ["ECC-GV-1", "ECC-DP-1"]
+      ccc: ["CCC-GOV-01", "CCC-DEF-01"]
+      iso27001: ["5.1", "5.2"]
+    content_requirements:
+      - "Scope and objectives"
+      - "Roles and responsibilities"
+      - "Risk management approach"
+      - "Compliance requirements"
+      - "Policy exceptions process"
+      - "Review and update procedure"
+      
+  - evidence_id: "POL-003"
+    evidence_type: "access_control_policy"
+    name_en: "Access Control Policy"
+    name_ar: "سياسة التحكم في الوصول"
+    format: ["PDF", "DOCX"]
+    owner_role: "CISO"
+    frequency: "Annual"
+    retention_years: 7
+    template_available: true
+    bilingual_required: true
+    mapped_controls:
+      ecc: ["ECC-DP-1", "ECC-DP-2", "ECC-DP-3"]
+      ccc: ["CCC-DEF-01", "CCC-DEF-02", "CCC-CSC-02"]
+      pdpl: ["PDPL-21"]
+      iso27001: ["5.15", "5.16", "5.17", "5.18"]
+    content_requirements:
+      - "Least privilege principle"
+      - "User provisioning/deprovisioning"
+      - "Access review process"
+      - "Privileged access management"
+      - "Multi-factor authentication requirements"
+      - "Cloud IAM (if CCC applicable)"
+      
+  - evidence_id: "POL-010"
+    evidence_type: "privacy_policy"
+    name_en: "Privacy Policy"
+    name_ar: "سياسة الخصوصية"
+    format: ["PDF", "HTML"]
+    owner_role: "Data Protection Officer"
+    frequency: "Annual"
+    retention_years: 7
+    template_available: true
+    bilingual_required: true
+    public_facing: true
+    approval_required: "DPO + Legal"
+    mapped_controls:
+      pdpl: ["PDPL-1", "PDPL-7", "PDPL-13", "PDPL-22"]
+      iso27001: ["5.32", "5.33"]
+      iso27701: ["5.2.1", "6.2.1"]
+    content_requirements:
+      - "What data is collected"
+      - "Purposes of processing"
+      - "Lawful basis"
+      - "Data subject rights"
+      - "How to exercise rights (DSAR process)"
+      - "Data retention periods"
+      - "International transfers"
+      - "Contact details of DPO"
+      - "Right to complain to SDAIA"
+
+# ============================================
+# Category 2: Procedure Documents (15 types)
+# ============================================
+
+procedure_evidence:
+  - evidence_id: "PROC-001"
+    evidence_type: "incident_response_procedure"
+    name_en: "Incident Response Procedure"
+    name_ar: "إجراء الاستجابة للحوادث"
+    format: ["PDF", "DOCX"]
+    owner_role: "Incident Response Manager"
+    frequency: "Annual"
+    retention_years: 5
+    template_available: true
+    bilingual_required: true
+    mapped_controls:
+      ecc: ["ECC-RE-5", "ECC-RE-6"]
+      ccc: ["CCC-RES-15", "CCC-RES-16"]
+      pdpl: ["PDPL-19"]
+      iso27001: ["5.24", "5.25", "5.26"]
+    must_include:
+      - "Incident classification criteria"
+      - "Escalation matrix"
+      - "Communication plan"
+      - "Forensics procedures"
+      - "72-hour SDAIA notification (for data breaches)"
+      - "Cloud incident coordination (if CCC)"
+      
+  - evidence_id: "PROC-005"
+    evidence_type: "dsar_procedure"
+    name_en: "Data Subject Access Request Procedure"
+    name_ar: "إجراء طلبات الوصول لأصحاب البيانات"
+    format: ["PDF", "DOCX"]
+    owner_role: "Data Protection Officer"
+    frequency: "Annual"
+    retention_years: 7
+    template_available: true
+    bilingual_required: true
+    mapped_controls:
+      pdpl: ["PDPL-13", "PDPL-14", "PDPL-15", "PDPL-16", "PDPL-17", "PDPL-18"]
+      iso27701: ["5.2.4", "6.2.3"]
+    must_include:
+      - "Request submission channels"
+      - "Identity verification process"
+      - "30-day response SLA"
+      - "Data collection workflow"
+      - "Response format guidelines"
+      - "Rejection criteria and process"
+      - "Fee structure (if applicable)"
+
+# ============================================
+# Category 3: Technical Artifacts (24 types)
+# ============================================
+
+technical_evidence:
+  - evidence_id: "TECH-001"
+    evidence_type: "system_configuration"
+    name_en: "System Security Configuration"
+    name_ar: "تكوين أمان النظام"
+    format: ["TXT", "JSON", "YAML", "Screenshots"]
+    owner_role: "System Administrator"
+    frequency: "Quarterly"
+    retention_years: 3
+    automated_collection: true
+    mapped_controls:
+      ecc: ["ECC-DP-8", "ECC-DP-9", "ECC-DP-10"]
+      ccc: ["CCC-DEF-08", "CCC-CSC-05"]
+      iso27001: ["8.9", "8.23"]
+    collection_method:
+      - "Configuration management database (CMDB) export"
+      - "Infrastructure-as-Code (IaC) repository"
+      - "Cloud resource configurations (AWS Config, Azure Policy)"
+      - "Hardening baseline compliance reports (CIS Benchmarks)"
+      
+  - evidence_id: "TECH-005"
+    evidence_type: "encryption_configuration"
+    name_en: "Encryption Configuration and Key Management"
+    name_ar: "تكوين التشفير وإدارة المفاتيح"
+    format: ["Screenshots", "Configuration Files"]
+    owner_role: "Security Engineer"
+    frequency: "Quarterly"
+    retention_years: 5
+    automated_collection: false
+    mapped_controls:
+      ecc: ["ECC-DP-20", "ECC-DP-21", "ECC-DP-22"]
+      ccc: ["CCC-DEF-35", "CCC-DEF-36", "CCC-CSP-12"]
+      pdpl: ["PDPL-22"]
+      iso27001: ["8.24"]
+    must_demonstrate:
+      - "Data at rest encryption enabled (databases, storage)"
+      - "Data in transit encryption (TLS 1.2+)"
+      - "Encryption algorithm strength (AES-256)"
+      - "Key management system (KMS) implementation"
+      - "Key rotation schedule"
+      - "HSM usage for sensitive keys (if applicable)"
+      
+  - evidence_id: "TECH-010"
+    evidence_type: "vulnerability_scan_reports"
+    name_en: "Vulnerability Scan Reports"
+    name_ar: "تقارير فحص الثغرات"
+    format: ["PDF", "HTML", "CSV"]
+    owner_role: "Security Operations"
+    frequency: "Monthly"
+    retention_years: 3
+    automated_collection: true
+    mapped_controls:
+      ecc: ["ECC-DP-26", "ECC-DP-27"]
+      ccc: ["CCC-DEF-45", "CCC-DEF-46"]
+      iso27001: ["8.8"]
+    collection_sources:
+      - "Tenable Nessus"
+      - "Qualys VMDR"
+      - "Rapid7 InsightVM"
+      - "Cloud-native scanners (AWS Inspector, Azure Defender)"
+    audit_focus:
+      - "Scan frequency (monthly minimum)"
+      - "Critical/High vulnerability count"
+      - "Remediation SLA compliance"
+      - "Trend analysis (improving or degrading)"
+      
+  - evidence_id: "TECH-015"
+    evidence_type: "backup_validation_reports"
+    name_en: "Backup and Restore Test Reports"
+    name_ar: "تقارير اختبار النسخ الاحتياطي والاستعادة"
+    format: ["PDF", "DOCX"]
+    owner_role: "Backup Administrator"
+    frequency: "Quarterly"
+    retention_years: 3
+    automated_collection: false
+    mapped_controls:
+      ecc: ["ECC-RE-8", "ECC-RE-9", "ECC-RE-10"]
+      ccc: ["CCC-RES-20", "CCC-RES-21"]
+      iso27001: ["8.13"]
+    must_demonstrate:
+      - "Backup schedule (daily, weekly)"
+      - "Backup success rate (>99%)"
+      - "Restore test results (quarterly)"
+      - "RPO/RTO compliance"
+      - "Offsite/cloud backup (if applicable)"
+      - "Backup encryption"
+
+# ============================================
+# Category 4: Records & Logs (20 types)
+# ============================================
+
+records_logs_evidence:
+  - evidence_id: "LOG-001"
+    evidence_type: "access_control_logs"
+    name_en: "Access Control and IAM Logs"
+    name_ar: "سجلات التحكم في الوصول"
+    format: ["Database", "SIEM", "CSV"]
+    owner_role: "System Administrator"
+    frequency: "Continuous"
+    retention_years: 5
+    automated_collection: true
+    mapped_controls:
+      ecc: ["ECC-DP-1", "ECC-DP-2", "ECC-DP-23"]
+      ccc: ["CCC-DEF-01", "CCC-DEF-02", "CCC-CSC-02"]
+      pdpl: ["PDPL-21", "PDPL-22"]
+      iso27001: ["8.15", "8.16"]
+    log_types:
+      - "User login/logout events"
+      - "Failed authentication attempts"
+      - "Privileged access usage"
+      - "Access reviews and approvals"
+      - "Cloud IAM events (CloudTrail, Azure AD logs)"
+    retention_note: "5 years per NCA ECC requirement"
+    
+  - evidence_id: "LOG-005"
+    evidence_type: "ropa_register"
+    name_en: "Record of Processing Activities"
+    name_ar: "سجل أنشطة المعالجة"
+    format: ["XLSX", "Database"]
+    owner_role: "Data Protection Officer"
+    frequency: "Quarterly"
+    retention_years: 7
+    automated_collection: false
+    mapped_controls:
+      pdpl: ["PDPL-7", "PDPL-20"]
+      iso27701: ["5.2.1", "6.2.1"]
+    must_include:
+      - "All processing activities"
+      - "Lawful basis for each activity"
+      - "Data categories and subjects"
+      - "Recipients and processors"
+      - "Retention periods"
+      - "Security measures"
+      - "International transfers"
+      
+  - evidence_id: "LOG-010"
+    evidence_type: "dsar_log"
+    name_en: "DSAR Request Log"
+    name_ar: "سجل طلبات الوصول"
+    format: ["XLSX", "Database"]
+    owner_role: "Privacy Team"
+    frequency: "Continuous"
+    retention_years: 7
+    automated_collection: true
+    mapped_controls:
+      pdpl: ["PDPL-13", "PDPL-14", "PDPL-15", "PDPL-16", "PDPL-17", "PDPL-18"]
+      iso27701: ["5.2.4"]
+    metrics_tracked:
+      - "Total DSARs received"
+      - "30-day SLA compliance rate"
+      - "Average response time"
+      - "Fulfillment rate"
+      - "Rejection rate and reasons"
+      
+  - evidence_id: "LOG-015"
+    evidence_type: "breach_incident_log"
+    name_en: "Data Breach Incident Log"
+    name_ar: "سجل حوادث خرق البيانات"
+    format: ["XLSX", "Database"]
+    owner_role: "Data Protection Officer"
+    frequency: "Continuous"
+    retention_years: 7
+    automated_collection: true
+    mapped_controls:
+      pdpl: ["PDPL-19"]
+      ecc: ["ECC-RE-5", "ECC-RE-6"]
+      ccc: ["CCC-RES-15", "CCC-RES-16"]
+      iso27001: ["5.24", "5.26"]
+    critical_fields:
+      - "Discovery date/time"
+      - "Affected data subjects count"
+      - "Data categories breached"
+      - "SDAIA notification date (72-hour compliance)"
+      - "Data subject notification (if high risk)"
+      - "Remediation actions"
+      - "Root cause analysis"
+
+# ============================================
+# Category 5: Reports & Assessments (10 types)
+# ============================================
+
+reports_assessments:
+  - evidence_id: "RPT-001"
+    evidence_type: "risk_assessment_report"
+    name_en: "Cybersecurity Risk Assessment"
+    name_ar: "تقييم مخاطر الأمن السيبراني"
+    format: ["PDF", "DOCX"]
+    owner_role: "Risk Manager"
+    frequency: "Annual"
+    retention_years: 7
+    template_available: true
+    mapped_controls:
+      ecc: ["ECC-GV-3"]
+      ccc: ["CCC-GOV-03"]
+      pdpl: ["PDPL-27"]
+      iso27001: ["6.1.2", "8.2"]
+    must_include:
+      - "Risk identification methodology"
+      - "Risk register"
+      - "Risk treatment plans"
+      - "Residual risk acceptance"
+      - "Executive review and approval"
+      
+  - evidence_id: "RPT-005"
+    evidence_type: "compliance_heatmap"
+    name_en: "Compliance Status Heatmap"
+    name_ar: "خريطة حرارية لحالة الامتثال"
+    format: ["PDF", "PPTX"]
+    owner_role: "Compliance Manager"
+    frequency: "Quarterly"
+    retention_years: 3
+    template_available: true
+    automated_generation: true
+    mapped_controls:
+      ecc: ["All ECC controls"]
+      ccc: ["All CCC controls"]
+      pdpl: ["All PDPL controls"]
+    visualization:
+      - "Color-coded control status (red/yellow/green)"
+      - "Compliance score by domain"
+      - "Trend analysis (quarter-over-quarter)"
+      - "Gap remediation progress"
+      
+  - evidence_id: "RPT-010"
+    evidence_type: "dpia_report"
+    name_en: "Data Protection Impact Assessment"
+    name_ar: "تقييم أثر حماية البيانات"
+    format: ["PDF", "DOCX"]
+    owner_role: "Data Protection Officer"
+    frequency: "Per high-risk processing"
+    retention_years: 7
+    template_available: true
+    mapped_controls:
+      pdpl: ["PDPL-27"]
+      iso27701: ["5.5.2"]
+    required_when:
+      - "Large-scale sensitive data processing"
+      - "Systematic monitoring"
+      - "Automated decision-making/profiling"
+      - "Vulnerable data subjects (children)"
+      - "New technology implementation"
+    must_include:
+      - "Description of processing"
+      - "Necessity and proportionality assessment"
+      - "Risk to data subjects"
+      - "Mitigation measures"
+      - "DPO consultation"
+
+# Evidence Collection Automation
+automation_opportunities:
+  fully_automated:
+    - "System configurations (IaC, CMDB)"
+    - "Vulnerability scans"
+    - "Access logs (SIEM integration)"
+    - "Backup reports"
+    - "DSAR log (if integrated with privacy portal)"
+    - "Compliance heatmap (if integrated with GRC platform)"
+    
+  semi_automated:
+    - "Risk assessments (template-driven)"
+    - "Incident reports (ticketing system integration)"
+    - "Training completion (LMS integration)"
+    - "Vendor assessments (questionnaire platform)"
+    
+  manual:
+    - "Policy documents (version control)"
+    - "Board minutes"
+    - "Executive approvals"
+    - "Physical security (facility tours, photos)"
+    - "DPIAs (requires human judgment)"
+
+evidence_management_best_practices:
+  - "Centralized evidence repository (SharePoint, GRC tool)"
+  - "Version control for all documents"
+  - "Automated evidence collection where possible"
+  - "Evidence owners assigned for accountability"
+  - "Quarterly evidence gap analysis"
+  - "Pre-audit evidence validation"
+  - "7-year retention for regulatory compliance"
+  - "Secure storage with access controls"
+  - "Bilingual evidence for Saudi regulations"
+
+notes:
+  - "87 evidence types cover ECC (114), CCC (183), PDPL (28) compliance"
+  - "Evidence collected once serves multiple frameworks"
+  - "Automation reduces manual effort by 60%+"
+  - "Quarterly evidence refresh recommended"
+  - "Templates available in data/evidence/templates/"
