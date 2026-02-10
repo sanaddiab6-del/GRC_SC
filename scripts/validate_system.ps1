@@ -348,10 +348,10 @@ function Check-Dependencies {
             Check-Pass "Virtual environment directory exists"
         }
         
-        # Count required packages
+        # Count required packages (non-empty, non-comment lines)
         try {
             $backendPackages = (Get-Content "src\backend\requirements.txt" -ErrorAction SilentlyContinue | 
-                               Where-Object { $_ -match "==" }).Count
+                               Where-Object { $_ -notmatch "^#" -and $_ -match "\S" }).Count
             if ($backendPackages -gt 0) {
                 Print-Info "Backend requires $backendPackages packages"
             } else {
@@ -387,10 +387,10 @@ function Check-Dependencies {
     if (Test-Path "ai\requirements.txt") {
         Check-Pass "ai\requirements.txt exists"
         
-        # Count AI packages
+        # Count AI packages (non-empty, non-comment lines)
         try {
             $aiPackages = (Get-Content "ai\requirements.txt" -ErrorAction SilentlyContinue | 
-                          Where-Object { $_ -match "==" }).Count
+                          Where-Object { $_ -notmatch "^#" -and $_ -match "\S" }).Count
             if ($aiPackages -gt 0) {
                 Print-Info "AI engine requires $aiPackages packages"
             } else {

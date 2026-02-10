@@ -8,7 +8,7 @@
 ## Prerequisites
 
 - **Python**: 3.10 or higher
-- **Node.js**: 16+ (for frontend)
+- **Node.js**: 18+ (for frontend)
 - **PostgreSQL**: 13+ (or use Docker Compose)
 - **Redis**: 6+ (or use Docker Compose)
 

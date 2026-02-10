@@ -296,9 +296,9 @@ check_dependencies() {
             check_pass "Virtual environment directory exists"
         fi
         
-        # Count required packages
+        # Count required packages (non-empty, non-comment lines)
         if [ -f "src/backend/requirements.txt" ]; then
-            BACKEND_PACKAGES=$(grep -v "^#" src/backend/requirements.txt | grep -v "^$" | grep -c "==" || echo "0")
+            BACKEND_PACKAGES=$(grep -v "^#" src/backend/requirements.txt | grep -v "^$" | grep -c "." || echo "0")
             if [ "$BACKEND_PACKAGES" -gt 0 ]; then
                 print_info "Backend requires $BACKEND_PACKAGES packages"
             else
@@ -332,8 +332,8 @@ check_dependencies() {
     if [ -f "ai/requirements.txt" ]; then
         check_pass "ai/requirements.txt exists"
         
-        # Count AI packages
-        AI_PACKAGES=$(grep -v "^#" ai/requirements.txt | grep -v "^$" | grep -c "==" || echo "0")
+        # Count AI packages (non-empty, non-comment lines)
+        AI_PACKAGES=$(grep -v "^#" ai/requirements.txt | grep -v "^$" | grep -c "." || echo "0")
         if [ "$AI_PACKAGES" -gt 0 ]; then
             print_info "AI engine requires $AI_PACKAGES packages"
         else
