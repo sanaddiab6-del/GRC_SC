@@ -10,6 +10,7 @@ from sqlalchemy import select, func
 from typing import Optional
 
 from core.database import get_db
+from core.crud_utils import get_by_id, check_exists, update_model, delete_by_id
 from controls.models import Control, FrameworkType
 from controls.schemas import (
     ControlCreate,
@@ -72,19 +73,14 @@ async def get_control(
     # current_user: User = Depends(get_current_user),  # Authentication disabled for demo
 ):
     """Get a specific control by ID (e.g., ECC-GV-1)."""
-    query = select(Control).where(Control.control_id == control_id)
-    result = await db.execute(query)
-    control = result.scalar_one_or_none()
-    
-    if not control:
-        raise HTTPException(
-            status_code=404,
-            detail={
-                "message_en": f"Control {control_id} not found",
-                "message_ar": f"لم يتم العثور على الضابط {control_id}",
-            },
-        )
-    
+    control = await get_by_id(
+        db=db,
+        model=Control,
+        id_field_name="control_id",
+        id_value=control_id,
+        error_message_en=f"Control {control_id} not found",
+        error_message_ar=f"لم يتم العثور على الضابط {control_id}",
+    )
     return control
 
 
@@ -96,17 +92,14 @@ async def create_control(
 ):
     """Create a new control. Requires controls:create permission (Admin or Compliance Officer)."""
     # Check if control_id already exists
-    existing = await db.execute(
-        select(Control).where(Control.control_id == control_data.control_id)
+    await check_exists(
+        db=db,
+        model=Control,
+        id_field_name="control_id",
+        id_value=control_data.control_id,
+        error_message_en=f"Control {control_data.control_id} already exists",
+        error_message_ar=f"الضابط {control_data.control_id} موجود بالفعل",
     )
-    if existing.scalar_one_or_none():
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "message_en": f"Control {control_data.control_id} already exists",
-                "message_ar": f"الضابط {control_data.control_id} موجود بالفعل",
-            },
-        )
     
     control = Control(**control_data.model_dump())
     db.add(control)
@@ -124,27 +117,16 @@ async def update_control(
     # current_user: User = Depends(require_permission("controls", "update")),  # Requires controls:update permission
 ):
     """Update an existing control (partial update). Requires controls:update permission (Admin or Compliance Officer)."""
-    query = select(Control).where(Control.control_id == control_id)
-    result = await db.execute(query)
-    control = result.scalar_one_or_none()
+    control = await get_by_id(
+        db=db,
+        model=Control,
+        id_field_name="control_id",
+        id_value=control_id,
+        error_message_en=f"Control {control_id} not found",
+        error_message_ar=f"لم يتم العثور على الضابط {control_id}",
+    )
     
-    if not control:
-        raise HTTPException(
-            status_code=404,
-            detail={
-                "message_en": f"Control {control_id} not found",
-                "message_ar": f"لم يتم العثور على الضابط {control_id}",
-            },
-        )
-    
-    # Update only provided fields
-    update_data = control_data.model_dump(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(control, field, value)
-    
-    await db.commit()
-    await db.refresh(control)
-    
+    control = await update_model(item=control, update_data=control_data, db=db)
     return control
 
 
@@ -155,18 +137,11 @@ async def delete_control(
     # current_user: User = Depends(require_permission("controls", "delete")),  # Requires controls:delete permission
 ):
     """Delete a control. Requires controls:delete permission (Admin or Compliance Officer only)."""
-    query = select(Control).where(Control.control_id == control_id)
-    result = await db.execute(query)
-    control = result.scalar_one_or_none()
-    
-    if not control:
-        raise HTTPException(
-            status_code=404,
-            detail={
-                "message_en": f"Control {control_id} not found",
-                "message_ar": f"لم يتم العثور على الضابط {control_id}",
-            },
-        )
-    
-    await db.delete(control)
-    await db.commit()
+    await delete_by_id(
+        db=db,
+        model=Control,
+        id_field_name="control_id",
+        id_value=control_id,
+        error_message_en=f"Control {control_id} not found",
+        error_message_ar=f"لم يتم العثور على الضابط {control_id}",
+    )
