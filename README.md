@@ -15,6 +15,24 @@ git clone https://github.com/sonaiso/sanadcom.git
 cd sanadcom
 ```
 
+### Validate System Setup
+Before installing dependencies, run the system validation script to ensure all prerequisites are met:
+```bash
+# Run validation script
+make validate
+
+# Or directly
+./scripts/validate_system.sh
+```
+
+This will check:
+- ✅ Python 3.11+ and pip
+- ✅ Node.js 18+ and npm
+- ✅ Docker and Docker Compose
+- ✅ Required directory structure
+- ✅ Configuration files
+- ✅ Service connectivity
+
 ### Prerequisites
 - **Python 3.11+**
 - **Node.js 20+**
