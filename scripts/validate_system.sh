@@ -12,8 +12,8 @@
 # Usage: ./scripts/validate_system.sh
 # ============================================================================
 
-# Don't use set -e as it conflicts with arithmetic expressions
-# set -e
+# Don't use set -e as it conflicts with arithmetic expressions like ((PASSED++))
+# which return non-zero exit status when the variable is 0
 
 # Color codes for output
 RED='\033[0;31m'
@@ -297,8 +297,14 @@ check_dependencies() {
         fi
         
         # Count required packages
-        BACKEND_PACKAGES=$(grep -v "^#" src/backend/requirements.txt | grep -v "^$" | wc -l)
-        print_info "Backend requires $BACKEND_PACKAGES packages"
+        if [ -f "src/backend/requirements.txt" ]; then
+            BACKEND_PACKAGES=$(grep -v "^#" src/backend/requirements.txt | grep -v "^$" | grep -c "==" || echo "0")
+            if [ "$BACKEND_PACKAGES" -gt 0 ]; then
+                print_info "Backend requires $BACKEND_PACKAGES packages"
+            else
+                print_info "Backend requirements.txt exists but package count unavailable"
+            fi
+        fi
         
     else
         check_fail "src/backend/requirements.txt not found"
@@ -327,8 +333,12 @@ check_dependencies() {
         check_pass "ai/requirements.txt exists"
         
         # Count AI packages
-        AI_PACKAGES=$(grep -v "^#" ai/requirements.txt | grep -v "^$" | wc -l)
-        print_info "AI engine requires $AI_PACKAGES packages"
+        AI_PACKAGES=$(grep -v "^#" ai/requirements.txt | grep -v "^$" | grep -c "==" || echo "0")
+        if [ "$AI_PACKAGES" -gt 0 ]; then
+            print_info "AI engine requires $AI_PACKAGES packages"
+        else
+            print_info "AI requirements.txt exists but package count unavailable"
+        fi
         
     else
         check_warn "ai/requirements.txt not found"

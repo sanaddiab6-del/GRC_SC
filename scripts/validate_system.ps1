@@ -349,8 +349,17 @@ function Check-Dependencies {
         }
         
         # Count required packages
-        $backendPackages = (Get-Content "src\backend\requirements.txt" | Where-Object { $_ -notmatch "^#" -and $_ -notmatch "^$" }).Count
-        Print-Info "Backend requires $backendPackages packages"
+        try {
+            $backendPackages = (Get-Content "src\backend\requirements.txt" -ErrorAction SilentlyContinue | 
+                               Where-Object { $_ -match "==" }).Count
+            if ($backendPackages -gt 0) {
+                Print-Info "Backend requires $backendPackages packages"
+            } else {
+                Print-Info "Backend requirements.txt exists but package count unavailable"
+            }
+        } catch {
+            Print-Info "Backend requirements.txt exists but cannot be read"
+        }
         
     } else {
         Check-Fail "src\backend\requirements.txt not found"
@@ -379,8 +388,17 @@ function Check-Dependencies {
         Check-Pass "ai\requirements.txt exists"
         
         # Count AI packages
-        $aiPackages = (Get-Content "ai\requirements.txt" | Where-Object { $_ -notmatch "^#" -and $_ -notmatch "^$" }).Count
-        Print-Info "AI engine requires $aiPackages packages"
+        try {
+            $aiPackages = (Get-Content "ai\requirements.txt" -ErrorAction SilentlyContinue | 
+                          Where-Object { $_ -match "==" }).Count
+            if ($aiPackages -gt 0) {
+                Print-Info "AI engine requires $aiPackages packages"
+            } else {
+                Print-Info "AI requirements.txt exists but package count unavailable"
+            }
+        } catch {
+            Print-Info "AI requirements.txt exists but cannot be read"
+        }
         
     } else {
         Check-Warn "ai\requirements.txt not found"

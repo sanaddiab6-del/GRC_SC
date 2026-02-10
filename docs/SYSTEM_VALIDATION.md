@@ -36,7 +36,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ### 1. System Prerequisites
 - ✅ **Python**: Version 3.11 or higher
 - ✅ **pip**: Python package manager
-- ✅ **Node.js**: Version 18 or higher  
+- ✅ **Node.js**: Version 18 or higher
 - ✅ **npm**: Node package manager
 - ✅ **Docker**: Docker Engine
 - ✅ **Docker Compose**: Orchestration tool
