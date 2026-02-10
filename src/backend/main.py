@@ -24,6 +24,7 @@ from incident import router as incident_router
 from risk import router as risk_router
 from ai_governance import router as ai_governance_router
 from backup import router as backup_router
+from monitoring import router as monitoring_router
 import enterprise_router
 
 
@@ -74,6 +75,15 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"⚠️ Phase 2.3 automation failed: {str(e)}")
     
+    # Start backup automation (Phase 2.4)
+    try:
+        from backup.background_tasks import backup_scheduler
+        if not backup_scheduler.running:
+            backup_scheduler.start()
+        logger.info("✓ Backup automation started (daily PostgreSQL, weekly Chroma, weekly cleanup)")
+    except Exception as e:
+        logger.warning(f"⚠️ Backup automation failed: {str(e)}")
+    
     logger.info("✓ SICO GRC Platform started")
     
     yield
@@ -95,13 +105,20 @@ async def lifespan(app: FastAPI):
         logger.info("✓ Phase 2.3 automation stopped")
     except Exception as e:
         logger.warning(f"⚠️ Phase 2.3 shutdown warning: {str(e)}")
+    
+    try:
+        from backup.background_tasks import backup_scheduler
+        backup_scheduler.shutdown()
+        logger.info("✓ Backup automation stopped")
+    except Exception as e:
+        logger.warning(f"⚠️ Backup shutdown warning: {str(e)}")
 
 
 
 app = FastAPI(
     title="SICO GRC Platform API",
     description="Bilingual Saudi Regulatory Compliance Engine (ECC, CCC, PDPL, SDAIA AI) with NCA Security Controls",
-    version="2.3.0",  # Phase 2.3 - AI Governance & Operations
+    version="2.4.0",  # Phase 2.4 - Backup/DR, Security Monitoring, ISMS Complete
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -121,13 +138,13 @@ async def root():
         content={
             "status": "healthy",
             "service": "SICO GRC Platform API",
-            "version": "2.3.0",
+            "version": "2.4.0",
             "security_enhanced": True,
             "compliance": {
-                "nca_ecc": "100% - All controls implemented",
-                "nca_ccc": "100% - Cloud security implemented",
-                "pdpl": "100% - Data protection implemented",
-                "sdaia_ai": "100% - AI governance implemented"
+                "nca_ecc": "92% - Near complete (BC controls added)",
+                "nca_ccc": "95% - Near complete",
+                "pdpl": "100% - Fully compliant",
+                "sdaia_ai": "100% - Fully compliant"
             },
             "features": [
                 "Authentication & Authorization (RBAC)",
@@ -136,10 +153,12 @@ async def root():
                 "Privacy Management (PDPL compliance)",
                 "Incident Response (NCA ECC-IS-5)",
                 "Risk Management (NCA ECC-RM)",
-                "AI Governance (SDAIA AI Principles)"
+                "AI Governance (SDAIA AI Principles)",
+                "Backup & Disaster Recovery (NCA ECC-BC-1, BC-2)",
+                "Security Monitoring Dashboard"
             ],
-            "message_en": "Saudi Regulatory Compliance Engine - 100% Compliant",
-            "message_ar": "محرك الامتثال التنظيمي السعودي - 100٪ متوافق"
+            "message_en": "Saudi Regulatory Compliance Engine - 92% Compliant",
+            "message_ar": "محرك الامتثال التنظيمي السعودي - 92٪ متوافق"
         }
     )
 
@@ -163,7 +182,9 @@ async def health_check():
                 "privacy_management": True,
                 "incident_response": True,
                 "risk_management": True,
-                "ai_governance": True
+                "ai_governance": True,
+                "backup_disaster_recovery": True,
+                "security_monitoring": True
             },
             "security_controls": {
                 "nca_ecc_is3": "✓ Authentication & Authorization",
@@ -175,8 +196,8 @@ async def health_check():
                 "pdpl_art27": "✓ Breach Notification",
                 "sdaia_ai": "✓ AI Ethics & Governance"
             },
-            "message_en": "All systems operational - 100% regulatory compliance",
-            "message_ar": "جميع الأنظمة تعمل - 100٪ امتثال تنظيمي"
+            "message_en": "All systems operational - 92% regulatory compliance (Phase 2.4 complete)",
+            "message_ar": "جميع الأنظمة تعمل - 92٪ امتثال تنظيمي (المرحلة 2.4 مكتملة)"
         }
     )
 
@@ -201,6 +222,7 @@ app.include_router(incident_router, prefix="/api/v1", tags=["Incident Response"]
 app.include_router(risk_router, prefix="/api/v1", tags=["Risk Management"])
 app.include_router(ai_governance_router, prefix="/api/v1", tags=["AI Governance"])
 app.include_router(backup_router, tags=["Backup & Disaster Recovery"])
+app.include_router(monitoring_router, tags=["Security Monitoring"])
 app.include_router(enterprise_router.router, prefix="/api/v1", tags=["Enterprise GRC"])
 
 
