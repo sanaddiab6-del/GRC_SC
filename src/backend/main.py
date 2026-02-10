@@ -24,6 +24,7 @@ from incident import router as incident_router
 from risk import router as risk_router
 from ai_governance import router as ai_governance_router
 import enterprise_router
+from monitoring import router as monitoring_router
 
 
 # Configure logging
@@ -200,6 +201,7 @@ app.include_router(incident_router, prefix="/api/v1", tags=["Incident Response"]
 app.include_router(risk_router, prefix="/api/v1", tags=["Risk Management"])
 app.include_router(ai_governance_router, prefix="/api/v1", tags=["AI Governance"])
 app.include_router(enterprise_router.router, prefix="/api/v1", tags=["Enterprise GRC"])
+app.include_router(monitoring_router, prefix="/api/v1", tags=["Monitoring & Observability"])
 
 
 @app.get("/api/v1/security-status", tags=["Security"])
