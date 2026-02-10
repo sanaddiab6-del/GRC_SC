@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from typing import Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel
 
 from core.database import get_db
@@ -46,7 +46,7 @@ async def get_system_health(
     return {
         "status": "healthy" if db_status == "healthy" else "degraded",
         "database_status": db_status,
-        "last_health_check": datetime.utcnow().isoformat()
+        "last_health_check": datetime.now(timezone.utc).isoformat()
     }
 
 
@@ -55,7 +55,17 @@ async def get_compliance_metrics(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Get compliance posture across all frameworks"""
+    """
+    Get compliance posture across all frameworks
+    
+    NOTE: Compliance percentages are currently based on Phase 2.1-2.3 implementation status.
+    In production, these should be calculated from actual control implementation data:
+    - Query controls table for implemented vs total controls per framework
+    - Calculate based on evidence collection completeness
+    - Factor in audit findings and remediation status
+    """
+    # TODO: Calculate from database instead of hardcoded values
+    # Example query: SELECT COUNT(*) FROM controls WHERE framework='NCA-ECC' AND status='implemented'
     return {
         "overall_compliance_percent": 92.0,
         "nca_ecc_compliance": 92.0,
@@ -63,8 +73,8 @@ async def get_compliance_metrics(
         "pdpl_compliance": 100.0,
         "sdaia_ai_compliance": 100.0,
         "iso_27001_compliance": 85.0,
-        "last_assessment_date": (datetime.utcnow() - timedelta(days=7)).isoformat(),
-        "next_assessment_due": (datetime.utcnow() + timedelta(days=83)).isoformat()
+        "last_assessment_date": (datetime.now(timezone.utc) - timedelta(days=7)).isoformat(),
+        "next_assessment_due": (datetime.now(timezone.utc) + timedelta(days=83)).isoformat()
     }
 
 
@@ -78,7 +88,7 @@ async def get_comprehensive_dashboard(
     compliance = await get_compliance_metrics(db, current_user)
     
     return {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "system_health": health,
         "compliance": compliance,
         "message_en": "SICO GRC Platform - 92% Compliance Ready",
