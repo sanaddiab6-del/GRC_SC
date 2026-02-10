@@ -85,7 +85,9 @@ async def get_dashboard_overview(
         "timestamp": now.isoformat(),
         "compliance": {
             "total_controls": total_controls,
-            "compliance_score": 92,  # From compliance status
+            # Note: These scores are based on Phase 2.4 completion status
+            # TODO: Calculate dynamically from control implementation status in future iteration
+            "compliance_score": 92,  # From compliance status report
             "nca_ecc_score": 92,
             "pdpl_score": 100,
             "ccc_score": 95,
@@ -115,6 +117,9 @@ async def get_compliance_scorecard(
     """
     Get detailed compliance scorecard by framework
     Requires: audit:read permission
+    
+    Note: Compliance scores are based on Phase 2.4 implementation status.
+    Future enhancement: Calculate dynamically from control status in database.
     """
     return {
         "timestamp": datetime.now().isoformat(),

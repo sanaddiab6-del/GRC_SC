@@ -115,6 +115,9 @@ def initialize_backup_automation():
 
 
 # Start scheduler when module is imported
-if not backup_scheduler.running:
-    backup_scheduler.start()
-    initialize_backup_automation()
+# Note: Scheduler is explicitly managed in main.py lifespan for better control
+if __name__ == "__main__":
+    # Only auto-start if run directly (for testing)
+    if not backup_scheduler.running:
+        backup_scheduler.start()
+        initialize_backup_automation()

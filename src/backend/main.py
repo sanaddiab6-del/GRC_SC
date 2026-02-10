@@ -77,9 +77,10 @@ async def lifespan(app: FastAPI):
     
     # Start backup automation (Phase 2.4)
     try:
-        from backup.background_tasks import backup_scheduler
+        from backup.background_tasks import backup_scheduler, initialize_backup_automation
         if not backup_scheduler.running:
             backup_scheduler.start()
+            initialize_backup_automation()
         logger.info("✓ Backup automation started (daily PostgreSQL, weekly Chroma, weekly cleanup)")
     except Exception as e:
         logger.warning(f"⚠️ Backup automation failed: {str(e)}")

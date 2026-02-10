@@ -78,10 +78,20 @@ class BackupService:
         await db.commit()
         await db.refresh(backup_job)
         
-        # Execute backup asynchronously
-        asyncio.create_task(self._execute_postgresql_backup(db, backup_job, backup_file))
+        # Execute backup asynchronously with error tracking
+        task = asyncio.create_task(self._execute_postgresql_backup(db, backup_job, backup_file))
+        # Add done callback for error tracking
+        task.add_done_callback(lambda t: self._handle_task_result(t, backup_job.id))
         
         return backup_job
+    
+    def _handle_task_result(self, task: asyncio.Task, backup_id: str):
+        """Handle background task completion and errors"""
+        try:
+            if task.exception():
+                logger.error(f"Background backup task failed for {backup_id}: {task.exception()}")
+        except asyncio.CancelledError:
+            logger.warning(f"Backup task {backup_id} was cancelled")
     
     async def _execute_postgresql_backup(
         self,
@@ -210,7 +220,9 @@ class BackupService:
         await db.commit()
         await db.refresh(backup_job)
         
-        asyncio.create_task(self._execute_chroma_backup(db, backup_job, chroma_path, backup_file))
+        # Execute backup asynchronously with error tracking
+        task = asyncio.create_task(self._execute_chroma_backup(db, backup_job, chroma_path, backup_file))
+        task.add_done_callback(lambda t: self._handle_task_result(t, backup_job.id))
         
         return backup_job
     
