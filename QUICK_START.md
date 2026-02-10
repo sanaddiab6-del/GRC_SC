@@ -18,12 +18,19 @@
 
 Before starting, validate your system has all required prerequisites:
 
+**Linux/macOS:**
 ```bash
 # Run system validation
 make validate
 
 # Or directly
 ./scripts/validate_system.sh
+```
+
+**Windows (PowerShell):**
+```powershell
+# Run system validation
+.\scripts\validate_system.ps1
 ```
 
 **What it checks:**
