@@ -104,7 +104,7 @@ async def initialize_platform():
                 organization_id=org_id,
                 username="admin",
                 email="admin@sico-grc.local",
-                password_hash=get_password_hash("AdminPassword123!"),
+                password_hash=get_password_hash("REPLACE_ME"),
                 full_name_en="System Administrator",
                 full_name_ar="مسؤول النظام",
                 role="admin",
@@ -113,7 +113,7 @@ async def initialize_platform():
             )
             db.add(admin)
             await db.commit()
-            print("   ✓ Admin user created (username: admin, password: AdminPassword123!)")
+            print("   ✓ Admin user created (username: admin, password: REPLACE_ME)")
         else:
             print("   ℹ Admin user already exists")
     
