@@ -242,14 +242,8 @@ def setup_security_middleware(app):
     if settings.is_production:
         allowed_hosts = ["sico-grc.com", "*.sico-grc.com"]
     else:
-        allowed_hosts = [
-            "localhost",
-            "127.0.0.1",
-            "test",
-            "testserver",
-            "*.sico-grc.com",
-            "sico-grc.com",
-        ]
+        # Development: Allow all hosts for testing
+        allowed_hosts = ["*"]
 
     app.add_middleware(
         TrustedHostMiddleware,

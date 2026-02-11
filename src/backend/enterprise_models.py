@@ -113,6 +113,7 @@ class Organization(Base):
 class User(Base):
     """Platform users with RBAC"""
     __tablename__ = "users"
+    __table_args__ = {'extend_existing': True}
     
     id = Column(Integer, primary_key=True, index=True)
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
@@ -120,7 +121,7 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False, index=True)
     full_name_en = Column(String(255))
     full_name_ar = Column(String(255))
-    role = Column(String(50), nullable=False)  # admin, compliance_owner, control_owner, risk_owner, auditor, soc_analyst, executive, regulator
+    role = Column(String(50), nullable=False)  # admin, compliance_officer, control_owner, risk_owner, auditor, soc_analyst, executive, regulator
     is_active = Column(Boolean, default=True)
     last_login = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -147,7 +148,7 @@ class Asset(Base):
     location = Column(String(255))
     environment = Column(String(50))  # production, staging, development
     is_active = Column(Boolean, default=True)
-    metadata = Column(JSON)  # flexible storage for asset-specific attributes
+    asset_metadata = Column(JSON)  # flexible storage for asset-specific attributes
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, onupdate=datetime.utcnow)
 

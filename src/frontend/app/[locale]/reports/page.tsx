@@ -24,31 +24,31 @@ export default function ReportsPage() {
       id: 'compliance',
       name: 'Compliance Status Report',
       description: 'Comprehensive overview of compliance across all frameworks',
-      icon: '📊',
+      icon: 'COMP',
     },
     {
       id: 'gaps',
       name: 'Gap Analysis Report',
       description: 'Identify non-compliant controls and remediation actions',
-      icon: '⚠️',
+      icon: 'GAP',
     },
     {
       id: 'executive',
       name: 'Executive Summary',
       description: 'High-level summary for leadership and stakeholders',
-      icon: '📈',
+      icon: 'EXEC',
     },
     {
       id: 'evidence',
       name: 'Evidence Coverage Report',
       description: 'Evidence collection status and missing documentation',
-      icon: '📄',
+      icon: 'EVD',
     },
     {
       id: 'audit',
       name: 'Audit Trail Report',
       description: 'Complete audit log of all system activities',
-      icon: '🔍',
+      icon: 'AUD',
     },
   ];
 
@@ -110,7 +110,7 @@ export default function ReportsPage() {
                     }`}
                   >
                     <div className="flex items-start gap-3">
-                      <span className="text-2xl">{report.icon}</span>
+                      <span className="text-xs font-semibold tracking-wide text-gray-500">{report.icon}</span>
                       <div>
                         <p className="font-semibold">{report.name}</p>
                         <p className="text-sm text-gray-600 mt-1">{report.description}</p>
@@ -186,9 +186,9 @@ export default function ReportsPage() {
                 <button
                   onClick={handleGenerateReport}
                   disabled={generating}
-                  className="w-full bg-primary-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  className="w-full bg-gray-900 text-white px-6 py-3 rounded-md font-semibold hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed"
                 >
-                  {generating ? 'Generating Report...' : '📥 Generate & Download Report'}
+                  {generating ? 'Generating Report...' : 'Generate & Download Report'}
                 </button>
               </div>
             </div>

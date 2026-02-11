@@ -139,14 +139,14 @@ export default function ControlsListPage() {
             onClick={exportToCSV}
             className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2"
           >
-            <span>📥</span>
+            <span className="text-xs font-semibold tracking-wide">CSV</span>
             <span>تصدير CSV</span>
           </button>
           <Link
             href="/ar/controls/new"
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2"
           >
-            <span>➕</span>
+            <span className="text-xs font-semibold tracking-wide">NEW</span>
             <span>إضافة ضابط</span>
           </Link>
         </div>
@@ -203,7 +203,7 @@ export default function ControlsListPage() {
         <EmptyState
           title="لا توجد ضوابط"
           description="لم يتم العثور على ضوابط تطابق معايير البحث"
-          icon="🔍"
+          icon="SRCH"
           action={{
             label: 'إعادة تعيين البحث',
             onClick: () => {

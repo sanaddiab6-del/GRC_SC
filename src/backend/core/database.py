@@ -20,15 +20,17 @@ else:
 
 # Create async engine
 use_null_pool = bool(os.getenv("PYTEST_RUNNING")) or bool(os.getenv("PYTEST_CURRENT_TEST"))
+is_sqlite = "sqlite" in DATABASE_URL
+
 engine_kwargs: Dict[str, Any] = {
     "echo": settings.DATABASE_ECHO,
     "future": True,
-    "pool_pre_ping": True,
 }
 
-if use_null_pool:
+if use_null_pool or is_sqlite:
     engine_kwargs["poolclass"] = NullPool
 else:
+    engine_kwargs["pool_pre_ping"] = True
     engine_kwargs["pool_size"] = 10
     engine_kwargs["max_overflow"] = 20
 
@@ -57,6 +59,7 @@ def _load_models() -> None:
     from incident import models as _incident_models  # noqa: F401
     from risk import models as _risk_models  # noqa: F401
     from ai_governance import models as _ai_governance_models  # noqa: F401
+    import enterprise_models as _enterprise_models  # noqa: F401 - Enterprise GRC
 
 
 async def init_db():

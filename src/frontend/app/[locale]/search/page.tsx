@@ -65,9 +65,9 @@ export default function SearchPage() {
             />
             <button
               onClick={handleSearch}
-              className="px-8 py-3 bg-primary-600 text-white rounded-lg font-semibold hover:bg-primary-700"
+              className="inline-flex items-center justify-center rounded-lg px-6 py-3 text-sm font-semibold bg-primary-600 text-white hover:bg-primary-700 transition"
             >
-              🔍 Search
+              Search
             </button>
           </div>
         </div>
@@ -159,7 +159,7 @@ export default function SearchPage() {
                 Search Results ({filteredControls?.length || 0})
               </h2>
               {filteredControls && filteredControls.length > 0 && (
-                <button className="text-sm text-primary-600 hover:text-primary-700 font-semibold">
+                <button className="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50 transition">
                   Export Results
                 </button>
               )}

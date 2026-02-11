@@ -131,10 +131,7 @@ export default function GRCPlatform() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-                <span className="text-4xl">🛡️</span>
-                منصة SICO GRC
-              </h1>
+              <h1 className="text-3xl font-bold text-white">منصة SICO GRC</h1>
               <p className="text-gray-400 mt-1">إدارة الامتثال التنظيمي السعودي</p>
             </div>
             <div className="flex gap-3">
@@ -262,22 +259,22 @@ export default function GRCPlatform() {
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-8">
           <Link href="/ar/grc/controls" className="bg-gray-800 hover:bg-gray-750 rounded-xl p-6 border border-gray-700 text-center transition shadow-lg">
-            <div className="text-4xl mb-3">📚</div>
+            <div className="text-xs font-semibold tracking-wide text-gray-400 mb-3">LIB</div>
             <div className="font-bold text-lg">مكتبة الضوابط</div>
             <div className="text-gray-400 text-sm mt-1">{stats?.total_controls || 0} ضابط</div>
           </Link>
           <Link href="/ar/grc/evidence" className="bg-gray-800 hover:bg-gray-750 rounded-xl p-6 border border-gray-700 text-center transition shadow-lg">
-            <div className="text-4xl mb-3">📋</div>
+            <div className="text-xs font-semibold tracking-wide text-gray-400 mb-3">EVD</div>
             <div className="font-bold text-lg">الأدلة</div>
             <div className="text-gray-400 text-sm mt-1">إدارة الأدلة</div>
           </Link>
           <Link href="/ar/grc/reports" className="bg-gray-800 hover:bg-gray-750 rounded-xl p-6 border border-gray-700 text-center transition shadow-lg">
-            <div className="text-4xl mb-3">📊</div>
+            <div className="text-xs font-semibold tracking-wide text-gray-400 mb-3">RPT</div>
             <div className="font-bold text-lg">التقارير</div>
             <div className="text-gray-400 text-sm mt-1">تقارير تنفيذية</div>
           </Link>
           <Link href="/ar/grc/ai" className="bg-gray-800 hover:bg-gray-750 rounded-xl p-6 border border-gray-700 text-center transition shadow-lg">
-            <div className="text-4xl mb-3">🤖</div>
+            <div className="text-xs font-semibold tracking-wide text-gray-400 mb-3">AI</div>
             <div className="font-bold text-lg">مساعد AI</div>
             <div className="text-gray-400 text-sm mt-1">استشارات ذكية</div>
           </Link>

@@ -1,9 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter, Cairo } from 'next/font/google';
 import './globals.css';
-
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
-const cairo = Cairo({ subsets: ['arabic'], variable: '--font-cairo' });
 
 export const metadata: Metadata = {
   title: 'SICO GRC Platform | منصة سيكو للحوكمة',
@@ -17,7 +13,7 @@ export default function RootLayout({
 }) {
   return (
     <html>
-      <body className={`${inter.variable} ${cairo.variable}`}>
+      <body className="min-h-screen bg-background text-foreground antialiased">
         {children}
       </body>
     </html>

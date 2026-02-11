@@ -304,13 +304,13 @@ export default function ControlLibraryPage() {
                     {control.description_ar}
                   </p>
                   <div className="flex items-center gap-4 text-sm text-gray-500">
-                    <span>📁 {control.domain_ar}</span>
-                    <span>📋 {control.evidence_types?.length || 0} نوع أدلة</span>
+                    <span>المجال: {control.domain_ar}</span>
+                    <span>الأدلة: {control.evidence_types?.length || 0} نوع أدلة</span>
                   </div>
                 </div>
                 <Link
                   href={`/ar/controls/${control.control_id}`}
-                  className="bg-purple-50 text-purple-600 px-4 py-2 rounded-lg hover:bg-purple-100 transition"
+                  className="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold bg-purple-50 text-purple-700 hover:bg-purple-100 transition"
                 >
                   عرض التفاصيل ←
                 </Link>

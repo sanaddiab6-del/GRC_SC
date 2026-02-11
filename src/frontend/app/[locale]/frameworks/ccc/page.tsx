@@ -51,7 +51,6 @@ export default function CCCFrameworkPage() {
         </Link>
         <div className="bg-gradient-to-r from-purple-600 to-purple-800 text-white rounded-xl p-8 shadow-lg">
           <div className="flex items-center gap-4 mb-4">
-            <div className="text-6xl">☁️</div>
             <div>
               <h1 className="text-4xl font-bold">
                 {isArabic ? 'ضوابط الأمن السيبراني السحابي' : 'Cloud Cybersecurity Controls (CCC)'}
@@ -98,7 +97,7 @@ export default function CCCFrameworkPage() {
           </p>
           <div className="bg-purple-50 border-l-4 border-purple-500 p-4 mt-4">
             <p className="font-semibold text-purple-900">
-              {isArabic ? '☁️ المجالات الرئيسية:' : '☁️ Main Areas:'}
+              {isArabic ? 'المجالات الرئيسية:' : 'Main Areas:'}
             </p>
             <ul className="list-disc list-inside mt-2 text-purple-800">
               <li>{isArabic ? 'حوكمة السحابة' : 'Cloud Governance'}</li>
@@ -168,14 +167,14 @@ export default function CCCFrameworkPage() {
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <a href="https://nca.gov.sa/pages/CCC.html" target="_blank" className="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-lg hover:border-purple-500 hover:bg-purple-50">
-            <span className="text-2xl">📄</span>
+            <span className="text-xs font-semibold tracking-wide text-gray-500">DOC</span>
             <div>
               <p className="font-semibold">{isArabic ? 'دليل الضوابط الرسمي' : 'Official Controls Guide'}</p>
               <p className="text-sm text-gray-600">NCA Website</p>
             </div>
           </a>
           <a href="#" className="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-lg hover:border-purple-500 hover:bg-purple-50">
-            <span className="text-2xl">📊</span>
+            <span className="text-xs font-semibold tracking-wide text-gray-500">RPT</span>
             <div>
               <p className="font-semibold">{isArabic ? 'تقرير الامتثال' : 'Compliance Report'}</p>
               <p className="text-sm text-gray-600">{isArabic ? 'تنزيل PDF' : 'Download PDF'}</p>

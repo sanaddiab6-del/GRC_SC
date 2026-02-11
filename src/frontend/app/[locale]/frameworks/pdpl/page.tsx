@@ -51,7 +51,6 @@ export default function PDPLFrameworkPage() {
         </Link>
         <div className="bg-gradient-to-r from-green-600 to-green-800 text-white rounded-xl p-8 shadow-lg">
           <div className="flex items-center gap-4 mb-4">
-            <div className="text-6xl">🔒</div>
             <div>
               <h1 className="text-4xl font-bold">
                 {isArabic ? 'نظام حماية البيانات الشخصية' : 'Personal Data Protection Law (PDPL)'}
@@ -98,7 +97,7 @@ export default function PDPLFrameworkPage() {
           </p>
           <div className="bg-green-50 border-l-4 border-green-500 p-4 mt-4">
             <p className="font-semibold text-green-900">
-              {isArabic ? '🔒 المبادئ الأساسية:' : '🔒 Core Principles:'}
+              {isArabic ? 'المبادئ الأساسية:' : 'Core Principles:'}
             </p>
             <ul className="list-disc list-inside mt-2 text-green-800">
               <li>{isArabic ? 'الموافقة والشفافية' : 'Consent & Transparency'}</li>
@@ -168,14 +167,14 @@ export default function PDPLFrameworkPage() {
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <a href="https://sdaia.gov.sa/en/PDPL.html" target="_blank" className="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-lg hover:border-green-500 hover:bg-green-50">
-            <span className="text-2xl">📄</span>
+            <span className="text-xs font-semibold tracking-wide text-gray-500">DOC</span>
             <div>
               <p className="font-semibold">{isArabic ? 'نص النظام الرسمي' : 'Official Law Text'}</p>
               <p className="text-sm text-gray-600">SDAIA Website</p>
             </div>
           </a>
           <a href="#" className="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-lg hover:border-green-500 hover:bg-green-50">
-            <span className="text-2xl">📊</span>
+            <span className="text-xs font-semibold tracking-wide text-gray-500">RPT</span>
             <div>
               <p className="font-semibold">{isArabic ? 'تقرير الامتثال' : 'Compliance Report'}</p>
               <p className="text-sm text-gray-600">{isArabic ? 'تنزيل PDF' : 'Download PDF'}</p>

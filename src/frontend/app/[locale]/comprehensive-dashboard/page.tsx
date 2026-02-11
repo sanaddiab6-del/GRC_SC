@@ -81,7 +81,7 @@ export default function ComprehensiveDashboard() {
       status: "مكتمل",
       statusColor: "green",
       link: "/ar/control-library",
-      icon: "📚"
+      icon: "LIB"
     },
     {
       id: 2,
@@ -92,7 +92,7 @@ export default function ComprehensiveDashboard() {
       status: "مكتمل",
       statusColor: "green",
       link: "/ar/unified-baseline",
-      icon: "🔗"
+      icon: "MAP"
     },
     {
       id: 3,
@@ -103,7 +103,7 @@ export default function ComprehensiveDashboard() {
       status: "مكتمل",
       statusColor: "green",
       link: "/ar/pdpl-controls",
-      icon: "🔐"
+      icon: "PDPL"
     },
     {
       id: 4,
@@ -114,7 +114,7 @@ export default function ComprehensiveDashboard() {
       status: "مكتمل",
       statusColor: "green",
       link: "/ar/evidence-catalog",
-      icon: "📋"
+      icon: "EVD"
     },
     {
       id: 5,
@@ -125,7 +125,7 @@ export default function ComprehensiveDashboard() {
       status: "مكتمل",
       statusColor: "green",
       link: "/ar/audit-procedures",
-      icon: "✅"
+      icon: "AUD"
     },
     {
       id: 6,
@@ -136,7 +136,7 @@ export default function ComprehensiveDashboard() {
       status: "متاح",
       statusColor: "blue",
       link: "/ar/sico-packs",
-      icon: "📦"
+      icon: "PKG"
     },
     {
       id: 7,
@@ -147,7 +147,7 @@ export default function ComprehensiveDashboard() {
       status: "متاح",
       statusColor: "blue",
       link: "/ar/executive-reports",
-      icon: "📊"
+      icon: "RPT"
     },
     {
       id: 8,
@@ -158,7 +158,7 @@ export default function ComprehensiveDashboard() {
       status: "متاح",
       statusColor: "blue",
       link: "/ar/soc-grc-bridge",
-      icon: "🔄"
+      icon: "SOC"
     },
     {
       id: 9,
@@ -169,7 +169,7 @@ export default function ComprehensiveDashboard() {
       status: "متاح",
       statusColor: "blue",
       link: "/ar/ai-assistant",
-      icon: "🤖"
+      icon: "AI"
     },
     {
       id: 10,
@@ -180,7 +180,7 @@ export default function ComprehensiveDashboard() {
       status: "متاح",
       statusColor: "blue",
       link: "/ar/client-dictionary",
-      icon: "📖"
+      icon: "DICT"
     },
     {
       id: 11,
@@ -191,7 +191,7 @@ export default function ComprehensiveDashboard() {
       status: "بريميوم",
       statusColor: "purple",
       link: "/ar/bert-adapters",
-      icon: "🧠"
+      icon: "NLP"
     },
     {
       id: 12,
@@ -202,7 +202,7 @@ export default function ComprehensiveDashboard() {
       status: "متاح",
       statusColor: "blue",
       link: "/ar/delivery-playbook",
-      icon: "⚙️"
+      icon: "OPS"
     }
   ];
 
@@ -311,7 +311,7 @@ export default function ComprehensiveDashboard() {
                   className="block bg-gradient-to-br from-gray-50 to-white p-6 rounded-lg border-2 border-gray-200 hover:border-purple-400 transition hover:shadow-lg"
                 >
                   <div className="flex items-start gap-3 mb-3">
-                    <span className="text-3xl">{deliverable.icon}</span>
+                    <span className="text-xs font-semibold tracking-wide text-gray-500">{deliverable.icon}</span>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <span className={`px-2 py-1 rounded text-xs font-medium ${
@@ -349,7 +349,7 @@ export default function ComprehensiveDashboard() {
                   className="block bg-gradient-to-br from-blue-50 to-white p-6 rounded-lg border-2 border-gray-200 hover:border-blue-400 transition hover:shadow-lg"
                 >
                   <div className="flex items-start gap-3 mb-3">
-                    <span className="text-3xl">{deliverable.icon}</span>
+                    <span className="text-xs font-semibold tracking-wide text-gray-500">{deliverable.icon}</span>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <span className={`px-2 py-1 rounded text-xs font-medium ${
@@ -387,7 +387,7 @@ export default function ComprehensiveDashboard() {
                   className="block bg-gradient-to-br from-green-50 to-white p-6 rounded-lg border-2 border-gray-200 hover:border-green-400 transition hover:shadow-lg"
                 >
                   <div className="flex items-start gap-3 mb-3">
-                    <span className="text-3xl">{deliverable.icon}</span>
+                    <span className="text-xs font-semibold tracking-wide text-gray-500">{deliverable.icon}</span>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <span className={`px-2 py-1 rounded text-xs font-medium ${
@@ -425,7 +425,7 @@ export default function ComprehensiveDashboard() {
                   className= "block bg-gradient-to-br from-orange-50 to-white p-6 rounded-lg border-2 border-gray-200 hover:border-orange-400 transition hover:shadow-lg"
                 >
                   <div className="flex items-start gap-3 mb-3">
-                    <span className="text-3xl">{deliverable.icon}</span>
+                    <span className="text-xs font-semibold tracking-wide text-gray-500">{deliverable.icon}</span>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <span className={`px-2 py-1 rounded text-xs font-medium ${
@@ -456,7 +456,7 @@ export default function ComprehensiveDashboard() {
             href="/ar/control-library"
             className="bg-white p-6 rounded-xl shadow-lg border hover:shadow-xl transition text-center"
           >
-            <div className="text-4xl mb-3">📚</div>
+            <div className="text-xs font-semibold tracking-wide text-gray-500 mb-3">LIB</div>
             <div className="font-bold text-gray-900 mb-2">مكتبة الضوابط</div>
             <div className="text-sm text-gray-600">{stats?.totalControls || 0} ضابط تشغيلي</div>
           </Link>
@@ -464,7 +464,7 @@ export default function ComprehensiveDashboard() {
             href="/ar/evidence-catalog"
             className="bg-white p-6 rounded-xl shadow-lg border hover:shadow-xl transition text-center"
           >
-            <div className="text-4xl mb-3">📋</div>
+            <div className="text-xs font-semibold tracking-wide text-gray-500 mb-3">EVD</div>
             <div className="font-bold text-gray-900 mb-2">فهرس الأدلة</div>
             <div className="text-sm text-gray-600">قوالب جاهزة للتدقيق</div>
           </Link>
@@ -472,7 +472,7 @@ export default function ComprehensiveDashboard() {
             href="/ar/ai-assistant"
             className="bg-white p-6 rounded-xl shadow-lg border hover:shadow-xl transition text-center"
           >
-            <div className="text-4xl mb-3">🤖</div>
+            <div className="text-xs font-semibold tracking-wide text-gray-500 mb-3">AI</div>
             <div className="font-bold text-gray-900 mb-2">مساعد AI</div>
             <div className="text-sm text-gray-600">استشارات ذكية ثنائية اللغة</div>
           </Link>
@@ -480,7 +480,7 @@ export default function ComprehensiveDashboard() {
             href="/ar/executive-reports"
             className="bg-white p-6 rounded-xl shadow-lg border hover:shadow-xl transition text-center"
           >
-            <div className="text-4xl mb-3">📊</div>
+            <div className="text-xs font-semibold tracking-wide text-gray-500 mb-3">RPT</div>
             <div className="font-bold text-gray-900 mb-2">التقارير التنفيذية</div>
             <div className="text-sm text-gray-600">لوحات تحكم شاملة</div>
           </Link>

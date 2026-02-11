@@ -162,7 +162,7 @@ export default function ControlsManagement() {
         <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 mb-8">
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-300 mb-2">🔍 البحث</label>
+              <label className="block text-sm font-medium text-gray-300 mb-2">البحث</label>
               <input
                 type="text"
                 value={searchTerm}
@@ -217,7 +217,6 @@ export default function ControlsManagement() {
         <div className="space-y-4">
           {filteredControls.length === 0 ? (
             <div className="bg-gray-800 rounded-xl p-12 border border-gray-700 text-center">
-              <div className="text-6xl mb-4">🔍</div>
               <h3 className="text-2xl font-bold text-gray-300 mb-2">لا توجد ضوابط</h3>
               <p className="text-gray-400">جرب تعديل معايير البحث</p>
             </div>
@@ -253,22 +252,22 @@ export default function ControlsManagement() {
                       {control.description_ar}
                     </p>
                     <div className="flex items-center gap-4 text-sm text-gray-500">
-                      <span>📁 {control.domain_ar || control.domain}</span>
+                      <span>المجال: {control.domain_ar || control.domain}</span>
                       {control.evidence_types && (
-                        <span>📋 {control.evidence_types.length} نوع أدلة</span>
+                        <span>الأدلة: {control.evidence_types.length} نوع أدلة</span>
                       )}
                     </div>
                   </div>
                   <Link
                     href={`/ar/grc/controls/${control.control_id}`}
-                    className="bg-purple-600 hover:bg-purple-700 px-6 py-2.5 rounded-lg font-medium transition shadow-lg ml-4"
+                    className="inline-flex items-center justify-center rounded-lg px-5 py-2.5 text-sm font-semibold bg-purple-600 hover:bg-purple-700 transition shadow-lg ml-4"
                   >
                     عرض التفاصيل
                   </Link>
                 </div>
                 {control.implementation_guidance && (
                   <div className="mt-4 p-4 bg-blue-900/30 rounded-lg border border-blue-800/50">
-                    <p className="text-sm font-medium text-blue-300 mb-1">💡 إرشادات التنفيذ:</p>
+                    <p className="text-sm font-medium text-blue-300 mb-1">إرشادات التنفيذ:</p>
                     <p className="text-sm text-blue-200">{control.implementation_guidance}</p>
                   </div>
                 )}

@@ -74,7 +74,7 @@ export default function ProfessionalDashboard() {
           name_en: 'Essential Cybersecurity Controls',
           authority_ar: 'الهيئة الوطنية للأمن السيبراني',
           authority_en: 'National Cybersecurity Authority',
-          icon: '🛡️',
+          icon: 'ECC',
           color: 'border-blue-500',
           controls_count: eccControls.length,
           compliance_score: calculateFrameworkScore(eccControls)
@@ -85,7 +85,7 @@ export default function ProfessionalDashboard() {
           name_en: 'Cloud Cybersecurity Controls',
           authority_ar: 'الهيئة الوطنية للأمن السيبراني',
           authority_en: 'National Cybersecurity Authority',
-          icon: '☁️',
+          icon: 'CCC',
           color: 'border-purple-500',
           controls_count: cccControls.length,
           compliance_score: calculateFrameworkScore(cccControls)
@@ -96,7 +96,7 @@ export default function ProfessionalDashboard() {
           name_en: 'Personal Data Protection Law',
           authority_ar: 'هيئة حماية  البيانات الشخصية',
           authority_en: 'Personal Data Protection Authority',
-          icon: '🔒',
+          icon: 'PDPL',
           color: 'border-green-500',
           controls_count: pdplControls.length,
           compliance_score: calculateFrameworkScore(pdplControls)
@@ -140,7 +140,7 @@ export default function ProfessionalDashboard() {
         <StatsCard
           title="نسبة الامتثال الإجمالية"
           value={`${stats?.compliance_score || 0}%`}
-          icon="📊"
+          icon="CMP"
           color="bg-blue-500/10"
           trend={{ value: 12, isPositive: true }}
           locale={locale}
@@ -148,14 +148,14 @@ export default function ProfessionalDashboard() {
         <StatsCard
           title="إجمالي الضوابط"
           value={stats?.total_controls || 0}
-          icon="🛡️"
+          icon="CTRL"
           color="bg-purple-500/10"
           locale={locale}
         />
         <StatsCard
           title="الضوابط المتوافقة"
           value={stats?.compliant || 0}
-          icon="✅"
+          icon="OK"
           color="bg-green-500/10"
           trend={{ value: 8, isPositive: true }}
           locale={locale}
@@ -163,7 +163,7 @@ export default function ProfessionalDashboard() {
         <StatsCard
           title="يتطلب اهتمام"
           value={stats?.non_compliant || 0}
-          icon="⚠️"
+          icon="RSK"
           color="bg-red-500/10"
           trend={{ value: 5, isPositive: false }}
           locale={locale}
@@ -266,28 +266,28 @@ export default function ProfessionalDashboard() {
         </h2>
         <div className="space-y-4">
           <ActivityItem
-            icon="✅"
+            icon="OK"
             title="تم تحديث ضابط ECC-AC-3"
             description="تم تطبيق المصادقة متعددة العوامل بنجاح"
             time="منذ ساعتين"
             type="success"
           />
           <ActivityItem
-            icon="📝"
+            icon="REQ"
             title="طلب مراجعة جديد"
             description="ضابط PDPL-8 يتطلب مراجعة تقييم الأثر"
             time="منذ 4 ساعات"
             type="info"
           />
           <ActivityItem
-            icon="⚠️"
+            icon="ALR"
             title="تنبيه امتثال"
             description="انتهاء صلاحية شهادة التشفير في CCC-CD-1"
             time="منذ يوم واحد"
             type="warning"
           />
           <ActivityItem
-            icon="🔍"
+            icon="REV"
             title="مراجعة دورية مجدولة"
             description="مراجعة ربع سنوية لضوابط ECC المطلوبة خلال 7 أيام"
             time="منذ يومين"
@@ -299,25 +299,25 @@ export default function ProfessionalDashboard() {
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
         <QuickActionButton
-          icon="➕"
+          icon="NEW"
           label="إضافة دليل جديد"
           href="/ar/evidence/new"
           color="bg-blue-600 hover:bg-blue-700"
         />
         <QuickActionButton
-          icon="📑"
+          icon="RPT"
           label="إنشاء تقرير"
           href="/ar/reports/new"
           color="bg-green-600 hover:bg-green-700"
         />
         <QuickActionButton
-          icon="🔍"
+          icon="RSK"
           label="تقييم المخاطر"
           href="/ar/risk/assessment"
           color="bg-purple-600 hover:bg-purple-700"
         />
         <QuickActionButton
-          icon="🤖"
+          icon="AI"
           label="استشارة AI"
           href="/ar/search"
           color="bg-indigo-600 hover:bg-indigo-700"

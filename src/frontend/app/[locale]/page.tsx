@@ -14,7 +14,7 @@ export default function HomePage({
       <div className="bg-gradient-to-br from-primary-600 to-primary-800 text-white py-20">
         <div className="container mx-auto px-4 text-center">
           <h1 className="text-5xl font-bold mb-6">
-            🛡️ {isArabic ? 'منصة سيكو للحوكمة' : 'SICO GRC Platform'}
+            {isArabic ? 'منصة سيكو للحوكمة' : 'SICO GRC Platform'}
           </h1>
           <p className="text-xl mb-8 max-w-3xl mx-auto">
             {isArabic 
@@ -31,7 +31,7 @@ export default function HomePage({
               href={`/${locale}/dashboard`}
               className="px-8 py-4 bg-white text-primary-600 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors"
             >
-              {isArabic ? 'الذهاب إلى لوحة القيادة ←' : 'Go to Dashboard →'}
+              {isArabic ? 'الذهاب إلى لوحة القيادة' : 'Go to Dashboard'}
             </Link>
             <Link
               href={`/${locale}/controls`}
@@ -50,7 +50,7 @@ export default function HomePage({
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <FeatureCard
-            icon="📊"
+            icon="CMP"
             title={isArabic ? 'لوحة الامتثال' : 'Compliance Dashboard'}
             description={isArabic 
               ? 'رؤية فورية لوضع الامتثال عبر جميع الأطر'
@@ -58,7 +58,7 @@ export default function HomePage({
             href={`/${locale}/dashboard`}
           />
           <FeatureCard
-            icon="📋"
+            icon="CTRL"
             title={isArabic ? 'إدارة الضوابط' : 'Control Management'}
             description={isArabic
               ? 'إدارة وتتبع ضوابط الامتثال مع التحقق القائم على الأدلة'
@@ -66,7 +66,7 @@ export default function HomePage({
             href={`/${locale}/controls`}
           />
           <FeatureCard
-            icon="🔍"
+            icon="SRCH"
             title={isArabic ? 'البحث المتقدم' : 'Advanced Search'}
             description={isArabic
               ? 'البحث عبر الضوابط بدعم ثنائي اللغة للعربية والإنجليزية'
@@ -74,7 +74,7 @@ export default function HomePage({
             href={`/${locale}/search`}
           />
           <FeatureCard
-            icon="📎"
+            icon="EVD"
             title={isArabic ? 'إدارة الأدلة' : 'Evidence Management'}
             description={isArabic
               ? 'تحميل وتنظيم أدلة الامتثال مع التحقق التلقائي'
@@ -82,7 +82,7 @@ export default function HomePage({
             href={`/${locale}/evidence/upload`}
           />
           <FeatureCard
-            icon="📈"
+            icon="RPT"
             title={isArabic ? 'تقارير الامتثال' : 'Compliance Reports'}
             description={isArabic
               ? 'إنشاء التقارير التنفيذية وتصدير البيانات بتنسيقات متعددة'
@@ -90,7 +90,7 @@ export default function HomePage({
             href={`/${locale}/reports`}
           />
           <FeatureCard
-            icon="🤖"
+            icon="AI"
             title={isArabic ? 'رؤى مدعومة بالذكاء الاصطناعي' : 'AI-Powered Insights'}
             description={isArabic
               ? 'احصل على توصيات ذكية باستخدام مساعد الامتثال القائم على RAG'
@@ -178,7 +178,7 @@ function FeatureCard({
       href={href}
       className="block bg-white rounded-lg shadow-md p-6 hover:shadow-xl transition-shadow border border-gray-200"
     >
-      <div className="text-4xl mb-4">{icon}</div>
+      <div className="text-xs font-semibold tracking-wide text-gray-500 mb-4">{icon}</div>
       <h3 className="text-xl font-bold mb-3">{title}</h3>
       <p className="text-gray-600">{description}</p>
     </Link>

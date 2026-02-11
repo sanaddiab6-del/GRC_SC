@@ -95,33 +95,28 @@ export const PriorityBadge: React.FC<{ priority: Control['priority']; locale?: s
     critical: {
       ar: 'حرج',
       en: 'Critical',
-      color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
-      icon: '🔴'
+      color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
     },
     high: {
       ar: 'عالي',
       en: 'High',
-      color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300',
-      icon: '🟠'
+      color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300'
     },
     medium: {
       ar: 'متوسط',
       en: 'Medium',
-      color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
-      icon: '🟡'
+      color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
     },
     low: {
       ar: 'منخفض',
       en: 'Low',
-      color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
-      icon: '🟢'
+      color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
     }
   };
 
   const config = priorityConfig[priority];
   return (
-    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${config.color}`}>
-      <span>{config.icon}</span>
+    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${config.color}`}>
       <span>{locale === 'ar' ? config.ar : config.en}</span>
     </span>
   );

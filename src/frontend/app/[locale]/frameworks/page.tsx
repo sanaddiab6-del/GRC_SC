@@ -19,7 +19,6 @@ export default function FrameworksPage() {
         ? 'مجموعة الضوابط الأمنية الإلزامية لحماية البنية التحتية الحيوية والأصول الرقمية'
         : 'Mandatory security controls to protect critical infrastructure and digital assets',
       color: 'blue',
-      icon: '🛡️',
       controls: '50+',
     },
     {
@@ -31,7 +30,6 @@ export default function FrameworksPage() {
         ? 'ضوابط متخصصة لحماية البيانات والخدمات السحابية'
         : 'Specialized controls for cloud data and services protection',
       color: 'purple',
-      icon: '☁️',
       controls: '40+',
     },
     {
@@ -43,7 +41,6 @@ export default function FrameworksPage() {
         ? 'الإطار التنظيمي لحماية خصوصية الأفراد وتنظيم معالجة البيانات الشخصية'
         : 'Regulatory framework for protecting privacy and regulating personal data processing',
       color: 'green',
-      icon: '🔒',
       controls: '30+',
     },
   ];
@@ -94,7 +91,6 @@ export default function FrameworksPage() {
             >
               <div className={`${colorClasses[framework.color].bg} p-6`}>
                 <div className="flex items-center gap-3 mb-3">
-                  <span className="text-5xl">{framework.icon}</span>
                   <div>
                     <h2 className={`text-3xl font-bold ${colorClasses[framework.color].text}`}>
                       {framework.titleShort}
@@ -150,28 +146,28 @@ export default function FrameworksPage() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <a href="https://nca.gov.sa" target="_blank" className="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50">
-              <span className="text-3xl">🌐</span>
+              <span className="text-xs font-semibold tracking-wide text-gray-500">WWW</span>
               <div>
                 <p className="font-semibold">{isArabic ? 'الهيئة الوطنية للأمن السيبراني' : 'NCA Website'}</p>
                 <p className="text-sm text-gray-600">nca.gov.sa</p>
               </div>
             </a>
             <a href="https://sdaia.gov.sa" target="_blank" className="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-lg hover:border-green-500 hover:bg-green-50">
-              <span className="text-3xl">🌐</span>
+              <span className="text-xs font-semibold tracking-wide text-gray-500">WWW</span>
               <div>
                 <p className="font-semibold">{isArabic ? 'الهيئة السعودية للبيانات والذكاء الاصطناعي' : 'SDAIA Website'}</p>
                 <p className="text-sm text-gray-600">sdaia.gov.sa</p>
               </div>
             </a>
             <Link href={`/${locale}/controls`} className="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-lg hover:border-primary-500 hover:bg-primary-50">
-              <span className="text-3xl">📋</span>
+              <span className="text-xs font-semibold tracking-wide text-gray-500">CTRL</span>
               <div>
                 <p className="font-semibold">{isArabic ? 'جميع الضوابط' : 'All Controls'}</p>
                 <p className="text-sm text-gray-600">{isArabic ? 'عرض جميع ضوابط الامتثال' : 'View all compliance controls'}</p>
               </div>
             </Link>
             <Link href={`/${locale}/reports`} className="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-lg hover:border-primary-500 hover:bg-primary-50">
-              <span className="text-3xl">📊</span>
+              <span className="text-xs font-semibold tracking-wide text-gray-500">RPT</span>
               <div>
                 <p className="font-semibold">{isArabic ? 'تقارير الامتثال' : 'Compliance Reports'}</p>
                 <p className="text-sm text-gray-600">{isArabic ? 'إنشاء وتنزيل التقارير' : 'Generate and download reports'}</p>
