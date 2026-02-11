@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from typing import List, Optional
-from datetime import date
+from datetime import date, datetime
 from pydantic import BaseModel
 
 from core.database import get_db
@@ -96,6 +96,11 @@ class AuditFindingResponse(BaseModel):
         from_attributes = True
 
 
+class AuditFindingListResponse(BaseModel):
+    items: List[AuditFindingResponse]
+    total: int
+
+
 class RoPAResponse(BaseModel):
     id: int
     ropa_id: str
@@ -181,6 +186,162 @@ class ComplianceMetricsResponse(BaseModel):
 
 
 # ============================================================================
+# REQUEST SCHEMAS (for POST/PUT operations)
+# ============================================================================
+
+class OrganizationCreate(BaseModel):
+    name_en: str
+    name_ar: str
+    org_type: Optional[str] = None
+    parent_org_id: Optional[int] = None
+    license_type: str
+
+
+class OrganizationUpdate(BaseModel):
+    name_en: Optional[str] = None
+    name_ar: Optional[str] = None
+    org_type: Optional[str] = None
+    license_type: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class AssetCreate(BaseModel):
+    asset_id: str
+    asset_type: str
+    name_en: str
+    name_ar: Optional[str] = None
+    criticality: str
+    classification: Optional[str] = None
+    environment: Optional[str] = None
+
+
+class AssetUpdate(BaseModel):
+    name_en: Optional[str] = None
+    name_ar: Optional[str] = None
+    criticality: Optional[str] = None
+    classification: Optional[str] = None
+    environment: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class RiskCreate(BaseModel):
+    risk_id: str
+    risk_type: str
+    title_en: str
+    title_ar: Optional[str] = None
+    description_en: str
+    likelihood_inherent: int
+    impact_inherent: int
+
+
+class RiskUpdate(BaseModel):
+    title_en: Optional[str] = None
+    title_ar: Optional[str] = None
+    likelihood_inherent: Optional[int] = None
+    impact_inherent: Optional[int] = None
+    likelihood_residual: Optional[int] = None
+    impact_residual: Optional[int] = None
+    status: Optional[str] = None
+
+
+class AuditFindingCreate(BaseModel):
+    finding_id: str
+    title_en: str
+    title_ar: Optional[str] = None
+    description_en: str
+    severity: str
+    control_id: Optional[int] = None
+
+
+class AuditFindingUpdate(BaseModel):
+    title_en: Optional[str] = None
+    description_en: Optional[str] = None
+    severity: Optional[str] = None
+    status: Optional[str] = None
+    target_closure_date: Optional[date] = None
+
+
+class VendorCreate(BaseModel):
+    vendor_id: str
+    name_en: str
+    name_ar: Optional[str] = None
+    vendor_type: str
+    criticality: str
+    contact_email: str
+
+
+class VendorUpdate(BaseModel):
+    name_en: Optional[str] = None
+    vendor_type: Optional[str] = None
+    criticality: Optional[str] = None
+    contact_email: Optional[str] = None
+    status: Optional[str] = None
+
+
+class WorkflowCaseCreate(BaseModel):
+    case_type: str
+    title_en: str
+    title_ar: Optional[str] = None
+    description_en: Optional[str] = None
+    priority: Optional[str] = None
+
+
+class WorkflowCaseUpdate(BaseModel):
+    status: Optional[str] = None
+    assigned_to_id: Optional[int] = None
+    resolution_notes: Optional[str] = None
+
+
+class RoPACreate(BaseModel):
+    activity_id: str
+    processing_purpose_en: str
+    processing_purpose_ar: Optional[str] = None
+    data_categories: str
+    recipients_en: Optional[str] = None
+    retention_period: Optional[str] = None
+
+
+class RoPAUpdate(BaseModel):
+    processing_purpose_en: Optional[str] = None
+    data_categories: Optional[str] = None
+    recipients_en: Optional[str] = None
+    retention_period: Optional[str] = None
+    status: Optional[str] = None
+
+
+class DSARCreate(BaseModel):
+    dsar_id: str
+    data_subject_name: str
+    request_date: date
+    request_type: str
+    response_deadline: date
+
+
+class DSARUpdate(BaseModel):
+    status: Optional[str] = None
+    response_date: Optional[date] = None
+    response_format: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class DataBreachCreate(BaseModel):
+    breach_id: str
+    breach_date: date
+    suspected_date: Optional[date] = None
+    description_en: str
+    affected_data_types: str
+    severity: str
+
+
+class DataBreachUpdate(BaseModel):
+    breach_date: Optional[date] = None
+    description_en: Optional[str] = None
+    severity: Optional[str] = None
+    status: Optional[str] = None
+    sdaia_notified: Optional[bool] = None
+
+
+# ============================================================================
 # ORGANIZATIONS ENDPOINTS
 # ============================================================================
 
@@ -214,6 +375,110 @@ async def get_organization(org_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Organization not found")
     
     return dict(result._mapping)
+
+
+@router.post("/organizations", response_model=OrganizationResponse, status_code=201)
+async def create_organization(
+    org: OrganizationCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Create a new organization (Admin only)"""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    try:
+        await db.execute(text("""
+            INSERT INTO organizations (name_en, name_ar, org_type, parent_org_id, license_type, is_active)
+            VALUES (:name_en, :name_ar, :org_type, :parent_org_id, :license_type, 1)
+        """), {
+            "name_en": org.name_en,
+            "name_ar": org.name_ar,
+            "org_type": org.org_type,
+            "parent_org_id": org.parent_org_id,
+            "license_type": org.license_type
+        })
+        await db.commit()
+        
+        # Fetch created organization
+        result = await db.execute(text("""
+            SELECT * FROM organizations WHERE name_en = :name_en LIMIT 1
+        """), {"name_en": org.name_en})
+        return dict(result.first()._mapping)
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.put("/organizations/{org_id}", response_model=OrganizationResponse)
+async def update_organization(
+    org_id: int,
+    org: OrganizationUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Update an organization (Admin only)"""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    # Check exists
+    result = await db.execute(text("SELECT id FROM organizations WHERE id = :id"), {"id": org_id})
+    if not result.fetchone():
+        raise HTTPException(status_code=404, detail="Organization not found")
+    
+    try:
+        updates = []
+        params = {"id": org_id}
+        
+        if org.name_en:
+            updates.append("name_en = :name_en")
+            params["name_en"] = org.name_en
+        if org.name_ar:
+            updates.append("name_ar = :name_ar")
+            params["name_ar"] = org.name_ar
+        if org.org_type:
+            updates.append("org_type = :org_type")
+            params["org_type"] = org.org_type
+        if org.license_type:
+            updates.append("license_type = :license_type")
+            params["license_type"] = org.license_type
+        if org.is_active is not None:
+            updates.append("is_active = :is_active")
+            params["is_active"] = 1 if org.is_active else 0
+        
+        if updates:
+            await db.execute(text(f"UPDATE organizations SET {', '.join(updates)} WHERE id = :id"), params)
+            await db.commit()
+        
+        # Fetch updated organization
+        result = await db.execute(text("SELECT * FROM organizations WHERE id = :id"), {"id": org_id})
+        return dict(result.first()._mapping)
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/organizations/{org_id}", status_code=204)
+async def delete_organization(
+    org_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Delete an organization (Admin only)"""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    # Check exists
+    result = await db.execute(text("SELECT id FROM organizations WHERE id = :id"), {"id": org_id})
+    if not result.fetchone():
+        raise HTTPException(status_code=404, detail="Organization not found")
+    
+    try:
+        await db.execute(text("DELETE FROM organizations WHERE id = :id"), {"id": org_id})
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail=f"Cannot delete: {str(e)}")
 
 
 # ============================================================================
@@ -286,6 +551,109 @@ async def get_assets_by_criticality(db: AsyncSession = Depends(get_db)):
     return {row[0]: row[1] for row in result}
 
 
+@router.post("/assets", response_model=AssetResponse, status_code=201)
+async def create_asset(
+    asset: AssetCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Create a new asset"""
+    if current_user.role not in ["admin", "compliance_owner"]:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    
+    try:
+        await db.execute(text("""
+            INSERT INTO assets (organization_id, asset_id, asset_type, name_en, name_ar, criticality, classification, environment, is_active)
+            VALUES (:org_id, :asset_id, :asset_type, :name_en, :name_ar, :criticality, :classification, :environment, 1)
+        """), {
+            "org_id": current_user.organization_id,
+            "asset_id": asset.asset_id,
+            "asset_type": asset.asset_type,
+            "name_en": asset.name_en,
+            "name_ar": asset.name_ar,
+            "criticality": asset.criticality,
+            "classification": asset.classification,
+            "environment": asset.environment
+        })
+        await db.commit()
+        result = await db.execute(text("SELECT * FROM assets WHERE asset_id = :asset_id"), {"asset_id": asset.asset_id})
+        return dict(result.first()._mapping)
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.put("/assets/{asset_id}", response_model=AssetResponse)
+async def update_asset(
+    asset_id: str,
+    asset: AssetUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Update an asset"""
+    if current_user.role not in ["admin", "compliance_owner"]:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    
+    result = await db.execute(text("SELECT id FROM assets WHERE asset_id = :asset_id"), {"asset_id": asset_id})
+    if not result.fetchone():
+        raise HTTPException(status_code=404, detail="Asset not found")
+    
+    try:
+        updates = []
+        params = {"asset_id": asset_id}
+        
+        if asset.name_en:
+            updates.append("name_en = :name_en")
+            params["name_en"] = asset.name_en
+        if asset.name_ar:
+            updates.append("name_ar = :name_ar")
+            params["name_ar"] = asset.name_ar
+        if asset.criticality:
+            updates.append("criticality = :criticality")
+            params["criticality"] = asset.criticality
+        if asset.classification:
+            updates.append("classification = :classification")
+            params["classification"] = asset.classification
+        if asset.environment:
+            updates.append("environment = :environment")
+            params["environment"] = asset.environment
+        if asset.is_active is not None:
+            updates.append("is_active = :is_active")
+            params["is_active"] = 1 if asset.is_active else 0
+        
+        if updates:
+            await db.execute(text(f"UPDATE assets SET {', '.join(updates)} WHERE asset_id = :asset_id"), params)
+            await db.commit()
+        
+        result = await db.execute(text("SELECT * FROM assets WHERE asset_id = :asset_id"), {"asset_id": asset_id})
+        return dict(result.first()._mapping)
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/assets/{asset_id}", status_code=204)
+async def delete_asset(
+    asset_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Delete an asset"""
+    if current_user.role not in ["admin", "compliance_owner"]:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    
+    result = await db.execute(text("SELECT id FROM assets WHERE asset_id = :asset_id"), {"asset_id": asset_id})
+    if not result.fetchone():
+        raise HTTPException(status_code=404, detail="Asset not found")
+    
+    try:
+        await db.execute(text("DELETE FROM assets WHERE asset_id = :asset_id"), {"asset_id": asset_id})
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail=f"Cannot delete: {str(e)}")
+
+
 # ============================================================================
 # ENTERPRISE RISK MANAGEMENT (ERM)
 # ============================================================================
@@ -339,6 +707,115 @@ async def get_risk_dashboard(db: AsyncSession = Depends(get_db)):
     }
 
 
+@router.post("/risks", response_model=RiskResponse, status_code=201)
+async def create_risk(
+    risk: RiskCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Create a new risk"""
+    if current_user.role not in ["admin", "risk_owner"]:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    
+    try:
+        risk_score = risk.likelihood_inherent * risk.impact_inherent
+        await db.execute(text("""
+            INSERT INTO risks (organization_id, risk_id, risk_type, title_en, title_ar, description_en, 
+            likelihood_inherent, impact_inherent, risk_score_inherent, status)
+            VALUES (:org_id, :risk_id, :risk_type, :title_en, :title_ar, :desc_en, :likelihood, :impact, :score, 'open')
+        """), {
+            "org_id": current_user.organization_id,
+            "risk_id": risk.risk_id,
+            "risk_type": risk.risk_type,
+            "title_en": risk.title_en,
+            "title_ar": risk.title_ar,
+            "desc_en": risk.description_en,
+            "likelihood": risk.likelihood_inherent,
+            "impact": risk.impact_inherent,
+            "score": risk_score
+        })
+        await db.commit()
+        result = await db.execute(text("SELECT * FROM risks WHERE risk_id = :risk_id"), {"risk_id": risk.risk_id})
+        return dict(result.first()._mapping)
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.put("/risks/{risk_id}", response_model=RiskResponse)
+async def update_risk(
+    risk_id: str,
+    risk: RiskUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Update a risk"""
+    if current_user.role not in ["admin", "risk_owner"]:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    
+    result = await db.execute(text("SELECT id FROM risks WHERE risk_id = :risk_id"), {"risk_id": risk_id})
+    if not result.fetchone():
+        raise HTTPException(status_code=404, detail="Risk not found")
+    
+    try:
+        updates = []
+        params = {"risk_id": risk_id}
+        
+        if risk.title_en:
+            updates.append("title_en = :title_en")
+            params["title_en"] = risk.title_en
+        if risk.title_ar:
+            updates.append("title_ar = :title_ar")
+            params["title_ar"] = risk.title_ar
+        if risk.likelihood_inherent:
+            updates.append("likelihood_inherent = :likelihood")
+            params["likelihood"] = risk.likelihood_inherent
+        if risk.impact_inherent:
+            updates.append("impact_inherent = :impact")
+            params["impact"] = risk.impact_inherent
+        if risk.likelihood_residual:
+            updates.append("likelihood_residual = :likelihood_res")
+            params["likelihood_res"] = risk.likelihood_residual
+        if risk.impact_residual:
+            updates.append("impact_residual = :impact_res")
+            params["impact_res"] = risk.impact_residual
+        if risk.status:
+            updates.append("status = :status")
+            params["status"] = risk.status
+        
+        if updates:
+            await db.execute(text(f"UPDATE risks SET {', '.join(updates)} WHERE risk_id = :risk_id"), params)
+            await db.commit()
+        
+        result = await db.execute(text("SELECT * FROM risks WHERE risk_id = :risk_id"), {"risk_id": risk_id})
+        return dict(result.first()._mapping)
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/risks/{risk_id}", status_code=204)
+async def delete_risk(
+    risk_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Delete a risk"""
+    if current_user.role not in ["admin", "risk_owner"]:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    
+    result = await db.execute(text("SELECT id FROM risks WHERE risk_id = :risk_id"), {"risk_id": risk_id})
+    if not result.fetchone():
+        raise HTTPException(status_code=404, detail="Risk not found")
+    
+    try:
+        await db.execute(text("DELETE FROM risks WHERE risk_id = :risk_id"), {"risk_id": risk_id})
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail=f"Cannot delete: {str(e)}")
+
+
 # ============================================================================
 # AUDIT MANAGEMENT
 # ============================================================================
@@ -365,30 +842,166 @@ async def get_audit_programs(
     return [dict(row._mapping) for row in result]
 
 
-@router.get("/audit-findings", response_model=List[AuditFindingResponse])
+@router.get("/audit-findings", response_model=AuditFindingListResponse)
 async def get_audit_findings(
     db: AsyncSession = Depends(get_db),
     severity: Optional[str] = None,
     status: Optional[str] = None,
-    overdue_only: bool = False
+    overdue_only: bool = False,
+    search: Optional[str] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100)
 ):
     """Get audit findings"""
-    query = "SELECT * FROM audit_findings WHERE 1=1"
+    base_query = "FROM audit_findings WHERE 1=1"
     params = {}
+    filters = []
     
     if severity:
-        query += " AND severity = :severity"
+        filters.append("severity = :severity")
         params['severity'] = severity
     
     if status:
-        query += " AND status = :status"
+        filters.append("status = :status")
         params['status'] = status
     
     if overdue_only:
-        query += " AND is_overdue = 1"
+        filters.append("is_overdue = 1")
+
+    if search:
+        filters.append("(finding_id ILIKE :search OR title_en ILIKE :search OR title_ar ILIKE :search)")
+        params['search'] = f"%{search}%"
+
+    if filters:
+        base_query += " AND " + " AND ".join(filters)
+
+    total_result = await db.execute(text(f"SELECT COUNT(*) {base_query}"), params)
+    total = (total_result.fetchone() or (0,))[0]
+
+    result = await db.execute(
+        text(f"SELECT * {base_query} ORDER BY finding_id DESC LIMIT :limit OFFSET :skip"),
+        {**params, "limit": limit, "skip": skip}
+    )
+
+    return {
+        "items": [dict(row._mapping) for row in result],
+        "total": total
+    }
+
+
+@router.get("/audit-findings/{finding_id}", response_model=AuditFindingResponse)
+async def get_audit_finding(
+    finding_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """Get audit finding details"""
+    result = await db.execute(
+        text("SELECT * FROM audit_findings WHERE finding_id = :id"),
+        {"id": finding_id}
+    )
+    row = result.first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Finding not found")
+    return dict(row._mapping)
+
+
+@router.post("/audit-findings", response_model=AuditFindingResponse, status_code=201)
+async def create_audit_finding(
+    finding: AuditFindingCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Create a new audit finding"""
+    if current_user.role not in ["admin", "auditor"]:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
     
-    result = await db.execute(text(query), params)
-    return [dict(row._mapping) for row in result]
+    try:
+        await db.execute(text("""
+            INSERT INTO audit_findings (organization_id, finding_id, title_en, title_ar, description_en, severity, control_id, status)
+            VALUES (:org_id, :finding_id, :title_en, :title_ar, :desc_en, :severity, :control_id, 'open')
+        """), {
+            "org_id": current_user.organization_id,
+            "finding_id": finding.finding_id,
+            "title_en": finding.title_en,
+            "title_ar": finding.title_ar,
+            "desc_en": finding.description_en,
+            "severity": finding.severity,
+            "control_id": finding.control_id
+        })
+        await db.commit()
+        result = await db.execute(text("SELECT * FROM audit_findings WHERE finding_id = :id"), {"id": finding.finding_id})
+        return dict(result.first()._mapping)
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.put("/audit-findings/{finding_id}", response_model=AuditFindingResponse)
+async def update_audit_finding(
+    finding_id: str,
+    finding: AuditFindingUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Update an audit finding"""
+    if current_user.role not in ["admin", "auditor"]:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    
+    result = await db.execute(text("SELECT id FROM audit_findings WHERE finding_id = :id"), {"id": finding_id})
+    if not result.fetchone():
+        raise HTTPException(status_code=404, detail="Finding not found")
+    
+    try:
+        updates = []
+        params = {"id": finding_id}
+        
+        if finding.title_en:
+            updates.append("title_en = :title_en")
+            params["title_en"] = finding.title_en
+        if finding.description_en:
+            updates.append("description_en = :desc_en")
+            params["desc_en"] = finding.description_en
+        if finding.severity:
+            updates.append("severity = :severity")
+            params["severity"] = finding.severity
+        if finding.status:
+            updates.append("status = :status")
+            params["status"] = finding.status
+        if finding.target_closure_date:
+            updates.append("target_closure_date = :closure_date")
+            params["closure_date"] = finding.target_closure_date
+        
+        if updates:
+            await db.execute(text(f"UPDATE audit_findings SET {', '.join(updates)} WHERE finding_id = :id"), params)
+            await db.commit()
+        
+        result = await db.execute(text("SELECT * FROM audit_findings WHERE finding_id = :id"), {"id": finding_id})
+        return dict(result.first()._mapping)
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/audit-findings/{finding_id}", status_code=204)
+async def delete_audit_finding(
+    finding_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Delete an audit finding"""
+    if current_user.role not in ["admin", "auditor"]:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    
+    result = await db.execute(text("SELECT id FROM audit_findings WHERE finding_id = :id"), {"id": finding_id})
+    if not result.fetchone():
+        raise HTTPException(status_code=404, detail="Finding not found")
+    
+    try:
+        await db.execute(text("DELETE FROM audit_findings WHERE finding_id = :id"), {"id": finding_id})
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail=f"Cannot delete: {str(e)}")
 
 
 @router.get("/audit-findings/dashboard")
@@ -430,6 +1043,105 @@ async def get_ropa_records(
     return [dict(row._mapping) for row in result]
 
 
+@router.post("/pdpl/ropa", response_model=RoPAResponse, status_code=201)
+async def create_ropa_record(
+    ropa: RoPACreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Create a new RoPA record"""
+    if current_user.role not in ["admin", "compliance_owner"]:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    
+    try:
+        await db.execute(text("""
+            INSERT INTO ropa_records (organization_id, activity_id, processing_purpose_en, processing_purpose_ar, data_categories, recipients_en, retention_period, status)
+            VALUES (:org_id, :activity_id, :purpose_en, :purpose_ar, :categories, :recipients, :retention, 'active')
+        """), {
+            "org_id": current_user.organization_id,
+            "activity_id": ropa.activity_id,
+            "purpose_en": ropa.processing_purpose_en,
+            "purpose_ar": ropa.processing_purpose_ar,
+            "categories": ropa.data_categories,
+            "recipients": ropa.recipients_en,
+            "retention": ropa.retention_period
+        })
+        await db.commit()
+        result = await db.execute(text("SELECT * FROM ropa_records WHERE activity_id = :id"), {"id": ropa.activity_id})
+        return dict(result.first()._mapping)
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.put("/pdpl/ropa/{activity_id}", response_model=RoPAResponse)
+async def update_ropa_record(
+    activity_id: str,
+    ropa: RoPAUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Update a RoPA record"""
+    if current_user.role not in ["admin", "compliance_owner"]:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    
+    result = await db.execute(text("SELECT id FROM ropa_records WHERE activity_id = :id"), {"id": activity_id})
+    if not result.fetchone():
+        raise HTTPException(status_code=404, detail="RoPA record not found")
+    
+    try:
+        updates = []
+        params = {"id": activity_id}
+        
+        if ropa.processing_purpose_en:
+            updates.append("processing_purpose_en = :purpose")
+            params["purpose"] = ropa.processing_purpose_en
+        if ropa.data_categories:
+            updates.append("data_categories = :categories")
+            params["categories"] = ropa.data_categories
+        if ropa.recipients_en:
+            updates.append("recipients_en = :recipients")
+            params["recipients"] = ropa.recipients_en
+        if ropa.retention_period:
+            updates.append("retention_period = :retention")
+            params["retention"] = ropa.retention_period
+        if ropa.status:
+            updates.append("status = :status")
+            params["status"] = ropa.status
+        
+        if updates:
+            await db.execute(text(f"UPDATE ropa_records SET {', '.join(updates)} WHERE activity_id = :id"), params)
+            await db.commit()
+        
+        result = await db.execute(text("SELECT * FROM ropa_records WHERE activity_id = :id"), {"id": activity_id})
+        return dict(result.first()._mapping)
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/pdpl/ropa/{activity_id}", status_code=204)
+async def delete_ropa_record(
+    activity_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Delete a RoPA record"""
+    if current_user.role not in ["admin", "compliance_owner"]:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    
+    result = await db.execute(text("SELECT id FROM ropa_records WHERE activity_id = :id"), {"id": activity_id})
+    if not result.fetchone():
+        raise HTTPException(status_code=404, detail="RoPA record not found")
+    
+    try:
+        await db.execute(text("DELETE FROM ropa_records WHERE activity_id = :id"), {"id": activity_id})
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail=f"Cannot delete: {str(e)}")
+
+
 @router.get("/pdpl/dsar", response_model=List[DSARResponse])
 async def get_dsar_requests(
     db: AsyncSession = Depends(get_db),
@@ -451,6 +1163,101 @@ async def get_dsar_requests(
     return [dict(row._mapping) for row in result]
 
 
+@router.post("/pdpl/dsar", response_model=DSARResponse, status_code=201)
+async def create_dsar_request(
+    dsar: DSARCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Create a new DSAR request"""
+    if current_user.role not in ["admin", "compliance_owner"]:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    
+    try:
+        await db.execute(text("""
+            INSERT INTO dsar_requests (organization_id, dsar_id, data_subject_name, request_date, request_type, response_deadline, status)
+            VALUES (:org_id, :dsar_id, :subject_name, :request_date, :request_type, :deadline, 'pending')
+        """), {
+            "org_id": current_user.organization_id,
+            "dsar_id": dsar.dsar_id,
+            "subject_name": dsar.data_subject_name,
+            "request_date": dsar.request_date,
+            "request_type": dsar.request_type,
+            "deadline": dsar.response_deadline
+        })
+        await db.commit()
+        result = await db.execute(text("SELECT * FROM dsar_requests WHERE dsar_id = :id"), {"id": dsar.dsar_id})
+        return dict(result.first()._mapping)
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.put("/pdpl/dsar/{dsar_id}", response_model=DSARResponse)
+async def update_dsar_request(
+    dsar_id: str,
+    dsar: DSARUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Update a DSAR request"""
+    if current_user.role not in ["admin", "compliance_owner"]:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    
+    result = await db.execute(text("SELECT id FROM dsar_requests WHERE dsar_id = :id"), {"id": dsar_id})
+    if not result.fetchone():
+        raise HTTPException(status_code=404, detail="DSAR request not found")
+    
+    try:
+        updates = []
+        params = {"id": dsar_id}
+        
+        if dsar.status:
+            updates.append("status = :status")
+            params["status"] = dsar.status
+        if dsar.response_date:
+            updates.append("response_date = :response_date")
+            params["response_date"] = dsar.response_date
+        if dsar.response_format:
+            updates.append("response_format = :format")
+            params["format"] = dsar.response_format
+        if dsar.notes:
+            updates.append("notes = :notes")
+            params["notes"] = dsar.notes
+        
+        if updates:
+            await db.execute(text(f"UPDATE dsar_requests SET {', '.join(updates)} WHERE dsar_id = :id"), params)
+            await db.commit()
+        
+        result = await db.execute(text("SELECT * FROM dsar_requests WHERE dsar_id = :id"), {"id": dsar_id})
+        return dict(result.first()._mapping)
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/pdpl/dsar/{dsar_id}", status_code=204)
+async def delete_dsar_request(
+    dsar_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Delete a DSAR request"""
+    if current_user.role not in ["admin", "compliance_owner"]:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    
+    result = await db.execute(text("SELECT id FROM dsar_requests WHERE dsar_id = :id"), {"id": dsar_id})
+    if not result.fetchone():
+        raise HTTPException(status_code=404, detail="DSAR request not found")
+    
+    try:
+        await db.execute(text("DELETE FROM dsar_requests WHERE dsar_id = :id"), {"id": dsar_id})
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail=f"Cannot delete: {str(e)}")
+
+
 @router.get("/pdpl/breaches", response_model=List[DataBreachResponse])
 async def get_data_breaches(
     db: AsyncSession = Depends(get_db),
@@ -466,6 +1273,105 @@ async def get_data_breaches(
     
     result = await db.execute(text(query), params)
     return [dict(row._mapping) for row in result]
+
+
+@router.post("/pdpl/breaches", response_model=DataBreachResponse, status_code=201)
+async def create_data_breach(
+    breach: DataBreachCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Create a new data breach record"""
+    if current_user.role not in ["admin", "compliance_owner"]:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    
+    try:
+        await db.execute(text("""
+            INSERT INTO data_breaches (organization_id, breach_id, breach_date, suspected_date, description_en, affected_data_types, severity, status)
+            VALUES (:org_id, :breach_id, :breach_date, :suspected_date, :description, :data_types, :severity, 'reported')
+        """), {
+            "org_id": current_user.organization_id,
+            "breach_id": breach.breach_id,
+            "breach_date": breach.breach_date,
+            "suspected_date": breach.suspected_date,
+            "description": breach.description_en,
+            "data_types": breach.affected_data_types,
+            "severity": breach.severity
+        })
+        await db.commit()
+        result = await db.execute(text("SELECT * FROM data_breaches WHERE breach_id = :id"), {"id": breach.breach_id})
+        return dict(result.first()._mapping)
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.put("/pdpl/breaches/{breach_id}", response_model=DataBreachResponse)
+async def update_data_breach(
+    breach_id: str,
+    breach: DataBreachUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Update a data breach record"""
+    if current_user.role not in ["admin", "compliance_owner"]:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    
+    result = await db.execute(text("SELECT id FROM data_breaches WHERE breach_id = :id"), {"id": breach_id})
+    if not result.fetchone():
+        raise HTTPException(status_code=404, detail="Data breach not found")
+    
+    try:
+        updates = []
+        params = {"id": breach_id}
+        
+        if breach.breach_date:
+            updates.append("breach_date = :breach_date")
+            params["breach_date"] = breach.breach_date
+        if breach.description_en:
+            updates.append("description_en = :description")
+            params["description"] = breach.description_en
+        if breach.severity:
+            updates.append("severity = :severity")
+            params["severity"] = breach.severity
+        if breach.status:
+            updates.append("status = :status")
+            params["status"] = breach.status
+        if breach.sdaia_notified is not None:
+            updates.append("sdaia_notified = :notified")
+            params["notified"] = 1 if breach.sdaia_notified else 0
+        
+        if updates:
+            await db.execute(text(f"UPDATE data_breaches SET {', '.join(updates)} WHERE breach_id = :id"), params)
+            await db.commit()
+        
+        result = await db.execute(text("SELECT * FROM data_breaches WHERE breach_id = :id"), {"id": breach_id})
+        return dict(result.first()._mapping)
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/pdpl/breaches/{breach_id}", status_code=204)
+async def delete_data_breach(
+    breach_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Delete a data breach record"""
+    if current_user.role not in ["admin", "compliance_owner"]:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    
+    result = await db.execute(text("SELECT id FROM data_breaches WHERE breach_id = :id"), {"id": breach_id})
+    if not result.fetchone():
+        raise HTTPException(status_code=404, detail="Data breach not found")
+    
+    try:
+        await db.execute(text("DELETE FROM data_breaches WHERE breach_id = :id"), {"id": breach_id})
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail=f"Cannot delete: {str(e)}")
 
 
 @router.get("/pdpl/dashboard")
@@ -521,6 +1427,104 @@ async def get_workflow_cases(
     return [dict(row._mapping) for row in result]
 
 
+@router.post("/workflows/cases", response_model=WorkflowCaseResponse, status_code=201)
+async def create_workflow_case(
+    case: WorkflowCaseCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Create a new workflow case"""
+    if current_user.role not in ["admin", "compliance_owner", "control_owner"]:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    
+    try:
+        case_id = f"WC-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        await db.execute(text("""
+            INSERT INTO workflow_cases (case_id, organization_id, case_type, subject_en, subject_ar, status, priority, assigned_to, due_date)
+            VALUES (:case_id, :org_id, :case_type, :subject_en, :subject_ar, 'open', :priority, :assigned_to, :due_date)
+        """), {
+            "case_id": case_id,
+            "org_id": current_user.organization_id,
+            "case_type": case.case_type,
+            "subject_en": case.subject_en,
+            "subject_ar": case.subject_ar,
+            "priority": case.priority,
+            "assigned_to": case.assigned_to,
+            "due_date": case.due_date
+        })
+        await db.commit()
+        result = await db.execute(text("SELECT * FROM workflow_cases WHERE case_id = :id"), {"id": case_id})
+        return dict(result.first()._mapping)
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.put("/workflows/cases/{case_id}", response_model=WorkflowCaseResponse)
+async def update_workflow_case(
+    case_id: str,
+    case: WorkflowCaseUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Update a workflow case"""
+    if current_user.role not in ["admin", "compliance_owner", "control_owner"]:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    
+    result = await db.execute(text("SELECT id FROM workflow_cases WHERE case_id = :id"), {"id": case_id})
+    if not result.fetchone():
+        raise HTTPException(status_code=404, detail="Case not found")
+    
+    try:
+        updates = []
+        params = {"id": case_id}
+        
+        if case.status:
+            updates.append("status = :status")
+            params["status"] = case.status
+        if case.priority:
+            updates.append("priority = :priority")
+            params["priority"] = case.priority
+        if case.assigned_to:
+            updates.append("assigned_to = :assigned_to")
+            params["assigned_to"] = case.assigned_to
+        if case.due_date:
+            updates.append("due_date = :due_date")
+            params["due_date"] = case.due_date
+        
+        if updates:
+            await db.execute(text(f"UPDATE workflow_cases SET {', '.join(updates)} WHERE case_id = :id"), params)
+            await db.commit()
+        
+        result = await db.execute(text("SELECT * FROM workflow_cases WHERE case_id = :id"), {"id": case_id})
+        return dict(result.first()._mapping)
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/workflows/cases/{case_id}", status_code=204)
+async def delete_workflow_case(
+    case_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Delete a workflow case"""
+    if current_user.role not in ["admin", "compliance_owner"]:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    
+    result = await db.execute(text("SELECT id FROM workflow_cases WHERE case_id = :id"), {"id": case_id})
+    if not result.fetchone():
+        raise HTTPException(status_code=404, detail="Case not found")
+    
+    try:
+        await db.execute(text("DELETE FROM workflow_cases WHERE case_id = :id"), {"id": case_id})
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail=f"Cannot delete: {str(e)}")
+
+
 @router.get("/workflows/dashboard")
 async def get_workflow_dashboard(db: AsyncSession = Depends(get_db)):
     """Get workflow dashboard metrics"""
@@ -566,6 +1570,105 @@ async def get_vendors(
     
     result = await db.execute(text(query), params)
     return [dict(row._mapping) for row in result]
+
+
+@router.post("/vendors", response_model=VendorResponse, status_code=201)
+async def create_vendor(
+    vendor: VendorCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Create a new vendor"""
+    if current_user.role not in ["admin", "compliance_owner"]:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    
+    try:
+        await db.execute(text("""
+            INSERT INTO vendors (organization_id, vendor_id, name_en, name_ar, vendor_type, criticality, contact_email, status)
+            VALUES (:org_id, :vendor_id, :name_en, :name_ar, :vendor_type, :criticality, :email, 'active')
+        """), {
+            "org_id": current_user.organization_id,
+            "vendor_id": vendor.vendor_id,
+            "name_en": vendor.name_en,
+            "name_ar": vendor.name_ar,
+            "vendor_type": vendor.vendor_type,
+            "criticality": vendor.criticality,
+            "email": vendor.contact_email
+        })
+        await db.commit()
+        result = await db.execute(text("SELECT * FROM vendors WHERE vendor_id = :id"), {"id": vendor.vendor_id})
+        return dict(result.first()._mapping)
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.put("/vendors/{vendor_id}", response_model=VendorResponse)
+async def update_vendor(
+    vendor_id: str,
+    vendor: VendorUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Update a vendor"""
+    if current_user.role not in ["admin", "compliance_owner"]:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    
+    result = await db.execute(text("SELECT id FROM vendors WHERE vendor_id = :id"), {"id": vendor_id})
+    if not result.fetchone():
+        raise HTTPException(status_code=404, detail="Vendor not found")
+    
+    try:
+        updates = []
+        params = {"id": vendor_id}
+        
+        if vendor.name_en:
+            updates.append("name_en = :name_en")
+            params["name_en"] = vendor.name_en
+        if vendor.vendor_type:
+            updates.append("vendor_type = :vendor_type")
+            params["vendor_type"] = vendor.vendor_type
+        if vendor.criticality:
+            updates.append("criticality = :criticality")
+            params["criticality"] = vendor.criticality
+        if vendor.contact_email:
+            updates.append("contact_email = :email")
+            params["email"] = vendor.contact_email
+        if vendor.status:
+            updates.append("status = :status")
+            params["status"] = vendor.status
+        
+        if updates:
+            await db.execute(text(f"UPDATE vendors SET {', '.join(updates)} WHERE vendor_id = :id"), params)
+            await db.commit()
+        
+        result = await db.execute(text("SELECT * FROM vendors WHERE vendor_id = :id"), {"id": vendor_id})
+        return dict(result.first()._mapping)
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/vendors/{vendor_id}", status_code=204)
+async def delete_vendor(
+    vendor_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Delete a vendor"""
+    if current_user.role not in ["admin", "compliance_owner"]:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    
+    result = await db.execute(text("SELECT id FROM vendors WHERE vendor_id = :id"), {"id": vendor_id})
+    if not result.fetchone():
+        raise HTTPException(status_code=404, detail="Vendor not found")
+    
+    try:
+        await db.execute(text("DELETE FROM vendors WHERE vendor_id = :id"), {"id": vendor_id})
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail=f"Cannot delete: {str(e)}")
 
 
 @router.get("/vendors/dashboard")

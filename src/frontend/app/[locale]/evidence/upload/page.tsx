@@ -1,24 +1,46 @@
-'use client';
+"use client";
 
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import apiClient from '@/lib/api-client';
 import useSWR from 'swr';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 
 const fetcher = (url: string) => apiClient.get(url).then((res) => res.data);
 
 export default function EvidenceUploadPage() {
-  const t = useTranslations('evidence');
+  const t = useTranslations('evidenceUpload');
   const router = useRouter();
   const searchParams = useSearchParams();
   const preselectedControlId = searchParams.get('control_id');
 
+  const [step, setStep] = useState(0);
+  const [showChangeReason, setShowChangeReason] = useState(false);
+  const [changeReason, setChangeReason] = useState('');
   const [formData, setFormData] = useState({
     control_id: preselectedControlId || '',
     title: '',
     description: '',
     evidence_type: 'document',
+    source: 'manual',
+    owner: '',
+    classification: 'internal',
+    retention: '7y',
+    period_start: new Date().toISOString().split('T')[0],
+    period_end: new Date().toISOString().split('T')[0],
     collection_date: new Date().toISOString().split('T')[0],
     expiry_date: '',
     file_path: '',
@@ -37,7 +59,7 @@ export default function EvidenceUploadPage() {
       
       // Validate file size (max 10MB)
       if (selectedFile.size > 10 * 1024 * 1024) {
-        setError('File size must be less than 10MB');
+        setError(t('errors.fileSize'));
         return;
       }
 
@@ -52,7 +74,7 @@ export default function EvidenceUploadPage() {
       ];
       
       if (!allowedTypes.includes(selectedFile.type)) {
-        setError('Invalid file type. Allowed: PDF, DOC, DOCX, PNG, JPG, TXT');
+        setError(t('errors.fileType'));
         return;
       }
 
@@ -69,7 +91,13 @@ export default function EvidenceUploadPage() {
     try {
       // Validate required fields
       if (!formData.control_id || !formData.title || !file) {
-        setError('Please fill in all required fields and select a file');
+        setError(t('errors.required'));
+        setUploading(false);
+        return;
+      }
+
+      if (!changeReason) {
+        setError(t('errors.changeReason'));
         setUploading(false);
         return;
       }
@@ -81,6 +109,7 @@ export default function EvidenceUploadPage() {
         file_path: `/uploads/evidence/${Date.now()}_${file.name}`,
         file_size: file.size,
         mime_type: file.type,
+        change_reason: changeReason,
       };
 
       await apiClient.post('/api/v1/evidence', evidenceData);
@@ -90,201 +119,276 @@ export default function EvidenceUploadPage() {
         router.push(`/controls/${formData.control_id}`);
       }, 2000);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to upload evidence');
+      setError(err.response?.data?.detail || t('errors.uploadFailed'));
     } finally {
       setUploading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-3xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8">Upload Evidence</h1>
+    <div className="min-h-screen bg-background px-6 py-6">
+      <div className="mx-auto max-w-4xl space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold">{t('title')}</h1>
+          <p className="text-sm text-muted-foreground">{t('description')}</p>
+        </div>
 
         {success && (
-          <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
-            <p className="text-green-800 font-semibold">✓ Evidence uploaded successfully!</p>
-            <p className="text-green-600 text-sm mt-1">Redirecting to control page...</p>
-          </div>
+          <Card className="border border-success/30 bg-success/10">
+            <CardContent className="p-4 text-sm text-foreground">
+              {t('success')}
+            </CardContent>
+          </Card>
         )}
 
         {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-red-800">✗ {error}</p>
-          </div>
+          <Card className="border border-destructive/30 bg-destructive/10">
+            <CardContent className="p-4 text-sm text-destructive">{error}</CardContent>
+          </Card>
         )}
 
-        <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-lg p-6 space-y-6">
-          {/* Control Selection */}
-          <div>
-            <label className="block text-sm font-semibold mb-2">
-              Control <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={formData.control_id}
-              onChange={(e) => setFormData({ ...formData, control_id: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-              required
-            >
-              <option value="">Select a control</option>
-              {controls?.items?.map((control: any) => (
-                <option key={control.control_id} value={control.control_id}>
-                  {control.control_id} - {control.title_en}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Title */}
-          <div>
-            <label className="block text-sm font-semibold mb-2">
-              Evidence Title <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-              placeholder="e.g., Access Control Policy Document"
-              required
-            />
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className="block text-sm font-semibold mb-2">Description</label>
-            <textarea
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-              rows={4}
-              placeholder="Describe the evidence and what it demonstrates..."
-            />
-          </div>
-
-          {/* Evidence Type */}
-          <div>
-            <label className="block text-sm font-semibold mb-2">
-              Evidence Type <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={formData.evidence_type}
-              onChange={(e) => setFormData({ ...formData, evidence_type: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-              required
-            >
-              <option value="document">Document</option>
-              <option value="screenshot">Screenshot</option>
-              <option value="log">System Log</option>
-              <option value="certificate">Certificate</option>
-              <option value="report">Report</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
-
-          {/* Dates */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold mb-2">
-                Collection Date <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="date"
-                value={formData.collection_date}
-                onChange={(e) => setFormData({ ...formData, collection_date: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                required
-              />
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>{t('steps.title', { step: step + 1, total: 3 })}</CardTitle>
+              <Badge variant="outline">{t(`steps.step${step + 1}`)}</Badge>
             </div>
-            <div>
-              <label className="block text-sm font-semibold mb-2">Expiry Date (Optional)</label>
-              <input
-                type="date"
-                value={formData.expiry_date}
-                onChange={(e) => setFormData({ ...formData, expiry_date: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-              />
-            </div>
-          </div>
-
-          {/* File Upload */}
-          <div>
-            <label className="block text-sm font-semibold mb-2">
-              Upload File <span className="text-red-500">*</span>
-            </label>
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-primary-500 transition-colors">
-              <input
-                type="file"
-                onChange={handleFileChange}
-                className="hidden"
-                id="file-upload"
-                accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt"
-              />
-              <label
-                htmlFor="file-upload"
-                className="cursor-pointer flex flex-col items-center"
-              >
-                <svg
-                  className="w-12 h-12 text-gray-400 mb-3"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {step === 0 && (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label className="text-sm font-semibold">
+                    {t('control')} <span className="text-destructive">*</span>
+                  </label>
+                  <Select
+                    value={formData.control_id}
+                    onValueChange={(value) => setFormData({ ...formData, control_id: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t('controlPlaceholder')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {controls?.items?.map((control: any) => (
+                        <SelectItem key={control.control_id} value={control.control_id}>
+                          {control.control_id} - {control.title_en}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-semibold">
+                    {t('titleLabel')} <span className="text-destructive">*</span>
+                  </label>
+                  <Input
+                    value={formData.title}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    placeholder={t('titlePlaceholder')}
                   />
-                </svg>
-                {file ? (
-                  <div>
-                    <p className="text-primary-600 font-semibold">{file.name}</p>
-                    <p className="text-sm text-gray-500 mt-1">
-                      {(file.size / 1024 / 1024).toFixed(2)} MB
-                    </p>
-                  </div>
-                ) : (
-                  <div>
-                    <p className="text-gray-600 font-semibold">Click to upload or drag and drop</p>
-                    <p className="text-sm text-gray-500 mt-1">
-                      PDF, DOC, DOCX, PNG, JPG, TXT (max 10MB)
-                    </p>
-                  </div>
-                )}
-              </label>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-sm font-semibold">{t('description')}</label>
+                  <Textarea
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder={t('descriptionPlaceholder')}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold">
+                    {t('evidenceType')} <span className="text-destructive">*</span>
+                  </label>
+                  <Select
+                    value={formData.evidence_type}
+                    onValueChange={(value) => setFormData({ ...formData, evidence_type: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t('evidenceType')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="document">{t('document')}</SelectItem>
+                      <SelectItem value="screenshot">{t('screenshot')}</SelectItem>
+                      <SelectItem value="log">{t('log')}</SelectItem>
+                      <SelectItem value="certificate">{t('certificate')}</SelectItem>
+                      <SelectItem value="report">{t('report')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-semibold">{t('source')}</label>
+                  <Select
+                    value={formData.source}
+                    onValueChange={(value) => setFormData({ ...formData, source: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t('source')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="manual">{t('sourceManual')}</SelectItem>
+                      <SelectItem value="system">{t('sourceSystem')}</SelectItem>
+                      <SelectItem value="integration">{t('sourceIntegration')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
+            {step === 1 && (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label className="text-sm font-semibold">{t('classification')}</label>
+                  <Select
+                    value={formData.classification}
+                    onValueChange={(value) => setFormData({ ...formData, classification: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t('classification')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="public">{t('classificationPublic')}</SelectItem>
+                      <SelectItem value="internal">{t('classificationInternal')}</SelectItem>
+                      <SelectItem value="confidential">{t('classificationConfidential')}</SelectItem>
+                      <SelectItem value="restricted">{t('classificationRestricted')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-semibold">{t('retention')}</label>
+                  <Select
+                    value={formData.retention}
+                    onValueChange={(value) => setFormData({ ...formData, retention: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t('retention')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1y">{t('retention1y')}</SelectItem>
+                      <SelectItem value="3y">{t('retention3y')}</SelectItem>
+                      <SelectItem value="7y">{t('retention7y')}</SelectItem>
+                      <SelectItem value="permanent">{t('retentionPermanent')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-semibold">{t('periodStart')}</label>
+                  <Input
+                    type="date"
+                    value={formData.period_start}
+                    onChange={(e) => setFormData({ ...formData, period_start: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold">{t('periodEnd')}</label>
+                  <Input
+                    type="date"
+                    value={formData.period_end}
+                    onChange={(e) => setFormData({ ...formData, period_end: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold">{t('owner')}</label>
+                  <Input
+                    value={formData.owner}
+                    onChange={(e) => setFormData({ ...formData, owner: e.target.value })}
+                    placeholder={t('ownerPlaceholder')}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold">{t('expiryDate')}</label>
+                  <Input
+                    type="date"
+                    value={formData.expiry_date}
+                    onChange={(e) => setFormData({ ...formData, expiry_date: e.target.value })}
+                  />
+                </div>
+              </div>
+            )}
+
+            {step === 2 && (
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-semibold">
+                    {t('uploadFile')} <span className="text-destructive">*</span>
+                  </label>
+                  <Input
+                    type="file"
+                    onChange={handleFileChange}
+                    accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt"
+                  />
+                  <p className="text-xs text-muted-foreground mt-2">{t('allowedTypes')}</p>
+                </div>
+                <Card className="bg-muted/40">
+                  <CardContent className="p-4 text-sm">
+                    <div className="font-semibold mb-2">{t('review')}</div>
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                      <div>{t('control')}: {formData.control_id || '--'}</div>
+                      <div>{t('evidenceType')}: {formData.evidence_type}</div>
+                      <div>{t('classification')}: {formData.classification}</div>
+                      <div>{t('retention')}: {formData.retention}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between border-t border-border pt-4">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={step === 0}
+                  onClick={() => setStep((prev) => Math.max(prev - 1, 0))}
+                >
+                  {t('back')}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setStep((prev) => Math.min(prev + 1, 2))}
+                  disabled={step === 2}
+                >
+                  {t('next')}
+                </Button>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="secondary" size="sm">
+                  {t('saveDraft')}
+                </Button>
+                <Button size="sm" onClick={() => setShowChangeReason(true)} disabled={uploading || success || step < 2}>
+                  {uploading ? t('submitting') : t('submit')}
+                </Button>
+              </div>
             </div>
-          </div>
+          </CardContent>
+        </Card>
 
-          {/* Submit Buttons */}
-          <div className="flex gap-4 pt-4">
-            <button
-              type="submit"
-              disabled={uploading || success}
-              className="flex-1 bg-primary-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-            >
-              {uploading ? 'Uploading...' : 'Upload Evidence'}
-            </button>
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="px-6 py-3 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-
-        {/* Guidelines */}
-        <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h3 className="font-semibold text-blue-900 mb-2">Evidence Guidelines</h3>
-          <ul className="text-sm text-blue-800 space-y-1">
-            <li>• Ensure evidence is recent and relevant to the control</li>
-            <li>• Remove any sensitive or confidential information before uploading</li>
-            <li>• Use clear, descriptive titles and descriptions</li>
-            <li>• Set expiry dates for time-sensitive evidence (e.g., certificates)</li>
-          </ul>
-        </div>
+        <Dialog open={showChangeReason} onOpenChange={setShowChangeReason}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{t('changeReasonTitle')}</DialogTitle>
+              <DialogDescription>{t('changeReasonDescription')}</DialogDescription>
+            </DialogHeader>
+            <Textarea
+              value={changeReason}
+              onChange={(e) => setChangeReason(e.target.value)}
+              placeholder={t('changeReasonPlaceholder')}
+            />
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowChangeReason(false)}>
+                {t('cancel')}
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowChangeReason(false);
+                  handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+                }}
+              >
+                {t('confirmSubmit')}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

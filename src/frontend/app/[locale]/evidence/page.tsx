@@ -5,223 +5,259 @@ import useSWR from 'swr';
 import apiClient from '@/lib/api-client';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const fetcher = (url: string) => apiClient.get(url).then((res) => res.data);
 
 export default function EvidenceListPage() {
   const params = useParams();
   const locale = params.locale as string;
-  const isArabic = locale === 'ar';
-  
-  const [statusFilter, setStatusFilter] = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
+  const t = useTranslations('evidenceList');
+
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const limit = 20;
+  const [visibleColumns, setVisibleColumns] = useState({
+    control: true,
+    type: true,
+    source: true,
+    period: true,
+    owner: true,
+  });
 
   const queryParams = new URLSearchParams();
-  if (statusFilter) queryParams.append('status', statusFilter);
-  if (typeFilter) queryParams.append('evidence_type', typeFilter);
+  if (statusFilter !== 'all') queryParams.append('status', statusFilter);
+  if (typeFilter !== 'all') queryParams.append('evidence_type', typeFilter);
+  queryParams.append('offset', String((page - 1) * limit));
+  queryParams.append('limit', String(limit));
 
-  const { data: evidence, isLoading, error } = useSWR(
+  const { data: evidence, isLoading } = useSWR(
     `/api/v1/evidence?${queryParams.toString()}`,
     fetcher
   );
 
+  const items = evidence?.items || [];
+  const filteredItems = useMemo(() => {
+    if (!search) return items;
+    const term = search.toLowerCase();
+    return items.filter((item: any) =>
+      item.title?.toLowerCase().includes(term) ||
+      item.control_id?.toLowerCase().includes(term)
+    );
+  }, [items, search]);
+
+  const total = evidence?.total ?? filteredItems.length;
+
+  const validationVariant: Record<string, 'success' | 'warning' | 'destructive' | 'muted'> = {
+    approved: 'success',
+    pending: 'warning',
+    rejected: 'destructive',
+  };
+
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-foreground"></div>
       </div>
     );
   }
 
-  const stats = {
-    total: evidence?.items?.length || 0,
-    approved: evidence?.items?.filter((e: any) => e.validation_status === 'approved').length || 0,
-    pending: evidence?.items?.filter((e: any) => e.validation_status === 'pending').length || 0,
-    rejected: evidence?.items?.filter((e: any) => e.validation_status === 'rejected').length || 0,
-  };
-
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-4xl font-bold mb-2">
-                {isArabic ? '📎 إدارة الأدلة' : '📎 Evidence Management'}
-              </h1>
-              <p className="text-xl text-gray-600">
-                {isArabic
-                  ? 'عرض وإدارة جميع أدلة الامتثال'
-                  : 'View and manage all compliance evidence'}
-              </p>
-            </div>
-            <Link
-              href={`/${locale}/evidence/upload`}
-              className="px-6 py-3 bg-primary-600 text-white rounded-lg font-semibold hover:bg-primary-700"
-            >
-              {isArabic ? '+ تحميل أدلة جديدة' : '+ Upload Evidence'}
-            </Link>
-          </div>
+    <div className="min-h-screen bg-background px-6 py-6">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">{t('title')}</h1>
+          <p className="text-sm text-muted-foreground">{t('description')}</p>
         </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
-            <p className="text-sm text-gray-600 mb-1">{isArabic ? 'إجمالي الأدلة' : 'Total Evidence'}</p>
-            <p className="text-3xl font-bold text-blue-600">{stats.total}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
-            <p className="text-sm text-gray-600 mb-1">{isArabic ? 'معتمد' : 'Approved'}</p>
-            <p className="text-3xl font-bold text-green-600">{stats.approved}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6 border-l-4 border-yellow-500">
-            <p className="text-sm text-gray-600 mb-1">{isArabic ? 'قيد المراجعة' : 'Pending'}</p>
-            <p className="text-3xl font-bold text-yellow-600">{stats.pending}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6 border-l-4 border-red-500">
-            <p className="text-sm text-gray-600 mb-1">{isArabic ? 'مرفوض' : 'Rejected'}</p>
-            <p className="text-3xl font-bold text-red-600">{stats.rejected}</p>
-          </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm">
+            {t('export')}
+          </Button>
+          <Button size="sm" asChild>
+            <Link href={`/${locale}/evidence/upload`}>{t('upload')}</Link>
+          </Button>
         </div>
+      </div>
 
-        {/* Filters */}
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-          <h2 className="text-lg font-semibold mb-4">
-            {isArabic ? 'تصفية الأدلة' : 'Filter Evidence'}
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-semibold mb-2">
-                {isArabic ? 'حالة التحقق' : 'Validation Status'}
-              </label>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-              >
-                <option value="">{isArabic ? 'جميع الحالات' : 'All Statuses'}</option>
-                <option value="approved">{isArabic ? 'معتمد' : 'Approved'}</option>
-                <option value="pending">{isArabic ? 'قيد المراجعة' : 'Pending'}</option>
-                <option value="rejected">{isArabic ? 'مرفوض' : 'Rejected'}</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold mb-2">
-                {isArabic ? 'نوع الأدلة' : 'Evidence Type'}
-              </label>
-              <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-              >
-                <option value="">{isArabic ? 'جميع الأنواع' : 'All Types'}</option>
-                <option value="document">{isArabic ? 'وثيقة' : 'Document'}</option>
-                <option value="screenshot">{isArabic ? 'لقطة شاشة' : 'Screenshot'}</option>
-                <option value="log">{isArabic ? 'سجل النظام' : 'System Log'}</option>
-                <option value="certificate">{isArabic ? 'شهادة' : 'Certificate'}</option>
-                <option value="report">{isArabic ? 'تقرير' : 'Report'}</option>
-              </select>
-            </div>
-            <div className="flex items-end">
-              <button
-                onClick={() => {
-                  setStatusFilter('');
-                  setTypeFilter('');
-                }}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                {isArabic ? 'مسح التصفية' : 'Clear Filters'}
-              </button>
-            </div>
+      <Card className="mb-6">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-lg">{t('filters')}</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-4">
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t('searchPlaceholder')}
+          />
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder={t('status')} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t('allStatuses')}</SelectItem>
+              <SelectItem value="approved">{t('approved')}</SelectItem>
+              <SelectItem value="pending">{t('pending')}</SelectItem>
+              <SelectItem value="rejected">{t('rejected')}</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder={t('type')}></SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t('allTypes')}</SelectItem>
+              <SelectItem value="document">{t('document')}</SelectItem>
+              <SelectItem value="screenshot">{t('screenshot')}</SelectItem>
+              <SelectItem value="log">{t('log')}</SelectItem>
+              <SelectItem value="certificate">{t('certificate')}</SelectItem>
+              <SelectItem value="report">{t('report')}</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="flex items-center justify-end">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  {t('columns')}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>{t('columns')}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => setVisibleColumns((prev) => ({ ...prev, control: !prev.control }))}>
+                  {visibleColumns.control ? t('hide') : t('show')} {t('control')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setVisibleColumns((prev) => ({ ...prev, type: !prev.type }))}>
+                  {visibleColumns.type ? t('hide') : t('show')} {t('type')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setVisibleColumns((prev) => ({ ...prev, source: !prev.source }))}>
+                  {visibleColumns.source ? t('hide') : t('show')} {t('source')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setVisibleColumns((prev) => ({ ...prev, period: !prev.period }))}>
+                  {visibleColumns.period ? t('hide') : t('show')} {t('period')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setVisibleColumns((prev) => ({ ...prev, owner: !prev.owner }))}>
+                  {visibleColumns.owner ? t('hide') : t('show')} {t('owner')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-        </div>
+        </CardContent>
+      </Card>
 
-        {/* Evidence List - Skeleton for now */}
-        <div className="bg-white rounded-lg shadow-lg p-6">
-          <h2 className="text-xl font-semibold mb-6">
-            {isArabic ? 'قائمة الأدلة' : 'Evidence List'}
-          </h2>
-          
-          {evidence?.items && evidence.items.length > 0 ? (
-            <div className="space-y-4">
-              {evidence.items.map((item: any, index: number) => (
-                <div
-                  key={item.id || index}
-                  className="border-2 border-gray-200 rounded-lg p-6 hover:border-primary-500 hover:shadow-md transition-all"
-                >
-                  <div className="flex justify-between items-start">
-                    <div className="flex-grow">
-                      <div className="flex items-center gap-3 mb-2">
-                        <span className="text-2xl">📄</span>
-                        <h3 className="text-lg font-bold">{item.title}</h3>
-                      </div>
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t('titleColumn')}</TableHead>
+                {visibleColumns.control && <TableHead>{t('control')}</TableHead>}
+                {visibleColumns.type && <TableHead>{t('type')}</TableHead>}
+                {visibleColumns.source && <TableHead>{t('source')}</TableHead>}
+                {visibleColumns.period && <TableHead>{t('period')}</TableHead>}
+                {visibleColumns.owner && <TableHead>{t('owner')}</TableHead>}
+                <TableHead>{t('status')}</TableHead>
+                <TableHead className="text-right">{t('actions')}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredItems.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                    {t('noResults')}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredItems.map((item: any) => (
+                  <TableRow key={item.id}>
+                    <TableCell>
+                      <div className="font-semibold text-sm">{item.title}</div>
                       {item.description && (
-                        <p className="text-gray-600 mb-3">{item.description}</p>
+                        <div className="text-xs text-muted-foreground line-clamp-1">
+                          {item.description}
+                        </div>
                       )}
-                      <div className="flex flex-wrap gap-4 text-sm text-gray-500">
-                        <span>
-                          <strong>{isArabic ? 'الضابط:' : 'Control:'}</strong> {item.control_id}
-                        </span>
-                        <span>
-                          <strong>{isArabic ? 'النوع:' : 'Type:'}</strong> {item.evidence_type}
-                        </span>
-                        <span>
-                          <strong>{isArabic ? 'التاريخ:' : 'Date:'}</strong>{' '}
-                          {new Date(item.collection_date).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-                    <span
-                      className={`px-4 py-2 rounded-full text-sm font-semibold ${
-                        item.validation_status === 'approved'
-                          ? 'bg-green-100 text-green-800'
-                          : item.validation_status === 'rejected'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-yellow-100 text-yellow-800'
-                      }`}
-                    >
-                      {item.validation_status}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-16">
-              <div className="text-6xl mb-4">📂</div>
-              <h3 className="text-2xl font-bold text-gray-400 mb-2">
-                {isArabic ? 'لا توجد أدلة' : 'No Evidence Found'}
-              </h3>
-              <p className="text-gray-500 mb-6">
-                {isArabic
-                  ? 'ابدأ بتحميل الأدلة لإظهار الامتثال للضوابط'
-                  : 'Start by uploading evidence to demonstrate compliance with controls'}
-              </p>
-              <Link
-                href={`/${locale}/evidence/upload`}
-                className="inline-block px-6 py-3 bg-primary-600 text-white rounded-lg font-semibold hover:bg-primary-700"
-              >
-                {isArabic ? '+ تحميل أدلة' : '+ Upload Evidence'}
-              </Link>
-            </div>
-          )}
-        </div>
+                    </TableCell>
+                    {visibleColumns.control && <TableCell>{item.control_id || '--'}</TableCell>}
+                    {visibleColumns.type && <TableCell>{item.evidence_type || '--'}</TableCell>}
+                    {visibleColumns.source && <TableCell>{item.source || t('notSet')}</TableCell>}
+                    {visibleColumns.period && (
+                      <TableCell>
+                        {item.collection_date
+                          ? new Date(item.collection_date).toLocaleDateString()
+                          : '--'}
+                      </TableCell>
+                    )}
+                    {visibleColumns.owner && <TableCell>{item.owner || t('unassigned')}</TableCell>}
+                    <TableCell>
+                      <Badge variant={validationVariant[item.validation_status] || 'muted'}>
+                        {item.validation_status || t('notSet')}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">⋯</Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem asChild>
+                            <Link href={`/${locale}/evidence/${item.id}`}>{t('view')}</Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>{t('auditTrail')}</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
-        {/* Guidelines */}
-        <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
-          <h3 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
-            <span className="text-xl">💡</span>
-            {isArabic ? 'إرشادات إدارة الأدلة' : 'Evidence Management Guidelines'}
-          </h3>
-          <ul className="text-sm text-blue-800 space-y-2">
-            <li>✓ {isArabic ? 'تأكد من أن الأدلة حديثة وذات صلة بالضابط' : 'Ensure evidence is recent and relevant to the control'}</li>
-            <li>✓ {isArabic ? 'قم بإزالة أي معلومات حساسة أو سرية' : 'Remove any sensitive or confidential information'}</li>
-            <li>✓ {isArabic ? 'استخدم عناوين وأوصاف واضحة' : 'Use clear titles and descriptions'}</li>
-            <li>✓ {isArabic ? 'حدد تواريخ انتهاء الصلاحية للأدلة الحساسة للوقت' : 'Set expiry dates for time-sensitive evidence'}</li>
-            <li>✓ {isArabic ? 'قم بمراجعة الأدلة وتحديثها بانتظام' : 'Regularly review and update evidence'}</li>
-          </ul>
+      <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
+        <div>{t('results', { count: filteredItems.length, total })}</div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(page - 1)}>
+            {t('previous')}
+          </Button>
+          <span>{t('page', { page })}</span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={filteredItems.length < limit}
+            onClick={() => setPage(page + 1)}
+          >
+            {t('next')}
+          </Button>
         </div>
       </div>
     </div>

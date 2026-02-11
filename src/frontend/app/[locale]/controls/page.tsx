@@ -2,133 +2,302 @@
 
 import { useTranslations } from 'next-intl';
 import useSWR from 'swr';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import apiClient from '@/lib/api-client';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const fetcher = (url: string) => apiClient.get(url).then((res) => res.data);
 
 export default function ControlsPage() {
-  const t = useTranslations('controls');
-  const [framework, setFramework] = useState<string>('');
-  const [status, setStatus] = useState<string>('');
+  const t = useTranslations('controlsList');
+  const params = useParams();
+  const locale = params.locale as string;
+  const [framework, setFramework] = useState<string>('all');
+  const [status, setStatus] = useState<string>('all');
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const limit = 20;
+  const [visibleColumns, setVisibleColumns] = useState({
+    framework: true,
+    domain: true,
+    maturity: true,
+    updated: true,
+    owner: true,
+  });
+  const [selected, setSelected] = useState<Record<string, boolean>>({});
 
   const queryParams = new URLSearchParams();
-  if (framework) queryParams.append('framework', framework);
-  if (status) queryParams.append('status', status);
+  if (framework !== 'all') queryParams.append('framework', framework);
+  if (status !== 'all') queryParams.append('status', status);
+  queryParams.append('offset', String((page - 1) * limit));
+  queryParams.append('limit', String(limit));
 
   const { data, error, isLoading } = useSWR(
     `/api/v1/controls?${queryParams.toString()}`,
     fetcher
   );
 
+  const items = data?.items || [];
+  const filteredItems = useMemo(() => {
+    if (!search) return items;
+    const term = search.toLowerCase();
+    return items.filter((control: any) =>
+      control.control_id?.toLowerCase().includes(term) ||
+      control.title_en?.toLowerCase().includes(term) ||
+      control.title_ar?.includes(search)
+    );
+  }, [items, search]);
+
+  const total = data?.total ?? filteredItems.length;
+
+  const handleToggleColumn = (key: keyof typeof visibleColumns) => {
+    setVisibleColumns((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const handleToggleAll = (checked: boolean) => {
+    const next: Record<string, boolean> = {};
+    filteredItems.forEach((control: any) => {
+      next[control.control_id] = checked;
+    });
+    setSelected(next);
+  };
+
+  const handleToggleRow = (id: string) => {
+    setSelected((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-foreground"></div>
       </div>
     );
   }
 
+  const statusVariant: Record<string, 'success' | 'warning' | 'destructive' | 'muted'> = {
+    compliant: 'success',
+    in_progress: 'warning',
+    non_compliant: 'destructive',
+    not_started: 'muted',
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-4">{t('title')}</h1>
-
-        {/* Filters */}
-        <div className="flex gap-4 mb-6">
-          <select
-            value={framework}
-            onChange={(e) => setFramework(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-          >
-            <option value="">{t('all')} {t('framework')}</option>
-            <option value="ECC">ECC</option>
-            <option value="CCC">CCC</option>
-            <option value="PDPL">PDPL</option>
-          </select>
-
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-          >
-            <option value="">{t('all')} {t('status')}</option>
-            <option value="compliant">{t('compliant')}</option>
-            <option value="non_compliant">{t('nonCompliant')}</option>
-            <option value="in_progress">{t('inProgress')}</option>
-            <option value="not_started">{t('notStarted')}</option>
-          </select>
+    <div className="min-h-screen bg-background px-6 py-6">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">{t('title')}</h1>
+          <p className="text-sm text-muted-foreground">{t('description')}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm">
+            {t('export')}
+          </Button>
+          <Button size="sm" asChild>
+            <Link href={`/${locale}/controls/new`}>{t('create')}</Link>
+          </Button>
         </div>
       </div>
 
-      {/* Controls Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {data?.items?.map((control: any) => (
-          <ControlCard key={control.id} control={control} t={t} />
-        ))}
-      </div>
+      <Card className="mb-6">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-lg">{t('filters')}</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-4">
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t('searchPlaceholder')}
+          />
+          <Select value={framework} onValueChange={setFramework}>
+            <SelectTrigger>
+              <SelectValue placeholder={t('framework')} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t('allFrameworks')}</SelectItem>
+              <SelectItem value="ECC">ECC</SelectItem>
+              <SelectItem value="CCC">CCC</SelectItem>
+              <SelectItem value="PDPL">PDPL</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={status} onValueChange={setStatus}>
+            <SelectTrigger>
+              <SelectValue placeholder={t('status')} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t('allStatuses')}</SelectItem>
+              <SelectItem value="compliant">{t('compliant')}</SelectItem>
+              <SelectItem value="in_progress">{t('inProgress')}</SelectItem>
+              <SelectItem value="non_compliant">{t('nonCompliant')}</SelectItem>
+              <SelectItem value="not_started">{t('notStarted')}</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="flex items-center justify-end">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  {t('columns')}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>{t('columns')}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => handleToggleColumn('framework')}>
+                  {visibleColumns.framework ? t('hide') : t('show')} {t('framework')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => handleToggleColumn('domain')}>
+                  {visibleColumns.domain ? t('hide') : t('show')} {t('domain')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => handleToggleColumn('owner')}>
+                  {visibleColumns.owner ? t('hide') : t('show')} {t('owner')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => handleToggleColumn('maturity')}>
+                  {visibleColumns.maturity ? t('hide') : t('show')} {t('maturity')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => handleToggleColumn('updated')}>
+                  {visibleColumns.updated ? t('hide') : t('show')} {t('updated')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* Pagination Info */}
-      {data && (
-        <div className="mt-8 text-center text-gray-600">
-          Showing {data.items?.length || 0} of {data.total} controls
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[40px]">
+                  <input
+                    type="checkbox"
+                    aria-label={t('selectAll')}
+                    checked={filteredItems.length > 0 && filteredItems.every((c: any) => selected[c.control_id])}
+                    onChange={(e) => handleToggleAll(e.target.checked)}
+                  />
+                </TableHead>
+                <TableHead>{t('controlId')}</TableHead>
+                <TableHead>{t('titleColumn')}</TableHead>
+                {visibleColumns.framework && <TableHead>{t('framework')}</TableHead>}
+                {visibleColumns.domain && <TableHead>{t('domain')}</TableHead>}
+                {visibleColumns.owner && <TableHead>{t('owner')}</TableHead>}
+                <TableHead>{t('status')}</TableHead>
+                {visibleColumns.maturity && <TableHead>{t('maturity')}</TableHead>}
+                {visibleColumns.updated && <TableHead>{t('updated')}</TableHead>}
+                <TableHead className="text-right">{t('actions')}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredItems.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={10} className="py-10 text-center text-muted-foreground">
+                    {t('noResults')}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredItems.map((control: any) => (
+                  <TableRow key={control.control_id}>
+                    <TableCell>
+                      <input
+                        type="checkbox"
+                        aria-label={control.control_id}
+                        checked={!!selected[control.control_id]}
+                        onChange={() => handleToggleRow(control.control_id)}
+                      />
+                    </TableCell>
+                    <TableCell className="font-mono text-xs font-semibold">
+                      {control.control_id}
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-semibold text-sm">{control.title_en}</div>
+                      {control.title_ar && (
+                        <div className="text-xs text-muted-foreground" dir="rtl">
+                          {control.title_ar}
+                        </div>
+                      )}
+                    </TableCell>
+                    {visibleColumns.framework && <TableCell>{control.framework}</TableCell>}
+                    {visibleColumns.domain && (
+                      <TableCell className="max-w-[200px] truncate">{control.domain}</TableCell>
+                    )}
+                    {visibleColumns.owner && <TableCell>{t('unassigned')}</TableCell>}
+                    <TableCell>
+                      <Badge variant={statusVariant[control.status] || 'muted'}>
+                        {control.status?.replace('_', ' ')}
+                      </Badge>
+                    </TableCell>
+                    {visibleColumns.maturity && <TableCell>{control.maturity_level ?? '--'}</TableCell>}
+                    {visibleColumns.updated && (
+                      <TableCell>
+                        {control.updated_at ? new Date(control.updated_at).toLocaleDateString() : '--'}
+                      </TableCell>
+                    )}
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">⋯</Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem asChild>
+                            <Link href={`/${locale}/controls/${control.control_id}`}>{t('view')}</Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>{t('edit')}</DropdownMenuItem>
+                          <DropdownMenuItem>{t('auditTrail')}</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
+        <div>{t('results', { count: filteredItems.length, total })}</div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(page - 1)}>
+            {t('previous')}
+          </Button>
+          <span>{t('page', { page })}</span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={filteredItems.length < limit}
+            onClick={() => setPage(page + 1)}
+          >
+            {t('next')}
+          </Button>
         </div>
-      )}
+      </div>
     </div>
-  );
-}
-
-function ControlCard({ control, t }: { control: any; t: any }) {
-  const statusColors: Record<string, string> = {
-    compliant: 'bg-green-100 text-green-800',
-    non_compliant: 'bg-red-100 text-red-800',
-    in_progress: 'bg-yellow-100 text-yellow-800',
-    not_started: 'bg-gray-100 text-gray-800',
-    not_applicable: 'bg-gray-100 text-gray-600',
-  };
-
-  const priorityColors: Record<string, string> = {
-    critical: 'border-red-500',
-    high: 'border-orange-500',
-    medium: 'border-yellow-500',
-    low: 'border-green-500',
-  };
-
-  return (
-    <Link
-      href={`/controls/${control.control_id}`}
-      className={`block bg-white rounded-lg shadow-md p-6 border-l-4 ${
-        priorityColors[control.priority] || 'border-gray-300'
-      } hover:shadow-lg transition-shadow cursor-pointer`}
-    >
-      <div className="flex justify-between items-start mb-3">
-        <span className="font-mono text-sm text-primary-600 font-semibold">
-          {control.control_id}
-        </span>
-        <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
-          {control.framework}
-        </span>
-      </div>
-
-      <h3 className="font-semibold text-lg mb-2">{control.title_en}</h3>
-      <p className="text-sm text-gray-600 mb-4 line-clamp-2">{control.description_en}</p>
-
-      <div className="flex items-center justify-between">
-        <span className={`px-3 py-1 text-xs rounded-full ${statusColors[control.status]}`}>
-          {control.status.replace('_', ' ')}
-        </span>
-        <div className="text-sm text-gray-500">
-          {t('maturityLevel')}: <span className="font-semibold">{control.maturity_level}/5</span>
-        </div>
-      </div>
-
-      {control.domain && (
-        <div className="mt-3 pt-3 border-t border-gray-200">
-          <span className="text-xs text-gray-500">{t('domain')}: </span>
-          <span className="text-xs font-medium text-gray-700">{control.domain}</span>
-        </div>
-      )}
-    </Link>
   );
 }
