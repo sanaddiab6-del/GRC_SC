@@ -312,8 +312,10 @@ grep -E "^@router\.(get|post|put|delete)" src/backend/enterprise_router.py | wc 
 
 ### 2. Test POST Endpoint
 ```bash
+export API_TOKEN="REPLACE_ME"
+
 curl -X POST http://localhost:8000/api/v1/enterprise/organizations \
-  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Authorization: Bearer $API_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "name_en": "Test Org",
@@ -328,7 +330,7 @@ curl -X POST http://localhost:8000/api/v1/enterprise/organizations \
 ### 3. Test PUT Endpoint
 ```bash
 curl -X PUT http://localhost:8000/api/v1/enterprise/organizations/1 \
-  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Authorization: Bearer $API_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "name_en": "Updated Name"
@@ -340,7 +342,7 @@ curl -X PUT http://localhost:8000/api/v1/enterprise/organizations/1 \
 ### 4. Test DELETE Endpoint
 ```bash
 curl -X DELETE http://localhost:8000/api/v1/enterprise/organizations/1 \
-  -H "Authorization: Bearer YOUR_TOKEN"
+  -H "Authorization: Bearer $API_TOKEN"
 
 # Expected: 204 No Content
 ```
