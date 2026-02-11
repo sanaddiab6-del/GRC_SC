@@ -13,6 +13,12 @@ from sqlalchemy.dialects.postgresql import UUID, JSON
 from uuid import uuid4
 from datetime import datetime
 
+# revision identifiers
+revision = '003_ai_governance_siem'
+down_revision = '002_auth_tables'
+branch_labels = None
+depends_on = None
+
 
 def upgrade():
     """Apply AI Governance & SIEM tables"""
