@@ -1,12 +1,13 @@
 {
   "name": "SICO GRC Platform",
-  "image": "mcr.microsoft.com/devcontainers/python:3.11-bullseye",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspace",
   
   "features": {
     "ghcr.io/devcontainers/features/node:1": {
       "version": "20"
     },
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
     "ghcr.io/devcontainers/features/git:1": {},
     "ghcr.io/devcontainers-contrib/features/poetry:2": {}
   },
@@ -16,37 +17,14 @@
       "extensions": [
         "ms-python.python",
         "ms-python.vscode-pylance",
-        "ms-python.black-formatter",
         "ms-toolsai.jupyter",
-        "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode",
-        "bradlc.vscode-tailwindcss",
-        "GitHub.copilot",
-        "GitHub.copilot-chat",
-        "ms-azuretools.vscode-docker",
-        "redhat.vscode-yaml"
+        "GitHub.copilot-chat"
       ],
       "settings": {
         "python.defaultInterpreterPath": "/usr/local/bin/python",
-        "python.linting.enabled": true,
-        "python.linting.pylintEnabled": true,
-        "python.formatting.provider": "black",
         "editor.formatOnSave": true,
-        "editor.codeActionsOnSave": {
-          "source.organizeImports": true
-        },
-        "[python]": {
-          "editor.defaultFormatter": "ms-python.black-formatter"
-        },
-        "[javascript]": {
-          "editor.defaultFormatter": "esbenp.prettier-vscode"
-        },
-        "[typescript]": {
-          "editor.defaultFormatter": "esbenp.prettier-vscode"
-        },
-        "[typescriptreact]": {
-          "editor.defaultFormatter": "esbenp.prettier-vscode"
-        }
+        "editor.codeActionsOnSave": "explicit"
       }
     }
   },
