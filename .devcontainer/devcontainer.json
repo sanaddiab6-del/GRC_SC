@@ -23,8 +23,7 @@
       ],
       "settings": {
         "python.defaultInterpreterPath": "/usr/local/bin/python",
-        "editor.formatOnSave": true,
-        "editor.codeActionsOnSave": "explicit"
+        "editor.formatOnSave": true
       }
     }
   },
