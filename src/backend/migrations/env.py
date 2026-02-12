@@ -10,11 +10,26 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.database import Base
 from core.config import settings
+import os
 
-# Import all models to ensure they're registered with Base.metadata
-from controls.models import Control
-from evidence.models import Evidence
-from reporting.models import Report
+# Import ALL models to ensure they're registered with Base.metadata
+try:
+    from controls.models import Control
+    from evidence.models import Evidence
+    from reporting.models import Report
+    from auth.models import User, Role, Permission
+    from privacy.models import ProcessingActivity, DataSubjectRequest, DataBreach
+    from incident.models import Incident, IncidentWorkflowLog
+    from risk.models import Risk, RiskAssessment
+    from ai_governance.models import AIModel, BiasTestResult, AIPerformanceMetric, EthicalReview
+    from siem.models import SecurityEvent, ThreatIntelligence, SecurityAlert
+    from isms.models import Asset, Vendor
+    from training.models import TrainingModule, TrainingCompletion
+    from audit.models import AuditFinding, AuditWorkflow
+    import enterprise_models  # Import all enterprise models
+except ImportError as e:
+    print(f"Warning: Could not import some models: {e}")
+    print("Database metadata may be incomplete")
 
 # Alembic Config object
 config = context.config
@@ -27,7 +42,13 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 # Override sqlalchemy.url from environment
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+# Convert async URLs to sync for Alembic
+database_url = os.getenv("DATABASE_URL", settings.DATABASE_URL)
+if "postgresql+asyncpg://" in database_url:
+    database_url = database_url.replace("postgresql+asyncpg://", "postgresql://")
+elif "sqlite+aiosqlite://" in database_url:
+    database_url = database_url.replace("sqlite+aiosqlite://", "sqlite://")
+config.set_main_option("sqlalchemy.url", database_url)
 
 
 def run_migrations_offline() -> None:

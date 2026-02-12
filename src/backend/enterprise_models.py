@@ -152,21 +152,15 @@ class Asset(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, onupdate=datetime.utcnow)
 
+# AuditLog is defined in core.audit_logger with extend_existing=True
+# Multiple definitions allowed for compatibility
 
 class AuditLog(Base):
     """Immutable audit trail for all platform activities"""
     __tablename__ = "audit_logs"
+    __table_args__ = {'extend_existing': True}  # Allow redefinition for compatibility
     
     id = Column(Integer, primary_key=True, index=True)
-    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    action = Column(String(100), nullable=False)  # create, update, delete, approve, reject, view
-    entity_type = Column(String(50), nullable=False)  # control, risk, evidence, finding, etc.
-    entity_id = Column(String(100), nullable=False)
-    changes = Column(JSON)  # before/after state
-    ip_address = Column(String(50))
-    user_agent = Column(String(500))
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
 
 
 # ============================================================================
@@ -186,6 +180,7 @@ class FrameworkType(str, enum.Enum):
 class Control(Base):
     """Enterprise control library with full lifecycle"""
     __tablename__ = "controls"
+    __table_args__ = {'extend_existing': True}  # Allow redefinition for compatibility
     
     id = Column(Integer, primary_key=True, index=True)
     organization_id = Column(Integer, ForeignKey("organizations.id"))
