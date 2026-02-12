@@ -59,6 +59,21 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-cov pytest-asyncio
 
+      - name: Wait for PostgreSQL
+        run: |
+          until pg_isready -h localhost -p 5432 -U sico; do
+            echo "Waiting for postgres..."
+            sleep 2
+          done
+          echo "PostgreSQL is ready!"
+
+      - name: Run database migrations
+        env:
+          DATABASE_URL: postgresql://sico:test_password@localhost:5432/sico_test
+        run: |
+          cd src/backend
+          alembic upgrade head
+
       - name: Run linters
         continue-on-error: true
         run: |

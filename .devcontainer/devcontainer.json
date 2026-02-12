@@ -74,5 +74,11 @@
 
   "postCreateCommand": "bash .devcontainer/setup.sh",
   
-  "remoteUser": "vscode"
+  "remoteUser": "vscode",
+  
+  "containerEnv": {
+    "DATABASE_URL": "postgresql://postgres:postgres@localhost:5432/grc_platform",
+    "REDIS_URL": "redis://localhost:6379",
+    "SECRET_KEY": "dev-secret-key-change-in-production-32-chars-minimum-required"
+  }
 }

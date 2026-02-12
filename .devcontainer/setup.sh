@@ -23,6 +23,13 @@ cd src/backend
 if [ -f "requirements.txt" ]; then
     pip install --upgrade pip
     pip install -r requirements.txt
+    echo "✅ Python dependencies installed"
+fi
+
+# Run database migrations if alembic is available
+if command -v alembic &> /dev/null; then
+    echo "🔄 Running database migrations..."
+    alembic upgrade head || echo "⚠️  Migrations will run when database is available"
 fi
 
 # Frontend setup
