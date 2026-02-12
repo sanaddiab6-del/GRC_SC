@@ -177,18 +177,6 @@ export default function ControlDetailPage() {
                 <div>
                   <div className="text-xs text-muted-foreground">{t('framework')}</div>
                   <div className="text-sm font-semibold">{control.framework}</div>
-                  import { Badge } from '@/components/ui/badge';
-                  import { Button } from '@/components/ui/button';
-                  import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-                  import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-                  import {
-                    Table,
-                    TableBody,
-                    TableCell,
-                    TableHead,
-                    TableHeader,
-                    TableRow,
-                  } from '@/components/ui/table';
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground">{t('domain')}</div>
@@ -205,7 +193,7 @@ export default function ControlDetailPage() {
 
         <TabsContent value="requirements">
           <Card>
-                      activeTab === 'evidence' ? `/api/v1/evidence?control_id=${controlId}` : null,
+            <CardContent className="space-y-4 pt-6">
               <div>
                 <div className="text-sm font-semibold">{t('mappings')}</div>
                 <div className="mt-2 flex flex-wrap gap-2">

@@ -69,12 +69,15 @@ jobs:
 
       - name: Run tests
         env:
+          CI: true
+          PYTEST_RUNNING: "1"
           DATABASE_URL: postgresql://sico:test_password@localhost:5432/sico_test
           REDIS_URL: redis://localhost:6379
-          SECRET_KEY: test-secret-key-for-ci-32-chars-minimum
+          SECRET_KEY: test-secret-key-for-ci-32-chars-minimum-secure
           PYTHONPATH: ${{ github.workspace }}
         run: |
-          pytest tests/backend -v --cov=src/backend --cov-report=xml:src/backend/coverage.xml --cov-report=html:src/backend/htmlcov
+          cd ${{ github.workspace }}
+          pytest tests/backend -v --tb=short --maxfail=5 --cov=src/backend --cov-report=xml:src/backend/coverage.xml --cov-report=html:src/backend/htmlcov
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4

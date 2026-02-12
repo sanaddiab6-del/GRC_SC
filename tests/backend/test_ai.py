@@ -1,7 +1,7 @@
 # Backend Tests - AI/RAG Module
 import pytest
 from httpx import AsyncClient, ASGITransport
-from src.backend.main import app
+from main import app
 
 
 @pytest.mark.asyncio

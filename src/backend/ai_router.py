@@ -25,8 +25,16 @@ else:
 
 router = APIRouter()
 
-# Initialize retriever (in production, use dependency injection)
-retriever = BilingualRetriever() if AI_AVAILABLE and BilingualRetriever else None
+# Lazy initialization of retriever to avoid loading models during import
+# This prevents CI/CD test collection from hanging due to large model downloads
+_retriever_instance = None
+
+def get_retriever():
+    """Lazy load the BilingualRetriever instance"""
+    global _retriever_instance
+    if _retriever_instance is None and AI_AVAILABLE and BilingualRetriever:
+        _retriever_instance = BilingualRetriever()
+    return _retriever_instance
 
 
 class QueryRequest(BaseModel):
@@ -57,6 +65,7 @@ async def query_rag_system(
     Query the bilingual RAG system
     Returns relevant controls with citations
     """
+    retriever = get_retriever()
     if not AI_AVAILABLE or retriever is None:
         raise HTTPException(
             status_code=503,
