@@ -81,8 +81,7 @@
     }
   },
 
-  "postCreateCommand": "cat .devcontainer/WELCOME.txt",
-  "postStartCommand": "nohup bash .devcontainer/setup-background.sh > /tmp/setup.log 2>&1 &",
+  "onCreateCommand": "echo '🚀 Container created successfully!' && python3 --version && node --version",
   
   "remoteUser": "vscode",
   

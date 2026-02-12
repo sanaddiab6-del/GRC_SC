@@ -2,36 +2,40 @@
 
 This directory contains the configuration for GitHub Codespaces.
 
-## ⚡ Quick Start (Updated for Faster Launch)
+## ⚡ SIMPLIFIED APPROACH (Best Practice)
 
-### What Changed?
-The Codespace now launches **immediately** without waiting for all dependencies to install. Setup runs in the background so you can start coding right away!
+**Key Change:** No automated setup that could fail or block the UI.
+
+Following GitHub Codespaces best practices:
+- ✅ Minimal container configuration
+- ✅ Fast, predictable startup
+- ✅ Manual setup with clear instructions
+- ✅ No background processes
+- ✅ No blocking operations
 
 ## What's Included
 
 ### devcontainer.json
-The main configuration file that tells Codespaces:
-- What base Docker image to use (Python 3.11)
-- What features to install (Docker, Git, GitHub CLI, Node.js)
-- What VS Code extensions to install
-- Which ports to forward
-- **NEW:** Non-blocking setup (UI available in <2 minutes)
+Minimal configuration that:
+- Uses Python 3.11 base image
+- Installs Docker, Git, GitHub CLI, Node.js 20
+- Configures VS Code extensions
+- Sets up port forwarding
+- **Runs only simple version check on creation**
 
-### Setup Scripts
+### Setup Scripts (Run Manually)
 
-1. **setup-background.sh** (Automatic)
-   - Runs automatically in the background when Codespace starts
-   - Installs dependencies without blocking the UI
-   - Log file: `/tmp/setup.log`
-   - Check progress: `tail -f /tmp/setup.log`
+1. **show-welcome.sh**
+   - Displays welcome message with instructions
+   - Run: `bash .devcontainer/show-welcome.sh`
 
-2. **quick-start.sh** (Manual - Fast)
-   - Minimal setup for immediate development
-   - Installs only essential packages (~2 minutes)
+2. **quick-start.sh**
+   - Minimal setup for immediate development (2-3 min)
+   - Installs only essential packages
    - Run: `bash .devcontainer/quick-start.sh`
 
-3. **setup.sh** (Manual - Complete)
-   - Full setup including AI/ML dependencies
+3. **setup.sh**
+   - Full setup including AI/ML dependencies (10-15 min)
    - Run when you need all features
    - Run: `bash .devcontainer/setup.sh`
 
@@ -40,32 +44,29 @@ The main configuration file that tells Codespaces:
 ### Starting a Codespace
 
 1. **From GitHub.com:**
-   - Go to the repository: https://github.com/sonaiso/sanadcom
-   - Click the green "Code" button
-   - Select "Codespaces" tab
-   - Click "Create codespace on main" (or your branch)
+   - Go to: https://github.com/sonaiso/sanadcom
+   - Click "Code" → "Codespaces" → "Create codespace"
 
 2. **From VS Code:**
-   - Install the "GitHub Codespaces" extension
    - Open Command Palette (Ctrl/Cmd + Shift + P)
    - Type "Codespaces: Create New Codespace"
    - Select the repository
 
-### After Launch (< 2 minutes)
+### After Launch (30-60 seconds)
 
-Your Codespace UI will be available immediately! Background setup is running.
+Your Codespace UI will be available immediately!
 
-**Check setup progress:**
+**See welcome message:**
 ```bash
-tail -f /tmp/setup.log
+bash .devcontainer/show-welcome.sh
 ```
 
-**Quick start (if you can't wait):**
+**Quick setup (2-3 min):**
 ```bash
 bash .devcontainer/quick-start.sh
 ```
 
-**Full setup (when you need everything):**
+**Full setup (10-15 min):**
 ```bash
 bash .devcontainer/setup.sh
 ```
