@@ -1,26 +1,31 @@
 #!/bin/bash
 
 # SICO GRC Platform - Codespace Setup Script
-# This script initializes the development environment in GitHub Codespaces
+# This script can be run manually for full setup
+# For quick start, use: bash .devcontainer/quick-start.sh
 
 set -e
 
 echo "🚀 Setting up SICO GRC Platform in Codespaces..."
+echo ""
+echo "⚡ Tip: This installs everything. For faster setup, use:"
+echo "   bash .devcontainer/quick-start.sh"
 echo ""
 
 WORKSPACE_DIR="/workspaces/sanadcom"
 cd $WORKSPACE_DIR
 
 # 1. Install backend dependencies
-echo "📦 Installing backend dependencies..."
+echo "📦 [1/6] Installing backend dependencies..."
 cd $WORKSPACE_DIR/src/backend
 pip install --no-cache-dir -r requirements.txt
 echo "✅ Backend dependencies installed"
 echo ""
 
-# 2. Install AI dependencies
-echo "🤖 Installing AI dependencies..."
+# 2. Install AI dependencies (optional)
+echo "🤖 [2/6] Installing AI dependencies..."
 if [ -f "$WORKSPACE_DIR/ai/requirements.txt" ]; then
+    echo "   ⏳ This may take 5-10 minutes for ML packages..."
     pip install --no-cache-dir -r $WORKSPACE_DIR/ai/requirements.txt
     echo "✅ AI dependencies installed"
 else
@@ -29,16 +34,20 @@ fi
 echo ""
 
 # 3. Install frontend dependencies
-echo "📦 Installing frontend dependencies..."
+echo "📦 [3/6] Installing frontend dependencies..."
 if [ -d "$WORKSPACE_DIR/src/frontend" ]; then
     cd $WORKSPACE_DIR/src/frontend
-    npm install
+    if [ -f "package-lock.json" ]; then
+        npm ci --prefer-offline --no-audit
+    else
+        npm install --prefer-offline --no-audit
+    fi
     echo "✅ Frontend dependencies installed"
 fi
 echo ""
 
 # 4. Create .env file if not exists
-echo "⚙️  Setting up environment configuration..."
+echo "⚙️  [4/6] Setting up environment configuration..."
 cd $WORKSPACE_DIR
 if [ ! -f ".env" ]; then
     if [ -f "config/env.example" ]; then
@@ -78,42 +87,15 @@ else
 fi
 echo ""
 
-# 5. Start Docker Compose services
-echo "🐳 Starting Docker services (PostgreSQL, Redis, Chroma)..."
-cd $WORKSPACE_DIR/deployment
-docker-compose up -d postgres redis chroma
-echo "✅ Docker services started"
+# 5. Start Docker Compose services (optional)
+echo "🐳 [5/6] Docker services (optional)..."
+echo "   Run manually when needed: cd deployment && docker-compose up -d"
+echo "   Services: PostgreSQL, Redis, Chroma"
 echo ""
 
-# 6. Wait for PostgreSQL to be ready
-echo "⏳ Waiting for PostgreSQL to be ready..."
-max_attempts=30
-attempt=0
-
-while [ $attempt -lt $max_attempts ]; do
-    if docker-compose exec -T postgres pg_isready -U postgres > /dev/null 2>&1; then
-        echo "✅ PostgreSQL is ready"
-        break
-    fi
-    attempt=$((attempt + 1))
-    if [ $attempt -eq $max_attempts ]; then
-        echo "⚠️  PostgreSQL did not become ready in time, but continuing..."
-        break
-    fi
-    echo "Waiting for PostgreSQL... (attempt $attempt/$max_attempts)"
-    sleep 2
-done
-echo ""
-
-# 7. Run database migrations
-echo "🔧 Running database migrations..."
-cd $WORKSPACE_DIR/src/backend
-if [ -f "alembic.ini" ]; then
-    alembic upgrade head 2>&1 || echo "⚠️  Migration failed or no migrations to run"
-    echo "✅ Database migrations complete"
-else
-    echo "⚠️  alembic.ini not found, skipping migrations"
-fi
+# 6. Database migrations (optional)
+echo "🔧 [6/6] Database migrations (optional)..."
+echo "   Run after Docker is up: cd src/backend && alembic upgrade head"
 echo ""
 
 echo "================================================"
@@ -121,6 +103,9 @@ echo "✅ Setup complete! Your environment is ready."
 echo "================================================"
 echo ""
 echo "🎯 Quick Start Commands:"
+echo ""
+echo "  Start Docker services:"
+echo "    cd deployment && docker-compose up -d"
 echo ""
 echo "  Start Backend API:"
 echo "    cd src/backend"
@@ -130,17 +115,13 @@ echo "  Start Frontend:"
 echo "    cd src/frontend"
 echo "    npm run dev"
 echo ""
-echo "  View Docker logs:"
-echo "    cd deployment"
-echo "    docker-compose logs -f"
-echo ""
 echo "📚 Access Points (after starting services):"
 echo "  • Backend API:  http://localhost:8000"
 echo "  • API Docs:     http://localhost:8000/docs"
 echo "  • Frontend:     http://localhost:3000"
 echo ""
 echo "💡 Tips:"
-echo "  • All database services are running in Docker"
-echo "  • Backend and frontend should be started manually"
-echo "  • Check QUICK_START.md for more details"
+echo "  • For minimal setup: bash .devcontainer/quick-start.sh"
+echo "  • Check background setup: tail -f /tmp/setup.log"
+echo "  • See QUICK_START.md for more details"
 echo ""

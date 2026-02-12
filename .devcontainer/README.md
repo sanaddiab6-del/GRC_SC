@@ -2,6 +2,11 @@
 
 This directory contains the configuration for GitHub Codespaces.
 
+## ⚡ Quick Start (Updated for Faster Launch)
+
+### What Changed?
+The Codespace now launches **immediately** without waiting for all dependencies to install. Setup runs in the background so you can start coding right away!
+
 ## What's Included
 
 ### devcontainer.json
@@ -10,15 +15,25 @@ The main configuration file that tells Codespaces:
 - What features to install (Docker, Git, GitHub CLI, Node.js)
 - What VS Code extensions to install
 - Which ports to forward
-- What setup script to run on first launch
+- **NEW:** Non-blocking setup (UI available in <2 minutes)
 
-### setup.sh
-The initialization script that runs when the Codespace is first created:
-1. Installs Python dependencies (backend + AI)
-2. Installs Node.js dependencies (frontend)
-3. Creates `.env` configuration file
-4. Starts Docker services (PostgreSQL, Redis, Chroma)
-5. Runs database migrations
+### Setup Scripts
+
+1. **setup-background.sh** (Automatic)
+   - Runs automatically in the background when Codespace starts
+   - Installs dependencies without blocking the UI
+   - Log file: `/tmp/setup.log`
+   - Check progress: `tail -f /tmp/setup.log`
+
+2. **quick-start.sh** (Manual - Fast)
+   - Minimal setup for immediate development
+   - Installs only essential packages (~2 minutes)
+   - Run: `bash .devcontainer/quick-start.sh`
+
+3. **setup.sh** (Manual - Complete)
+   - Full setup including AI/ML dependencies
+   - Run when you need all features
+   - Run: `bash .devcontainer/setup.sh`
 
 ## How to Use
 
@@ -36,15 +51,24 @@ The initialization script that runs when the Codespace is first created:
    - Type "Codespaces: Create New Codespace"
    - Select the repository
 
-### First Time Setup
+### After Launch (< 2 minutes)
 
-The Codespace will automatically:
-1. Build the development container (~5-10 minutes first time)
-2. Run the setup script to install all dependencies
-3. Start database services in Docker
-4. Configure the environment
+Your Codespace UI will be available immediately! Background setup is running.
 
-Wait for the "✅ Setup complete!" message in the terminal.
+**Check setup progress:**
+```bash
+tail -f /tmp/setup.log
+```
+
+**Quick start (if you can't wait):**
+```bash
+bash .devcontainer/quick-start.sh
+```
+
+**Full setup (when you need everything):**
+```bash
+bash .devcontainer/setup.sh
+```
 
 ### Starting the Application
 

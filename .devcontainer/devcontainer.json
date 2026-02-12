@@ -81,7 +81,8 @@
     }
   },
 
-  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "postCreateCommand": "echo '✅ Codespace container ready! Run setup script when ready: bash .devcontainer/setup.sh'",
+  "postStartCommand": "nohup bash .devcontainer/setup-background.sh > /tmp/setup.log 2>&1 &",
   
   "remoteUser": "vscode",
   
