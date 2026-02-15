@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SICO Enterprise GRC Platform - Professional Demo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+       .card-hover:hover { transform: translateY(-2px); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Navigation -->
+    <nav class="gradient-bg text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center space-x-4">
+                    <svg class="w-10 h-10" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm-1 11V9a1 1 0 112 0v4a1 1 0 11-2 0z"/>
+                    </svg>
+                    <div>
+                        <h1 class="text-2xl font-bold">SICO GRC Platform</h1>
+                        <p class="text-sm text-purple-200">Saudi National Bank - Enterprise Demo</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-6">
+                    <span class="text-sm">🇸🇦 NCA Compliant</span>
+                    <span class="px-3 py-1 bg-green-500 rounded-full text-xs font-semibold">✓ OPERATIONAL</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+       <!-- Executive Dashboard Header -->
+        <div class="mb-8">
+            <h2 class="text-3xl font-bold text-gray-900 mb-2">Executive Dashboard</h2>
+            <p class="text-gray-600">Real-time compliance and risk posture monitoring</p>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow-md p-6 card-hover transition-all duration-200">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <p class="text-sm text-gray-500 font-medium">Compliance Score</p>
+                        <h3 class="text-3xl font-bold text-green-600 mt-2">92%</h3>
+                    </div>
+                    <div class="bg-green-100 p-3 rounded-lg">
+                        <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-500"><span class="text-green-600 font-semibold">+5%</span> from last month</p>
+                <div class="mt-3 text-xs text-gray-600">
+                    <div class="flex justify-between mb-1"><span>NCA ECC:</span><span class="font-semibold">95%</span></div>
+                    <div class="flex justify-between mb-1"><span>NCA CCC:</span><span class="font-semibold">88%</span></div>
+                    <div class="flex justify-between"><span>PDPL:</span><span class="font-semibold">94%</span></div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-md p-6 card-hover transition-all duration-200">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <p class="text-sm text-gray-500 font-medium">High Risks</p>
+                        <h3 class="text-3xl font-bold text-red-600 mt-2">7</h3>
+                    </div>
+                    <div class="bg-red-100 p-3 rounded-lg">
+                        <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-500"><span class="text-red-600 font-semibold">-3</span> from last month</p>
+                <div class="mt-3 text-xs text-gray-600">
+                    <div class="flex justify-between mb-1"><span>Cyber:</span><span class="font-semibold">4</span></div>
+                    <div class="flex justify-between mb-1"><span>Compliance:</span><span class="font-semibold">2</span></div>
+                    <div class="flex justify-between"><span>Operational:</span><span class="font-semibold">1</span></div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-md p-6 card-hover transition-all duration-200">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <p class="text-sm text-gray-500 font-medium">Open Audit Findings</p>
+                        <h3 class="text-3xl font-bold text-yellow-600 mt-2">12</h3>
+                    </div>
+                    <div class="bg-yellow-100 p-3 rounded-lg">
+                        <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                        </svg>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-500"><span class="text-green-600 font-semibold">8</span> resolved this month</p>
+                <div class="mt-3 text-xs text-gray-600">
+                    <div class="flex justify-between mb-1"><span>Critical:</span><span class="font-semibold text-red-600">2</span></div>
+                    <div class="flex justify-between mb-1"><span>High:</span><span class="font-semibold text-orange-600">5</span></div>
+                    <div class="flex justify-between"><span>Medium:</span><span class="font-semibold text-yellow-600">5</span></div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-md p-6 card-hover transition-all duration-200">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <p class="text-sm text-gray-500 font-medium">Critical Assets</p>
+                        <h3 class="text-3xl font-bold text-blue-600 mt-2">89</h3>
+                    </div>
+                    <div class="bg-blue-100 p-3 rounded-lg">
+                        <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
+                        </svg>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-500">Protected by <span class="font-semibold">142</span> controls</p>
+                <div class="mt-3 text-xs text-gray-600">
+                    <div class="flex justify-between mb-1"><span>Applications:</span><span class="font-semibold">34</span></div>
+                    <div class="flex justify-between mb-1"><span>Databases:</span><span class="font-semibold">28</span></div>
+                    <div class="flex justify-between"><span>Infrastructure:</span><span class="font-semibold">27</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Compliance Overview -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">NCA Compliance Status</h3>
+                <div class="space-y-4">
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <span class="text-sm font-medium text-gray-700">NCA ECC (Essential Cybersecurity Controls)</span>
+                            <span class="text-sm font-bold text-green-600">95%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2.5">
+                            <div class="bg-green-600 h-2.5 rounded-full" style="width: 95%"></div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">142 of 150 controls implemented</p>
+                    </div>
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <span class="text-sm font-medium text-gray-700">NCA CCC (Cloud Cybersecurity Controls)</span>
+                            <span class="text-sm font-bold text-green-600">88%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2.5">
+                            <div class="bg-green-600 h-2.5 rounded-full" style="width: 88%"></div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">88 of 100 cloud controls active</p>
+                    </div>
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <span class="text-sm font-medium text-gray-700">PDPL (Personal Data Protection Law)</span>
+                            <span class="text-sm font-bold text-green-600">94%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2.5">
+                            <div class="bg-green-600 h-2.5 rounded-full" style="width: 94%"></div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">47 of 50 privacy requirements met</p>
+                    </div>
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <span class="text-sm font-medium text-gray-700">ISO 27001:2022</span>
+                            <span class="text-sm font-bold text-yellow-600">82%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2.5">
+                            <div class="bg-yellow-600 h-2.5 rounded-full" style="width: 82%"></div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">Certification in progress - 94 of 114 controls</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Risk Heat Map</h3>
+                <canvas id="riskHeatMap" width="400" height="300"></canvas>
+                <div class="mt-4 grid grid-cols-2 gap-4 text-xs">
+                    <div class="flex items-center">
+                        <div class="w-4 h-4 bg-red-600 rounded mr-2"></div>
+                        <span>Critical (7)</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-4 h-4 bg-orange-500 rounded mr-2"></div>
+                        <span>High (12)</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-4 h-4 bg-yellow-500 rounded mr-2"></div>
+                        <span>Medium (24)</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-4 h-4 bg-green-500 rounded mr-2"></div>
+                        <span>Low (38)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Activities & Incidents -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Recent Security Incidents</h3>
+                <div class="space-y-3">
+                    <div class="flex items-start p-3 bg-red-50 rounded-lg">
+                        <div class="flex-shrink-0 w-2 h-2 mt-2 bg-red-600 rounded-full"></div>
+                        <div class="ml-3 flex-1">
+                            <p class="text-sm font-medium text-gray-900">Ransomware Attack Attempt</p>
+                            <p class="text-xs text-gray-600 mt-1">INC-2024-001 • Blocked by EDR • 2 hours ago</p>
+                            <span class="inline-block mt-2 px-2 py-1 text-xs font-semibold bg-red-200 text-red-800 rounded">CRITICAL</span>
+                        </div>
+                    </div>
+                    <div class="flex items-start p-3 bg-yellow-50 rounded-lg">
+                        <div class="flex-shrink-0 w-2 h-2 mt-2 bg-yellow-600 rounded-full"></div>
+                        <div class="ml-3 flex-1">
+                            <p class="text-sm font-medium text-gray-900">Failed Login Attempts</p>
+                            <p class="text-xs text-gray-600 mt-1">INC-2024-002 • 1,245 attempts from 203.0.113.45 • 5 hours ago</p>
+                            <span class="inline-block mt-2 px-2 py-1 text-xs font-semibold bg-yellow-200 text-yellow-800 rounded">HIGH</span>
+                        </div>
+                    </div>
+                    <div class="flex items-start p-3 bg-green-50 rounded-lg">
+                        <div class="flex-shrink-0 w-2 h-2 mt-2 bg-green-600 rounded-full"></div>
+                        <div class="ml-3 flex-1">
+                            <p class="text-sm font-medium text-gray-900">Malware Detected & Quarantined</p>
+                            <p class="text-xs text-gray-600 mt-1">INC-2024-003 • Workstation WS-0455 • 1 day ago</p>
+                            <span class="inline-block mt-2 px-2 py-1 text-xs font-semibold bg-green-200 text-green-800 rounded">RESOLVED</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Control Effectiveness Trend</h3>
+                <canvas id="controlTrend" width="400" height="240"></canvas>
+                <p class="text-xs text-gray-500 mt-3 text-center">Average control effectiveness: <span class="font-semibold text-green-600">88.5%</span></p>
+            </div>
+        </div>
+
+        <!-- PDPL Compliance & Vendor Risk -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">PDPL Compliance Dashboard</h3>
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div class="bg-blue-50 p-4 rounded-lg text-center">
+                        <p class="text-2xl font-bold text-blue-600">48</p>
+                        <p class="text-xs text-gray-600 mt-1">Processing Activities (RoPA)</p>
+                    </div>
+                    <div class="bg-purple-50 p-4 rounded-lg text-center">
+                        <p class="text-2xl font-bold text-purple-600">23</p>
+                        <p class="text-xs text-gray-600 mt-1">Data Subject Requests</p>
+                    </div>
+                    <div class="bg-green-50 p-4 rounded-lg text-center">
+                        <p class="text-2xl font-bold text-green-600">97%</p>
+                        <p class="text-xs text-gray-600 mt-1">DSAR Completion (< 30 days)</p>
+                    </div>
+                    <div class="bg-red-50 p-4 rounded-lg text-center">
+                        <p class="text-2xl font-bold text-red-600">1</p>
+                        <p class="text-xs text-gray-600 mt-1">Data Breaches (Resolved)</p>
+                    </div>
+                </div>
+                <div class="border-t pt-4">
+                    <h4 class="text-sm font-semibold text-gray-700 mb-2">Recent DSARs</h4>
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">DSAR-2024-045 • Access Request</span>
+                            <span class="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">In Progress</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">DSAR-2024-044 • Deletion Request</span>
+                            <span class="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">Completed</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Vendor Risk Assessment</h3>
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div class="flex-1">
+                            <p class="text-sm font-medium text-gray-900">AWS Cloud Services</p>
+                            <p class="text-xs text-gray-600 mt-1">Infrastructure • Last assessed: 30 days ago</p>
+                        </div>
+                        <div class="text-right">
+                            <div class="flex items-center">
+                                <span class="text-xl font-bold text-green-600">85</span>
+                                <span class="text-xs text-gray-500 ml-1">/100</span>
+                            </div>
+                            <p class="text-xs text-gray-500">Risk Score</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div class="flex-1">
+                            <p class="text-sm font-medium text-gray-900">Microsoft Azure</p>
+                            <p class="text-xs text-gray-600 mt-1">Cloud Applications • Last assessed: 45 days ago</p>
+                        </div>
+                        <div class="text-right">
+                            <div class="flex items-center">
+                                <span class="text-xl font-bold text-green-600">88</span>
+                                <span class="text-xs text-gray-500 ml-1">/100</span>
+                            </div>
+                            <p class="text-xs text-gray-500">Risk Score</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div class="flex-1">
+                            <p class="text-sm font-medium text-gray-900">Splunk SIEM</p>
+                            <p class="text-xs text-gray-600 mt-1">Security Monitoring • Last assessed: 15 days ago</p>
+                        </div>
+                        <div class="text-right">
+                            <div class="flex items-center">
+                                <span class="text-xl font-bold text-green-600">90</span>
+                                <span class="text-xs text-gray-500 ml-1">/100</span>
+                            </div>
+                            <p class="text-xs text-gray-500">Risk Score</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                        <div class="flex-1">
+                            <p class="text-sm font-medium text-gray-900">Third-Party Payment Gateway</p>
+                            <p class="text-xs text-gray-600 mt-1">Payment Processing • Review overdue by 10 days</p>
+                        </div>
+                        <div class="text-right">
+                            <div class="flex items-center">
+                                <span class="text-xl font-bold text-yellow-600">68</span>
+                                <span class="text-xs text-gray-500 ml-1">/100</span>
+                            </div>
+                            <p class="text-xs text-yellow-600 font-semibold">ACTION REQUIRED</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Policy Management & Audit Programs -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Policy Library</h3>
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">Information Security Policy</p>
+                            <p class="text-xs text-gray-600">POL-IS-001 • Version 2.1 • Last updated: 30 days ago</p>
+                        </div>
+                        <span class="px-3 py-1 text-xs font-semibold bg-green-100 text-green-800 rounded">APPROVED</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">Access Control Policy</p>
+                            <p class="text-xs text-gray-600">POL-AC-001 • Version 1.8 • Last updated: 45 days ago</p>
+                        </div>
+                        <span class="px-3 py-1 text-xs font-semibold bg-green-100 text-green-800 rounded">APPROVED</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">Incident Response Policy</p>
+                            <p class="text-xs text-gray-600">POL-IR-001 • Version 3.0 • Last updated: 60 days ago</p>
+                        </div>
+                        <span class="px-3 py-1 text-xs font-semibold bg-green-100 text-green-800 rounded">APPROVED</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">Privacy Policy (PDPL)</p>
+                            <p class="text-xs text-gray-600">POL-PR-001 • Version 2.5 • Review overdue by 15 days</p>
+                        </div>
+                        <span class="px-3 py-1 text-xs font-semibold bg-yellow-100 text-yellow-800 rounded">REVIEW DUE</span>
+                    </div>
+                </div>
+                <div class="mt-4 pt-4 border-t">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Total Policies:</span>
+                        <span class="font-semibold">24</span>
+                    </div>
+                    <div class="flex justify-between text-sm mt-1">
+                        <span class="text-gray-600">Pending Review:</span>
+                        <span class="font-semibold text-yellow-600">3</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Active Audit Programs</h3>
+                <div class="space-y-3">
+                    <div class="p-4 bg-blue-50 rounded-lg border-l-4 border-blue-600">
+                        <div class="flex justify-between items-start mb-2">
+                            <h4 class="text-sm font-semibold text-gray-900">NCA ECC Compliance Audit</h4>
+                            <span class="px-2 py-1 text-xs font-semibold bg-blue-200 text-blue-800 rounded">IN PROGRESS</span>
+                        </div>
+                        <p class="text-xs text-gray-600 mb-2">AUD-2024-NCA-ECC • Scope: All 150 ECC controls</p>
+                        <div class="flex justify-between text-xs mt-2">
+                            <span class="text-gray-600">Progress:</span>
+                            <span class="font-semibold">68%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2 mt-1">
+                            <div class="bg-blue-600 h-2 rounded-full" style="width: 68%"></div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2">Lead Auditor: Ahmed Al-Mutairi • Due: 30 days</p>
+                    </div>
+                    <div class="p-4 bg-purple-50 rounded-lg border-l-4 border-purple-600">
+                        <div class="flex justify-between items-start mb-2">
+                            <h4 class="text-sm font-semibold text-gray-900">PDPL Privacy Audit</h4>
+                            <span class="px-2 py-1 text-xs font-semibold bg-purple-200 text-purple-800 rounded">IN PROGRESS</span>
+                        </div>
+                        <p class="text-xs text-gray-600 mb-2">AUD-2024-PDPL • Scope: Data processing activities</p>
+                        <div class="flex justify-between text-xs mt-2">
+                            <span class="text-gray-600">Progress:</span>
+                            <span class="font-semibold">45%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2 mt-1">
+                            <div class="bg-purple-600 h-2 rounded-full" style="width: 45%"></div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2">Lead Auditor: Fatima Al-Qasim • Due: 45 days</p>
+                    </div>
+                    <div class="p-4 bg-gray-50 rounded-lg border-l-4 border-gray-400">
+                        <div class="flex justify-between items-start mb-2">
+                            <h4 class="text-sm font-semibold text-gray-900">ISO 27001 Certification Audit</h4>
+                            <span class="px-2 py-1 text-xs font-semibold bg-gray-200 text-gray-800 rounded">PLANNED</span>
+                        </div>
+                        <p class="text-xs text-gray-600 mb-2">AUD-2024-ISO • Scope: Full ISMS certification</p>
+                        <p class="text-xs text-gray-500 mt-2">Auditor: External BSI • Scheduled: +60 days</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feature Highlights -->
+        <div class="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-lg shadow-lg p-8 text-white">
+            <h2 class="text-2xl font-bold mb-6">Enterprise GRC Platform Features</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                    <h3 class="font-semibold mb-3 flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/></svg>
+                        Multi-Framework Compliance
+                    </h3>
+                    <ul class="text-sm space-y-1 opacity-90">
+                        <li>✓ NCA ECC (Essential Cybersecurity Controls)</li>
+                        <li>✓ NCA CCC (Cloud Cybersecurity Controls)</li>
+                        <li>✓ PDPL (Personal Data Protection Law)</li>
+                        <li>✓ ISO 27001/27017/27018/27701</li>
+                        <li>✓ NIST Cybersecurity Framework</li>
+                    </ul>
+                </div>
+                <div>
+                    <h3 class="font-semibold mb-3 flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/></svg>
+                        Advanced Risk Management
+                    </h3>
+                    <ul class="text-sm space-y-1 opacity-90">
+                        <li>✓ Real-time risk heat maps</li>
+                        <li>✓ Automated risk scoring (CVSS integration)</li>
+                        <li>✓ Monte Carlo simulations</li>
+                        <li>✓ Risk appetite & tolerance tracking</li>
+                        <li>✓ Treatment plan automation</li>
+                    </ul>
+                </div>
+                <div>
+                    <h3 class="font-semibold mb-3 flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                        Intelligent Automation
+                    </h3>
+                    <ul class="text-sm space-y-1 opacity-90">
+                        <li>✓ AI-powered control recommendations</li>
+                        <li>✓ Automated evidence collection</li>
+                        <li>✓ SIEM integration (Splunk, QRadar)</li>
+                        <li>✓ Continuous compliance monitoring</li>
+                        <li>✓ Predictive risk analytics</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Technical Architecture -->
+        <div class="mt-8 bg-white rounded-lg shadow-md p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Docker Deployment Architecture</h3>
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-4 text-center">
+                <div class="p-4 bg-blue-50 rounded-lg">
+                    <div class="text-3xl mb-2">🐳</div>
+                    <p class="font-semibold text-sm">Docker Compose</p>
+                    <p class="text-xs text-gray-600 mt-1">Orchestration</p>
+                </div>
+                <div class="p-4 bg-green-50 rounded-lg">
+                    <div class="text-3xl mb-2">⚡</div>
+                    <p class="font-semibold text-sm">FastAPI Backend</p>
+                    <p class="text-xs text-gray-600 mt-1">Python 3.11 + SQLAlchemy</p>
+                </div>
+                <div class="p-4 bg-purple-50 rounded-lg">
+                    <div class="text-3xl mb-2">⚛️</div>
+                    <p class="font-semibold text-sm">Next.js Frontend</p>
+                    <p class="text-xs text-gray-600 mt-1">React 18 + TypeScript</p>
+                </div>
+                <div class="p-4 bg-indigo-50 rounded-lg">
+                    <div class="text-3xl mb-2">🗄️</div>
+                    <p class="font-semibold text-sm">PostgreSQL</p>
+                    <p class="text-xs text-gray-600 mt-1">Primary Database</p>
+                </div>
+                <div class="p-4 bg-red-50 rounded-lg">
+                    <div class="text-3xl mb-2">🔒</div>
+                    <p class="font-semibold text-sm">Nginx + SSL</p>
+                    <p class="text-xs text-gray-600 mt-1">Reverse Proxy</p>
+                </div>
+            </div>
+            <div class="mt-6 p-4 bg-gray-50 rounded-lg">
+                <h4 class="font-semibold text-sm mb-2">Deployment Specifications:</h4>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                    <div><span class="font-semibold">Authentication:</span> JWT + OAuth2</div>
+                    <div><span class="font-semibold">Encryption:</span> AES-256-GCM + TLS 1.3</div>
+                    <div><span class="font-semibold">Backup:</span> Automated daily (7-year retention)</div>
+                    <div><span class="font-semibold">Monitoring:</span> Prometheus + Grafana</div>
+                    <div><span class="font-semibold">Audit Logging:</span> Immutable 7-year logs</div>
+                    <div><span class="font-semibold">RBAC:</span> 8 roles with granular permissions</div>
+                    <div><span class="font-semibold">Scalability:</span> Horizontal pod autoscaling</div>
+                    <div><span class="font-semibold">Availability:</span> 99.9% SLA</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="mt-8 text-center text-gray-600 text-sm">
+            <p>© 2024 SICO Enterprise GRC Platform | Saudi National Bank</p>
+            <p class="mt-2">🇸🇦 100% NCA ECC/CCC/PDPL Compliant | ISO 27001 Certified | Built by Cybersecurity Specialists</p>
+            <p class="mt-1 text-xs">When deployed in Docker: Backend (port 8000) + Frontend (port 3000) + PostgreSQL (port 5432) + Redis (port 6379) + Nginx (ports 80/443)</p>
+        </div>
+    </div>
+
+    <script>
+        // Risk Heat Map
+        const riskCtx = document.getElementById('riskHeatMap').getContext('2d');
+        new Chart(riskCtx, {
+            type: 'scatter',
+            data: {
+                datasets: [{
+                    label: 'Critical',
+                    data: [
+                        {x: 5, y: 5}, {x: 5, y: 4}, {x: 4, y: 5}, {x: 5, y: 5}, 
+                        {x: 4, y: 4}, {x: 5, y: 4}, {x: 4, y: 5}
+                    ],
+                    backgroundColor: 'rgba(220, 38, 38, 0.8)',
+                    pointRadius: 10
+                }, {
+                    label: 'High',
+                    data: [
+                        {x: 4, y: 3}, {x: 3, y: 4}, {x: 4, y: 4}, {x: 3, y: 3},
+                        {x: 4, y: 3}, {x: 3, y: 4}, {x: 3, y: 3}, {x: 4, y: 3},
+                        {x: 3, y: 4}, {x: 4, y: 3}, {x: 3, y: 3}, {x: 3, y: 4}
+                    ],
+                    backgroundColor: 'rgba(249, 115, 22, 0.8)',
+                    pointRadius: 8
+                }, {
+                    label: 'Medium',
+                    data: Array.from({length: 24}, () => ({
+                        x: Math.floor(Math.random() * 2) + 2,
+                        y: Math.floor(Math.random() * 2) + 2
+                    })),
+                    backgroundColor: 'rgba(234, 179, 8, 0.8)',
+                    pointRadius: 6
+                }, {
+                    label: 'Low',
+                    data: Array.from({length: 38}, () => ({
+                        x: Math.floor(Math.random() * 2) + 1,
+                        y: Math.floor(Math.random() * 2) + 1
+                    })),
+                    backgroundColor: 'rgba(34, 197, 94, 0.8)',
+                    pointRadius: 4
+                }]
+            },
+            options: {
+                scales: {
+                    x: {title: {display: true, text: 'Likelihood'}, min: 0, max: 6, ticks: {stepSize: 1}},
+                    y: {title: {display: true, text: 'Impact'}, min: 0, max: 6, ticks: {stepSize: 1}}
+                },
+                plugins: {legend: {display: false}}
+            }
+        });
+
+        // Control Effectiveness Trend
+        const trendCtx = document.getElementById('controlTrend').getContext('2d');
+        new Chart(trendCtx, {
+            type: 'line',
+            data: {
+                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                datasets: [{
+                    label: 'Control Effectiveness',
+                    data: [82, 84, 85, 87, 88, 88.5],
+                    borderColor: 'rgb(34, 197, 94)',
+                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                scales: {y: {beginAtZero: false, min: 75, max: 100}},
+                plugins: {legend: {display: false}}
+            }
+        });
+    </script>
+</body>
+</html>

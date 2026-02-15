@@ -1,0 +1,92 @@
+# ============================
+# Git Merge Strategy Attributes
+# ============================
+# This file defines merge strategies for different file types to minimize conflicts
+
+# ============================
+# Source Code - Use union merge for imports, ours for conflicts
+# ============================
+*.py text diff=python merge=union
+*.js text diff=javascript
+*.ts text diff=typescript
+*.tsx text diff=typescript
+*.jsx text diff=javascript
+
+# ============================
+# Configuration Files - Favor manual review
+# ============================
+*.json text merge=union
+*.yaml text
+*.yml text
+*.toml text
+*.ini text
+.env* text merge=ours
+
+# ============================
+# Documentation - Use union merge to preserve both changes
+# ============================
+*.md text merge=union
+*.txt text
+*.rst text
+
+# ============================
+# Lock Files - Always use ours (regenerate after merge)
+# ============================
+package-lock.json binary merge=ours
+yarn.lock binary merge=ours
+poetry.lock binary merge=ours
+Pipfile.lock binary merge=ours
+requirements.txt text merge=union
+
+# ============================
+# Database Migrations - Manual review required
+# ============================
+**/migrations/*.py text merge=union
+**/alembic/versions/*.py text
+
+# ============================
+# Generated Files - Binary, use ours
+# ============================
+*.pyc binary
+*.pyo binary
+*.so binary
+*.dylib binary
+*.dll binary
+*.exe binary
+*.o binary
+*.a binary
+
+# ============================
+# Images and Assets - Binary
+# ============================
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg text
+*.pdf binary
+
+# ============================
+# Archives - Binary
+# ============================
+*.zip binary
+*.tar binary
+*.gz binary
+*.tgz binary
+*.rar binary
+
+# ============================
+# Language-specific line endings
+# ============================
+# Ensure consistent line endings across platforms
+* text=auto
+*.sh text eol=lf
+*.bash text eol=lf
+*.py text eol=lf
+
+# ============================
+# Git merge driver configurations
+# ============================
+# These require git config setup (documented in CONTRIBUTING.md)
+# For package.json, use npm-merge-driver: npm i -g npm-merge-driver && npx npm-merge-driver install --global
