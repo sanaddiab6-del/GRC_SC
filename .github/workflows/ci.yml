@@ -66,7 +66,7 @@ jobs:
           cd sanadcom/src/backend
           # Install only necessary dependencies for testing (skip ML packages)
           pip install fastapi uvicorn sqlalchemy psycopg2-binary alembic redis aioredis
-          pip install pydantic pydantic-settings python-jose passlib python-dotenv cryptography PyJWT
+          pip install pydantic pydantic-settings email-validator python-jose passlib python-dotenv cryptography PyJWT
           pip install aiosqlite asyncpg httpx aiohttp pandas openpyxl
           pip install pytest pytest-cov pytest-asyncio black flake8 mypy
           pip install azure-identity azure-keyvault-secrets pyotp qrcode pillow apscheduler
