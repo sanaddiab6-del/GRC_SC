@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers
 revision = '002_auth_tables'
-down_revision = '001_initial_migration'
+down_revision = '001'
 branch_labels = None
 depends_on = None
 

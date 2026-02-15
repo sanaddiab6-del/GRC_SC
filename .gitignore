@@ -76,6 +76,7 @@ htmlcov/
 # Misc
 .trace
 *.tmp
+*.bak
 *.temp
 =======
 # Docker
