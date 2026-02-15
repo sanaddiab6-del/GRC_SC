@@ -51,13 +51,25 @@ jobs:
         with:
           python-version: '3.11'
           cache: 'pip'
-          cache-dependency-path: src/backend/requirements.txt
+          cache-dependency-path: sanadcom/src/backend/requirements.txt
+
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          df -h
 
       - name: Install dependencies
         run: |
-          cd src/backend
-          pip install -r requirements.txt
-          pip install pytest pytest-cov pytest-asyncio
+          cd sanadcom/src/backend
+          # Install only necessary dependencies for testing (skip ML packages)
+          pip install fastapi uvicorn sqlalchemy psycopg2-binary alembic redis aioredis
+          pip install pydantic pydantic-settings python-jose passlib python-dotenv cryptography PyJWT
+          pip install aiosqlite asyncpg httpx aiohttp pandas openpyxl
+          pip install pytest pytest-cov pytest-asyncio black flake8 mypy
+          pip install azure-identity azure-keyvault-secrets pyotp qrcode pillow apscheduler
 
       - name: Wait for PostgreSQL
         run: |
@@ -71,13 +83,13 @@ jobs:
         env:
           DATABASE_URL: postgresql://sico:test_password@localhost:5432/sico_test
         run: |
-          cd src/backend
+          cd sanadcom/src/backend
           alembic upgrade head
 
       - name: Run linters
         continue-on-error: true
         run: |
-          cd src/backend
+          cd sanadcom/src/backend
           pip install black flake8
           black --check . || true
           flake8 . || true
@@ -94,12 +106,12 @@ jobs:
           PYTHONDONTWRITEBYTECODE: 1
         run: |
           cd ${{ github.workspace }}
-          pytest tests/backend -v --tb=short --maxfail=5 --cov=src/backend --cov-report=xml:src/backend/coverage.xml --cov-report=html:src/backend/htmlcov --cov-report=term
+          pytest tests/backend -v --tb=short --maxfail=5 --cov=sanadcom/src/backend --cov-report=xml:sanadcom/src/backend/coverage.xml --cov-report=html:sanadcom/src/backend/htmlcov --cov-report=term
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
         with:
-          files: src/backend/coverage.xml
+          files: sanadcom/src/backend/coverage.xml
           flags: backend
           name: backend-coverage
 
@@ -109,8 +121,8 @@ jobs:
         with:
           name: backend-test-results
           path: |
-            src/backend/htmlcov/
-            src/backend/coverage.xml
+            sanadcom/src/backend/htmlcov/
+            sanadcom/src/backend/coverage.xml
           retention-days: 30
 
   frontend-tests:
@@ -126,35 +138,35 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: src/frontend/package-lock.json
+          cache-dependency-path: sanadcom/src/frontend/package-lock.json
 
       - name: Install dependencies
         run: |
-          cd src/frontend
+          cd sanadcom/src/frontend
           npm ci
 
       - name: Run linter
         continue-on-error: true
         run: |
-          cd src/frontend
+          cd sanadcom/src/frontend
           npm run lint || true
 
       - name: Run type check
         continue-on-error: true
         run: |
-          cd src/frontend
+          cd sanadcom/src/frontend
           npm run type-check || true
 
       - name: Run tests
         run: |
-          cd src/frontend
+          cd sanadcom/src/frontend
           npm test -- --coverage --watchAll=false --passWithNoTests
 
       - name: Build
         env:
           NEXT_PUBLIC_API_URL: http://localhost:8000
         run: |
-          cd src/frontend
+          cd sanadcom/src/frontend
           npm run build
 
       - name: Archive test results
@@ -163,7 +175,7 @@ jobs:
         with:
           name: frontend-test-results
           path: |
-            src/frontend/coverage/
+            sanadcom/src/frontend/coverage/
           retention-days: 30
 
   ai-tests:
@@ -179,17 +191,17 @@ jobs:
         with:
           python-version: '3.11'
           cache: 'pip'
-          cache-dependency-path: ai/requirements.txt
+          cache-dependency-path: sanadcom/ai/requirements.txt
 
       - name: Install dependencies
         run: |
-          cd ai
+          cd sanadcom/ai
           pip install -r requirements.txt
           pip install pytest pytest-asyncio
 
       - name: Run AI tests
         run: |
-          cd ai
+          cd sanadcom/ai
           pytest tests/ -v || true
 
   docker-build:
@@ -206,8 +218,8 @@ jobs:
       - name: Build backend image
         uses: docker/build-push-action@v5
         with:
-          context: ./src/backend
-          file: src/backend/Dockerfile
+          context: ./sanadcom/src/backend
+          file: sanadcom/src/backend/Dockerfile
           push: false
           tags: sico-backend:test
           cache-from: type=gha
@@ -215,7 +227,7 @@ jobs:
 
       - name: Test docker-compose
         run: |
-          docker compose -f deployment/docker-compose.yml config
+          docker compose -f sanadcom/deployment/docker-compose.yml config
 
   integration-check:
     name: Integration Check
@@ -237,9 +249,9 @@ jobs:
 
       - name: Validate Python imports
         run: |
-          python -m compileall src/backend -q
-          python -m compileall ai -q
-          python -m compileall scripts -q || true
+          python -m compileall sanadcom/src/backend -q
+          python -m compileall sanadcom/ai -q
+          python -m compileall sanadcom/scripts -q || true
 
       - name: Summary
         run: |
