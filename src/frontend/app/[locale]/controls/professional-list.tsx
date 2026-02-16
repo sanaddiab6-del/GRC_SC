@@ -37,7 +37,7 @@ export default function ControlsListPage() {
 
   const loadControls = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/v1/controls/');
+      const res = await fetch('/api/v1/controls/');
       const data = await res.json();
       setControls(data);
       setLoading(false);

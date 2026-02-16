@@ -35,7 +35,7 @@ export default function ProfessionalDashboard() {
   const loadDashboardData = async () => {
     try {
       // Fetch controls from API
-      const controlsRes = await fetch('http://localhost:8000/api/v1/controls/');
+      const controlsRes = await fetch('/api/v1/controls/');
       const controlsData = await controlsRes.json();
       setControls(controlsData);
 

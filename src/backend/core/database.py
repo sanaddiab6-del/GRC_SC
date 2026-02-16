@@ -59,7 +59,8 @@ def _load_models() -> None:
     from incident import models as _incident_models  # noqa: F401
     from risk import models as _risk_models  # noqa: F401
     from ai_governance import models as _ai_governance_models  # noqa: F401
-    import enterprise_models as _enterprise_models  # noqa: F401 - Enterprise GRC
+    # Disabled to avoid duplicate table definitions (models already in module-specific files)
+    # import enterprise_models as _enterprise_models  # noqa: F401 - Enterprise GRC
 
 
 async def init_db():

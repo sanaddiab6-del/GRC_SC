@@ -24,7 +24,7 @@ export default function ComprehensiveDashboard() {
 
   const fetchDashboardData = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/v1/controls/?limit=1000');
+      const response = await fetch('/api/v1/controls/?limit=1000');
       const controls = await response.json();
       
       const eccControls = controls.filter((c: any) => c.framework === 'ECC');

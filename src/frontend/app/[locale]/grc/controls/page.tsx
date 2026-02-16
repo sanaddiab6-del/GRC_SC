@@ -36,7 +36,7 @@ export default function ControlsManagement() {
 
   const loadControls = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/v1/controls/?limit=500');
+      const response = await fetch('/api/v1/controls/?limit=500');
       if (response.ok) {
         const data = await response.json();
         setAllControls(data);

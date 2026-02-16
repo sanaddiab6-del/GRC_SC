@@ -44,13 +44,19 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
+import asyncio
+
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    # Handle async drivers (like aiosqlite) by using a synchronous engine for migrations
+    # or by wrapping the connection in an async-to-sync bridge.
+    # For simplicity in migrations, we'll convert the URL to a sync one if it's aiosqlite.
+    url = settings.DATABASE_URL
+    if "sqlite+aiosqlite" in url:
+        url = url.replace("sqlite+aiosqlite", "sqlite")
+    
+    from sqlalchemy import create_engine
+    connectable = create_engine(url, poolclass=pool.NullPool)
 
     with connectable.connect() as connection:
         context.configure(

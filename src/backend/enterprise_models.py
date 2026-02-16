@@ -153,20 +153,22 @@ class Asset(Base):
     updated_at = Column(DateTime, onupdate=datetime.utcnow)
 
 
-class AuditLog(Base):
-    """Immutable audit trail for all platform activities"""
-    __tablename__ = "audit_logs"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    action = Column(String(100), nullable=False)  # create, update, delete, approve, reject, view
-    entity_type = Column(String(50), nullable=False)  # control, risk, evidence, finding, etc.
-    entity_id = Column(String(100), nullable=False)
-    changes = Column(JSON)  # before/after state
-    ip_address = Column(String(50))
-    user_agent = Column(String(500))
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+# NOTE: AuditLog is defined in auth/models.py to avoid duplicate table definition
+# Keeping this here commented out for reference of the alternative schema
+# class AuditLog(Base):
+#     """Immutable audit trail for all platform activities"""
+#     __tablename__ = "audit_logs"
+#     
+#     id = Column(Integer, primary_key=True, index=True)
+#     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
+#     user_id = Column(Integer, ForeignKey("users.id"))
+#     action = Column(String(100), nullable=False)  # create, update, delete, approve, reject, view
+#     entity_type = Column(String(50), nullable=False)  # control, risk, evidence, finding, etc.
+#     entity_id = Column(String(100), nullable=False)
+#     changes = Column(JSON)  # before/after state
+#     ip_address = Column(String(50))
+#     user_agent = Column(String(500))
+#     timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
 
 
 # ============================================================================
