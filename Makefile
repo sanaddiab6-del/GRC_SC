@@ -23,7 +23,12 @@ help:
 	@echo "  security-deps - Scan dependencies for vulnerabilities"
 	@echo "  security-sast - Run static application security testing"
 	@echo ""
-	@echo "🔀 Git & Merge:"
+	@echo "�️  Database & Data:"
+	@echo "  migrate       - Run database migrations"
+	@echo "  populate-controls - Load NCA control libraries (ECC, CCC, PDPL)"
+	@echo "  validate-deployment - Run comprehensive deployment validation"
+	@echo ""
+	@echo "�🔀 Git & Merge:"
 	@echo "  git-setup     - Configure git for optimal merge handling"
 	@echo "  check-conflicts - Check for potential merge conflicts with main"
 	@echo ""
@@ -100,3 +105,31 @@ git-setup:
 check-conflicts:
 	@echo "Checking for potential merge conflicts with main..."
 	@bash scripts/check_conflicts.sh main -v
+
+
+migrate:
+@echo "Running database migrations..."
+cd src/backend && alembic upgrade head
+@echo " Migrations applied successfully"
+
+populate-controls:
+@echo "Populating OFFICIAL NCA control libraries from CSV (ECC, CCC, PDPL)..."
+cd scripts && python load_official_nca_controls.py
+@echo "✅ Official control libraries populated with real regulatory data"
+
+populate-controls-legacy:
+@echo "Populating sample NCA control libraries (legacy)..."
+cd scripts && python load_nca_controls.py
+@echo " Sample control libraries populated"
+
+validate-deployment:
+@echo "Running comprehensive deployment validation..."
+cd scripts && python validate_deployment.py
+@echo " Deployment validation complete"
+
+prod-check: test security validate-deployment
+@echo "============================================"
+@echo "Production Readiness Check Complete"
+@echo "============================================"
+@echo " All checks passed - Ready for deployment"
+

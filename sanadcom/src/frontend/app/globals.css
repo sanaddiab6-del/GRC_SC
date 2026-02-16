@@ -1,0 +1,74 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans", "Liberation Sans", sans-serif;
+  --font-arabic: "Tajawal", "Noto Sans Arabic", Arial, "Segoe UI", Tahoma, sans-serif;
+
+  --background: 0 0% 98%;
+  --foreground: 222 20% 12%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 20% 12%;
+  --border: 220 13% 91%;
+  --input: 220 13% 91%;
+  --ring: 222 20% 20%;
+
+  --primary: 222 47% 11%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 220 14% 96%;
+  --secondary-foreground: 222 20% 12%;
+  --muted: 220 14% 96%;
+  --muted-foreground: 220 9% 46%;
+  --accent: 220 14% 96%;
+  --accent-foreground: 222 20% 12%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 210 40% 98%;
+
+  --success: 142 71% 45%;
+  --warning: 38 92% 50%;
+  --info: 217 91% 60%;
+  --radius: 1rem;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    color-scheme: light;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  [dir="rtl"] body {
+    font-family: var(--font-arabic);
+  }
+
+  h1 {
+    @apply text-2xl font-semibold;
+  }
+
+  h2 {
+    @apply text-lg font-semibold;
+  }
+
+  h3, h4, h5, h6 {
+    @apply text-base font-semibold;
+  }
+
+  .text-muted-foreground {
+    color: hsl(var(--muted-foreground));
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+}

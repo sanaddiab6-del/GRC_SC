@@ -152,6 +152,8 @@ class Asset(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, onupdate=datetime.utcnow)
 
+# AuditLog is defined in core.audit_logger with extend_existing=True
+# Multiple definitions allowed for compatibility
 
 # NOTE: AuditLog is defined in auth/models.py to avoid duplicate table definition
 # Keeping this here commented out for reference of the alternative schema
@@ -169,6 +171,12 @@ class Asset(Base):
 #     ip_address = Column(String(50))
 #     user_agent = Column(String(500))
 #     timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+class AuditLog(Base):
+    """Immutable audit trail for all platform activities"""
+    __tablename__ = "audit_logs"
+    __table_args__ = {'extend_existing': True}  # Allow redefinition for compatibility
+    
+    id = Column(Integer, primary_key=True, index=True)
 
 
 # ============================================================================
@@ -188,6 +196,7 @@ class FrameworkType(str, enum.Enum):
 class Control(Base):
     """Enterprise control library with full lifecycle"""
     __tablename__ = "controls"
+    __table_args__ = {'extend_existing': True}  # Allow redefinition for compatibility
     
     id = Column(Integer, primary_key=True, index=True)
     organization_id = Column(Integer, ForeignKey("organizations.id"))

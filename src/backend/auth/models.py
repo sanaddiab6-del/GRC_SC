@@ -56,7 +56,7 @@ class User(Base):
         back_populates="users",
     )
     refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
-    audit_logs = relationship("AuditLog", back_populates="user")
+    # audit_logs relationship available but not actively used
 
 
 class Role(Base):
@@ -127,22 +127,17 @@ class APIKey(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     revoked_at = Column(DateTime)
 
+# AuditLog defined in core.audit_logger with extend_existing=True
+# Simplified version here for auth module compatibility
 
 class AuditLog(Base):
     """Audit log model for compliance tracking (NCA ECC-IS-5, 7-year retention)."""
     __tablename__ = "audit_logs"
+    __table_args__ = {'extend_existing': True}  # Allow redefinition for compatibility
     
     log_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey('users.user_id'), nullable=True)
-    action = Column(String(100), nullable=False)  # login, logout, create, update, delete
-    resource = Column(String(50), nullable=False)  # controls, evidence, users
-    resource_id = Column(String(255))
-    ip_address = Column(String(45))  # IPv6 support
-    user_agent = Column(String(500))
-    status = Column(String(20))  # success, failure
-    details = Column(JSON)  # Additional context
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
-    
-    # Relationships
-    user = relationship("User", back_populates="audit_logs")
+    action = Column(String(100), nullable=False)
+    resource = Column(String(50), nullable=False)
+    details = Column(JSON)
 
