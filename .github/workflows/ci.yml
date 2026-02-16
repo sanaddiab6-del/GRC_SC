@@ -43,18 +43,42 @@ jobs:
           cache: 'pip'
           cache-dependency-path: src/backend/requirements.txt
 
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf /usr/share/swift
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          df -h
+
       - name: Install dependencies
         run: |
           cd src/backend
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest pytest-asyncio pytest-cov httpx
+          # Install only essential packages for API testing (skip ML/AI packages to save disk space)
+          pip install fastapi==0.109.0 uvicorn==0.27.0 python-multipart==0.0.6
+          pip install sqlalchemy==2.0.25 asyncpg==0.29.0 psycopg2-binary==2.9.9 alembic==1.13.1 aiosqlite==0.19.0
+          pip install redis==5.0.1 aioredis==2.0.1
+          pip install pydantic==2.5.3 pydantic-settings==2.1.0 email-validator==2.1.0
+          pip install python-jose[cryptography]==3.3.0 passlib[bcrypt]==1.7.4 python-dotenv==1.0.0
+          pip install cryptography==41.0.7 PyJWT==2.8.0 pyotp==2.9.0 qrcode==7.4.2 pillow==10.2.0
+          pip install azure-identity==1.15.0 azure-keyvault-secrets==4.7.0
+          pip install httpx==0.27.2 aiohttp==3.9.1
+          pip install pandas==2.1.4 openpyxl==3.1.2
+          pip install apscheduler==3.10.4
+          pip install pytest==7.4.4 pytest-asyncio==0.23.3 pytest-cov==4.1.0
+          pip install black==23.12.1 flake8==7.0.0
+          echo "✅ Installed essential packages for API testing (skipped ML/AI packages)"
 
       - name: Run migrations
         env:
           DATABASE_URL: postgresql://sico:test_password@localhost:5432/sico_test
           SECRET_KEY: test-secret-key-for-ci-32-chars-minimum-secure-key-12345
           ENCRYPTION_KEY: vS8-vS8-vS8-vS8-vS8-vS8-vS8-vS8-vS8-vS8-vS8=
+          CI_SKIP_AI: "true"
         run: |
           cd src/backend
           alembic upgrade head
@@ -67,6 +91,7 @@ jobs:
           ENCRYPTION_KEY: vS8-vS8-vS8-vS8-vS8-vS8-vS8-vS8-vS8-vS8-vS8=
           DEBUG: "True"
           PYTEST_RUNNING: "1"
+          CI_SKIP_AI: "true"
           PYTHONPATH: ${{ github.workspace }}/src/backend
         run: |
           cd src/backend
