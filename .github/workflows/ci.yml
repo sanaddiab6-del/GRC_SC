@@ -114,6 +114,12 @@ jobs:
           cd src/frontend
           npm ci
 
+      - name: Clean build cache
+        run: |
+          cd src/frontend
+          rm -rf .next
+          echo "✅ Cleaned Next.js cache"
+
       - name: Build frontend
         run: |
           cd src/frontend
