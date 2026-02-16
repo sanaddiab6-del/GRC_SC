@@ -6,11 +6,9 @@ const withNextIntl = createNextIntlPlugin('./i18n.ts');
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  webpack: (config) => {
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      '@': path.resolve(__dirname),
-    };
+  webpack: (config, { isServer }) => {
+    // Explicitly set the @ alias to resolve to the frontend directory
+    config.resolve.alias['@'] = path.resolve(__dirname);
     return config;
   },
   async rewrites() {
