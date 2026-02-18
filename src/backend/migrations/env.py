@@ -18,7 +18,7 @@ try:
     from evidence.models import Evidence
     from reporting.models import Report
     from auth.models import User, Role, Permission
-    from privacy.models import ProcessingActivity, DataSubjectRequest, DataBreach
+    from privacy.models import Consent, DataSubjectRequest, DataBreachIncident
     from incident.models import Incident, IncidentWorkflowLog
     from risk.models import Risk, RiskAssessment
     from ai_governance.models import AIModel, BiasTestResult, AIPerformanceMetric, EthicalReview

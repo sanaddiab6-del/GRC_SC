@@ -7,6 +7,7 @@ Create Date: 2026-02-12 10:00:00.000000
 """
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect
 
 
 # revision identifiers, used by Alembic.
@@ -17,6 +18,15 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # Check if table already exists (idempotent migration)
+    conn = op.get_bind()
+    inspector = inspect(conn)
+    existing_tables = inspector.get_table_names()
+    
+    if 'audit_logs' in existing_tables:
+        print("⚠️ Table 'audit_logs' already exists. Skipping creation.")
+        return
+    
     # Create audit_logs table
     op.create_table(
         'audit_logs',
@@ -65,7 +75,22 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(op.f('ix_audit_logs_resource'), table_name='audit_logs')
-    op.drop_index(op.f('ix_audit_logs_user_timestamp'), table_name='audit_logs')
-    op.drop_index(op.f('ix_audit_logs_timestamp_event'), table_name='audit_logs')
+    # Check if table exists before dropping
+    conn = op.get_bind()
+    inspector = inspect(conn)
+    existing_tables = inspector.get_table_names()
+    
+    if 'audit_logs' not in existing_tables:
+        print("⚠️ Table 'audit_logs' does not exist. Skipping drop.")
+        return
+    
+    # Drop indexes first
+    try:
+        op.drop_index(op.f('ix_audit_logs_resource'), table_name='audit_logs')
+        op.drop_index(op.f('ix_audit_logs_user_timestamp'), table_name='audit_logs')
+        op.drop_index(op.f('ix_audit_logs_timestamp_event'), table_name='audit_logs')
+    except Exception as e:
+        print(f"⚠️ Error dropping indexes: {e}")
+    
+    # Drop table
     op.drop_table('audit_logs')
