@@ -62,6 +62,14 @@ class UserResponse(UserBase):
         from_attributes = True
 
 
+class UserUpdate(BaseModel):
+    """Schema for user update (Admin only)."""
+    full_name_en: Optional[str] = None
+    full_name_ar: Optional[str] = None
+    is_active: Optional[bool] = None
+    is_verified: Optional[bool] = None
+
+
 class TokenResponse(BaseModel):
     """Schema for token response."""
     access_token: str

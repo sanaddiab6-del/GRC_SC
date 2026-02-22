@@ -28,8 +28,8 @@ class ControlBase(BaseModel):
     status: str = "not_started"
     maturity_level: int = 1
     
-    evidence_types: Optional[List[str]] = []
-    related_controls: Optional[Dict[str, List[str]]] = {}
+    evidence_types: Optional[List[str]] = None
+    related_controls: Optional[Dict[str, List[str]]] = None
 
 
 class ControlCreate(ControlBase):
@@ -45,14 +45,13 @@ class ControlUpdate(BaseModel):
     description_ar: Optional[str] = None
     status: Optional[str] = None
     maturity_level: Optional[int] = None
-    evidence_types: Optional[List[str]] = None
 
 
 class ControlResponse(ControlBase):
     """Schema for control responses"""
     id: int
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
     
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 

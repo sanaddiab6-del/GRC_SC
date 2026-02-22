@@ -7,6 +7,7 @@ Enhanced with NCA ECC-IS-3 and PDPL Article 29 security controls
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 
@@ -43,6 +44,13 @@ async def lifespan(app: FastAPI):
     try:
         await init_db()
         logger.info("✓ Database initialized")
+        
+        # Initialize data (Saudi frameworks, sample data) if needed
+        try:
+            from startup_init_data import check_and_initialize_data
+            check_and_initialize_data()
+        except Exception as e:
+            logger.warning(f"⚠️ Data initialization warning: {str(e)}")
         
         # Initialize RBAC system
         try:
@@ -105,6 +113,17 @@ app = FastAPI(
     redoc_url="/redoc",
     lifespan=lifespan,
 )
+
+
+# Add CORS middleware to allow frontend access
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, replace with specific origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+logger.info("✓ CORS middleware configured")
 
 
 # Setup security middleware (MUST be called before adding routes)

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { useState } from 'react';
 import useSWR from 'swr';
 import { useTranslations } from 'next-intl';
 import apiClient from '@/lib/api-client';
@@ -9,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import RiskAssessmentModal from '@/components/modals/RiskAssessmentModal';
 
 const fetcher = (url: string) => apiClient.get(url).then((res) => res.data);
 
@@ -19,10 +21,27 @@ export default function RiskDetailPage() {
   const t = useTranslations('riskDetail');
   const tList = useTranslations('riskList');
 
-  const { data: risk, error, isLoading } = useSWR(
+  const { data: risk, error, isLoading, mutate } = useSWR(
     `/api/v1/risks/${riskId}`,
     fetcher
   );
+
+  // Assessment Modal State
+  const [isAssessModalOpen, setIsAssessModalOpen] = useState(false);
+
+  // Role-based access control
+  const canAssessRisk = () => {
+    try {
+      const userStr = localStorage.getItem('currentUser');
+      if (!userStr) return false;
+      const user = JSON.parse(userStr);
+      const role = user.role?.toLowerCase() || '';
+      // Only Admin, Compliance Officer, and Auditor can assess risks
+      return ['admin', 'compliance officer', 'auditor'].includes(role);
+    } catch {
+      return false;
+    }
+  };
 
   if (isLoading) {
     return (
@@ -87,9 +106,34 @@ export default function RiskDetailPage() {
         <Link href={`/${locale}/risks`} className="text-sm text-muted-foreground hover:text-foreground">
           {t('back')}
         </Link>
-        <Button variant="outline" size="sm">
-          {t('edit')}
-        </Button>
+        <div className="flex gap-2">
+          {canAssessRisk() && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => setIsAssessModalOpen(true)}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <svg
+                className="w-4 h-4 mr-2"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              {t('assessRisk')}
+            </Button>
+          )}
+          <Button variant="outline" size="sm">
+            {t('edit')}
+          </Button>
+        </div>
       </div>
 
       <Card className="mb-6">
@@ -250,6 +294,17 @@ export default function RiskDetailPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Risk Assessment Modal */}
+      <RiskAssessmentModal
+        isOpen={isAssessModalOpen}
+        onClose={() => setIsAssessModalOpen(false)}
+        onSuccess={() => mutate()}
+        locale={locale as 'en' | 'ar'}
+        riskId={riskId}
+        currentLikelihood={risk?.likelihood}
+        currentImpact={risk?.impact}
+      />
     </div>
   );
 }

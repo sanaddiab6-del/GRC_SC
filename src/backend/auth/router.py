@@ -413,3 +413,56 @@ async def assign_roles_to_user(
     )
     
     return {"message": "Roles assigned successfully"}
+
+
+@router.patch("/users/{user_id}")
+async def update_user(
+    user_id: str,
+    user_update: schemas.UserUpdate,
+    current_user: User = Depends(require_role("Admin")),
+    db: AsyncSession = Depends(get_db)
+):
+    """Update user details (Admin only)."""
+    # Fetch user
+    result = await db.execute(select(User).where(User.user_id == user_id))
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Update fields if provided
+    update_data = user_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(user, field, value)
+    
+    await db.commit()
+    await db.refresh(user)
+    
+    # Audit log
+    await log_audit_event(
+        db=db,
+        user_id=str(current_user.user_id),
+        action="update_user",
+        resource="users",
+        resource_id=str(user_id),
+        status="success",
+        ip_address=None,
+        user_agent=None,
+        details=update_data
+    )
+    
+    return {"message": "User updated successfully", "user": user}
+
+
+@router.get("/roles", response_model=List[schemas.RoleResponse])
+async def list_roles(
+    current_user: User = Depends(require_role("Admin")),
+    db: AsyncSession = Depends(get_db)
+):
+    """List all roles (Admin only)."""
+    result = await db.execute(select(Role))
+    roles = result.scalars().all()
+    return roles

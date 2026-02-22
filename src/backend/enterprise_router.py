@@ -18,6 +18,64 @@ from auth.models import User
 router = APIRouter(prefix="/enterprise", tags=["Enterprise GRC"])
 
 # ============================================================================
+# HEALTH CHECK (No Auth Required)
+# ============================================================================
+
+@router.get("/health")
+async def enterprise_health_check(db: AsyncSession = Depends(get_db)):
+    """Health check endpoint for enterprise module - no auth required"""
+    try:
+        result = await db.execute(text("SELECT COUNT(*) as count FROM organizations"))
+        row = result.first()
+        org_count = row[0] if row else 0
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "organizations_count": org_count,
+            "module": "enterprise_grc"
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "database": "disconnected",
+            "error": str(e),
+            "module": "enterprise_grc"
+        }
+
+
+@router.get("/test/organizations")
+async def test_get_organizations(db: AsyncSession = Depends(get_db)):
+    """TEST ONLY: Get all organizations without auth (for development testing)"""
+    try:
+        result = await db.execute(text("SELECT * FROM organizations"))
+        rows = result.fetchall()
+        return {
+            "count": len(rows),
+            "organizations": [dict(row._mapping) for row in rows]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/test/dashboard")
+async def test_get_dashboard(db: AsyncSession = Depends(get_db)):
+    """TEST ONLY: Get quick dashboard stats without auth"""
+    try:
+        org_result = await db.execute(text("SELECT COUNT(*) as count FROM organizations"))
+        risk_result = await db.execute(text("SELECT COUNT(*) as count FROM risks"))
+        audit_result = await db.execute(text("SELECT COUNT(*) as count FROM audit_findings"))
+        dsar_result = await db.execute(text("SELECT COUNT(*) as count FROM dsar_requests"))
+        
+        return {
+            "organizations": org_result.first()[0],
+            "risks": risk_result.first()[0],
+            "audit_findings": audit_result.first()[0],
+            "dsar_requests": dsar_result.first()[0]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ============================================================================
 # PYDANTIC SCHEMAS
 # ============================================================================
 

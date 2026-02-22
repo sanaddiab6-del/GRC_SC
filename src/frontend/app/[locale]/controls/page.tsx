@@ -1,15 +1,14 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import useSWR from 'swr';
 import { useMemo, useState } from 'react';
-import apiClient from '@/lib/api-client';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import ControlEditModal from '@/components/modals/ControlEditModal';
 import {
   Select,
   SelectContent,
@@ -29,12 +28,9 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-
-const fetcher = (url: string) => apiClient.get(url).then((res) => res.data);
+import { useEffect } from 'react';
 
 export default function ControlsPage() {
   const t = useTranslations('controlsList');
@@ -44,57 +40,81 @@ export default function ControlsPage() {
   const [status, setStatus] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const limit = 20;
-  const [visibleColumns, setVisibleColumns] = useState({
-    framework: true,
-    domain: true,
-    maturity: true,
-    updated: true,
-    owner: true,
-  });
-  const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const limit = 50;
+  const [controls, setControls] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({ total: 0, ecc: 0, ccc: 0, pdpl: 0 });
 
-  const queryParams = new URLSearchParams();
-  if (framework !== 'all') queryParams.append('framework', framework);
-  if (status !== 'all') queryParams.append('status', status);
-  queryParams.append('offset', String((page - 1) * limit));
-  queryParams.append('limit', String(limit));
+  // Edit Modal State
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedControl, setSelectedControl] = useState<any>(null);
 
-  const { data, error, isLoading } = useSWR(
-    `/api/v1/controls?${queryParams.toString()}`,
-    fetcher
-  );
+  const fetchControls = async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (framework !== 'all') params.append('framework', framework);
+      if (status !== 'all') params.append('status', status);
+      params.append('offset', String((page - 1) * limit));
+      params.append('limit', String(limit));
+      
+      const response = await fetch(`http://localhost:8000/api/v1/controls?${params}`);
+      const data = await response.json();
+      setControls(data.items || []);
+      setTotal(data.total || 0);
+    } catch (error) {
+      console.error('Failed to fetch controls:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const items = data?.items || [];
+  useEffect(() => {
+    fetchControls();
+  }, [framework, status, page]);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const [allRes, eccRes, cccRes, pdplRes] = await Promise.all([
+          fetch('http://localhost:8000/api/v1/controls?limit=1'),
+          fetch('http://localhost:8000/api/v1/controls?framework=ECC&limit=1'),
+          fetch('http://localhost:8000/api/v1/controls?framework=CCC&limit=1'),
+          fetch('http://localhost:8000/api/v1/controls?framework=PDPL&limit=1'),
+        ]);
+        const [all, ecc, ccc, pdpl] = await Promise.all([
+          allRes.json(),
+          eccRes.json(),
+          cccRes.json(),
+          pdplRes.json(),
+        ]);
+        setStats({
+          total: all.total || 0,
+          ecc: ecc.total || 0,
+          ccc: ccc.total || 0,
+          pdpl: pdpl.total || 0,
+        });
+      } catch (error) {
+        console.error('Failed to fetch stats:', error);
+      }
+    };
+    
+    fetchStats();
+  }, []);
+
+  
   const filteredItems = useMemo(() => {
-    if (!search) return items;
+    if (!search) return controls;
     const term = search.toLowerCase();
-    return items.filter((control: any) =>
+    return controls.filter((control: any) =>
       control.control_id?.toLowerCase().includes(term) ||
       control.title_en?.toLowerCase().includes(term) ||
       control.title_ar?.includes(search)
     );
-  }, [items, search]);
+  }, [controls, search]);
 
-  const total = data?.total ?? filteredItems.length;
-
-  const handleToggleColumn = (key: keyof typeof visibleColumns) => {
-    setVisibleColumns((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const handleToggleAll = (checked: boolean) => {
-    const next: Record<string, boolean> = {};
-    filteredItems.forEach((control: any) => {
-      next[control.control_id] = checked;
-    });
-    setSelected(next);
-  };
-
-  const handleToggleRow = (id: string) => {
-    setSelected((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
-
-  if (isLoading) {
+  if (loading && controls.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-foreground"></div>
@@ -102,11 +122,16 @@ export default function ControlsPage() {
     );
   }
 
-  const statusVariant: Record<string, 'success' | 'warning' | 'destructive' | 'muted'> = {
+  const statusVariant: Record<string, 'success' | 'warning' | 'destructive' | 'default'> = {
+    COMPLIANT: 'success',
+    IN_PROGRESS: 'warning',
+    NON_COMPLIANT: 'destructive',
+    NOT_STARTED: 'default',
     compliant: 'success',
     in_progress: 'warning',
     non_compliant: 'destructive',
-    not_started: 'muted',
+    not_started: 'default',
+    active: 'success',
   };
 
   return (
@@ -124,6 +149,46 @@ export default function ControlsPage() {
             <Link href={`/${locale}/controls/new`}>{t('create')}</Link>
           </Button>
         </div>
+      </div>
+
+      {/* Statistics Dashboard */}
+      <div className="grid grid-cols-1 gap-4 mb-6 md:grid-cols-4">
+        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Controls</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.total}</div>
+            <p className="text-xs text-muted-foreground mt-1">All frameworks</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">ECC Controls</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">{stats.ecc}</div>
+            <p className="text-xs text-muted-foreground mt-1">Essential Cybersecurity</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">CCC Controls</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-green-600 dark:text-green-400">{stats.ccc}</div>
+            <p className="text-xs text-muted-foreground mt-1">Cloud Cybersecurity</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">PDPL Articles</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-orange-600 dark:text-orange-400">{stats.pdpl}</div>
+            <p className="text-xs text-muted-foreground mt-1">Data Protection Law</p>
+          </CardContent>
+        </Card>
       </div>
 
       <Card className="mb-6">
@@ -153,40 +218,12 @@ export default function ControlsPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">{t('allStatuses')}</SelectItem>
-              <SelectItem value="compliant">{t('compliant')}</SelectItem>
-              <SelectItem value="in_progress">{t('inProgress')}</SelectItem>
-              <SelectItem value="non_compliant">{t('nonCompliant')}</SelectItem>
-              <SelectItem value="not_started">{t('notStarted')}</SelectItem>
+              <SelectItem value="COMPLIANT">Compliant</SelectItem>
+              <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+              <SelectItem value="NON_COMPLIANT">Non Compliant</SelectItem>
+              <SelectItem value="NOT_STARTED">Not Started</SelectItem>
             </SelectContent>
           </Select>
-          <div className="flex items-center justify-end">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  {t('columns')}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>{t('columns')}</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={() => handleToggleColumn('framework')}>
-                  {visibleColumns.framework ? t('hide') : t('show')} {t('framework')}
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => handleToggleColumn('domain')}>
-                  {visibleColumns.domain ? t('hide') : t('show')} {t('domain')}
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => handleToggleColumn('owner')}>
-                  {visibleColumns.owner ? t('hide') : t('show')} {t('owner')}
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => handleToggleColumn('maturity')}>
-                  {visibleColumns.maturity ? t('hide') : t('show')} {t('maturity')}
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => handleToggleColumn('updated')}>
-                  {visibleColumns.updated ? t('hide') : t('show')} {t('updated')}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
         </CardContent>
       </Card>
 
@@ -195,43 +232,25 @@ export default function ControlsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[40px]">
-                  <input
-                    type="checkbox"
-                    aria-label={t('selectAll')}
-                    checked={filteredItems.length > 0 && filteredItems.every((c: any) => selected[c.control_id])}
-                    onChange={(e) => handleToggleAll(e.target.checked)}
-                  />
-                </TableHead>
                 <TableHead>{t('controlId')}</TableHead>
                 <TableHead>{t('titleColumn')}</TableHead>
-                {visibleColumns.framework && <TableHead>{t('framework')}</TableHead>}
-                {visibleColumns.domain && <TableHead>{t('domain')}</TableHead>}
-                {visibleColumns.owner && <TableHead>{t('owner')}</TableHead>}
+                <TableHead>{t('framework')}</TableHead>
+                <TableHead>{t('domain')}</TableHead>
                 <TableHead>{t('status')}</TableHead>
-                {visibleColumns.maturity && <TableHead>{t('maturity')}</TableHead>}
-                {visibleColumns.updated && <TableHead>{t('updated')}</TableHead>}
+                <TableHead>{t('maturity')}</TableHead>
                 <TableHead className="text-right">{t('actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredItems.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="py-10 text-center text-muted-foreground">
-                    {t('noResults')}
+                  <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                    {loading ? 'Loading...' : t('noResults')}
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredItems.map((control: any) => (
                   <TableRow key={control.control_id}>
-                    <TableCell>
-                      <input
-                        type="checkbox"
-                        aria-label={control.control_id}
-                        checked={!!selected[control.control_id]}
-                        onChange={() => handleToggleRow(control.control_id)}
-                      />
-                    </TableCell>
                     <TableCell className="font-mono text-xs font-semibold">
                       {control.control_id}
                     </TableCell>
@@ -243,22 +262,16 @@ export default function ControlsPage() {
                         </div>
                       )}
                     </TableCell>
-                    {visibleColumns.framework && <TableCell>{control.framework}</TableCell>}
-                    {visibleColumns.domain && (
-                      <TableCell className="max-w-[200px] truncate">{control.domain}</TableCell>
-                    )}
-                    {visibleColumns.owner && <TableCell>{t('unassigned')}</TableCell>}
                     <TableCell>
-                      <Badge variant={statusVariant[control.status] || 'muted'}>
+                      <Badge variant="outline">{control.framework}</Badge>
+                    </TableCell>
+                    <TableCell className="max-w-[200px] truncate">{control.domain}</TableCell>
+                    <TableCell>
+                      <Badge variant={statusVariant[control.status] || 'default'}>
                         {control.status?.replace('_', ' ')}
                       </Badge>
                     </TableCell>
-                    {visibleColumns.maturity && <TableCell>{control.maturity_level ?? '--'}</TableCell>}
-                    {visibleColumns.updated && (
-                      <TableCell>
-                        {control.updated_at ? new Date(control.updated_at).toLocaleDateString() : '--'}
-                      </TableCell>
-                    )}
+                    <TableCell>{control.maturity_level ?? '--'}</TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -266,10 +279,17 @@ export default function ControlsPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem asChild>
-                            <Link href={`/${locale}/controls/${control.control_id}`}>{t('view')}</Link>
+                            <Link href={`/${locale}/controls/${control.control_id}`}>View Details</Link>
                           </DropdownMenuItem>
-                          <DropdownMenuItem>{t('edit')}</DropdownMenuItem>
-                          <DropdownMenuItem>{t('auditTrail')}</DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setSelectedControl(control);
+                              setIsEditModalOpen(true);
+                            }}
+                          >
+                            Edit Control
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>View Evidence</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -282,22 +302,48 @@ export default function ControlsPage() {
       </Card>
 
       <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
-        <div>{t('results', { count: filteredItems.length, total })}</div>
+        <div>Showing {filteredItems.length} of {total} controls</div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(page - 1)}>
-            {t('previous')}
+          <Button variant="outline" size="sm" disabled={page === 1 || loading} onClick={() => setPage(page - 1)}>
+            Previous
           </Button>
-          <span>{t('page', { page })}</span>
+          <span>Page {page}</span>
           <Button
             variant="outline"
             size="sm"
-            disabled={filteredItems.length < limit}
+            disabled={filteredItems.length < limit || loading}
             onClick={() => setPage(page + 1)}
           >
-            {t('next')}
+            Next
           </Button>
         </div>
       </div>
+
+      {/* Control Edit Modal */}
+      {selectedControl && (
+        <ControlEditModal
+          isOpen={isEditModalOpen}
+          onClose={() => {
+            setIsEditModalOpen(false);
+            setSelectedControl(null);
+          }}
+          onSuccess={() => {
+            fetchControls();
+          }}
+          locale={locale as 'en' | 'ar'}
+          controlData={{
+            control_id: selectedControl.control_id,
+            framework: selectedControl.framework,
+            domain: selectedControl.domain,
+            title_en: selectedControl.title_en,
+            title_ar: selectedControl.title_ar,
+            description_en: selectedControl.description_en || '',
+            description_ar: selectedControl.description_ar || '',
+            status: selectedControl.status,
+            maturity_level: selectedControl.maturity_level,
+          }}
+        />
+      )}
     </div>
   );
 }

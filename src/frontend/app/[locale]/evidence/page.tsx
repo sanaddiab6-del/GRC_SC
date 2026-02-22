@@ -33,13 +33,45 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import EvidenceUploadModal from '@/components/modals/EvidenceUploadModal';
+import EvidenceApprovalModal from '@/components/modals/EvidenceApprovalModal';
 
 const fetcher = (url: string) => apiClient.get(url).then((res) => res.data);
+
+// Helper function to get user role from localStorage
+const getUserRole = (): string => {
+  if (typeof window !== 'undefined') {
+    const user = localStorage.getItem('currentUser');
+    if (user) {
+      try {
+        const userData = JSON.parse(user);
+        return userData.role?.toLowerCase() || '';
+      } catch {
+        return '';
+      }
+    }
+  }
+  return '';
+};
+
+// Helper function to check if user can approve/reject evidence
+const canApproveEvidence = (): boolean => {
+  const role = getUserRole();
+  return role === 'admin' || role === 'auditor';
+};
 
 export default function EvidenceListPage() {
   const params = useParams();
   const locale = params.locale as string;
   const t = useTranslations('evidenceList');
+
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
+  const [selectedEvidence, setSelectedEvidence] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
+  const [approvalAction, setApprovalAction] = useState<'approve' | 'reject'>('approve');
 
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -60,7 +92,7 @@ export default function EvidenceListPage() {
   queryParams.append('offset', String((page - 1) * limit));
   queryParams.append('limit', String(limit));
 
-  const { data: evidence, isLoading } = useSWR(
+  const { data: evidence, isLoading, mutate } = useSWR(
     `/api/v1/evidence?${queryParams.toString()}`,
     fetcher
   );
@@ -76,6 +108,22 @@ export default function EvidenceListPage() {
   }, [items, search]);
 
   const total = evidence?.total ?? filteredItems.length;
+
+  // Check if current user can approve/reject evidence
+  const userCanApprove = canApproveEvidence();
+
+  // Handler for approve/reject actions
+  const handleApprove = (evidenceId: string, title: string) => {
+    setSelectedEvidence({ id: evidenceId, title });
+    setApprovalAction('approve');
+    setIsApprovalModalOpen(true);
+  };
+
+  const handleReject = (evidenceId: string, title: string) => {
+    setSelectedEvidence({ id: evidenceId, title });
+    setApprovalAction('reject');
+    setIsApprovalModalOpen(true);
+  };
 
   const validationVariant: Record<string, 'success' | 'warning' | 'destructive' | 'muted'> = {
     approved: 'success',
@@ -102,8 +150,8 @@ export default function EvidenceListPage() {
           <Button variant="outline" size="sm">
             {t('export')}
           </Button>
-          <Button size="sm" asChild>
-            <Link href={`/${locale}/evidence/upload`}>{t('upload')}</Link>
+          <Button size="sm" onClick={() => setIsUploadModalOpen(true)}>
+            {t('upload')}
           </Button>
         </div>
       </div>
@@ -231,6 +279,53 @@ export default function EvidenceListPage() {
                           <DropdownMenuItem asChild>
                             <Link href={`/${locale}/evidence/${item.id}`}>{t('view')}</Link>
                           </DropdownMenuItem>
+                          
+                          {/* Approve/Reject actions - only for admin/auditor on pending evidence */}
+                          {userCanApprove && item.validation_status === 'pending' && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => handleApprove(item.evidence_id || item.id, item.title)}
+                                className="text-green-600 font-semibold cursor-pointer"
+                              >
+                                <svg
+                                  className="w-4 h-4 mr-2"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M5 13l4 4L19 7"
+                                  />
+                                </svg>
+                                {t('approve') || 'Approve'}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleReject(item.evidence_id || item.id, item.title)}
+                                className="text-red-600 font-semibold cursor-pointer"
+                              >
+                                <svg
+                                  className="w-4 h-4 mr-2"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M6 18L18 6M6 6l12 12"
+                                  />
+                                </svg>
+                                {t('reject') || 'Reject'}
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                          
+                          <DropdownMenuSeparator />
                           <DropdownMenuItem>{t('auditTrail')}</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -260,6 +355,35 @@ export default function EvidenceListPage() {
           </Button>
         </div>
       </div>
+
+      {/* Upload Evidence Modal */}
+      <EvidenceUploadModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        onSuccess={() => {
+          mutate(); // Refresh the evidence list
+          setPage(1); // Reset to first page
+        }}
+        locale={locale as 'en' | 'ar'}
+      />
+
+      {/* Evidence Approval Modal */}
+      {selectedEvidence && (
+        <EvidenceApprovalModal
+          isOpen={isApprovalModalOpen}
+          onClose={() => {
+            setIsApprovalModalOpen(false);
+            setSelectedEvidence(null);
+          }}
+          onSuccess={() => {
+            mutate(); // Refresh the evidence list
+          }}
+          evidenceId={selectedEvidence.id}
+          evidenceTitle={selectedEvidence.title}
+          action={approvalAction}
+          locale={locale as 'en' | 'ar'}
+        />
+      )}
     </div>
   );
 }

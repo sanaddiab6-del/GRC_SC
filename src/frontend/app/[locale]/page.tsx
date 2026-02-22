@@ -66,6 +66,14 @@ export default function HomePage({
             href={`/${locale}/controls`}
           />
           <FeatureCard
+            icon="INC"
+            title={isArabic ? '🚨 إدارة الحوادث الأمنية' : '🚨 Incident Response'}
+            description={isArabic
+              ? 'إدارة وتتبع الحوادث الأمنية مع الإبلاغ الإلزامي للهيئة (ECC-IS-5)'
+              : 'Manage and track security incidents with mandatory NCA reporting (ECC-IS-5)'}
+            href={`/${locale}/incidents`}
+          />
+          <FeatureCard
             icon="SRCH"
             title={isArabic ? 'البحث المتقدم' : 'Advanced Search'}
             description={isArabic
@@ -96,6 +104,22 @@ export default function HomePage({
               ? 'احصل على توصيات ذكية باستخدام مساعد الامتثال القائم على RAG'
               : 'Get intelligent recommendations using RAG-based compliance assistant'}
             href={`/${locale}/dashboard`}
+          />
+          <FeatureCard
+            icon="PRIV"
+            title={isArabic ? '🔒 إدارة الخصوصية' : '🔒 Privacy Management'}
+            description={isArabic
+              ? 'إدارة الموافقات وطلبات حقوق البيانات والإخطارات (PDPL)'
+              : 'Manage consents, data subject rights requests, and breach notifications (PDPL)'}
+            href={`/${locale}/privacy`}
+          />
+          <FeatureCard
+            icon="ENT"
+            title={isArabic ? '🏢 المؤسسية GRC' : '🏢 Enterprise GRC'}
+            description={isArabic
+              ? 'إدارة المخاطر والتدقيق والامتثال على مستوى المؤسسة'
+              : 'Enterprise-level Risk, Audit, and Compliance Management'}
+            href={`/${locale}/enterprise`}
           />
         </div>
       </div>

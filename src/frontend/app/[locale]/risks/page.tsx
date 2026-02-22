@@ -33,6 +33,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import RiskModal from '@/components/modals/RiskModal';
 
 interface RiskItem {
   risk_id: string;
@@ -73,12 +74,17 @@ export default function RiskManagementPage() {
   const [page, setPage] = useState(1);
   const limit = 20;
 
+  // Risk Modal States
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedRisk, setSelectedRisk] = useState<RiskItem | null>(null);
+
   const queryParams = new URLSearchParams();
   if (status !== 'all') queryParams.append('status', status);
   queryParams.append('skip', String((page - 1) * limit));
   queryParams.append('limit', String(limit));
 
-  const { data, error, isLoading } = useSWR(
+  const { data, error, isLoading, mutate } = useSWR(
     `/api/v1/risks?${queryParams.toString()}`,
     fetcher
   );
@@ -158,7 +164,7 @@ export default function RiskManagementPage() {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm">{t('export')}</Button>
-          <Button size="sm">{t('create')}</Button>
+          <Button size="sm" onClick={() => setIsCreateModalOpen(true)}>{t('create')}</Button>
         </div>
       </div>
 
@@ -291,6 +297,14 @@ export default function RiskManagementPage() {
                           <DropdownMenuItem asChild>
                             <Link href={`/${locale}/risks/${risk.risk_id}`}>{t('view')}</Link>
                           </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setSelectedRisk(risk);
+                              setIsEditModalOpen(true);
+                            }}
+                          >
+                            {t('edit')}
+                          </DropdownMenuItem>
                           <DropdownMenuItem>{t('auditTrail')}</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -325,6 +339,43 @@ export default function RiskManagementPage() {
         <div className="text-xs text-destructive mt-2">
           {t('loadError')}
         </div>
+      )}
+
+      {/* Risk Create Modal */}
+      <RiskModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={() => {
+          mutate();
+          setPage(1);
+        }}
+        locale={locale}
+        mode="create"
+      />
+
+      {/* Risk Edit Modal */}
+      {selectedRisk && (
+        <RiskModal
+          isOpen={isEditModalOpen}
+          onClose={() => {
+            setIsEditModalOpen(false);
+            setSelectedRisk(null);
+          }}
+          onSuccess={() => mutate()}
+          locale={locale}
+          mode="edit"
+          riskData={{
+            risk_id: selectedRisk.risk_id,
+            category: selectedRisk.category || '',
+            title_en: selectedRisk.title_en,
+            title_ar: selectedRisk.title_ar,
+            description_en: selectedRisk.description_en || '',
+            description_ar: selectedRisk.description_ar || '',
+            likelihood: selectedRisk.likelihood,
+            impact: selectedRisk.impact,
+            risk_owner: selectedRisk.risk_owner || '',
+          }}
+        />
       )}
     </div>
   );

@@ -47,7 +47,7 @@ services:
   # FastAPI Backend
   backend:
     build:
-      context: ./src/backend
+      context: ../src/backend
       dockerfile: Dockerfile
     container_name: sico-backend
     ports:
@@ -67,9 +67,9 @@ services:
       - AUDIT_LOG_RETENTION_YEARS=7
       - LOG_LEVEL=INFO
     volumes:
-      - ./src/backend:/app
-      - ./data:/data
-      - ./ai:/ai
+      - ../src/backend:/app
+      - ../data:/data
+      - ../ai:/ai
     depends_on:
       postgres:
         condition: service_healthy
@@ -82,7 +82,7 @@ services:
   # Next.js Frontend
   frontend:
     build:
-      context: ./src/frontend
+      context: ../src/frontend
       dockerfile: Dockerfile
     container_name: sico-frontend
     ports:
@@ -90,7 +90,7 @@ services:
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
     volumes:
-      - ./src/frontend:/app
+      - ../src/frontend:/app
       - /app/node_modules
       - /app/.next
     depends_on:
