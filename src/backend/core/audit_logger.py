@@ -95,7 +95,7 @@ class AuditLog(Base):
     error_message = Column(Text, nullable=True)
     
     # Additional data (JSON)
-    metadata = Column(JSON, nullable=True)
+    extra_data = Column('metadata', JSON, nullable=True)
     
     # Cryptographic integrity
     previous_hash = Column(String(64), nullable=True)  # SHA-256 of previous record
@@ -160,7 +160,7 @@ class AuditLogger:
             request_id=request_id,
             success=success,
             error_message=error_message,
-            metadata=metadata,
+            extra_data=metadata,
             previous_hash=previous_hash,
             current_hash="",  # Will be calculated
             retention_until=retention_until,
