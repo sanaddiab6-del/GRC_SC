@@ -343,3 +343,4 @@ async def approve_dr_plan(
     await db.refresh(plan)
     
     return plan
+    return plan

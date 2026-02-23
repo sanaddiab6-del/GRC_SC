@@ -169,3 +169,4 @@ class DisasterRecoveryPlan(Base):
     
     def __repr__(self):
         return f"<DisasterRecoveryPlan {self.plan_name} v{self.version}>"
+        return f"<DisasterRecoveryPlan {self.plan_name} v{self.version}>"

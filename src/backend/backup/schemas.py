@@ -185,3 +185,4 @@ class DisasterRecoveryPlanResponse(DisasterRecoveryPlanBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
     created_by: Optional[str] = None
+    created_by: Optional[str] = None
