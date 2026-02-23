@@ -106,8 +106,8 @@ class Organization(Base):
     # Relationships
     parent = relationship("Organization", remote_side=[id], backref="children")
     users = relationship("EnterpriseUser", back_populates="organization")
-    controls = relationship("Control", back_populates="organization")
-    risks = relationship("Risk", back_populates="organization")
+    controls = relationship("EnterpriseControl", back_populates="organization")
+    risks = relationship("EnterpriseRisk", back_populates="organization")
 
 
 class EnterpriseUser(Base):
@@ -143,7 +143,7 @@ class Asset(Base):
     description_ar = Column(Text)
     criticality = Column(Enum(AssetCriticality), nullable=False)
     classification = Column(Enum(DataClassification))
-    owner_id = Column(Integer, ForeignKey("users.id"))
+    owner_id = Column(Integer, ForeignKey("enterprise_users.id"))
     location = Column(String(255))
     environment = Column(String(50))  # production, staging, development
     is_active = Column(Boolean, default=True)
@@ -156,13 +156,13 @@ class Asset(Base):
 
 # NOTE: AuditLog is defined in auth/models.py to avoid duplicate table definition
 # Keeping this here commented out for reference of the alternative schema
-# class AuditLog(Base):
+# class EnterpriseAuditLog(Base):
 #     """Immutable audit trail for all platform activities"""
-#     __tablename__ = "audit_logs"
+#     __tablename__ = "enterprise_audit_logs"
 #     
 #     id = Column(Integer, primary_key=True, index=True)
 #     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
-#     user_id = Column(Integer, ForeignKey("users.id"))
+#     user_id = Column(Integer, ForeignKey("enterprise_users.id"))
 #     action = Column(String(100), nullable=False)  # create, update, delete, approve, reject, view
 #     entity_type = Column(String(50), nullable=False)  # control, risk, evidence, finding, etc.
 #     entity_id = Column(String(100), nullable=False)
@@ -170,9 +170,9 @@ class Asset(Base):
 #     ip_address = Column(String(50))
 #     user_agent = Column(String(500))
 #     timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
-class AuditLog(Base):
+class EnterpriseAuditLog(Base):
     """Immutable audit trail for all platform activities"""
-    __tablename__ = "audit_logs"
+    __tablename__ = "enterprise_audit_logs"
     __table_args__ = {'extend_existing': True}  # Allow redefinition for compatibility
     
     id = Column(Integer, primary_key=True, index=True)
@@ -192,10 +192,9 @@ class FrameworkType(str, enum.Enum):
     CUSTOM = "CUSTOM"
 
 
-class Control(Base):
+class EnterpriseControl(Base):
     """Enterprise control library with full lifecycle"""
-    __tablename__ = "controls"
-    __table_args__ = {'extend_existing': True}  # Allow redefinition for compatibility
+    __tablename__ = "enterprise_controls"
     
     id = Column(Integer, primary_key=True, index=True)
     organization_id = Column(Integer, ForeignKey("organizations.id"))
@@ -216,8 +215,8 @@ class Control(Base):
     effectiveness_score = Column(Float)  # 0-100
     
     # Ownership & accountability
-    control_owner_id = Column(Integer, ForeignKey("users.id"))
-    reviewer_id = Column(Integer, ForeignKey("users.id"))
+    control_owner_id = Column(Integer, ForeignKey("enterprise_users.id"))
+    reviewer_id = Column(Integer, ForeignKey("enterprise_users.id"))
     
     # Implementation guidance
     policy_guidance_en = Column(Text)
@@ -244,15 +243,15 @@ class Control(Base):
     # Audit fields
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, onupdate=datetime.utcnow)
-    created_by_id = Column(Integer, ForeignKey("users.id"))
-    updated_by_id = Column(Integer, ForeignKey("users.id"))
+    created_by_id = Column(Integer, ForeignKey("enterprise_users.id"))
+    updated_by_id = Column(Integer, ForeignKey("enterprise_users.id"))
     
     # Relationships
     organization = relationship("Organization", back_populates="controls")
     control_owner = relationship("EnterpriseUser", foreign_keys=[control_owner_id])
     assessments = relationship("ControlAssessment", back_populates="control")
-    evidences = relationship("Evidence", back_populates="control")
-    findings = relationship("AuditFinding", back_populates="control")
+    evidences = relationship("EnterpriseEvidence", back_populates="control")
+    findings = relationship("EnterpriseAuditFinding", back_populates="control")
 
 
 # ============================================================================
@@ -273,8 +272,8 @@ class Policy(Base):
     version = Column(String(20), nullable=False)
     status = Column(String(50), nullable=False)  # draft, pending_approval, approved, archived
     policy_type = Column(String(100))  # security, privacy, operational, hr
-    owner_id = Column(Integer, ForeignKey("users.id"))
-    approver_id = Column(Integer, ForeignKey("users.id"))
+    owner_id = Column(Integer, ForeignKey("enterprise_users.id"))
+    approver_id = Column(Integer, ForeignKey("enterprise_users.id"))
     effective_date = Column(Date)
     review_date = Column(Date)
     document_url = Column(String(500))
@@ -306,15 +305,15 @@ class EvidenceTemplate(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
-class Evidence(Base):
+class EnterpriseEvidence(Base):
     """Evidence instances with chain of custody"""
-    __tablename__ = "evidences"
+    __tablename__ = "enterprise_evidences"
     
     id = Column(Integer, primary_key=True, index=True)
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
     evidence_id = Column(String(100), unique=True, nullable=False, index=True)
     template_id = Column(Integer, ForeignKey("evidence_templates.id"))
-    control_id = Column(Integer, ForeignKey("controls.id"))
+    control_id = Column(Integer, ForeignKey("enterprise_controls.id"))
     
     title_en = Column(String(500), nullable=False)
     title_ar = Column(String(500))
@@ -329,7 +328,7 @@ class Evidence(Base):
     
     # Versioning
     version = Column(String(20))
-    previous_version_id = Column(Integer, ForeignKey("evidences.id"))
+    previous_version_id = Column(Integer, ForeignKey("enterprise_evidences.id"))
     
     # Validity
     status = Column(String(50), nullable=False)  # draft, submitted, approved, rejected, expired
@@ -338,9 +337,9 @@ class Evidence(Base):
     is_expired = Column(Boolean, default=False)
     
     # Chain of custody
-    uploaded_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    reviewed_by_id = Column(Integer, ForeignKey("users.id"))
-    approved_by_id = Column(Integer, ForeignKey("users.id"))
+    uploaded_by_id = Column(Integer, ForeignKey("enterprise_users.id"), nullable=False)
+    reviewed_by_id = Column(Integer, ForeignKey("enterprise_users.id"))
+    approved_by_id = Column(Integer, ForeignKey("enterprise_users.id"))
     uploaded_at = Column(DateTime, default=datetime.utcnow)
     reviewed_at = Column(DateTime)
     approved_at = Column(DateTime)
@@ -350,7 +349,7 @@ class Evidence(Base):
     extra_metadata = Column(JSON)
     
     # Relationships
-    control = relationship("Control", back_populates="evidences")
+    control = relationship("EnterpriseControl", back_populates="evidences")
     uploaded_by = relationship("EnterpriseUser", foreign_keys=[uploaded_by_id])
 
 
@@ -364,9 +363,9 @@ class ControlAssessment(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
-    control_id = Column(Integer, ForeignKey("controls.id"), nullable=False)
+    control_id = Column(Integer, ForeignKey("enterprise_controls.id"), nullable=False)
     assessment_date = Column(Date, nullable=False)
-    assessor_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    assessor_id = Column(Integer, ForeignKey("enterprise_users.id"), nullable=False)
     
     # Results
     test_result = Column(Enum(TestResult), nullable=False)
@@ -386,13 +385,13 @@ class ControlAssessment(Base):
     
     # Approvals
     status = Column(String(50), default="draft")
-    approved_by_id = Column(Integer, ForeignKey("users.id"))
+    approved_by_id = Column(Integer, ForeignKey("enterprise_users.id"))
     approved_at = Column(DateTime)
     
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
-    control = relationship("Control", back_populates="assessments")
+    control = relationship("EnterpriseControl", back_populates="assessments")
     assessor = relationship("EnterpriseUser", foreign_keys=[assessor_id])
 
 
@@ -400,9 +399,9 @@ class ControlAssessment(Base):
 # 6. ENTERPRISE RISK MANAGEMENT (ERM)
 # ============================================================================
 
-class Risk(Base):
+class EnterpriseRisk(Base):
     """Enterprise risk register"""
-    __tablename__ = "risks"
+    __tablename__ = "enterprise_risks"
     
     id = Column(Integer, primary_key=True, index=True)
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
@@ -434,7 +433,7 @@ class Risk(Base):
     is_within_appetite = Column(Boolean)
     
     # Ownership
-    risk_owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    risk_owner_id = Column(Integer, ForeignKey("enterprise_users.id"), nullable=False)
     
     # Mitigation
     mitigation_strategy = Column(Text)  # avoid, reduce, transfer, accept
@@ -455,7 +454,7 @@ class Risk(Base):
     # Audit
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, onupdate=datetime.utcnow)
-    created_by_id = Column(Integer, ForeignKey("users.id"))
+    created_by_id = Column(Integer, ForeignKey("enterprise_users.id"))
     
     # Relationships
     organization = relationship("Organization", back_populates="risks")
@@ -466,9 +465,9 @@ class Risk(Base):
 # 7. AUDIT MANAGEMENT
 # ============================================================================
 
-class AuditProgram(Base):
+class EnterpriseAuditProgram(Base):
     """Audit planning and programs"""
-    __tablename__ = "audit_programs"
+    __tablename__ = "enterprise_audit_programs"
     
     id = Column(Integer, primary_key=True, index=True)
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
@@ -482,21 +481,21 @@ class AuditProgram(Base):
     planned_end_date = Column(Date)
     actual_start_date = Column(Date)
     actual_end_date = Column(Date)
-    lead_auditor_id = Column(Integer, ForeignKey("users.id"))
+    lead_auditor_id = Column(Integer, ForeignKey("enterprise_users.id"))
     status = Column(String(50), default="planned")
     controls_in_scope = Column(JSON)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
-class AuditFinding(Base):
+class EnterpriseAuditFinding(Base):
     """Audit findings register"""
-    __tablename__ = "audit_findings"
+    __tablename__ = "enterprise_audit_findings"
     
     id = Column(Integer, primary_key=True, index=True)
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
     finding_id = Column(String(100), unique=True, nullable=False, index=True)
-    audit_program_id = Column(Integer, ForeignKey("audit_programs.id"))
-    control_id = Column(Integer, ForeignKey("controls.id"))
+    audit_program_id = Column(Integer, ForeignKey("enterprise_audit_programs.id"))
+    control_id = Column(Integer, ForeignKey("enterprise_controls.id"))
     
     # Finding details
     title_en = Column(String(500), nullable=False)
@@ -509,7 +508,7 @@ class AuditFinding(Base):
     # Remediation
     remediation_plan_en = Column(Text)
     remediation_plan_ar = Column(Text)
-    remediation_owner_id = Column(Integer, ForeignKey("users.id"))
+    remediation_owner_id = Column(Integer, ForeignKey("enterprise_users.id"))
     target_closure_date = Column(Date)
     actual_closure_date = Column(Date)
     is_overdue = Column(Boolean, default=False)
@@ -517,16 +516,16 @@ class AuditFinding(Base):
     # Status & workflow
     status = Column(Enum(CaseStatus), default=CaseStatus.OPEN)
     verification_evidence_ids = Column(JSON)
-    verified_by_id = Column(Integer, ForeignKey("users.id"))
+    verified_by_id = Column(Integer, ForeignKey("enterprise_users.id"))
     verified_at = Column(DateTime)
     
     # Audit
-    identified_by_id = Column(Integer, ForeignKey("users.id"))
+    identified_by_id = Column(Integer, ForeignKey("enterprise_users.id"))
     identified_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, onupdate=datetime.utcnow)
     
     # Relationships
-    control = relationship("Control", back_populates="findings")
+    control = relationship("EnterpriseControl", back_populates="findings")
     identified_by = relationship("EnterpriseUser", foreign_keys=[identified_by_id])
 
 
@@ -541,7 +540,7 @@ class ControlException(Base):
     id = Column(Integer, primary_key=True, index=True)
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
     exception_id = Column(String(100), unique=True, nullable=False)
-    control_id = Column(Integer, ForeignKey("controls.id"), nullable=False)
+    control_id = Column(Integer, ForeignKey("enterprise_controls.id"), nullable=False)
     
     # Exception details
     justification_en = Column(Text, nullable=False)
@@ -550,8 +549,8 @@ class ControlException(Base):
     compensating_controls = Column(JSON)
     
     # Approvals
-    requested_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    approved_by_id = Column(Integer, ForeignKey("users.id"))
+    requested_by_id = Column(Integer, ForeignKey("enterprise_users.id"), nullable=False)
+    approved_by_id = Column(Integer, ForeignKey("enterprise_users.id"))
     approval_date = Column(Date)
     
     # Validity
@@ -587,8 +586,8 @@ class WorkflowCase(Base):
     priority = Column(String(20))  # critical, high, medium, low
     
     # Assignment
-    assigned_to_id = Column(Integer, ForeignKey("users.id"))
-    assigned_by_id = Column(Integer, ForeignKey("users.id"))
+    assigned_to_id = Column(Integer, ForeignKey("enterprise_users.id"))
+    assigned_by_id = Column(Integer, ForeignKey("enterprise_users.id"))
     assigned_at = Column(DateTime)
     
     # SLA & escalation
@@ -596,7 +595,7 @@ class WorkflowCase(Base):
     due_date = Column(DateTime)
     is_overdue = Column(Boolean, default=False)
     escalation_level = Column(Integer, default=0)
-    escalated_to_id = Column(Integer, ForeignKey("users.id"))
+    escalated_to_id = Column(Integer, ForeignKey("enterprise_users.id"))
     
     # Status
     status = Column(Enum(CaseStatus), default=CaseStatus.OPEN)
@@ -695,17 +694,17 @@ class RecordOfProcessingActivity(Base):
     dpia_reference = Column(String(100))
     
     # Ownership
-    data_controller_id = Column(Integer, ForeignKey("users.id"))
-    dpo_id = Column(Integer, ForeignKey("users.id"))
+    data_controller_id = Column(Integer, ForeignKey("enterprise_users.id"))
+    dpo_id = Column(Integer, ForeignKey("enterprise_users.id"))
     
     status = Column(String(50), default="active")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, onupdate=datetime.utcnow)
 
 
-class DataSubjectRequest(Base):
+class EnterpriseDataSubjectRequest(Base):
     """DSAR (Data Subject Access Request) register"""
-    __tablename__ = "dsar_requests"
+    __tablename__ = "enterprise_dsar_requests"
     
     id = Column(Integer, primary_key=True, index=True)
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
@@ -728,7 +727,7 @@ class DataSubjectRequest(Base):
     is_overdue = Column(Boolean, default=False)
     
     # Assignment
-    assigned_to_id = Column(Integer, ForeignKey("users.id"))
+    assigned_to_id = Column(Integer, ForeignKey("enterprise_users.id"))
     
     # Response
     response_provided = Column(Text)
@@ -799,7 +798,7 @@ class AutomatedEvidence(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
-    control_id = Column(Integer, ForeignKey("controls.id"), nullable=False)
+    control_id = Column(Integer, ForeignKey("enterprise_controls.id"), nullable=False)
     integration_id = Column(Integer, ForeignKey("integrations.id"))
     evidence_rule = Column(JSON)  # query/filter definition
     collection_frequency = Column(String(50))  # daily, weekly, monthly, realtime

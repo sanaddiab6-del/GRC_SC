@@ -221,12 +221,18 @@ async def verify_evidence_integrity(
     ).hexdigest()
 
     integrity_ok = recomputed == evidence.file_hash
+    if integrity_ok:
+        msg_en = "Evidence integrity verified successfully."
+        msg_ar = "تم التحقق من تكامل الدليل بنجاح."
+    else:
+        msg_en = "Evidence integrity check FAILED: record may have been tampered with."
+        msg_ar = "فشل التحقق من تكامل الدليل: ربما تم التلاعب بالسجل."
     return EvidenceIntegrityResponse(
         evidence_id=evidence_id,
         has_hash=True,
         integrity_ok=integrity_ok,
-        message_en="Evidence integrity verified successfully." if integrity_ok else "Evidence integrity check FAILED: record may have been tampered with.",
-        message_ar="تم التحقق من تكامل الدليل بنجاح." if integrity_ok else "فشل التحقق من تكامل الدليل: ربما تم التلاعب بالسجل.",
+        message_en=msg_en,
+        message_ar=msg_ar,
     )
 
 
