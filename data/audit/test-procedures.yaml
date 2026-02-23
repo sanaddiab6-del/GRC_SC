@@ -1,0 +1,492 @@
+# Audit Test Procedures Library
+# Comprehensive testing methodology for ECC, CCC, and PDPL compliance audits
+# Version: 1.0
+
+metadata:
+  document_name: "Audit Test Procedures Library"
+  document_name_ar: "مكتبة إجراءات الاختبار التدقيقي"
+  purpose: "Standardized audit testing procedures for Saudi regulatory compliance"
+  version: "1.0"
+  last_updated: "2024-01-01"
+  owner: "Internal Audit / Compliance Team"
+  audience: ["Internal Auditors", "External Auditors", "Certification Bodies"]
+  
+  summary:
+    total_test_procedures: 325
+    ecc_procedures: 114
+    ccc_procedures: 183
+    pdpl_procedures: 28
+    
+  audit_types:
+    - type: "internal_audit"
+      frequency: "Annual"
+      purpose: "Self-assessment and continuous improvement"
+    - type: "external_audit"
+      frequency: "Annual (for certification)"
+      purpose: "Third-party validation for ISO 27001, NCA compliance"
+    - type: "regulatory_audit"
+      frequency: "As requested by NCA/SDAIA"
+      purpose: "Regulatory compliance verification"
+
+# ============================================
+# Audit Methodology Standards
+# ============================================
+
+audit_methodology:
+  framework: "ISO 19011:2018 (Auditing Management Systems)"
+  approach: "Risk-based audit planning"
+  sampling: "Statistical sampling per ISO 2859-1"
+  
+  audit_phases:
+    - phase: "Planning"
+      duration: "2 weeks"
+      activities:
+        - "Define audit scope"
+        - "Identify audit criteria"
+        - "Prepare audit plan"
+        - "Assign audit team"
+        - "Send document request list"
+        
+    - phase: "Fieldwork"
+      duration: "3-4 weeks"
+      activities:
+        - "Opening meeting"
+        - "Document review"
+        - "Interviews and walkthroughs"
+        - "Testing (design and operating effectiveness)"
+        - "Issue identification"
+        
+    - phase: "Reporting"
+      duration: "1-2 weeks"
+      activities:
+        - "Draft audit findings"
+        - "Validate findings with auditees"
+        - "Closing meeting"
+        - "Issue final audit report"
+        - "Corrective action tracking"
+
+# ============================================
+# Test Procedure Structure
+# ============================================
+
+test_procedure_template:
+  control_id: "ECC-GV-1"
+  control_title: "Cybersecurity Governance Framework"
+  
+  test_objective:
+    en: "Verify that a comprehensive cybersecurity governance framework is established and maintained"
+    ar: "التحقق من إنشاء والحفاظ على إطار شامل لحوكمة الأمن السيبراني"
+  
+  audit_criteria:
+    - "Board-approved governance policy exists"
+    - "Governance policy reviewed annually"
+    - "Organizational structure with cybersecurity roles defined"
+    - "Quarterly governance reviews conducted"
+    - "Risk committee with cybersecurity oversight"
+  
+  test_methods:
+    - method: "Document Review"
+      percentage: 60
+    - method: "Interview"
+      percentage: 20
+    - method: "Observation"
+      percentage: 10
+    - method: "Reperformance"
+      percentage: 10
+  
+  test_steps:
+    - step: 1
+      description_en: "Obtain and review cybersecurity governance policy"
+      description_ar: "الحصول على ومراجعة سياسة حوكمة الأمن السيبراني"
+      test_method: "Document Review"
+      what_to_look_for:
+        - "Policy is signed by Board Chairman or CEO"
+        - "Policy includes roles, responsibilities, reporting structure"
+        - "Policy addresses cybersecurity risk management"
+        - "Policy is dated within last 12 months (annual review)"
+        - "Bilingual (Arabic + English)"
+      evidence_to_collect:
+        - "PDF copy of signed policy"
+        - "Board resolution approving policy"
+      pass_criteria: "Policy exists, approved, and current (< 12 months old)"
+      
+    - step: 2
+      description_en: "Review organizational chart"
+      description_ar: "مراجعة الهيكل التنظيمي"
+      test_method: "Document Review"
+      what_to_look_for:
+        - "CISO position shown on org chart"
+        - "CISO reports to CEO or Board (not CIO/CTO)"
+        - "Security team structure documented"
+        - "Clear reporting lines"
+      evidence_to_collect:
+        - "Organizational chart (dated)"
+        - "Job descriptions for key security roles"
+      pass_criteria: "CISO exists and reports to appropriate level"
+      
+    - step: 3
+      description_en: "Sample quarterly board minutes"
+      description_ar: "عينة من محاضر مجلس الإدارة الربع سنوية"
+      test_method: "Document Review + Sampling"
+      sample_size: "4 quarters (last 12 months)"
+      what_to_look_for:
+        - "Cybersecurity is standing agenda item"
+        - "CISO presents quarterly report"
+        - "Board discusses cybersecurity risks"
+        - "Board approves budget for cybersecurity initiatives"
+      evidence_to_collect:
+        - "Board minutes (4 quarters)"
+        - "CISO quarterly reports to board"
+      pass_criteria: "All 4 quarters show cybersecurity discussion"
+      
+    - step: 4
+      description_en: "Interview CISO"
+      description_ar: "مقابلة رئيس أمن المعلومات"
+      test_method: "Interview"
+      interview_questions:
+        - "Describe your role and responsibilities"
+        - "How often do you report to the Board?"
+        - "What cybersecurity metrics do you present?"
+        - "How is the cybersecurity budget determined?"
+        - "Describe the governance review process"
+      what_to_validate:
+        - "CISO understanding of governance framework"
+        - "CISO has direct access to Board"
+        - "Governance process is active (not just documented)"
+      evidence_to_collect:
+        - "Interview notes"
+        - "CISO credentials verification"
+      pass_criteria: "CISO demonstrates active governance process"
+  
+  sampling_methodology:
+    population: "Last 12 months of governance artifacts"
+    sample_size: "4 quarters of board minutes, 2 governance reviews"
+    selection_method: "Judgmental (focus on recent quarters)"
+    
+  expected_result: "Pass if all 4 test steps meet pass criteria"
+  
+  finding_classification:
+    critical: "No governance framework exists or not board-approved"
+    high: "Governance framework exists but not reviewed annually"
+    medium: "Governance framework adequate but improvements needed"
+    low: "Minor documentation gaps"
+    observation: "Suggestions for improvement (not a deficiency)"
+
+# ============================================
+# Sample Test Procedures
+# ============================================
+
+sample_test_procedures:
+  # ECC-GV-3: Risk Management
+  - control_id: "ECC-GV-3"
+    control_title: "Cybersecurity Risk Management"
+    test_objective: "Verify cybersecurity risk management program is established and operational"
+    
+    test_steps:
+      - step: 1
+        action: "Review risk management framework"
+        method: "Document Review"
+        criteria: "Framework documented, board-approved, includes risk assessment methodology"
+        
+      - step: 2
+        action: "Review annual risk assessment report"
+        method: "Document Review"
+        criteria: "Completed within last 12 months, executive approval, risk register populated"
+        
+      - step: 3
+        action: "Sample 10 high-priority risks from register"
+        method: "Sampling + Document Review"
+        sample_size: 10
+        criteria: "Each risk has: likelihood, impact, treatment plan, owner, status"
+        
+      - step: 4
+        action: "Review quarterly risk monitoring reports"
+        method: "Document Review"
+        sample_size: "Last 4 quarters"
+        criteria: "Risks tracked, treatment progress monitored, new risks added"
+        
+      - step: 5
+        action: "Interview Risk Manager"
+        method: "Interview"
+        questions:
+          - "How often is risk register updated?"
+          - "Who approves risk treatment plans?"
+          - "Describe a recent risk that was mitigated"
+        criteria: "Risk manager demonstrates active risk management"
+    
+    expected_evidence:
+      - "Risk Management Framework"
+      - "Annual Risk Assessment Report"
+      - "Risk Register (current)"
+      - "Risk Treatment Plans (sample)"
+      - "Quarterly Risk Reports (4 quarters)"
+      
+    pass_criteria: "All 5 test steps pass"
+    
+  # PDPL-7: Lawful Basis
+  - control_id: "PDPL-7"
+    control_title: "Lawfulness of Processing"
+    test_objective: "Verify lawful basis is documented for all personal data processing activities"
+    
+    test_steps:
+      - step: 1
+        action: "Obtain Record of Processing Activities (RoPA)"
+        method: "Document Review"
+        criteria: "RoPA exists, updated within last 3 months, includes all business units"
+        
+      - step: 2
+        action: "Sample 15 processing activities from RoPA"
+        method: "Stratified Sampling"
+        sample_size: 15
+        sampling_criteria: "5 consent-based, 5 contract-based, 5 legitimate interest"
+        criteria: "Each activity has lawful basis documented per PDPL Article 7"
+        
+      - step: 3
+        action: "For consent-based processing, verify consent management"
+        method: "System Testing"
+        criteria:
+          - "Consent records exist in system"
+          - "Consent is freely given, specific, informed"
+          - "Easy to withdraw consent"
+          - "Consent audit log maintained"
+          
+      - step: 4
+        action: "For legitimate interest processing, review LIA"
+        method: "Document Review"
+        criteria: "Legitimate Interest Assessment (LIA) documents balancing test"
+        
+      - step: 5
+        action: "Interview Data Protection Officer"
+        method: "Interview"
+        questions:
+          - "How do you determine lawful basis for new processing?"
+          - "Describe your consent management approach"
+          - "How often is RoPA reviewed?"
+        criteria: "DPO demonstrates understanding of PDPL Article 7"
+    
+    expected_evidence:
+      - "Record of Processing Activities (RoPA)"
+      - "Consent Records (sample)"
+      - "Legitimate Interest Assessments (sample)"
+      - "Data Processing Agreements (sample)"
+      - "DPO Interview Notes"
+      
+    pass_criteria: "All 15 sampled activities have documented lawful basis"
+    critical_finding: "No lawful basis for 3 or more activities"
+    
+  # PDPL-19: Breach Notification
+  - control_id: "PDPL-19"
+    control_title: "Data Breach Notification"
+    test_objective: "Verify 72-hour breach notification process to SDAIA is established"
+    
+    test_steps:
+      - step: 1
+        action: "Review data breach response plan"
+        method: "Document Review"
+        criteria:
+          - "Plan includes 72-hour SDAIA notification procedure"
+          - "Plan tested annually"
+          - "Plan includes data subject notification process"
+          
+      - step: 2
+        action: "Review breach incident log"
+        method: "Document Review"
+        criteria: "Log exists and maintained (even if no breaches)"
+        
+      - step: 3
+        action: "If breaches occurred, sample 100% of breaches"
+        method: "Complete Enumeration"
+        sample_size: "All breaches in last 12 months"
+        criteria:
+          - "Each breach logged with discovery date/time"
+          - "SDAIA notified within 72 hours (if applicable)"
+          - "Data subjects notified (if high risk)"
+          - "Root cause analysis completed"
+          
+      - step: 4
+        action: "Test breach response capability (tabletop exercise)"
+        method: "Reperformance / Simulation"
+        criteria:
+          - "Team can execute 72-hour notification process"
+          - "SDAIA notification portal access confirmed"
+          - "Notification templates available"
+          
+      - step: 5
+        action: "Interview Incident Response Team and DPO"
+        method: "Interview"
+        questions:
+          - "Describe your breach notification process"
+          - "What constitutes a 'reportable breach' under PDPL?"
+          - "How do you determine if data subject notification is required?"
+        criteria: "Team demonstrates readiness for breach response"
+    
+    expected_evidence:
+      - "Data Breach Response Plan"
+      - "Breach Incident Log"
+      - "SDAIA Notifications (if breaches occurred)"
+      - "Tabletop Exercise Report"
+      - "Interview Notes"
+      
+    pass_criteria: "Process documented, tested, and compliant (if breaches occurred)"
+    critical_finding: "Breach occurred and SDAIA not notified within 72 hours"
+
+# ============================================
+# Sampling Guidelines
+# ============================================
+
+sampling_guidelines:
+  approach: "ISO 2859-1 Acceptance Sampling"
+  
+  sample_size_table:
+    - population: "1-10"
+      sample_size: "All (100%)"
+      confidence: "100%"
+      
+    - population: "11-50"
+      sample_size: 10
+      confidence: "95%"
+      
+    - population: "51-100"
+      sample_size: 15
+      confidence: "95%"
+      
+    - population: "101-500"
+      sample_size: 25
+      confidence: "95%"
+      
+    - population: "501-1000"
+      sample_size: 30
+      confidence: "95%"
+      
+    - population: "1001+"
+      sample_size: 40
+      confidence: "95%"
+  
+  sampling_methods:
+    - method: "Random Sampling"
+      use_when: "Homogeneous population"
+      tool: "Excel RAND() function"
+      
+    - method: "Stratified Sampling"
+      use_when: "Heterogeneous population (e.g., different business units)"
+      approach: "Sample proportionally from each stratum"
+      
+    - method: "Judgmental Sampling"
+      use_when: "High-risk areas or small populations"
+      approach: "Auditor selects based on risk criteria"
+      
+    - method: "Complete Enumeration"
+      use_when: "Very small population (<10) or critical controls"
+      approach: "Test 100% of population"
+  
+  error_tolerance:
+    zero_tolerance: "Critical controls (e.g., SDAIA breach notification)"
+    low_tolerance: "1 error in sample = finding"
+    medium_tolerance: "2 errors in sample = finding"
+    high_tolerance: "3+ errors in sample = finding"
+
+# ============================================
+# Finding Classification
+# ============================================
+
+finding_classification:
+  critical:
+    definition: "Absence of control or complete failure causing severe risk"
+    examples:
+      - "No cybersecurity governance framework"
+      - "SDAIA breach notification missed 72-hour deadline"
+      - "No data encryption for sensitive data"
+    remediation_timeline: "Immediate (within 30 days)"
+    impact: "May result in regulatory enforcement action"
+    
+  high:
+    definition: "Control exists but significant deficiency in design or operation"
+    examples:
+      - "Risk assessment not completed annually"
+      - "DSAR SLA breached in 50%+ of requests"
+      - "Vulnerability patching SLA not met"
+    remediation_timeline: "60 days"
+    impact: "Increases risk of compliance failure"
+    
+  medium:
+    definition: "Control partially effective but improvements needed"
+    examples:
+      - "Policy reviewed annually but minor content gaps"
+      - "Training completion rate 85% (target 100%)"
+      - "Access reviews completed but inconsistent documentation"
+    remediation_timeline: "90 days"
+    impact: "Moderate risk, may escalate if not addressed"
+    
+  low:
+    definition: "Minor deficiency not affecting control effectiveness"
+    examples:
+      - "Procedure document has typos"
+      - "Evidence collection format inconsistent"
+      - "Date stamp missing on some documents"
+    remediation_timeline: "120 days"
+    impact: "Minimal risk"
+    
+  observation:
+    definition: "Opportunity for improvement (not a deficiency)"
+    examples:
+      - "Consider automating evidence collection"
+      - "Suggest implementing advanced threat detection"
+      - "Recommend privacy-by-design training"
+    remediation_timeline: "Optional"
+    impact: "None (enhancement opportunity)"
+
+# Audit Report Template
+audit_report_structure:
+  sections:
+    - section: "Executive Summary"
+      content:
+        - "Audit objective and scope"
+        - "Overall conclusion"
+        - "Summary of findings (by severity)"
+        - "Key recommendations"
+      pages: 2
+      
+    - section: "Audit Details"
+      content:
+        - "Audit criteria (ECC, CCC, PDPL)"
+        - "Audit methodology"
+        - "Sampling approach"
+        - "Audit team and dates"
+      pages: 3
+      
+    - section: "Detailed Findings"
+      content:
+        - "Finding title and classification"
+        - "Control tested"
+        - "Condition (what was found)"
+        - "Criteria (what should be)"
+        - "Cause (why it happened)"
+        - "Effect (risk/impact)"
+        - "Recommendation"
+        - "Management response"
+      pages: "Variable (5-20)"
+      
+    - section: "Control Testing Results"
+      content:
+        - "Summary table of all controls tested"
+        - "Pass/Fail status"
+        - "Evidence reviewed"
+        - "Sample sizes"
+      pages: 5
+      
+    - section: "Conclusion and Next Steps"
+      content:
+        - "Overall compliance rating"
+        - "Areas of strength"
+        - "Areas for improvement"
+        - "Corrective action plan timeline"
+        - "Follow-up audit schedule"
+      pages: 2
+
+notes:
+  - "325 test procedures cover all ECC, CCC, and PDPL controls"
+  - "ISO 19011:2018 compliant audit methodology"
+  - "Risk-based sampling per ISO 2859-1"
+  - "Bilingual testing for Saudi regulations"
+  - "Evidence-based testing approach"
+  - "Full test procedures available in control-specific files"

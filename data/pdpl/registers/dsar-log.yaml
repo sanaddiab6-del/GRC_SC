@@ -1,0 +1,339 @@
+# Data Subject Access Request (DSAR) Log Template
+# PDPL Article 13-18 Requirement (Data Subject Rights)
+# Version: 1.0
+
+metadata:
+  document_name: "Data Subject Access Request Log"
+  document_name_ar: "سجل طلبات الوصول لأصحاب البيانات"
+  legal_basis: "PDPL Articles 13-18 (Data Subject Rights)"
+  purpose: "Track and manage data subject rights requests (access, rectification, erasure, etc.)"
+  update_frequency: "Real-time (per request)"
+  owner: "Data Protection Officer / Privacy Team"
+  retention_period: "7 years"
+  sla: "30 days response time"
+
+dsar_types:
+  - type_id: "access"
+    type_name_en: "Right to Access"
+    type_name_ar: "حق الوصول"
+    pdpl_article: "Article 13"
+    description_en: "Request to confirm what personal data is being processed and obtain a copy"
+    description_ar: "طلب تأكيد البيانات الشخصية التي يتم معالجتها والحصول على نسخة"
+    response_includes:
+      - "Confirmation of processing"
+      - "Copy of personal data"
+      - "Purposes of processing"
+      - "Categories of data"
+      - "Recipients"
+      - "Retention period"
+      - "Source of data (if not collected directly)"
+      - "Existence of other rights"
+      
+  - type_id: "rectification"
+    type_name_en: "Right to Rectification"
+    type_name_ar: "حق التصحيح"
+    pdpl_article: "Article 14"
+    description_en: "Request to correct inaccurate or incomplete personal data"
+    description_ar: "طلب تصحيح البيانات الشخصية غير الدقيقة أو غير الكاملة"
+    
+  - type_id: "erasure"
+    type_name_en: "Right to Erasure (Right to be Forgotten)"
+    type_name_ar: "حق المحو (الحق في النسيان)"
+    pdpl_article: "Article 15"
+    description_en: "Request to delete personal data when no longer necessary"
+    description_ar: "طلب حذف البيانات الشخصية عندما لم تعد ضرورية"
+    conditions:
+      - "Data no longer necessary for original purpose"
+      - "Consent withdrawn"
+      - "Data unlawfully processed"
+      - "Legal obligation requires erasure"
+      
+  - type_id: "restriction"
+    type_name_en: "Right to Restriction of Processing"
+    type_name_ar: "حق تقييد المعالجة"
+    pdpl_article: "Article 16"
+    description_en: "Request to restrict processing while accuracy or lawfulness is verified"
+    description_ar: "طلب تقييد المعالجة أثناء التحقق من الدقة أو المشروعية"
+    
+  - type_id: "portability"
+    type_name_en: "Right to Data Portability"
+    type_name_ar: "حق نقل البيانات"
+    pdpl_article: "Article 17"
+    description_en: "Request data in structured, machine-readable format"
+    description_ar: "طلب البيانات بصيغة منظمة وقابلة للقراءة آلياً"
+    
+  - type_id: "objection"
+    type_name_en: "Right to Object"
+    type_name_ar: "حق الاعتراض"
+    pdpl_article: "Article 18"
+    description_en: "Request to stop processing based on legitimate interests or direct marketing"
+    description_ar: "طلب إيقاف المعالجة على أساس المصالح المشروعة أو التسويق المباشر"
+
+dsar_log_fields:
+  - name: request_id
+    type: "string"
+    description: "Unique request identifier"
+    example: "DSAR-2024-001"
+    
+  - name: request_date
+    type: "datetime"
+    description: "Date and time request received"
+    example: "2024-01-15 10:30:00"
+    
+  - name: request_type
+    type: "enum"
+    options: ["access", "rectification", "erasure", "restriction", "portability", "objection"]
+    example: "access"
+    
+  - name: requester_name
+    type: "string"
+    description: "Name of data subject"
+    example: "أحمد محمد (Ahmed Mohammed)"
+    
+  - name: requester_email
+    type: "string"
+    description: "Contact email"
+    example: "ahmed.m@email.com"
+    
+  - name: requester_id_verified
+    type: "boolean"
+    description: "Identity verification completed"
+    example: true
+    verification_method: "National ID verification via Absher"
+    
+  - name: request_details
+    type: "text"
+    description: "Detailed description of request"
+    example: "Requesting copy of all personal data held by company including HR records, access logs, and marketing preferences"
+    
+  - name: assigned_to
+    type: "string"
+    description: "Team member handling request"
+    example: "سارة أحمد - Privacy Team (Sarah Ahmed)"
+    
+  - name: priority
+    type: "enum"
+    options: ["low", "medium", "high", "urgent"]
+    example: "medium"
+    criteria:
+      urgent: "Media attention, regulatory inquiry, or complainant threat"
+      high: "Breach-related request or legal dispute"
+      medium: "Standard request"
+      low: "Routine newsletter unsubscribe"
+      
+  - name: due_date
+    type: "date"
+    description: "30-day deadline per PDPL"
+    calculation: "request_date + 30 days"
+    example: "2024-02-14"
+    
+  - name: status
+    type: "enum"
+    options: ["received", "in_progress", "awaiting_verification", "completed", "rejected", "extended"]
+    example: "in_progress"
+    
+  - name: response_date
+    type: "datetime"
+    description: "Date response sent to requester"
+    example: "2024-02-10 14:00:00"
+    
+  - name: response_method
+    type: "enum"
+    options: ["email", "postal_mail", "portal", "in_person"]
+    example: "email"
+    
+  - name: outcome
+    type: "enum"
+    options: ["fulfilled", "partially_fulfilled", "rejected", "no_data_found"]
+    example: "fulfilled"
+    
+  - name: rejection_reason
+    type: "text"
+    description: "If rejected, provide legal justification"
+    example: "Request manifestly unfounded or excessive (PDPL Article 13.3)"
+    
+  - name: extension_granted
+    type: "boolean"
+    description: "Whether 30-day extension was granted (complex requests)"
+    example: false
+    
+  - name: data_sources_searched
+    type: "array"
+    description: "Systems searched for personal data"
+    example:
+      - "HR Management System"
+      - "CRM Database"
+      - "Email Archives"
+      - "Access Control Logs"
+      - "Marketing Automation Platform"
+      
+  - name: records_found
+    type: "integer"
+    description: "Number of records containing personal data"
+    example: 47
+    
+  - name: response_format
+    type: "enum"
+    options: ["pdf", "csv", "json", "xml", "paper"]
+    example: "pdf"
+    
+  - name: fees_charged
+    type: "decimal"
+    description: "Fees for excessive/repeat requests (PDPL allows)"
+    example: 0.00
+    currency: "SAR"
+    
+  - name: escalated_to_sdaia
+    type: "boolean"
+    description: "Whether requester escalated to SDAIA"
+    example: false
+    
+  - name: notes
+    type: "text"
+    description: "Internal notes about request handling"
+    example: "Requester was satisfied with response. No issues."
+
+sample_dsar_requests:
+  - request_id: "DSAR-2024-001"
+    request_date: "2024-01-15 10:30:00"
+    request_type: "access"
+    requester_name: "أحمد محمد علي"
+    requester_email: "ahmed.m@email.com"
+    requester_id_verified: true
+    request_details: "I would like to know what personal information you hold about me as a customer"
+    assigned_to: "Sara Ahmed - Privacy Team"
+    priority: "medium"
+    due_date: "2024-02-14"
+    status: "completed"
+    response_date: "2024-02-05 11:00:00"
+    response_method: "email"
+    outcome: "fulfilled"
+    data_sources_searched:
+      - "CRM System"
+      - "Order Management System"
+      - "Marketing Database"
+    records_found: 23
+    response_format: "pdf"
+    fees_charged: 0.00
+    sla_compliance: true
+    days_to_complete: 21
+    
+  - request_id: "DSAR-2024-002"
+    request_date: "2024-01-20 14:15:00"
+    request_type: "erasure"
+    requester_name: "فاطمة سعيد"
+    requester_email: "fatima.s@email.com"
+    requester_id_verified: true
+    request_details: "Please delete all my personal data. I no longer wish to use your services"
+    assigned_to: "Mohammed Ali - Privacy Team"
+    priority: "medium"
+    due_date: "2024-02-19"
+    status: "completed"
+    response_date: "2024-02-15 10:30:00"
+    response_method: "email"
+    outcome: "fulfilled"
+    erasure_details:
+      systems_updated:
+        - "CRM: Customer record anonymized"
+        - "Marketing: Email removed from all lists"
+        - "Support: Ticket history anonymized"
+      retained_data: "Order history retained for 7 years per tax law"
+      retention_reason: "Legal obligation (tax records)"
+    fees_charged: 0.00
+    sla_compliance: true
+    days_to_complete: 26
+
+workflow:
+  step_1:
+    action: "Receive Request"
+    owner: "Privacy Team / DPO"
+    tasks:
+      - "Log request in DSAR system"
+      - "Acknowledge receipt within 48 hours"
+      - "Assign unique request ID"
+      
+  step_2:
+    action: "Verify Identity"
+    owner: "Privacy Team"
+    tasks:
+      - "Request government-issued ID"
+      - "Verify via Absher (for Saudi nationals)"
+      - "Document verification method"
+    sla: "5 business days"
+    
+  step_3:
+    action: "Assess Request"
+    owner: "Privacy Team + DPO"
+    tasks:
+      - "Determine request type and scope"
+      - "Identify systems to search"
+      - "Check for exemptions or limitations"
+      - "Assess complexity (simple vs complex)"
+    sla: "3 business days"
+    
+  step_4:
+    action: "Search and Collect Data"
+    owner: "Privacy Team + IT"
+    tasks:
+      - "Search identified systems"
+      - "Collect relevant personal data"
+      - "Redact third-party information"
+      - "Prepare response package"
+    sla: "15 business days"
+    
+  step_5:
+    action: "Review and Approve"
+    owner: "DPO"
+    tasks:
+      - "Review completeness of response"
+      - "Verify no over-disclosure"
+      - "Approve final response"
+    sla: "3 business days"
+    
+  step_6:
+    action: "Deliver Response"
+    owner: "Privacy Team"
+    tasks:
+      - "Send response via secure method"
+      - "Update DSAR log"
+      - "Close request"
+    sla: "2 business days"
+    
+  total_sla: "30 days (PDPL requirement)"
+
+metrics_tracking:
+  - metric: "DSAR Volume"
+    calculation: "Total requests per month/quarter"
+    target: "N/A (demand-driven)"
+    
+  - metric: "SLA Compliance Rate"
+    calculation: "(Requests completed within 30 days / Total requests) * 100"
+    target: ">95%"
+    
+  - metric: "Average Response Time"
+    calculation: "Average days from request to response"
+    target: "<20 days"
+    
+  - metric: "Fulfillment Rate"
+    calculation: "(Fulfilled requests / Total requests) * 100"
+    target: ">90%"
+    
+  - metric: "Extension Rate"
+    calculation: "(Extended requests / Total requests) * 100"
+    target: "<10%"
+
+compliance_notes:
+  - "30-day response deadline is strict (PDPL Article 13)"
+  - "Extension of 30 days allowed for complex requests (must notify requester)"
+  - "Identity verification mandatory to prevent fraud"
+  - "Rejection must be justified with legal basis"
+  - "Right to complain to SDAIA must be communicated"
+  - "Free of charge for first request; reasonable fee for excessive/repeat requests"
+  - "Response must be in clear, plain language"
+  - "Electronic format preferred unless requester requests paper"
+
+related_documents:
+  - "DSAR Policy and Procedure"
+  - "Identity Verification Procedure"
+  - "Data Subject Rights Information Notice"
+  - "SDAIA Complaint Escalation Process"

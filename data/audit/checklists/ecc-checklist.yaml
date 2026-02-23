@@ -1,0 +1,257 @@
+# ECC Compliance Audit Checklist
+# Saudi National Cybersecurity Authority - Essential Cybersecurity Controls
+# Version: 1.0
+# Total Controls: 114
+
+metadata:
+  framework: "ECC"
+  version: "1.0"
+  authority: "National Cybersecurity Authority (NCA)"
+  total_controls: 114
+  last_updated: "2024-01-01"
+  usage: "Internal audit, external audit, self-assessment"
+
+checklist_structure:
+  domains:
+    - Governance (GV): 13 controls
+    - Defense (DP): 35 controls
+    - Resilience (RE): 28 controls
+    - Third-Party Management (TM): 22 controls
+    - Industrial Control Systems (IC): 16 controls
+
+# Governance Domain (GV) - 13 Controls
+governance_checklist:
+  - control_id: "ECC-GV-1"
+    control_title: "Cybersecurity Governance Framework"
+    status_options: ["Not Implemented", "Partially Implemented", "Implemented", "Not Applicable"]
+    evidence_required:
+      - "Board-approved cybersecurity governance policy"
+      - "Organizational chart showing CISO role"
+      - "Quarterly board minutes (cybersecurity discussions)"
+      - "Governance review reports"
+    test_questions:
+      - "Is cybersecurity governance policy approved by Board? □ Yes □ No"
+      - "Does CISO report to CEO/Board (not CIO/CTO)? □ Yes □ No"
+      - "Are quarterly governance reviews conducted? □ Yes □ No"
+      - "Is cybersecurity a standing Board agenda item? □ Yes □ No"
+    maturity_level: "___/5"
+    auditor_notes: "_______________________________________"
+    status: "☐ Pass ☐ Fail ☐ Observation"
+    
+  - control_id: "ECC-GV-2"
+    control_title: "Cybersecurity Strategy"
+    status_options: ["Not Implemented", "Partially Implemented", "Implemented", "Not Applicable"]
+    evidence_required:
+      - "3-5 year cybersecurity strategy document"
+      - "Board resolution approving strategy"
+      - "Quarterly strategy progress reports"
+      - "Budget allocation for cybersecurity"
+    test_questions:
+      - "Does cybersecurity strategy exist and span 3-5 years? □ Yes □ No"
+      - "Is strategy approved by Board? □ Yes □ No"
+      - "Is strategy reviewed annually? □ Yes □ No"
+      - "Are strategic objectives aligned with business goals? □ Yes □ No"
+    maturity_level: "___/5"
+    auditor_notes: "_______________________________________"
+    status: "☐ Pass ☐ Fail ☐ Observation"
+    
+  - control_id: "ECC-GV-3"
+    control_title: "Cybersecurity Risk Management"
+    status_options: ["Not Implemented", "Partially Implemented", "Implemented", "Not Applicable"]
+    evidence_required:
+      - "Risk management framework"
+      - "Annual risk assessment report"
+      - "Risk register (current)"
+      - "Risk treatment plans"
+      - "Quarterly risk monitoring reports"
+    test_questions:
+      - "Is risk management framework documented? □ Yes □ No"
+      - "Is annual risk assessment completed? □ Yes □ No"
+      - "Are high/critical risks tracked with treatment plans? □ Yes □ No"
+      - "Is risk register updated quarterly? □ Yes □ No"
+    maturity_level: "___/5"
+    auditor_notes: "_______________________________________"
+    status: "☐ Pass ☐ Fail ☐ Observation"
+
+# Defense Domain (DP) - 35 Controls (Sample)
+defense_checklist:
+  - control_id: "ECC-DP-1"
+    control_title: "Access Control Policy"
+    evidence_required:
+      - "Access control policy"
+      - "User provisioning procedure"
+      - "Access review records"
+      - "Privileged access management logs"
+    test_questions:
+      - "Is access control policy documented and approved? □ Yes □ No"
+      - "Is least privilege principle implemented? □ Yes □ No"
+      - "Are access reviews conducted quarterly? □ Yes □ No"
+      - "Is multi-factor authentication (MFA) required? □ Yes □ No"
+    maturity_level: "___/5"
+    auditor_notes: "_______________________________________"
+    status: "☐ Pass ☐ Fail ☐ Observation"
+    
+  - control_id: "ECC-DP-15"
+    control_title: "Data Classification"
+    evidence_required:
+      - "Data classification policy"
+      - "Data classification scheme (Public, Internal, Confidential, Restricted)"
+      - "Data inventory with classification labels"
+      - "Data handling procedures"
+    test_questions:
+      - "Is data classification policy documented? □ Yes □ No"
+      - "Are all data assets classified? □ Yes □ No"
+      - "Are handling procedures defined per classification level? □ Yes □ No"
+      - "Are employees trained on data classification? □ Yes □ No"
+    maturity_level: "___/5"
+    auditor_notes: "_______________________________________"
+    status: "☐ Pass ☐ Fail ☐ Observation"
+    
+  - control_id: "ECC-DP-20"
+    control_title: "Encryption"
+    evidence_required:
+      - "Encryption policy"
+      - "Encryption at rest configuration (databases, storage)"
+      - "Encryption in transit configuration (TLS)"
+      - "Key management system documentation"
+    test_questions:
+      - "Is encryption policy documented? □ Yes □ No"
+      - "Is data at rest encrypted (AES-256 or equivalent)? □ Yes □ No"
+      - "Is data in transit encrypted (TLS 1.2+)? □ Yes □ No"
+      - "Is key management system implemented? □ Yes □ No"
+    maturity_level: "___/5"
+    auditor_notes: "_______________________________________"
+    status: "☐ Pass ☐ Fail ☐ Observation"
+    
+  - control_id: "ECC-DP-26"
+    control_title: "Vulnerability Management"
+    evidence_required:
+      - "Vulnerability management policy"
+      - "Vulnerability scan reports (monthly)"
+      - "Patch management records"
+      - "Remediation tracking"
+    test_questions:
+      - "Are vulnerability scans conducted monthly? □ Yes □ No"
+      - "Are critical vulnerabilities patched within 14 days? □ Yes □ No"
+      - "Are high vulnerabilities patched within 30 days? □ Yes □ No"
+      - "Is patch testing performed before production deployment? □ Yes □ No"
+    maturity_level: "___/5"
+    auditor_notes: "_______________________________________"
+    status: "☐ Pass ☐ Fail ☐ Observation"
+
+# Resilience Domain (RE) - 28 Controls (Sample)
+resilience_checklist:
+  - control_id: "ECC-RE-5"
+    control_title: "Incident Response"
+    evidence_required:
+      - "Incident response plan"
+      - "Incident response team roster"
+      - "Incident log (last 12 months)"
+      - "Incident response test report (annual)"
+    test_questions:
+      - "Is incident response plan documented and approved? □ Yes □ No"
+      - "Is incident response team trained? □ Yes □ No"
+      - "Are all incidents logged and investigated? □ Yes □ No"
+      - "Is incident response plan tested annually? □ Yes □ No"
+    maturity_level: "___/5"
+    auditor_notes: "_______________________________________"
+    status: "☐ Pass ☐ Fail ☐ Observation"
+    
+  - control_id: "ECC-RE-8"
+    control_title: "Business Continuity Planning"
+    evidence_required:
+      - "Business continuity plan (BCP)"
+      - "Business impact analysis (BIA)"
+      - "BCP test report (annual)"
+      - "Recovery time objective (RTO) / Recovery point objective (RPO) definitions"
+    test_questions:
+      - "Is BCP documented and approved? □ Yes □ No"
+      - "Is BIA completed annually? □ Yes □ No"
+      - "Are RTO/RPO objectives defined? □ Yes □ No"
+      - "Is BCP tested annually? □ Yes □ No"
+    maturity_level: "___/5"
+    auditor_notes: "_______________________________________"
+    status: "☐ Pass ☐ Fail ☐ Observation"
+
+# Third-Party Management (TM) - 22 Controls (Sample)
+third_party_checklist:
+  - control_id: "ECC-TM-1"
+    control_title: "Vendor Risk Management"
+    evidence_required:
+      - "Vendor risk management policy"
+      - "Vendor risk assessment questionnaires"
+      - "Vendor security certifications (ISO 27001, SOC 2)"
+      - "Vendor contracts with security clauses"
+    test_questions:
+      - "Is vendor risk management policy documented? □ Yes □ No"
+      - "Are all vendors risk-assessed before engagement? □ Yes □ No"
+      - "Are vendor security certifications verified? □ Yes □ No"
+      - "Do contracts include security requirements and right-to-audit? □ Yes □ No"
+    maturity_level: "___/5"
+    auditor_notes: "_______________________________________"
+    status: "☐ Pass ☐ Fail ☐ Observation"
+
+# Compliance Scoring
+scoring:
+  methodology: "Weighted average across all 114 controls"
+  maturity_scale:
+    0: "Non-existent"
+    1: "Initial/Ad-hoc"
+    2: "Repeatable"
+    3: "Defined"
+    4: "Managed"
+    5: "Optimizing"
+  
+  compliance_calculation:
+    formula: "(Controls at level 3+ / Total controls) * 100"
+    thresholds:
+      audit_ready: "≥ 80% at level 3+"
+      certification_ready: "≥ 90% at level 4+"
+      excellence: "≥ 95% at level 4+"
+  
+  example_scoring:
+    scenario: "100 controls at level 3+, 14 controls at level 2"
+    calculation: "(100 / 114) * 100 = 87.7%"
+    status: "Audit Ready"
+
+summary_report:
+  header:
+    organization: "_______________________________"
+    audit_date: "_______________________________"
+    auditor_name: "_______________________________"
+    audit_type: "☐ Internal ☐ External ☐ Certification"
+    
+  domain_scores:
+    governance: "___/13 controls pass (____%)"
+    defense: "___/35 controls pass (____%)"
+    resilience: "___/28 controls pass (____%)"
+    third_party: "___/22 controls pass (____%)"
+    ics: "___/16 controls pass (____%)"
+    
+  overall_score:
+    total_pass: "___/114 (____%)"
+    compliance_level: "☐ Not Ready ☐ Audit Ready ☐ Certification Ready ☐ Excellence"
+    
+  findings_summary:
+    critical: "___"
+    high: "___"
+    medium: "___"
+    low: "___"
+    observations: "___"
+    
+  recommendation:
+    proceed_to_certification: "☐ Yes ☐ No (complete remediation first)"
+    estimated_remediation_time: "___ days"
+    next_audit_date: "_______________________________"
+    
+  signatures:
+    lead_auditor: "_______________________________  Date: ___________"
+    auditee: "_______________________________  Date: ___________"
+    management: "_______________________________  Date: ___________"
+
+notes:
+  - "Complete checklist covers all 114 ECC controls"
+  - "Use for internal self-assessment or external audit"
+  - "Maturity scoring enables gap analysis"
+  - "Bilingual testing recommended for Saudi audits"
+  - "Retain completed checklists for 7 years per NCA requirements"
