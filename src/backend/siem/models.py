@@ -9,6 +9,7 @@ import uuid
 import enum
 
 from core.database import Base
+from incident.models import SecurityIncident  # canonical definition to avoid duplicate table
 
 
 class SecurityEventType(str, enum.Enum):
@@ -31,16 +32,6 @@ class SecurityEventSeverity(str, enum.Enum):
     MEDIUM = "medium"
     LOW = "low"
     INFORMATIONAL = "informational"
-
-
-class IncidentStatus(str, enum.Enum):
-    """Incident lifecycle status"""
-    NEW = "new"
-    INVESTIGATING = "investigating"
-    CONTAINED = "contained"
-    ERADICATED = "eradicated"
-    RECOVERED = "recovered"
-    CLOSED = "closed"
 
 
 class SecurityEvent(Base):
@@ -94,79 +85,6 @@ class SecurityEvent(Base):
     # Relationships
     source_user = relationship("User", foreign_keys=[source_user_id])
     incident = relationship("SecurityIncident", foreign_keys=[incident_id])
-
-
-class SecurityIncident(Base):
-    """Security incidents requiring investigation"""
-    __tablename__ = "security_incidents"
-    
-    incident_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    
-    # Incident identification
-    incident_number = Column(String(50), unique=True, nullable=False)
-    title_en = Column(String(255), nullable=False)
-    title_ar = Column(String(255), nullable=False)
-    description_en = Column(Text, nullable=False)
-    description_ar = Column(Text, nullable=False)
-    
-    # Classification
-    incident_type = Column(String(100), nullable=False)  # intrusion, data_breach, malware, insider_threat
-    severity = Column(SQLEnum(SecurityEventSeverity), nullable=False)
-    status = Column(SQLEnum(IncidentStatus), default=IncidentStatus.NEW, nullable=False)
-    
-    # Timeline
-    detected_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    reported_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    containment_at = Column(DateTime)
-    eradication_at = Column(DateTime)
-    recovery_at = Column(DateTime)
-    closed_at = Column(DateTime)
-    
-    # Impact assessment
-    affected_systems = Column(JSON)  # [system1, system2]
-    affected_users_count = Column(Integer, default=0)
-    data_compromised = Column(Boolean, default=False)
-    data_types_compromised = Column(JSON)  # [PII, financial, credentials]
-    estimated_impact_usd = Column(Float)
-    
-    # GRC impact
-    violated_controls = Column(JSON)  # [control_id, control_id]
-    compliance_violations = Column(JSON)  # {framework: [violation1, violation2]}
-    regulatory_notification_required = Column(Boolean, default=False)
-    regulatory_notification_deadline = Column(DateTime)
-    
-    # Investigation
-    assigned_to = Column(UUID(as_uuid=True), ForeignKey('users.user_id'))
-    investigation_notes = Column(Text)
-    root_cause_en = Column(Text)
-    root_cause_ar = Column(Text)
-    attack_vector_en = Column(Text)
-    attack_vector_ar = Column(Text)
-    
-    # Response actions
-    containment_actions = Column(JSON)  # [action1, action2]
-    eradication_actions = Column(JSON)
-    recovery_actions = Column(JSON)
-    preventive_measures_en = Column(Text)
-    preventive_measures_ar = Column(Text)
-    
-    # Lessons learned
-    lessons_learned_en = Column(Text)
-    lessons_learned_ar = Column(Text)
-    recommendations_en = Column(Text)
-    recommendations_ar = Column(Text)
-    
-    # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-    
-    # Relationships
-    assignee = relationship("User", foreign_keys=[assigned_to])
-    events = relationship("SecurityEvent", back_populates="incident")
-
-
-# Add back_populates to SecurityEvent
-SecurityEvent.incident = relationship("SecurityIncident", back_populates="events", foreign_keys=[SecurityEvent.incident_id])
 
 
 class VulnerabilityScan(Base):
