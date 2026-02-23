@@ -1,4 +1,5 @@
 # Pytest configuration
+import asyncio
 import os
 import sys
 from pathlib import Path
@@ -20,9 +21,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../s
 @pytest.fixture(scope="session", autouse=True)
 def apply_migrations() -> None:
 	"""Apply Alembic migrations before running API tests.
-	
-	Database schema is created via migrations, not FastAPI lifespan.
-	httpx 0.27+ ASGITransport handles lifespan events automatically.
+
+	Falls back to creating tables via SQLAlchemy metadata for SQLite
+	(which does not support all PostgreSQL migration operations).
 	"""
 	try:
 		repo_root = Path(__file__).resolve().parents[1]
@@ -38,5 +39,27 @@ def apply_migrations() -> None:
 		print("✓ Database migrations applied successfully")
 	except Exception as e:
 		print(f"⚠️  Database migration failed: {e}")
-		print("   Tests will run with limited functionality")
-		# Don't fail - allow tests to run even if DB is not available
+		print("   Falling back to SQLAlchemy create_all for test schema")
+		# Fallback: drop and recreate all tables from current models (safe for test env)
+		try:
+			async def _recreate_db():
+				from sqlalchemy.ext.asyncio import create_async_engine
+				from core.config import settings
+				from core.database import Base
+				from core.database import _load_models
+				_load_models()
+				try:
+					import regulatory_versions  # noqa: F401
+				except Exception:
+					pass
+				engine = create_async_engine(settings.DATABASE_URL)
+				async with engine.begin() as conn:
+					await conn.run_sync(Base.metadata.drop_all)
+					await conn.run_sync(Base.metadata.create_all)
+				await engine.dispose()
+
+			asyncio.run(_recreate_db())
+			print("✓ Database schema created via SQLAlchemy models")
+		except Exception as e2:
+			print(f"⚠️  Fallback schema creation also failed: {e2}")
+			print("   Tests will run with limited functionality")

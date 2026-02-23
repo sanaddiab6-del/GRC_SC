@@ -38,21 +38,25 @@ class ControlCreate(ControlBase):
 
 
 class ControlUpdate(BaseModel):
-    """Schema for updating a control (all fields optional)"""
+    """Schema for updating a control (all fields optional).
+    When 'status' is provided, the lifecycle transition rules are enforced.
+    """
     title_en: Optional[str] = None
     title_ar: Optional[str] = None
     description_en: Optional[str] = None
     description_ar: Optional[str] = None
     status: Optional[str] = None
     maturity_level: Optional[int] = None
+    priority: Optional[str] = None
 
 
 class ControlResponse(ControlBase):
     """Schema for control responses"""
     id: int
+    lifecycle_updated_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
-    
+
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
 

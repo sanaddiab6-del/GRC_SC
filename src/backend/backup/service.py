@@ -21,10 +21,16 @@ logger = logging.getLogger(__name__)
 
 class BackupService:
     """Service for managing backups and disaster recovery"""
-    
+
     def __init__(self, backup_base_path: str = "/var/backups/sico"):
         self.backup_base_path = backup_base_path
-        os.makedirs(backup_base_path, exist_ok=True)
+        try:
+            os.makedirs(backup_base_path, exist_ok=True)
+        except OSError:
+            # Fall back to a writable temp location if the default is not accessible
+            import tempfile
+            self.backup_base_path = os.path.join(tempfile.gettempdir(), "sico_backups")
+            os.makedirs(self.backup_base_path, exist_ok=True)
     
     async def create_postgresql_backup(
         self,

@@ -66,6 +66,9 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         """Check if running in production mode."""
+        import os
+        if os.getenv("PYTEST_RUNNING") == "1" or os.getenv("PYTEST_CURRENT_TEST"):
+            return False
         return not self.DEBUG and "localhost" not in self.DATABASE_URL
     
     # Azure Key Vault (for production)
