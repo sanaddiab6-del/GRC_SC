@@ -1,0 +1,100 @@
+{
+  "policy_name": "Evidence Collection and Retention Policy",
+  "policy_name_ar": "سياسة جمع الأدلة والاحتفاظ بها",
+  "version": "1.0",
+  "effective_date": "2026-02-23",
+  "issuer": "Compliance Department",
+  "issuer_ar": "قسم الامتثال",
+  "frameworks_covered": [
+    "ECC",
+    "CCC",
+    "PDPL"
+  ],
+  "purpose_en": "This policy establishes requirements for collecting, storing, and retaining evidence to demonstrate compliance with NCA ECC, NCA CCC, and PDPL regulations.",
+  "purpose_ar": "تحدد هذه السياسة متطلبات جمع الأدلة وتخزينها والاحتفاظ بها لإثبات الامتثال للوائح NCA ECC وNCA CCC وPDPL.",
+  "principles": [
+    {
+      "id": "EP-01",
+      "title_en": "Completeness",
+      "title_ar": "الاكتمال",
+      "description_en": "Evidence must be complete and sufficient to demonstrate full compliance with each applicable control.",
+      "description_ar": "يجب أن تكون الأدلة كاملة وكافية لإثبات الامتثال الكامل لكل ضابط معمول به."
+    },
+    {
+      "id": "EP-02",
+      "title_en": "Authenticity",
+      "title_ar": "الأصالة",
+      "description_en": "Evidence must be authentic, unaltered, and traceable to its original source.",
+      "description_ar": "يجب أن تكون الأدلة أصلية وغير معدلة وقابلة للتتبع إلى مصدرها الأصلي."
+    },
+    {
+      "id": "EP-03",
+      "title_en": "Timeliness",
+      "title_ar": "التوقيت",
+      "description_en": "Evidence must be collected at the required frequency and retained for the full retention period.",
+      "description_ar": "يجب جمع الأدلة بالتكرار المطلوب والاحتفاظ بها طوال فترة الاحتفاظ الكاملة."
+    },
+    {
+      "id": "EP-04",
+      "title_en": "Bilingual Documentation",
+      "title_ar": "التوثيق ثنائي اللغة",
+      "description_en": "All compliance evidence must include both Arabic and English labels and metadata to support Saudi regulatory requirements.",
+      "description_ar": "يجب أن تتضمن جميع أدلة الامتثال تسميات وبيانات وصفية باللغتين العربية والإنجليزية لدعم المتطلبات التنظيمية السعودية."
+    },
+    {
+      "id": "EP-05",
+      "title_en": "Retention",
+      "title_ar": "الاحتفاظ",
+      "description_en": "All compliance evidence must be retained for a minimum of 7 years per NCA requirements, unless a longer period is required by specific regulations.",
+      "description_ar": "يجب الاحتفاظ بجميع أدلة الامتثال لمدة لا تقل عن 7 سنوات وفقاً لمتطلبات NCA، ما لم تتطلب لوائح محددة فترة أطول."
+    }
+  ],
+  "retention_schedule": {
+    "default_years": 7,
+    "framework_specific": {
+      "ECC": {
+        "security_logs": 1,
+        "audit_reports": 7,
+        "policies_and_procedures": 7,
+        "risk_assessments": 5,
+        "training_records": 5
+      },
+      "CCC": {
+        "cloud_configuration_records": 5,
+        "penetration_test_reports": 3,
+        "key_management_records": 7
+      },
+      "PDPL": {
+        "consent_records": 7,
+        "processing_records": 7,
+        "dpia_reports": 7,
+        "breach_notifications": 7
+      }
+    }
+  },
+  "collection_responsibilities": {
+    "Compliance Officer": [
+      "governance_policy",
+      "audit_reports",
+      "risk_register"
+    ],
+    "IT Security Team": [
+      "security_logs",
+      "penetration_test_report",
+      "asset_inventory",
+      "iam_policy"
+    ],
+    "Data Protection Officer": [
+      "data_processing_records",
+      "consent_records",
+      "dpia_report",
+      "breach_notification_records"
+    ],
+    "HR Department": [
+      "training_records"
+    ],
+    "Cloud Team": [
+      "key_management_procedures"
+    ]
+  }
+}

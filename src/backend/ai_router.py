@@ -131,15 +131,27 @@ async def rebuild_vector_index(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Rebuild the vector database index
-    Admin endpoint - requires authentication in production
+    Rebuild the vector database index from repo control libraries (Repo Mode).
+    Admin endpoint - requires authentication in production.
     """
-    # This would trigger a background task to rebuild the index
-    # For now, return a placeholder response
-    return {
-        "status": "initiated",
-        "message_en": "Vector index rebuild initiated",
-        "message_ar": "تم بدء إعادة بناء فهرس المتجهات",
-    }
+    try:
+        from ai.rag.control_loader import load_all_frameworks_as_documents, get_library_stats
+        stats = get_library_stats()
+        total_controls = sum(
+            v.get("total_controls", 0) for v in stats.values() if isinstance(v, dict)
+        )
+        docs = load_all_frameworks_as_documents()
+        return {
+            "status": "ready",
+            "message_en": f"Control library loaded: {total_controls} controls, {len(docs)} chunks ready for indexing. Run scripts/build_rag_index.py to build the vector store.",
+            "message_ar": f"تم تحميل مكتبة الضوابط: {total_controls} ضابط، {len(docs)} قطعة جاهزة للفهرسة.",
+            "library_stats": stats,
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message_en": f"Error loading control library: {str(e)}",
+            "message_ar": f"خطأ في تحميل مكتبة الضوابط: {str(e)}",
+        }
 
 
