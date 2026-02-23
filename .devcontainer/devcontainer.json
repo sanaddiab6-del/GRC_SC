@@ -25,6 +25,7 @@
       "nodeGypDependencies": true
     }
     "ghcr.io/devcontainers/features/poetry:1": {}
+    "ghcr.io/devcontainers-extra/features/poetry:1": {}
   },
 
   "customizations": {
