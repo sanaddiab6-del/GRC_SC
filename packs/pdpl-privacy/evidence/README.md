@@ -1,3 +1,4 @@
+# Evidence Templates for PDPL Privacy Pack
 
 ## Overview
 Evidence collection templates for Saudi Personal Data Protection Law (PDPL) compliance. Essential for data controllers and processors operating in Saudi Arabia.
@@ -204,3 +205,5 @@ Per PDPL requirements:
 ---
 **Last Updated**: February 2024  
 **Version**: 1.0  
+**Compliance Framework**: PDPL (Royal Decree M/19, 1443 H)  
+**Regulator**: Saudi Data & AI Authority (SDAIA)

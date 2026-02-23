@@ -1,3 +1,4 @@
+# Evidence Templates for CCC Cloud Pack
 
 ## Overview
 Evidence collection templates for NCA Cloud Computing Controls (CCC). Designed for cloud service providers and cloud consumers to demonstrate compliance.
@@ -160,3 +161,4 @@ Required evidence from CSP:
 ---
 **Last Updated**: February 2024  
 **Version**: 1.0  
+**Compliance Framework**: NCA CCC 1.0

@@ -29,6 +29,7 @@ from backup import router as backup_router
 import enterprise_router
 from isms import router as isms_router
 from audit import router as audit_router
+from monitoring import router as monitoring_router
 
 
 # Configure logging
@@ -263,6 +264,7 @@ app.include_router(backup_router, prefix="/api/v1", tags=["Backup & Disaster Rec
 app.include_router(enterprise_router.router, prefix="/api/v1", tags=["Enterprise GRC"])
 app.include_router(isms_router, prefix="/api/v1", tags=["ISMS & ISO 27001"])
 app.include_router(audit_router, prefix="/api/v1", tags=["Audit Management"])
+app.include_router(monitoring_router, prefix="/api/v1", tags=["Monitoring & Observability"])
 
 
 @app.get("/api/v1/security-status", tags=["Security"])
