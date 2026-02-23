@@ -21,6 +21,11 @@ from reporting.schemas import (
     ControlPosture,
     DashboardData,
 )
+Reporting Router
+API endpoints for compliance reporting
+"""
+
+from fastapi import APIRouter
 
 router = APIRouter()
 
@@ -253,3 +258,13 @@ async def list_reports(
     
     return reports
 
+@router.get("/")
+async def list_reports():
+    """List all reports"""
+    return {"reports": []}
+
+
+@router.post("/generate")
+async def generate_report():
+    """Generate new report"""
+    return {"status": "generating"}
