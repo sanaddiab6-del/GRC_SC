@@ -9,10 +9,10 @@ from sqlalchemy import select, and_, or_, func, update
 import json
 
 from siem.models import (
-    SecurityEvent, SecurityIncident, VulnerabilityScan, VulnerabilityFinding,
-    ThreatIntelligence, SecurityEventType, SecurityEventSeverity,
-    IncidentStatus
+    SecurityEvent, VulnerabilityScan, VulnerabilityFinding,
+    ThreatIntelligence, SecurityEventType, SecurityEventSeverity
 )
+from incident.models import SecurityIncident, IncidentStatus
 from auth.models import User
 
 

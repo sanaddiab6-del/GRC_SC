@@ -146,6 +146,27 @@ async def update_incident(
     
     # Update fields
     update_data = update.model_dump(exclude_unset=True)
+
+    # Enforce strict lifecycle transitions for status/state
+    if "status" in update_data:
+        from core.lifecycle_transitions import INCIDENT_TRANSITIONS
+        current_status = getattr(incident, "status")
+        new_status = update_data["status"]
+        allowed = INCIDENT_TRANSITIONS.get(current_status, [])
+        if new_status != current_status and new_status not in allowed:
+            tooltip = (
+                f"Transition from '{current_status}' to '{new_status}' is not allowed. "
+                f"Allowed: {allowed if allowed else 'No further transitions.'}"
+            )
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message_en": f"Invalid status transition: {current_status} → {new_status}",
+                    "message_ar": f"الانتقال من الحالة '{current_status}' إلى '{new_status}' غير مسموح.",
+                    "tooltip": tooltip,
+                },
+            )
+
     for field, value in update_data.items():
         setattr(incident, field, value)
     
