@@ -1,10 +1,16 @@
 # Backend Tests - AI/RAG Module
+import os
 import pytest
 from httpx import AsyncClient, ASGITransport
 from main import app
 
+# Skip AI tests when AI dependencies are not installed (e.g., CI environment)
+AI_UNAVAILABLE = os.environ.get("CI_SKIP_AI", "").lower() in ("1", "true")
+skip_if_no_ai = pytest.mark.skipif(AI_UNAVAILABLE, reason="AI dependencies not installed")
+
 
 @pytest.mark.asyncio
+@skip_if_no_ai
 async def test_rag_query_english():
     """Test RAG query in English"""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -26,6 +32,7 @@ async def test_rag_query_english():
 
 
 @pytest.mark.asyncio
+@skip_if_no_ai
 async def test_rag_query_arabic():
     """Test RAG query in Arabic"""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:

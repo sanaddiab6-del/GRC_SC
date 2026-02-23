@@ -37,8 +37,8 @@ class Report(Base):
     id = Column(Integer, primary_key=True, index=True)
     report_id = Column(String(100), unique=True, index=True, nullable=False)
     
-    report_type = Column(Enum(ReportType), nullable=False)
-    status = Column(Enum(ReportStatus), default=ReportStatus.PENDING)
+    report_type = Column(Enum(ReportType, native_enum=False), nullable=False)
+    status = Column(Enum(ReportStatus, native_enum=False), default=ReportStatus.PENDING)
     
     # Bilingual fields
     title_en = Column(String(500), nullable=False)

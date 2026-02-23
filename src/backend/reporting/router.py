@@ -25,6 +25,11 @@ from reporting.schemas import (
 router = APIRouter()
 
 
+def _str_value(v) -> str:
+    """Return the string value of an enum or plain string."""
+    return v if isinstance(v, str) else v.value
+
+
 @router.get("/dashboard", response_model=DashboardData)
 async def get_executive_dashboard(
     db: AsyncSession = Depends(get_db),
@@ -51,11 +56,11 @@ async def get_executive_dashboard(
     by_domain = {}
     
     for control in all_controls:
-        status = control.status.value
+        status = _str_value(control.status)
         status_counts[status] = status_counts.get(status, 0) + 1
         
         # By framework
-        framework = control.framework.value
+        framework = _str_value(control.framework)
         if framework not in by_framework:
             by_framework[framework] = {
                 "compliant": 0,
@@ -130,7 +135,7 @@ async def get_executive_dashboard(
             "control_id": c.control_id,
             "title_en": c.title_en,
             "title_ar": c.title_ar,
-            "framework": c.framework.value,
+            "framework": _str_value(c.framework),
         }
         for c in gaps_controls
     ]

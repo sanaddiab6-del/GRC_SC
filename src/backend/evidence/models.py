@@ -46,8 +46,8 @@ class Evidence(Base):
     control_id = Column(String(50), ForeignKey("controls.control_id"), nullable=False)
     
     # Evidence metadata
-    evidence_type = Column(Enum(EvidenceType), nullable=False)
-    status = Column(Enum(EvidenceStatus), default=EvidenceStatus.PENDING)
+    evidence_type = Column(Enum(EvidenceType, native_enum=False), nullable=False)
+    status = Column(Enum(EvidenceStatus, native_enum=False), default=EvidenceStatus.PENDING)
     
     # Bilingual fields
     title_en = Column(String(500), nullable=False)
