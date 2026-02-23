@@ -57,7 +57,10 @@ jobs:
         continue-on-error: true
 
       - name: Upload Bandit SARIF
-        uses: github/codeql-action/upload-sarif@v3
+        if: ${{ exists('bandit-report.sarif') }}
+        if: ${{ exists('bandit-report.sarif') }}
+        if: ${{ exists('bandit-report.sarif') }}
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: bandit-report.sarif
           category: bandit
@@ -97,7 +100,10 @@ jobs:
           severity: 'CRITICAL,HIGH'
 
       - name: Upload Trivy SARIF
-        uses: github/codeql-action/upload-sarif@v3
+        if: ${{ exists('trivy-results.sarif') }}
+        if: ${{ exists('trivy-results.sarif') }}
+        if: ${{ exists('trivy-results.sarif') }}
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-results.sarif
           category: trivy

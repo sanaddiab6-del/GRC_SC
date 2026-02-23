@@ -123,7 +123,10 @@ jobs:
           retention-days: 90
 
       - name: Upload SARIF to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
+        if: ${{ exists('bandit-report.sarif') }}
+        if: ${{ exists('bandit-report.sarif') }}
+        if: ${{ exists('bandit-report.sarif') }}
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: bandit-report.sarif
           category: bandit
@@ -238,7 +241,10 @@ jobs:
           retention-days: 90
 
       - name: Upload SARIF to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
+        if: ${{ exists('trivy-backend-results.sarif') }}
+        if: ${{ exists('trivy-backend-results.sarif') }}
+        if: ${{ exists('trivy-backend-results.sarif') }}
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-backend-results.sarif
           category: trivy-backend
