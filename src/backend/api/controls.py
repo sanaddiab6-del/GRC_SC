@@ -104,3 +104,17 @@ async def get_control(control_id: str):
         raise HTTPException(status_code=404, detail="Control not found")
     
     return controls[control_id]
+Controls API Module
+Provides REST endpoints for control management
+Wraps the controls router for API v1
+"""
+
+from fastapi import APIRouter
+from src.backend.controls.router import router as controls_router
+
+router = APIRouter()
+
+# Include all control endpoints
+router.include_router(controls_router, tags=["controls"])
+
+__all__ = ["router"]
