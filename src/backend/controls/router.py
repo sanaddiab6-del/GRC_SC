@@ -53,15 +53,24 @@ async def list_controls(
     if domain:
         query = query.where(Control.domain == domain)
     
-    # Count total - simplified
-    count_result = await db.execute(query)
-    all_items = count_result.scalars().all()
-    total = len(all_items)
+    # Get total count efficiently
+    count_query = select(func.count()).select_from(Control)
+    if framework:
+        count_query = count_query.where(Control.framework == framework)
+    if status:
+        count_query = count_query.where(Control.status == status)
+    if domain:
+        count_query = count_query.where(Control.domain == domain)
     
-    # Apply pagination manually
-    paginated_items = all_items[offset:offset + limit]
+    total_result = await db.execute(count_query)
+    total = total_result.scalar()
     
-    response_items = [ControlResponse.model_validate(item) for item in paginated_items]
+    # Apply pagination in database
+    query = query.offset(offset).limit(limit)
+    result = await db.execute(query)
+    items = result.scalars().all()
+    
+    response_items = [ControlResponse.model_validate(item) for item in items]
     return ControlListResponse(
         total=total,
         offset=offset,
