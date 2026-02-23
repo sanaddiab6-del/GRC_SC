@@ -9,6 +9,8 @@ from datetime import datetime, timedelta
 from uuid import UUID
 
 from core.database import get_db
+from core.crud_utils import get_by_id, update_model
+from core.audit_utils import log_create_event, log_update_event
 from auth.security import get_current_user, require_permission, log_audit_event
 from auth.models import User
 from .models import Risk, RiskAssessment, ThirdPartyRisk, RiskCategory, RiskStatus, TreatmentStatus
@@ -150,14 +152,14 @@ async def get_risk(
     db: AsyncSession = Depends(get_db)
 ):
     """Get risk details"""
-    result = await db.execute(
-        select(Risk).where(Risk.risk_id == risk_id)
+    risk = await get_by_id(
+        db=db,
+        model=Risk,
+        id_field_name="risk_id",
+        id_value=risk_id,
+        error_message_en="Risk not found",
+        error_message_ar="لم يتم العثور على المخاطر",
     )
-    risk = result.scalar_one_or_none()
-    
-    if not risk:
-        raise HTTPException(status_code=404, detail="Risk not found")
-    
     return risk
 
 
@@ -170,13 +172,14 @@ async def update_risk(
     db: AsyncSession = Depends(get_db)
 ):
     """Update risk"""
-    result = await db.execute(
-        select(Risk).where(Risk.risk_id == risk_id)
+    risk = await get_by_id(
+        db=db,
+        model=Risk,
+        id_field_name="risk_id",
+        id_value=risk_id,
+        error_message_en="Risk not found",
+        error_message_ar="لم يتم العثور على المخاطر",
     )
-    risk = result.scalar_one_or_none()
-    
-    if not risk:
-        raise HTTPException(status_code=404, detail="Risk not found")
     
     # Update fields
     update_data = update.model_dump(exclude_unset=True)
@@ -205,16 +208,13 @@ async def update_risk(
     await db.refresh(risk)
     
     # Audit log
-    await log_audit_event(
+    await log_update_event(
         db=db,
         user_id=str(current_user.user_id),
-        action="risk.updated",
         resource="risk",
         resource_id=str(risk_id),
-        status="success",
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
-        details=update_data
+        request=request,
+        details=update_data,
     )
     
     return risk
@@ -333,14 +333,14 @@ async def get_vendor(
     db: AsyncSession = Depends(get_db)
 ):
     """Get vendor details"""
-    result = await db.execute(
-        select(ThirdPartyRisk).where(ThirdPartyRisk.vendor_id == vendor_id)
+    vendor = await get_by_id(
+        db=db,
+        model=ThirdPartyRisk,
+        id_field_name="vendor_id",
+        id_value=vendor_id,
+        error_message_en="Vendor not found",
+        error_message_ar="لم يتم العثور على البائع",
     )
-    vendor = result.scalar_one_or_none()
-    
-    if not vendor:
-        raise HTTPException(status_code=404, detail="Vendor not found")
-    
     return vendor
 
 
@@ -353,33 +353,25 @@ async def update_vendor(
     db: AsyncSession = Depends(get_db)
 ):
     """Update vendor risk assessment"""
-    result = await db.execute(
-        select(ThirdPartyRisk).where(ThirdPartyRisk.vendor_id == vendor_id)
+    vendor = await get_by_id(
+        db=db,
+        model=ThirdPartyRisk,
+        id_field_name="vendor_id",
+        id_value=vendor_id,
+        error_message_en="Vendor not found",
+        error_message_ar="لم يتم العثور على البائع",
     )
-    vendor = result.scalar_one_or_none()
     
-    if not vendor:
-        raise HTTPException(status_code=404, detail="Vendor not found")
-    
-    # Update fields
-    update_data = update.model_dump(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(vendor, field, value)
-    
-    await db.commit()
-    await db.refresh(vendor)
+    vendor = await update_model(item=vendor, update_data=update, db=db)
     
     # Audit log
-    await log_audit_event(
+    await log_update_event(
         db=db,
         user_id=str(current_user.user_id),
-        action="vendor.updated",
         resource="vendor",
         resource_id=str(vendor_id),
-        status="success",
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
-        details=update_data
+        request=request,
+        details=update.model_dump(exclude_unset=True),
     )
     
     return vendor
