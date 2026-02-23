@@ -4,28 +4,22 @@ RESTful endpoints for control management with bilingual support
 Protected with NCA ECC-IS-3 authentication and RBAC authorization
 """
 
+from datetime import datetime
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from typing import Optional
 
 from core.database import get_db
 from core.crud_utils import get_by_id, check_exists, update_model, delete_by_id
-from controls.models import Control, FrameworkType
+from controls.models import Control, FrameworkType, ControlStatus, LIFECYCLE_TRANSITIONS
 from controls.schemas import (
     ControlCreate,
     ControlUpdate,
     ControlResponse,
     ControlListResponse,
 )
-# Import authentication dependencies (disabled for demo)
-# from auth.security import get_current_user, require_permission
-# from auth.models import User
-Controls Router
-API endpoints for compliance controls management
-"""
-
-from fastapi import APIRouter
 
 router = APIRouter()
 
@@ -38,14 +32,13 @@ async def list_controls(
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=1000),
     db: AsyncSession = Depends(get_db),
-    # current_user: User = Depends(get_current_user),  # Authentication disabled for demo
 ):
     """
     Get paginated list of controls with filtering
     Supports bilingual results
     """
     query = select(Control)
-    
+
     # Apply filters
     if framework:
         query = query.where(Control.framework == framework)
@@ -53,7 +46,7 @@ async def list_controls(
         query = query.where(Control.status == status)
     if domain:
         query = query.where(Control.domain == domain)
-    
+
     # Get total count efficiently
     count_query = select(func.count()).select_from(Control)
     if framework:
@@ -62,15 +55,15 @@ async def list_controls(
         count_query = count_query.where(Control.status == status)
     if domain:
         count_query = count_query.where(Control.domain == domain)
-    
+
     total_result = await db.execute(count_query)
     total = total_result.scalar()
-    
+
     # Apply pagination in database
     query = query.offset(offset).limit(limit)
     result = await db.execute(query)
     items = result.scalars().all()
-    
+
     response_items = [ControlResponse.model_validate(item) for item in items]
     return ControlListResponse(
         total=total,
@@ -84,7 +77,6 @@ async def list_controls(
 async def get_control(
     control_id: str,
     db: AsyncSession = Depends(get_db),
-    # current_user: User = Depends(get_current_user),  # Authentication disabled for demo
 ):
     """Get a specific control by ID (e.g., ECC-GV-1)."""
     control = await get_by_id(
@@ -102,7 +94,6 @@ async def get_control(
 async def create_control(
     control_data: ControlCreate,
     db: AsyncSession = Depends(get_db),
-    # current_user: User = Depends(require_permission("controls", "create")),  # Requires controls:create permission
 ):
     """Create a new control. Requires controls:create permission (Admin or Compliance Officer)."""
     # Check if control_id already exists
@@ -114,12 +105,12 @@ async def create_control(
         error_message_en=f"Control {control_data.control_id} already exists",
         error_message_ar=f"الضابط {control_data.control_id} موجود بالفعل",
     )
-    
+
     control = Control(**control_data.model_dump())
     db.add(control)
     await db.commit()
     await db.refresh(control)
-    
+
     return control
 
 
@@ -128,9 +119,11 @@ async def update_control(
     control_id: str,
     control_data: ControlUpdate,
     db: AsyncSession = Depends(get_db),
-    # current_user: User = Depends(require_permission("controls", "update")),  # Requires controls:update permission
 ):
-    """Update an existing control (partial update). Requires controls:update permission (Admin or Compliance Officer)."""
+    """
+    Update an existing control (partial update).
+    Enforces lifecycle transition rules when status is changed.
+    """
     control = await get_by_id(
         db=db,
         model=Control,
@@ -139,7 +132,32 @@ async def update_control(
         error_message_en=f"Control {control_id} not found",
         error_message_ar=f"لم يتم العثور على الضابط {control_id}",
     )
-    
+
+    # Enforce lifecycle transition rules
+    if control_data.status is not None:
+        new_status = ControlStatus(control_data.status)
+        current_status = ControlStatus(
+            control.status if isinstance(control.status, str) else control.status.value
+        )
+        allowed = LIFECYCLE_TRANSITIONS.get(current_status, set())
+        if new_status not in allowed:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "message_en": (
+                        f"Invalid lifecycle transition: cannot move from "
+                        f"'{current_status.value}' to '{new_status.value}'. "
+                        f"Allowed transitions: {[s.value for s in allowed]}"
+                    ),
+                    "message_ar": (
+                        f"انتقال دورة حياة غير صالح: لا يمكن الانتقال من "
+                        f"'{current_status.value}' إلى '{new_status.value}'"
+                    ),
+                },
+            )
+        # Stamp the lifecycle change timestamp
+        setattr(control, "lifecycle_updated_at", datetime.utcnow())
+
     control = await update_model(item=control, update_data=control_data, db=db)
     return control
 
@@ -148,34 +166,8 @@ async def update_control(
 async def delete_control(
     control_id: str,
     db: AsyncSession = Depends(get_db),
-    # current_user: User = Depends(require_permission("controls", "delete")),  # Requires controls:delete permission
 ):
     """Delete a control. Requires controls:delete permission (Admin or Compliance Officer only)."""
-    query = select(Control).where(Control.control_id == control_id)
-    result = await db.execute(query)
-    control = result.scalar_one_or_none()
-    
-    if not control:
-        raise HTTPException(
-            status_code=404,
-            detail={
-                "message_en": f"Control {control_id} not found",
-                "message_ar": f"لم يتم العثور على الضابط {control_id}",
-            },
-        )
-    
-    await db.delete(control)
-    await db.commit()
-@router.get("/")
-async def list_controls():
-    """List all controls"""
-    return {"controls": []}
-
-
-@router.get("/{control_id}")
-async def get_control(control_id: str):
-    """Get control by ID"""
-    return {"control_id": control_id}
     await delete_by_id(
         db=db,
         model=Control,

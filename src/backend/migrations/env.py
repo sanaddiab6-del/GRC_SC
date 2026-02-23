@@ -27,6 +27,10 @@ try:
     from training.models import TrainingCourse, TrainingEnrollment
     from audit.models import AuditFinding, AuditEngagement
     import enterprise_models  # Import all enterprise models
+    try:
+        from regulatory_versions import FrameworkVersion  # noqa: F401
+    except ImportError:
+        pass
 except ImportError as e:
     print(f"Warning: Could not import some models: {e}")
     print("Database metadata may be incomplete")

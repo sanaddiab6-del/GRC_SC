@@ -105,16 +105,15 @@ class Organization(Base):
     
     # Relationships
     parent = relationship("Organization", remote_side=[id], backref="children")
-    users = relationship("User", back_populates="organization")
+    users = relationship("EnterpriseUser", back_populates="organization")
     controls = relationship("Control", back_populates="organization")
     risks = relationship("Risk", back_populates="organization")
 
 
-class User(Base):
-    """Platform users with RBAC"""
-    __tablename__ = "users"
-    __table_args__ = {'extend_existing': True}
-    
+class EnterpriseUser(Base):
+    """Platform users with RBAC (enterprise-extended user model)"""
+    __tablename__ = "enterprise_users"
+
     id = Column(Integer, primary_key=True, index=True)
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
     username = Column(String(100), unique=True, nullable=False, index=True)
@@ -125,7 +124,7 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     last_login = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow)
-    
+
     # Relationships
     organization = relationship("Organization", back_populates="users")
 
@@ -250,7 +249,7 @@ class Control(Base):
     
     # Relationships
     organization = relationship("Organization", back_populates="controls")
-    control_owner = relationship("User", foreign_keys=[control_owner_id])
+    control_owner = relationship("EnterpriseUser", foreign_keys=[control_owner_id])
     assessments = relationship("ControlAssessment", back_populates="control")
     evidences = relationship("Evidence", back_populates="control")
     findings = relationship("AuditFinding", back_populates="control")
@@ -348,11 +347,11 @@ class Evidence(Base):
     
     # Metadata
     tags = Column(JSON)
-    metadata = Column(JSON)
+    extra_metadata = Column(JSON)
     
     # Relationships
     control = relationship("Control", back_populates="evidences")
-    uploaded_by = relationship("User", foreign_keys=[uploaded_by_id])
+    uploaded_by = relationship("EnterpriseUser", foreign_keys=[uploaded_by_id])
 
 
 # ============================================================================
@@ -394,7 +393,7 @@ class ControlAssessment(Base):
     
     # Relationships
     control = relationship("Control", back_populates="assessments")
-    assessor = relationship("User", foreign_keys=[assessor_id])
+    assessor = relationship("EnterpriseUser", foreign_keys=[assessor_id])
 
 
 # ============================================================================
@@ -460,7 +459,7 @@ class Risk(Base):
     
     # Relationships
     organization = relationship("Organization", back_populates="risks")
-    risk_owner = relationship("User", foreign_keys=[risk_owner_id])
+    risk_owner = relationship("EnterpriseUser", foreign_keys=[risk_owner_id])
 
 
 # ============================================================================
@@ -528,7 +527,7 @@ class AuditFinding(Base):
     
     # Relationships
     control = relationship("Control", back_populates="findings")
-    identified_by = relationship("User", foreign_keys=[identified_by_id])
+    identified_by = relationship("EnterpriseUser", foreign_keys=[identified_by_id])
 
 
 # ============================================================================

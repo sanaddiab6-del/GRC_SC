@@ -46,15 +46,25 @@ class EvidenceResponse(EvidenceBase):
     """Schema for evidence responses"""
     id: int
     status: str
+    file_hash: Optional[str] = None
     collection_date: datetime
     expiry_date: Optional[datetime] = None
     validated_by: Optional[str] = None
     validated_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
-    
+
     class Config:
         from_attributes = True
+
+
+class EvidenceIntegrityResponse(BaseModel):
+    """Schema for evidence integrity verification result"""
+    evidence_id: str
+    has_hash: bool
+    integrity_ok: bool
+    message_en: str
+    message_ar: str
 
 
 class EvidenceListResponse(BaseModel):
