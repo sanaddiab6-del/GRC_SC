@@ -42,10 +42,6 @@ class ControlChunker:
         Returns:
             List of Document objects for vector store
         """
-        if not _LANGCHAIN_AVAILABLE:
-            raise ImportError(
-                "AI dependencies are not installed. Install langchain to use chunking."
-            )
         chunks = []
         control_id = control.get("control_id")
         framework = control.get("framework")
