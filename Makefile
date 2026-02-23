@@ -1,12 +1,13 @@
 # SICO GRC Platform Makefile
 
-.PHONY: help install dev test clean docker-up docker-down security security-deps security-sast security-scan git-setup check-conflicts
+.PHONY: help install dev test clean docker-up docker-down security security-deps security-sast security-scan git-setup check-conflicts validate
 
 help:
 	@echo "SICO GRC Platform - Available Commands"
 	@echo "======================================"
 	@echo ""
 	@echo "📦 Setup & Installation:"
+	@echo "  validate      - Validate system prerequisites and configuration"
 	@echo "  install       - Install all dependencies"
 	@echo ""
 	@echo "🚀 Development:"
@@ -19,9 +20,12 @@ help:
 	@echo "  lint          - Run linters"
 	@echo ""
 	@echo "🔒 Security:"
-	@echo "  security      - Run all security scans"
-	@echo "  security-deps - Scan dependencies for vulnerabilities"
-	@echo "  security-sast - Run static application security testing"
+	@echo "  security          - Run all security scans (deps + SAST + secrets + containers)"
+	@echo "  security-deps     - Scan dependencies for vulnerabilities"
+	@echo "  security-sast     - Run static application security testing"
+	@echo "  security-secrets  - Detect hardcoded secrets (requires gitleaks)"
+	@echo "  security-containers - Scan Docker containers (requires trivy)"
+	@echo "  security-sbom     - Generate Software Bill of Materials"
 	@echo ""
 	@echo "�️  Database & Data:"
 	@echo "  migrate       - Run database migrations"
@@ -76,16 +80,26 @@ clean:
 	rm -rf src/frontend/.next
 	rm -rf src/frontend/node_modules
 
-security: security-deps security-sast
+security: security-deps security-sast security-secrets security-containers
 	@echo "✅ All security scans completed"
+	@echo ""
+	@echo "📊 Security Summary:"
+	@echo "  - Dependency vulnerabilities: Check safety-report.json + npm-audit.json"
+	@echo "  - Code security issues: Check bandit-report.json"
+	@echo "  - Secrets detected: Check gitleaks output"
+	@echo "  - Container vulnerabilities: Check trivy-*.json"
+	@echo ""
+	@echo "📖 See docs/SECURITY_PIPELINE.md for details"
 
 security-deps:
 	@echo "Running dependency vulnerability scans..."
 	@echo "Checking Python dependencies..."
 	cd src/backend && pip install safety 2>/dev/null || true
-	cd src/backend && safety check --json || true
+	cd src/backend && safety check --json > ../../safety-report.json || true
+	cd src/backend && safety check || true
 	@echo "Checking Node.js dependencies..."
-	cd src/frontend && npm audit --json || true
+	cd src/frontend && npm audit --json > ../../npm-audit.json || true
+	cd src/frontend && npm audit || true
 
 security-sast:
 	@echo "Running SAST (Static Application Security Testing)..."
@@ -93,7 +107,38 @@ security-sast:
 	pip install bandit 2>/dev/null || true
 	@echo "Scanning backend for security issues..."
 	bandit -r src/backend -f json -o bandit-report.json || true
+	bandit -r src/backend || true
 	@echo "Report saved to bandit-report.json"
+
+security-secrets:
+	@echo "Running secret detection scan..."
+	@which gitleaks > /dev/null || (echo "⚠️  Gitleaks not installed. Install from: https://github.com/gitleaks/gitleaks" && exit 1)
+	gitleaks detect --source . --verbose --report-path gitleaks-report.json || true
+
+security-containers:
+	@echo "Running container security scans..."
+	@which trivy > /dev/null || (echo "⚠️  Trivy not installed. Install from: https://aquasecurity.github.io/trivy/" && exit 1)
+	@echo "Building backend container..."
+	docker build -t sico-grc-backend:local -f deployment/Dockerfile.backend . || true
+	@echo "Scanning backend container..."
+	trivy image --format json --output trivy-backend.json sico-grc-backend:local || true
+	trivy image sico-grc-backend:local || true
+	@echo "Building frontend container..."
+	docker build -t sico-grc-frontend:local -f deployment/Dockerfile.frontend . || true
+	@echo "Scanning frontend container..."
+	trivy image --format json --output trivy-frontend.json sico-grc-frontend:local || true
+	trivy image sico-grc-frontend:local || true
+
+security-sbom:
+	@echo "Generating Software Bill of Materials (SBOM)..."
+	@echo "Installing CycloneDX tools..."
+	pip install cyclonedx-bom 2>/dev/null || true
+	npm install -g @cyclonedx/cyclonedx-npm 2>/dev/null || true
+	@echo "Generating Python SBOM..."
+	cd src/backend && cyclonedx-py requirements -i requirements.txt -o ../../sbom-python.json --output-format json || true
+	@echo "Generating Node.js SBOM..."
+	cd src/frontend && cyclonedx-npm --output-file ../../sbom-nodejs.json || true
+	@echo "✅ SBOM files generated: sbom-python.json, sbom-nodejs.json"
 
 security-scan: security
 	@echo "Security scan complete. Check reports for details."

@@ -1,0 +1,61 @@
+# CCC Control Library - Cloud Cybersecurity Controls
+# National Cybersecurity Authority (NCA) - Saudi Arabia
+
+framework:
+  id: ccc
+  name: "Cloud Cybersecurity Controls"
+  version: "1.0"
+  authority: "National Cybersecurity Authority (NCA)"
+  country: "Saudi Arabia"
+  total_controls: 180
+
+domains:
+  - id: 1
+    name: "Cloud Strategy and Governance"
+    name_ar: "استراتيجية وحوكمة السحابة"
+    controls: 25
+    
+  - id: 2
+    name: "Cloud Service Provider Management"
+    name_ar: "إدارة مزودي الخدمات السحابية"
+    controls: 30
+    
+  - id: 3
+    name: "Cloud Security Architecture"
+    name_ar: "بنية أمن السحابة"
+    controls: 28
+    
+  - id: 4
+    name: "Cloud Data Protection"
+    name_ar: "حماية البيانات السحابية"
+    controls: 35
+    
+  - id: 5
+    name: "Cloud Identity and Access Management"
+    name_ar: "إدارة الهوية والوصول السحابي"
+    controls: 32
+
+sample_controls:
+  - control_id: "CCC-1.1.1"
+    title: "Cloud Strategy"
+    title_ar: "استراتيجية السحابة"
+    description: "Develop and maintain a comprehensive cloud adoption strategy"
+    description_ar: "تطوير والحفاظ على استراتيجية شاملة لاعتماد السحابة"
+    domain: "Cloud Strategy and Governance"
+    priority: "Critical"
+    
+  - control_id: "CCC-2.1.1"
+    title: "Cloud Service Provider Assessment"
+    title_ar: "تقييم مزود الخدمة السحابية"
+    description: "Assess cloud service providers before adoption"
+    description_ar: "تقييم مزودي الخدمات السحابية قبل الاعتماد"
+    domain: "Cloud Service Provider Management"
+    priority: "High"
+    
+  - control_id: "CCC-3.1.1"
+    title: "Cloud Architecture Design"
+    title_ar: "تصميم البنية السحابية"
+    description: "Design secure cloud architecture based on best practices"
+    description_ar: "تصميم بنية سحابية آمنة بناءً على أفضل الممارسات"
+    domain: "Cloud Security Architecture"
+    priority: "High"

@@ -1,47 +1,6 @@
-'use client';
-
-import { useTranslations } from 'next-intl';
-import useSWR from 'swr';
-import apiClient from '@/lib/api-client';
-import Link from 'next/link';
-import { useParams } from 'next/navigation';
-
-const fetcher = (url: string) => apiClient.get(url).then((res) => res.data);
+import FrameworkPage from '@/components/FrameworkPage';
 
 export default function PDPLFrameworkPage() {
-  const params = useParams();
-  const locale = params.locale as string;
-  const isArabic = locale === 'ar';
-
-  const { data: controls, isLoading } = useSWR(
-    '/api/v1/controls?framework=PDPL',
-    fetcher
-  );
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
-  }
-
-  const domains = controls?.items?.reduce((acc: any, control: any) => {
-    const domain = control.domain;
-    if (!acc[domain]) {
-      acc[domain] = [];
-    }
-    acc[domain].push(control);
-    return acc;
-  }, {}) || {};
-
-  const stats = {
-    total: controls?.items?.length || 0,
-    compliant: controls?.items?.filter((c: any) => c.status === 'compliant').length || 0,
-    inProgress: controls?.items?.filter((c: any) => c.status === 'in_progress').length || 0,
-    nonCompliant: controls?.items?.filter((c: any) => c.status === 'non_compliant').length || 0,
-  };
-
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       {/* Header */}

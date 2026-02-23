@@ -17,18 +17,55 @@ SICO GRC Platform is a comprehensive Saudi regulatory compliance engine that pro
 
 ## 🚀 Quick Start
 
-### Clone Repository
+### Option 1: GitHub Codespaces (Easiest) ⚡
+
+Launch a complete development environment in your browser:
+
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://github.com/codespaces/new?hide_repo_select=true&ref=main&repo=sonaiso/sanadcom)
+
+**No installation required!** All dependencies and services are pre-configured.
+
+📖 **New to Codespaces?** See [CODESPACES_GUIDE.md](CODESPACES_GUIDE.md) for detailed instructions.
+
+### Option 2: Local Development
+
+#### Clone Repository
 ```bash
 git clone https://github.com/sonaiso/sanadcom.git
 cd sanadcom
 ```
 
+### Validate System Setup
+Before installing dependencies, run the system validation script to ensure all prerequisites are met:
+```bash
+# Run validation script
+make validate
+
+# Or directly
+./scripts/validate_system.sh
+```
+
+This will check:
+- ✅ Python 3.11+ and pip
+- ✅ Node.js 18+ and npm
+- ✅ Docker and Docker Compose
+- ✅ Required directory structure
+- ✅ Configuration files
+- ✅ Service connectivity
+
 ### Prerequisites
+#### Prerequisites
 - **Python 3.11+**
 - **Node.js 20+**
 - **Docker & Docker Compose**
 - **PostgreSQL 15+**
 - **Redis**
+
+### Development Tools
+- **VS Code** (recommended) - See [VS Code setup guide](.vscode/README.md)
+- **GitHub Copilot** - AI pair programming (troubleshooting: [docs/development/COPILOT_TROUBLESHOOTING.md](docs/development/COPILOT_TROUBLESHOOTING.md))
+
+> **⚠️ GitHub Copilot Error?** If you see "client not supported: bad request: the specified API version is no longer supported", see our [Copilot Troubleshooting Guide](docs/development/COPILOT_TROUBLESHOOTING.md) for quick fixes.
 
 ---
 
@@ -233,11 +270,20 @@ View security findings in:
 
 ## 📊 Development Roadmap
 
-- [x] Repository initialization
-- [ ] Phase A: Regulatory data modeling (Week 1-2)
-- [ ] Phase B: Core platform development (Week 3-6)
-- [ ] Phase C: AI integration (Week 7-10)
-- [ ] Phase D: Delivery automation (Week 11-12)
+- [x] **Phase 1**: Repository initialization ✅
+- [x] **Phase 2**: Platform Development ✅
+  - Backend (FastAPI + SQLAlchemy 2.0)
+  - Frontend (Next.js 14 + Bilingual UI)
+  - AI/RAG Engine (LangChain)
+  - Evidence & Reporting modules
+- [ ] **Phase 2.1**: Critical Security Controls (2 weeks) 🚨 **BLOCKING**
+  - Authentication & Authorization
+  - Data Encryption
+  - Audit Logging
+- [ ] **Phase 2.2**: Data Protection (2 weeks)
+- [ ] **Phase 2.3**: AI Governance (2 weeks)
+- [ ] **Phase 2.4**: Documentation (2 weeks)
+- [ ] **Phase 3**: AI Enhancement (blocked until Phase 2.1-2.4 complete)
 
 ---
 
@@ -254,9 +300,14 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 ### Key Resources for Contributors
 
 - **Getting Started**: [CONTRIBUTING.md](CONTRIBUTING.md)
+- **Project Analysis**: [docs/PROJECT_ANALYSIS.md](docs/PROJECT_ANALYSIS.md) 🆕
+- **Analysis Dashboard**: [docs/ANALYSIS_SUMMARY.md](docs/ANALYSIS_SUMMARY.md) 🆕
+- **Compliance Status**: [docs/compliance/EXECUTIVE_SUMMARY.md](docs/compliance/EXECUTIVE_SUMMARY.md)
+- **Security Remediation**: [docs/compliance/PHASE_2.1_REMEDIATION_PLAN.md](docs/compliance/PHASE_2.1_REMEDIATION_PLAN.md)
 - **Conflict Resolution**: [docs/CONFLICT_RESOLUTION_GUIDE.md](docs/CONFLICT_RESOLUTION_GUIDE.md)
 - **Security Pipeline**: [docs/SECURITY_PIPELINE.md](docs/SECURITY_PIPELINE.md)
 - **API Documentation**: [docs/api/README.md](docs/api/README.md)
+- **GitHub Copilot Troubleshooting**: [docs/development/COPILOT_TROUBLESHOOTING.md](docs/development/COPILOT_TROUBLESHOOTING.md)
 
 ---
 

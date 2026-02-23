@@ -48,7 +48,7 @@ export interface Framework {
 // Status Badge Component
 // ============================================================================
 
-export const StatusBadge: React.FC<{ status: Control['status']; locale?: string }> = ({ 
+export const StatusBadge = React.memo<{ status: Control['status']; locale?: string }>(({ 
   status, 
   locale = 'ar' 
 }) => {
@@ -81,13 +81,15 @@ export const StatusBadge: React.FC<{ status: Control['status']; locale?: string 
       {locale === 'ar' ? config.ar : config.en}
     </span>
   );
-};
+});
+
+StatusBadge.displayName = 'StatusBadge';
 
 // ============================================================================
 // Priority Badge Component
 // ============================================================================
 
-export const PriorityBadge: React.FC<{ priority: Control['priority']; locale?: string }> = ({
+export const PriorityBadge = React.memo<{ priority: Control['priority']; locale?: string }>(({
   priority,
   locale = 'ar'
 }) => {
@@ -120,13 +122,15 @@ export const PriorityBadge: React.FC<{ priority: Control['priority']; locale?: s
       <span>{locale === 'ar' ? config.ar : config.en}</span>
     </span>
   );
-};
+});
+
+PriorityBadge.displayName = 'PriorityBadge';
 
 // ============================================================================
 // Framework Badge Component
 // ============================================================================
 
-export const FrameworkBadge: React.FC<{ framework: Framework['id']; locale?: string }> = ({
+export const FrameworkBadge = React.memo<{ framework: Framework['id']; locale?: string }>(({
   framework,
   locale = 'ar'
 }) => {
@@ -154,20 +158,22 @@ export const FrameworkBadge: React.FC<{ framework: Framework['id']; locale?: str
       {framework}
     </span>
   );
-};
+});
+
+FrameworkBadge.displayName = 'FrameworkBadge';
 
 // ============================================================================
 // Stats Card Component
 // ============================================================================
 
-export const StatsCard: React.FC<{
+export const StatsCard = React.memo<{
   title: string;
   value: string | number;
   icon: string;
   color: string;
   trend?: { value: number; isPositive: boolean };
   locale?: string;
-}> = ({ title, value, icon, color, trend, locale = 'ar' }) => {
+}>(({ title, value, icon, color, trend, locale = 'ar' }) => {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
       <div className="flex items-center justify-between mb-4">
@@ -187,18 +193,20 @@ export const StatsCard: React.FC<{
       <p className="text-3xl font-bold text-gray-900 dark:text-white">{value}</p>
     </div>
   );
-};
+});
+
+StatsCard.displayName = 'StatsCard';
 
 // ============================================================================
 // Compliance Progress Bar
 // ============================================================================
 
-export const ComplianceProgress: React.FC<{
+export const ComplianceProgress = React.memo<{
   percentage: number;
   label: string;
   color?: string;
   showLabel?: boolean;
-}> = ({ percentage, label, color = 'bg-blue-600', showLabel = true }) => {
+}>(({ percentage, label, color = 'bg-blue-600', showLabel = true }) => {
   return (
     <div className="w-full">
       {showLabel && (
@@ -215,17 +223,19 @@ export const ComplianceProgress: React.FC<{
       </div>
     </div>
   );
-};
+});
+
+ComplianceProgress.displayName = 'ComplianceProgress';
 
 // ============================================================================
 // Control Card Component
 // ============================================================================
 
-export const ControlCard: React.FC<{
+export const ControlCard = React.memo<{
   control: Control;
   locale?: string;
   onClick?: () => void;
-}> = ({ control, locale = 'ar', onClick }) => {
+}>(({ control, locale = 'ar', onClick }) => {
   const title = locale === 'ar' ? control.title_ar : control.title_en;
   const description = locale === 'ar' ? control.description_ar : control.description_en;
 
@@ -276,7 +286,9 @@ export const ControlCard: React.FC<{
       </div>
     </div>
   );
-};
+});
+
+ControlCard.displayName = 'ControlCard';
 
 // ============================================================================
 // Framework Card Component

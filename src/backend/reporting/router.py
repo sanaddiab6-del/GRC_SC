@@ -21,8 +21,18 @@ from reporting.schemas import (
     ControlPosture,
     DashboardData,
 )
+Reporting Router
+API endpoints for compliance reporting
+"""
+
+from fastapi import APIRouter
 
 router = APIRouter()
+
+
+def _str_value(v) -> str:
+    """Return the string value of an enum or plain string."""
+    return v if isinstance(v, str) else v.value
 
 
 @router.get("/dashboard", response_model=DashboardData)
@@ -32,13 +42,18 @@ async def get_executive_dashboard(
     """
     Get executive dashboard with real-time compliance data
     """
-    # Get all controls
-    controls_query = select(Control)
-    controls_result = await db.execute(controls_query)
-    all_controls = controls_result.scalars().all()
+    # Get total count and status breakdown using SQL aggregation
+    total_count_query = select(func.count()).select_from(Control)
+    total_result = await db.execute(total_count_query)
+    total_controls = total_result.scalar() or 0
     
-    # Calculate compliance summary
-    total_controls = len(all_controls)
+    # Get status counts with single query
+    status_query = select(
+        Control.status,
+        func.count(Control.id)
+    ).group_by(Control.status)
+    status_result = await db.execute(status_query)
+    
     status_counts = {
         "compliant": 0,
         "non_compliant": 0,
@@ -47,17 +62,30 @@ async def get_executive_dashboard(
         "not_applicable": 0,
     }
     
-    by_framework = {}
-    by_domain = {}
+    for status, count in status_result:
+        status_counts[status.value] = count
     
     for control in all_controls:
-        status = control.status.value
+        status = _str_value(control.status)
         status_counts[status] = status_counts.get(status, 0) + 1
         
         # By framework
-        framework = control.framework.value
+        framework = _str_value(control.framework)
         if framework not in by_framework:
             by_framework[framework] = {
+    # Get framework breakdown with single query
+    framework_query = select(
+        Control.framework,
+        Control.status,
+        func.count(Control.id)
+    ).group_by(Control.framework, Control.status)
+    framework_result = await db.execute(framework_query)
+    
+    by_framework = {}
+    for framework, status, count in framework_result:
+        fw_key = framework.value
+        if fw_key not in by_framework:
+            by_framework[fw_key] = {
                 "compliant": 0,
                 "non_compliant": 0,
                 "in_progress": 0,
@@ -65,14 +93,21 @@ async def get_executive_dashboard(
                 "not_applicable": 0,
                 "total": 0,
             }
-        by_framework[framework][status] += 1
-        by_framework[framework]["total"] += 1
-        
-        # By domain for posture
-        domain = control.domain
+        by_framework[fw_key][status.value] = count
+        by_framework[fw_key]["total"] += count
+    
+    # Get domain breakdown with single query
+    domain_query = select(
+        Control.domain,
+        Control.status,
+        func.count(Control.id)
+    ).group_by(Control.domain, Control.status)
+    domain_result = await db.execute(domain_query)
+    
+    by_domain = {}
+    for domain, status, count in domain_result:
         if domain not in by_domain:
             by_domain[domain] = {
-                "controls": [],
                 "statuses": {
                     "compliant": 0,
                     "non_compliant": 0,
@@ -81,8 +116,7 @@ async def get_executive_dashboard(
                     "not_applicable": 0,
                 }
             }
-        by_domain[domain]["controls"].append(control)
-        by_domain[domain]["statuses"][status] += 1
+        by_domain[domain]["statuses"][status.value] = count
     
     compliance_rate = (status_counts["compliant"] / total_controls * 100) if total_controls > 0 else 0
     
@@ -130,7 +164,7 @@ async def get_executive_dashboard(
             "control_id": c.control_id,
             "title_en": c.title_en,
             "title_ar": c.title_ar,
-            "framework": c.framework.value,
+            "framework": _str_value(c.framework),
         }
         for c in gaps_controls
     ]
@@ -248,3 +282,13 @@ async def list_reports(
     
     return reports
 
+@router.get("/")
+async def list_reports():
+    """List all reports"""
+    return {"reports": []}
+
+
+@router.post("/generate")
+async def generate_report():
+    """Generate new report"""
+    return {"status": "generating"}

@@ -43,11 +43,13 @@ class Evidence(Base):
     evidence_id = Column(String(100), unique=True, index=True, nullable=False)
     
     # Link to control
-    control_id = Column(String(50), ForeignKey("controls.control_id"), nullable=False)
+    control_id = Column(String(50), ForeignKey("controls.control_id"), nullable=False, index=True)  # Added index
     
     # Evidence metadata
+    evidence_type = Column(Enum(EvidenceType, native_enum=False), nullable=False)
+    status = Column(Enum(EvidenceStatus, native_enum=False), default=EvidenceStatus.PENDING)
     evidence_type = Column(Enum(EvidenceType), nullable=False)
-    status = Column(Enum(EvidenceStatus), default=EvidenceStatus.PENDING)
+    status = Column(Enum(EvidenceStatus), default=EvidenceStatus.PENDING, index=True)  # Added index
     
     # Bilingual fields
     title_en = Column(String(500), nullable=False)

@@ -52,7 +52,11 @@ build/
 *.pem
 
 # IDE
-.vscode/
+# Allow workspace configuration but exclude user-specific settings
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/README.md
 .idea/
 *.swp
 *.swo

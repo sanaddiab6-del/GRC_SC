@@ -42,6 +42,41 @@ AsyncSessionLocal = async_sessionmaker(
     class_=AsyncSession,
     expire_on_commit=False,
     autoflush=False,
+Database Configuration
+SQLAlchemy async session management
+"""
+
+import os
+from typing import AsyncGenerator
+
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+
+# Get database URL from environment (fallback for development)
+try:
+    from src.backend.core.secrets import get_secret
+    DATABASE_URL = get_secret("DATABASE-URL")
+except (ImportError, ValueError):
+    DATABASE_URL = os.getenv(
+        "DATABASE_URL",
+        "postgresql+asyncpg://user:pass@localhost:5432/sanadcom"
+    )
+
+# Create async engine
+engine = create_async_engine(
+    DATABASE_URL,
+    echo=False,
+    pool_pre_ping=True,
+    pool_size=10,
+    max_overflow=20,
+)
+
+# Create async session factory
+async_session_maker = sessionmaker(
+    engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
 )
 
 # Base class for models
@@ -59,6 +94,10 @@ def _load_models() -> None:
     from incident import models as _incident_models  # noqa: F401
     from risk import models as _risk_models  # noqa: F401
     from ai_governance import models as _ai_governance_models  # noqa: F401
+    from siem import models as _siem_models  # noqa: F401
+    from isms import models as _isms_models  # noqa: F401
+    from training import models as _training_models  # noqa: F401
+    from audit import models as _audit_models  # noqa: F401
     # Disabled to avoid duplicate table definitions (models already in module-specific files)
     # import enterprise_models as _enterprise_models  # noqa: F401 - Enterprise GRC
 
@@ -80,6 +119,16 @@ async def init_db():
 async def get_db():
     """Dependency for FastAPI routes"""
     async with AsyncSessionLocal() as session:
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    """
+    Dependency for getting async database session
+    
+    Usage:
+        @router.get("/items")
+        async def get_items(db: AsyncSession = Depends(get_db)):
+            ...
+    """
+    async with async_session_maker() as session:
         try:
             yield session
             await session.commit()

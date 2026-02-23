@@ -8,9 +8,48 @@
 ## Prerequisites
 
 - **Python**: 3.10 or higher
-- **Node.js**: 16+ (for frontend)
+- **Node.js**: 18+ (for frontend)
 - **PostgreSQL**: 13+ (or use Docker Compose)
 - **Redis**: 6+ (or use Docker Compose)
+
+---
+
+## Step 0: Validate System Setup (Recommended)
+
+Before starting, validate your system has all required prerequisites:
+
+**Linux/macOS:**
+```bash
+# Run system validation
+make validate
+
+# Or directly
+./scripts/validate_system.sh
+```
+
+**Windows (PowerShell):**
+```powershell
+# Run system validation
+.\scripts\validate_system.ps1
+```
+
+**What it checks:**
+- ✅ Python 3.11+ installation
+- ✅ Node.js 18+ installation
+- ✅ Docker and Docker Compose
+- ✅ Git installation
+- ✅ Required directory structure
+- ✅ Configuration files
+- ✅ Service connectivity (PostgreSQL, Redis, Chroma)
+
+**Expected Output:**
+```
+✓ Passed:   30
+✗ Failed:   0-1 (missing .env is expected before setup)
+⚠ Warnings: 3-5 (services not started yet)
+```
+
+If validation fails, fix the issues before proceeding.
 
 ---
 

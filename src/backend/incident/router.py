@@ -9,6 +9,8 @@ from datetime import datetime, timedelta
 from uuid import UUID
 
 from core.database import get_db
+from core.crud_utils import get_by_id, update_model
+from core.audit_utils import log_create_event, log_update_event
 from auth.security import get_current_user, require_permission, log_audit_event
 from auth.models import User
 from .models import SecurityIncident, IncidentPlaybook, IncidentStatus, IncidentSeverity, IncidentCategory
@@ -113,14 +115,14 @@ async def get_incident(
     db: AsyncSession = Depends(get_db)
 ):
     """Get incident details"""
-    result = await db.execute(
-        select(SecurityIncident).where(SecurityIncident.incident_id == incident_id)
+    incident = await get_by_id(
+        db=db,
+        model=SecurityIncident,
+        id_field_name="incident_id",
+        id_value=incident_id,
+        error_message_en="Incident not found",
+        error_message_ar="لم يتم العثور على الحادث",
     )
-    incident = result.scalar_one_or_none()
-    
-    if not incident:
-        raise HTTPException(status_code=404, detail="Incident not found")
-    
     return incident
 
 
@@ -133,13 +135,14 @@ async def update_incident(
     db: AsyncSession = Depends(get_db)
 ):
     """Update incident"""
-    result = await db.execute(
-        select(SecurityIncident).where(SecurityIncident.incident_id == incident_id)
+    incident = await get_by_id(
+        db=db,
+        model=SecurityIncident,
+        id_field_name="incident_id",
+        id_value=incident_id,
+        error_message_en="Incident not found",
+        error_message_ar="لم يتم العثور على الحادث",
     )
-    incident = result.scalar_one_or_none()
-    
-    if not incident:
-        raise HTTPException(status_code=404, detail="Incident not found")
     
     # Update fields
     update_data = update.model_dump(exclude_unset=True)
@@ -158,16 +161,13 @@ async def update_incident(
     await db.refresh(incident)
     
     # Audit log
-    await log_audit_event(
+    await log_update_event(
         db=db,
         user_id=str(current_user.user_id),
-        action="incident.updated",
         resource="incident",
         resource_id=str(incident_id),
-        status="success",
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
-        details=update_data
+        request=request,
+        details=update_data,
     )
     
     return incident
@@ -257,14 +257,14 @@ async def get_playbook(
     db: AsyncSession = Depends(get_db)
 ):
     """Get playbook details"""
-    result = await db.execute(
-        select(IncidentPlaybook).where(IncidentPlaybook.playbook_id == playbook_id)
+    playbook = await get_by_id(
+        db=db,
+        model=IncidentPlaybook,
+        id_field_name="playbook_id",
+        id_value=playbook_id,
+        error_message_en="Playbook not found",
+        error_message_ar="لم يتم العثور على دليل الإجراءات",
     )
-    playbook = result.scalar_one_or_none()
-    
-    if not playbook:
-        raise HTTPException(status_code=404, detail="Playbook not found")
-    
     return playbook
 
 

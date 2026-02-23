@@ -10,6 +10,7 @@ from typing import Optional
 from datetime import datetime, timedelta
 
 from core.database import get_db
+from core.crud_utils import get_by_id, check_exists, update_model, delete_by_id
 from evidence.models import Evidence, EvidenceStatus
 from evidence.schemas import (
     EvidenceCreate,
@@ -18,6 +19,11 @@ from evidence.schemas import (
     EvidenceListResponse,
     EvidenceValidationRequest,
 )
+Evidence Router
+API endpoints for evidence management
+"""
+
+from fastapi import APIRouter
 
 router = APIRouter()
 
@@ -68,19 +74,14 @@ async def get_evidence(
     db: AsyncSession = Depends(get_db),
 ):
     """Get specific evidence by ID"""
-    query = select(Evidence).where(Evidence.evidence_id == evidence_id)
-    result = await db.execute(query)
-    evidence = result.scalar_one_or_none()
-    
-    if not evidence:
-        raise HTTPException(
-            status_code=404,
-            detail={
-                "message_en": f"Evidence {evidence_id} not found",
-                "message_ar": f"لم يتم العثور على الدليل {evidence_id}",
-            },
-        )
-    
+    evidence = await get_by_id(
+        db=db,
+        model=Evidence,
+        id_field_name="evidence_id",
+        id_value=evidence_id,
+        error_message_en=f"Evidence {evidence_id} not found",
+        error_message_ar=f"لم يتم العثور على الدليل {evidence_id}",
+    )
     return evidence
 
 
@@ -91,17 +92,14 @@ async def create_evidence(
 ):
     """Create new evidence"""
     # Check if evidence_id already exists
-    existing = await db.execute(
-        select(Evidence).where(Evidence.evidence_id == evidence_data.evidence_id)
+    await check_exists(
+        db=db,
+        model=Evidence,
+        id_field_name="evidence_id",
+        id_value=evidence_data.evidence_id,
+        error_message_en=f"Evidence {evidence_data.evidence_id} already exists",
+        error_message_ar=f"الدليل {evidence_data.evidence_id} موجود بالفعل",
     )
-    if existing.scalar_one_or_none():
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "message_en": f"Evidence {evidence_data.evidence_id} already exists",
-                "message_ar": f"الدليل {evidence_data.evidence_id} موجود بالفعل",
-            },
-        )
     
     # Calculate expiry date
     collection_date = datetime.utcnow()
@@ -127,27 +125,16 @@ async def update_evidence(
     db: AsyncSession = Depends(get_db),
 ):
     """Update evidence (partial update)"""
-    query = select(Evidence).where(Evidence.evidence_id == evidence_id)
-    result = await db.execute(query)
-    evidence = result.scalar_one_or_none()
+    evidence = await get_by_id(
+        db=db,
+        model=Evidence,
+        id_field_name="evidence_id",
+        id_value=evidence_id,
+        error_message_en=f"Evidence {evidence_id} not found",
+        error_message_ar=f"لم يتم العثور على الدليل {evidence_id}",
+    )
     
-    if not evidence:
-        raise HTTPException(
-            status_code=404,
-            detail={
-                "message_en": f"Evidence {evidence_id} not found",
-                "message_ar": f"لم يتم العثور على الدليل {evidence_id}",
-            },
-        )
-    
-    # Update only provided fields
-    update_data = evidence_data.model_dump(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(evidence, field, value)
-    
-    await db.commit()
-    await db.refresh(evidence)
-    
+    evidence = await update_model(item=evidence, update_data=evidence_data, db=db)
     return evidence
 
 
@@ -158,18 +145,14 @@ async def validate_evidence(
     db: AsyncSession = Depends(get_db),
 ):
     """Validate or reject evidence"""
-    query = select(Evidence).where(Evidence.evidence_id == evidence_id)
-    result = await db.execute(query)
-    evidence = result.scalar_one_or_none()
-    
-    if not evidence:
-        raise HTTPException(
-            status_code=404,
-            detail={
-                "message_en": f"Evidence {evidence_id} not found",
-                "message_ar": f"لم يتم العثور على الدليل {evidence_id}",
-            },
-        )
+    evidence = await get_by_id(
+        db=db,
+        model=Evidence,
+        id_field_name="evidence_id",
+        id_value=evidence_id,
+        error_message_en=f"Evidence {evidence_id} not found",
+        error_message_ar=f"لم يتم العثور على الدليل {evidence_id}",
+    )
     
     # Update validation status
     setattr(evidence, "validated_by", validation.validated_by)
@@ -193,21 +176,14 @@ async def delete_evidence(
     db: AsyncSession = Depends(get_db),
 ):
     """Delete evidence"""
-    query = select(Evidence).where(Evidence.evidence_id == evidence_id)
-    result = await db.execute(query)
-    evidence = result.scalar_one_or_none()
-    
-    if not evidence:
-        raise HTTPException(
-            status_code=404,
-            detail={
-                "message_en": f"Evidence {evidence_id} not found",
-                "message_ar": f"لم يتم العثور على الدليل {evidence_id}",
-            },
-        )
-    
-    await db.delete(evidence)
-    await db.commit()
+    await delete_by_id(
+        db=db,
+        model=Evidence,
+        id_field_name="evidence_id",
+        id_value=evidence_id,
+        error_message_en=f"Evidence {evidence_id} not found",
+        error_message_ar=f"لم يتم العثور على الدليل {evidence_id}",
+    )
 
 
 @router.get("/evidence/control/{control_id}/summary")
@@ -216,20 +192,32 @@ async def get_control_evidence_summary(
     db: AsyncSession = Depends(get_db),
 ):
     """Get evidence summary for a control"""
-    query = select(Evidence).where(Evidence.control_id == control_id)
-    result = await db.execute(query)
-    evidence_list = result.scalars().all()
+    # Get total count efficiently
+    total_query = select(func.count()).select_from(Evidence).where(Evidence.control_id == control_id)
+    total_result = await db.execute(total_query)
+    total = total_result.scalar() or 0
     
-    # Calculate summary statistics
-    total = len(evidence_list)
+    # Get status breakdown with single query
+    status_query = select(
+        Evidence.status,
+        func.count(Evidence.id)
+    ).where(Evidence.control_id == control_id).group_by(Evidence.status)
+    status_result = await db.execute(status_query)
+    
     by_status = {}
-    by_type = {}
+    for status, count in status_result:
+        by_status[status.value] = count
     
-    for evidence in evidence_list:
-        status = evidence.status.value
-        etype = evidence.evidence_type.value
-        by_status[status] = by_status.get(status, 0) + 1
-        by_type[etype] = by_type.get(etype, 0) + 1
+    # Get type breakdown with single query
+    type_query = select(
+        Evidence.evidence_type,
+        func.count(Evidence.id)
+    ).where(Evidence.control_id == control_id).group_by(Evidence.evidence_type)
+    type_result = await db.execute(type_query)
+    
+    by_type = {}
+    for etype, count in type_result:
+        by_type[etype.value] = count
     
     return {
         "control_id": control_id,
@@ -239,3 +227,13 @@ async def get_control_evidence_summary(
         "compliance_rate": (by_status.get("validated", 0) / total * 100) if total > 0 else 0,
     }
 
+@router.get("/")
+async def list_evidence():
+    """List all evidence"""
+    return {"evidence": []}
+
+
+@router.post("/")
+async def create_evidence():
+    """Create new evidence"""
+    return {"status": "created"}

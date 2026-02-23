@@ -1,0 +1,249 @@
+# Record of Processing Activities (RoPA) Template
+# PDPL Article 20 Requirement
+# Version: 1.0
+
+metadata:
+  document_name: "Record of Processing Activities"
+  document_name_ar: "سجل أنشطة معالجة البيانات الشخصية"
+  legal_basis: "PDPL Article 20"
+  purpose: "Document all personal data processing activities as required by Saudi PDPL"
+  update_frequency: "Quarterly or when processing activities change"
+  owner: "Data Protection Officer"
+  retention_period: "7 years"
+
+ropa_structure:
+  required_fields:
+    - name: processing_activity_id
+      description_en: "Unique identifier for each processing activity"
+      description_ar: "معرف فريد لكل نشاط معالجة"
+      type: "string"
+      example: "PROC-001-HR-PAYROLL"
+      
+    - name: processing_activity_name
+      description_en: "Name of the processing activity"
+      description_ar: "اسم نشاط المعالجة"
+      type: "string"
+      example_en: "Employee Payroll Processing"
+      example_ar: "معالجة رواتب الموظفين"
+      
+    - name: data_controller
+      description_en: "Organization acting as data controller"
+      description_ar: "المنظمة التي تعمل كمراقب للبيانات"
+      type: "string"
+      example: "ACME Corp, CR 1234567890"
+      
+    - name: data_protection_officer
+      description_en: "Contact details of DPO"
+      description_ar: "بيانات الاتصال بمسؤول حماية البيانات"
+      type: "object"
+      fields:
+        - name: "محمد أحمد (Mohammed Ahmed)"
+        - email: "dpo@acme.com.sa"
+        - phone: "+966 11 234 5678"
+        
+    - name: purpose_of_processing
+      description_en: "Why personal data is being processed"
+      description_ar: "سبب معالجة البيانات الشخصية"
+      type: "string"
+      example_en: "Calculate monthly salary, process tax deductions, and generate payslips"
+      example_ar: "حساب الراتب الشهري، ومعالجة الخصومات الضريبية، وإصدار قسائم الرواتب"
+      
+    - name: lawful_basis
+      description_en: "Legal basis for processing per PDPL Article 7"
+      description_ar: "الأساس القانوني للمعالجة حسب المادة 7 من PDPL"
+      type: "enum"
+      options:
+        - value: "consent"
+          label_en: "Explicit Consent"
+          label_ar: "موافقة صريحة"
+        - value: "contract"
+          label_en: "Performance of Contract"
+          label_ar: "تنفيذ عقد"
+        - value: "legal_obligation"
+          label_en: "Legal Obligation"
+          label_ar: "التزام قانوني"
+        - value: "vital_interests"
+          label_en: "Vital Interests"
+          label_ar: "مصالح حيوية"
+        - value: "public_interest"
+          label_en: "Public Interest"
+          label_ar: "مصلحة عامة"
+        - value: "legitimate_interests"
+          label_en: "Legitimate Interests"
+          label_ar: "مصالح مشروعة"
+      example: "contract"
+      
+    - name: data_categories
+      description_en: "Categories of personal data processed"
+      description_ar: "فئات البيانات الشخصية المعالجة"
+      type: "array"
+      example:
+        - "Name, National ID, Job Title"
+        - "Bank account details"
+        - "Salary and tax information"
+        - "Employment history"
+      
+    - name: data_subjects
+      description_en: "Categories of data subjects"
+      description_ar: "فئات أصحاب البيانات"
+      type: "array"
+      example:
+        - "Current employees"
+        - "Former employees (up to 10 years)"
+        
+    - name: data_recipients
+      description_en: "Who receives the personal data"
+      description_ar: "من يستلم البيانات الشخصية"
+      type: "array"
+      example:
+        - "Internal: HR Department, Finance Department"
+        - "External: Bank (salary transfer), Tax Authority (ZATCA)"
+        
+    - name: data_transfers
+      description_en: "International data transfers if any"
+      description_ar: "نقل البيانات الدولية إن وجدت"
+      type: "object"
+      fields:
+        - transfer_exists: "boolean"
+        - destination_countries: "array"
+        - safeguards: "string"
+        - adequacy_decision: "boolean"
+      example:
+        transfer_exists: true
+        destination_countries: ["UAE (Dubai)"]
+        safeguards: "Standard Contractual Clauses (SCC) + Encryption"
+        adequacy_decision: false
+        
+    - name: retention_period
+      description_en: "How long data is retained"
+      description_ar: "مدة الاحتفاظ بالبيانات"
+      type: "string"
+      example: "10 years after employment termination (per Saudi Labor Law)"
+      
+    - name: security_measures
+      description_en: "Technical and organizational security measures"
+      description_ar: "التدابير الأمنية التقنية والتنظيمية"
+      type: "array"
+      example:
+        - "Access control (role-based)"
+        - "Encryption at rest and in transit (AES-256)"
+        - "Regular backups (daily)"
+        - "Audit logging enabled"
+        - "Annual security training for HR staff"
+        
+    - name: processors
+      description_en: "Third-party processors involved"
+      description_ar: "معالجي البيانات من الأطراف الثالثة"
+      type: "array"
+      example:
+        - processor_name: "CloudHR Solutions Ltd"
+          service: "Payroll Software (SaaS)"
+          location: "Saudi Arabia"
+          dpa_signed: true
+          dpa_date: "2023-01-15"
+          
+    - name: data_subject_rights
+      description_en: "How data subjects can exercise their rights"
+      description_ar: "كيفية ممارسة أصحاب البيانات لحقوقهم"
+      type: "string"
+      example: "Employees can submit DSAR via HR portal or email dsar@acme.com.sa. Response within 30 days."
+      
+    - name: dpia_required
+      description_en: "Whether DPIA is required for this processing"
+      description_ar: "ما إذا كان مطلوباً تقييم أثر حماية البيانات"
+      type: "boolean"
+      example: false
+      reason: "No high-risk processing (sensitive data, profiling, large scale)"
+      
+    - name: last_review_date
+      description_en: "Date of last review"
+      description_ar: "تاريخ آخر مراجعة"
+      type: "date"
+      example: "2024-01-15"
+      
+    - name: next_review_date
+      description_en: "Date of next scheduled review"
+      description_ar: "تاريخ المراجعة القادمة"
+      type: "date"
+      example: "2024-04-15"
+
+# Sample RoPA Entries
+
+sample_records:
+  - processing_activity_id: "PROC-001-HR-PAYROLL"
+    processing_activity_name_en: "Employee Payroll Processing"
+    processing_activity_name_ar: "معالجة رواتب الموظفين"
+    data_controller: "ACME Corporation"
+    purpose_of_processing: "Calculate and process monthly employee salaries"
+    lawful_basis: "contract"
+    data_categories:
+      - "Personal identifiers (name, national ID, IBAN)"
+      - "Financial data (salary, allowances, deductions)"
+      - "Employment data (job title, department, hire date)"
+    data_subjects:
+      - "Current employees (500 employees)"
+      - "Former employees (last 10 years, 200 employees)"
+    data_recipients:
+      - "Internal: HR, Finance"
+      - "External: Bank (salary transfer), ZATCA (tax reporting)"
+    retention_period: "10 years after employment termination"
+    security_measures:
+      - "Role-based access control"
+      - "AES-256 encryption"
+      - "Annual security awareness training"
+    processors:
+      - processor_name: "CloudHR Solutions Ltd"
+        service: "Payroll SaaS"
+        location: "Riyadh, Saudi Arabia"
+        dpa_signed: true
+    dpia_required: false
+    last_review_date: "2024-01-15"
+    
+  - processing_activity_id: "PROC-002-MKT-NEWSLETTER"
+    processing_activity_name_en: "Marketing Newsletter"
+    processing_activity_name_ar: "النشرة الإخبارية التسويقية"
+    data_controller: "ACME Corporation"
+    purpose_of_processing: "Send marketing newsletters to subscribed customers"
+    lawful_basis: "consent"
+    data_categories:
+      - "Contact information (email, name, preferences)"
+    data_subjects:
+      - "Newsletter subscribers (5,000 subscribers)"
+    data_recipients:
+      - "Internal: Marketing Department"
+      - "External: Email Service Provider (SendGrid)"
+    retention_period: "Until consent withdrawn or 2 years of inactivity"
+    security_measures:
+      - "Double opt-in confirmation"
+      - "Easy unsubscribe mechanism"
+      - "Encrypted transmission (TLS)"
+    processors:
+      - processor_name: "SendGrid Inc"
+        service: "Email Marketing Platform"
+        location: "USA (with SCC)"
+        dpa_signed: true
+    dpia_required: false
+    last_review_date: "2024-01-15"
+
+compliance_notes:
+  - "RoPA must be maintained in Arabic or English per PDPL"
+  - "Update RoPA whenever processing activities change"
+  - "Make RoPA available to SDAIA upon request"
+  - "Review RoPA at least quarterly"
+  - "Each business unit should contribute their processing activities"
+  - "DPO is responsible for maintaining master RoPA"
+
+audit_checklist:
+  - "✓ All processing activities documented"
+  - "✓ Lawful basis identified for each activity"
+  - "✓ Data retention periods defined"
+  - "✓ Security measures documented"
+  - "✓ Processor agreements (DPA) in place"
+  - "✓ International transfers documented with safeguards"
+  - "✓ Regular review schedule established"
+
+related_documents:
+  - "Data Inventory (data-inventory.yaml)"
+  - "Consent Log (consent-log.yaml)"
+  - "Data Processing Agreements (vendor-processor.yaml)"
+  - "DPIA Register (if high-risk processing exists)"

@@ -22,7 +22,7 @@ def upgrade() -> None:
         'controls',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('control_id', sa.String(length=50), nullable=False),
-        sa.Column('framework', sa.Enum('ECC', 'CCC', 'PDPL', name='frameworktype'), nullable=False),
+        sa.Column('framework', sa.String(length=10), nullable=False),
         sa.Column('domain', sa.String(length=100), nullable=False),
         sa.Column('title_en', sa.String(length=500), nullable=False),
         sa.Column('title_ar', sa.String(length=500), nullable=False),
@@ -33,7 +33,7 @@ def upgrade() -> None:
         sa.Column('procedure_guidance_en', sa.Text(), nullable=True),
         sa.Column('procedure_guidance_ar', sa.Text(), nullable=True),
         sa.Column('priority', sa.String(length=20), nullable=True),
-        sa.Column('status', sa.Enum('NOT_STARTED', 'IN_PROGRESS', 'COMPLIANT', 'NON_COMPLIANT', 'NOT_APPLICABLE', name='controlstatus'), nullable=True),
+        sa.Column('status', sa.String(length=20), nullable=True),
         sa.Column('maturity_level', sa.Integer(), nullable=True),
         sa.Column('evidence_types', sa.JSON(), nullable=True),
         sa.Column('related_controls', sa.JSON(), nullable=True),
@@ -51,8 +51,8 @@ def upgrade() -> None:
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('evidence_id', sa.String(length=100), nullable=False),
         sa.Column('control_id', sa.String(length=50), nullable=False),
-        sa.Column('evidence_type', sa.Enum('POLICY', 'PROCEDURE', 'LOG', 'SCREENSHOT', 'REPORT', 'CERTIFICATE', 'OTHER', name='evidencetype'), nullable=False),
-        sa.Column('status', sa.Enum('PENDING', 'COLLECTED', 'VALIDATED', 'REJECTED', 'EXPIRED', name='evidencestatus'), nullable=True),
+        sa.Column('evidence_type', sa.String(length=50), nullable=False),
+        sa.Column('status', sa.String(length=20), nullable=True),
         sa.Column('title_en', sa.String(length=500), nullable=False),
         sa.Column('title_ar', sa.String(length=500), nullable=False),
         sa.Column('description_en', sa.Text(), nullable=True),
@@ -82,8 +82,8 @@ def upgrade() -> None:
         'reports',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('report_id', sa.String(length=100), nullable=False),
-        sa.Column('report_type', sa.Enum('COMPLIANCE_SUMMARY', 'CONTROL_POSTURE', 'EVIDENCE_STATUS', 'RISK_HEATMAP', 'AUDIT_READINESS', 'EXECUTIVE_DASHBOARD', name='reporttype'), nullable=False),
-        sa.Column('status', sa.Enum('PENDING', 'GENERATING', 'COMPLETED', 'FAILED', name='reportstatus'), nullable=True),
+        sa.Column('report_type', sa.String(length=50), nullable=False),
+        sa.Column('status', sa.String(length=20), nullable=True),
         sa.Column('title_en', sa.String(length=500), nullable=False),
         sa.Column('title_ar', sa.String(length=500), nullable=False),
         sa.Column('framework_filter', sa.JSON(), nullable=True),
@@ -115,11 +115,5 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_controls_control_id'), table_name='controls')
     op.drop_table('controls')
     
-    # Drop enums
-    sa.Enum(name='reportstatus').drop(op.get_bind())
-    sa.Enum(name='reporttype').drop(op.get_bind())
-    sa.Enum(name='evidencestatus').drop(op.get_bind())
-    sa.Enum(name='evidencetype').drop(op.get_bind())
-    sa.Enum(name='controlstatus').drop(op.get_bind())
-    sa.Enum(name='frameworktype').drop(op.get_bind())
+
 

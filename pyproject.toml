@@ -1,0 +1,184 @@
+# SICO GRC Platform - Python Project Configuration
+# https://packaging.python.org/en/latest/guides/writing-pyproject-toml/
+
+[project]
+name = "sico-grc-platform"
+version = "2.3.0"
+description = "Saudi Regulatory Compliance Engine (ECC, CCC, PDPL) with AI/RAG"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "Proprietary"}
+authors = [
+    {name = "SICO GRC Team", email = "grc@sonaiso.com"}
+]
+keywords = ["grc", "compliance", "saudi", "nca", "ecc", "ccc", "pdpl", "ai", "rag"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Compliance",
+    "Topic :: Security :: Compliance",
+    "Programming Language :: Python :: 3.11",
+]
+
+[project.urls]
+Homepage = "https://github.com/sonaiso/sanadcom"
+Documentation = "https://github.com/sonaiso/sanadcom/tree/main/docs"
+Repository = "https://github.com/sonaiso/sanadcom"
+Issues = "https://github.com/sonaiso/sanadcom/issues"
+
+# Ruff configuration (linter + formatter)
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+indent-width = 4
+
+# Directories to exclude
+exclude = [
+    ".git",
+    ".github",
+    ".venv",
+    "venv",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    "node_modules",
+    "dist",
+    "build",
+    "*.egg-info",
+    "migrations/versions",
+]
+
+[tool.ruff.lint]
+# Enable: Pyflakes (F), pycodestyle (E, W), isort (I), pydocstyle (D), security (S)
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # Pyflakes
+    "I",   # isort (import sorting)
+    "N",   # pep8-naming
+    "S",   # flake8-bandit (security)
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+    "SIM", # flake8-simplify
+]
+
+# Disable specific rules
+ignore = [
+    "E501",   # Line too long (handled by formatter)
+    "S101",   # Use of assert (OK in tests)
+    "S104",   # Possible binding to all interfaces (OK for dev)
+    "S105",   # Possible hardcoded password (triggers on var names like 'password')
+    "S106",   # Possible hardcoded password (function args)
+    "S108",   # Insecure temp file (we handle this)
+    "B008",   # Do not use function calls in argument defaults (FastAPI Depends pattern)
+]
+
+# Allow unused variables when underscore-prefixed
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101", "S105", "S106"]  # Allow assert, test passwords
+"scripts/**/*.py" = ["S603", "S607"]  # Allow subprocess usage in scripts
+"migrations/**/*.py" = ["E402"]  # Allow import not at top of file
+
+[tool.ruff.lint.isort]
+known-first-party = ["src", "ai"]
+combine-as-imports = true
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+skip-magic-trailing-comma = false
+docstring-code-format = true
+
+# MyPy configuration (type checking)
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false  # Gradually enable
+check_untyped_defs = true
+ignore_missing_imports = true
+no_implicit_optional = true
+strict_equality = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+
+# Pytest configuration
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"
+addopts = [
+    "-ra",                    # Show summary of all test results
+    "--strict-markers",       # Error on unknown markers
+    "--strict-config",        # Error on unknown config options
+    "--cov=src/backend",      # Coverage for backend
+    "--cov=ai",               # Coverage for AI module
+    "--cov-report=term-missing",  # Show missing lines in terminal
+    "--cov-report=html",      # Generate HTML coverage report
+    "--cov-fail-under=80",    # Fail if coverage <80%
+    "-v",                     # Verbose output
+]
+markers = [
+    "unit: Unit tests (fast, no external dependencies)",
+    "integration: Integration tests (require DB, Redis, etc.)",
+    "slow: Slow tests (>1 second)",
+    "security: Security-specific tests",
+    "rag: RAG/AI tests",
+]
+
+# Coverage configuration
+[tool.coverage.run]
+source = ["src/backend", "ai"]
+omit = [
+    "*/tests/*",
+    "*/migrations/*",
+    "*/__pycache__/*",
+    "*/venv/*",
+    "*/.venv/*",
+]
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+]
+
+# Black (code formatter) - kept for backwards compatibility, but Ruff format is preferred
+[tool.black]
+line-length = 120
+target-version = ['py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # Default excludes
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+  | migrations/versions
+)/
+'''

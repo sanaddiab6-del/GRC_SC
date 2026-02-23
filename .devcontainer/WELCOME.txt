@@ -1,0 +1,60 @@
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                                                                          ║
+║              ✅ SICO GRC Platform - Codespace Ready!                     ║
+║                                                                          ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+🎉 Your Codespace is ready! Container built successfully.
+
+⚡ QUICK SETUP (Choose One Option):
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Option 1: MINIMAL SETUP (Fastest - 2-3 minutes)
+────────────────────────────────────────────────────────────────────────
+bash .devcontainer/quick-start.sh
+
+This installs only essential backend packages.
+Then start Docker and backend services.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Option 2: FULL SETUP (Complete - 10-15 minutes)
+────────────────────────────────────────────────────────────────────────
+bash .devcontainer/setup.sh
+
+This installs ALL dependencies including frontend and AI packages.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📝 After Setup, Start Services:
+────────────────────────────────────────────────────────────────────────
+
+1. Start Docker services:
+   cd deployment && docker-compose up -d
+
+2. Start Backend API:
+   cd src/backend && uvicorn main:app --reload --host 0.0.0.0
+
+3. Start Frontend (optional):
+   cd src/frontend && npm run dev
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📚 Access URLs (after starting services):
+────────────────────────────────────────────────────────────────────────
+• Backend API:  http://localhost:8000
+• API Docs:     http://localhost:8000/docs  
+• Frontend:     http://localhost:3000
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💡 Need Help?
+────────────────────────────────────────────────────────────────────────
+• Quick Start:   cat .devcontainer/WELCOME.txt
+• Documentation: ls *CODESPACE*.md
+• Setup Issues:  See CODESPACE_FIX.md
+
+═══════════════════════════════════════════════════════════════════════════
+
