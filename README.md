@@ -48,6 +48,12 @@ This will check:
 - **PostgreSQL 15+**
 - **Redis**
 
+### Development Tools
+- **VS Code** (recommended) - See [VS Code setup guide](.vscode/README.md)
+- **GitHub Copilot** - AI pair programming (troubleshooting: [docs/development/COPILOT_TROUBLESHOOTING.md](docs/development/COPILOT_TROUBLESHOOTING.md))
+
+> **⚠️ GitHub Copilot Error?** If you see "client not supported: bad request: the specified API version is no longer supported", see our [Copilot Troubleshooting Guide](docs/development/COPILOT_TROUBLESHOOTING.md) for quick fixes.
+
 ---
 
 ## 📦 Project Structure
@@ -288,6 +294,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 - **Conflict Resolution**: [docs/CONFLICT_RESOLUTION_GUIDE.md](docs/CONFLICT_RESOLUTION_GUIDE.md)
 - **Security Pipeline**: [docs/SECURITY_PIPELINE.md](docs/SECURITY_PIPELINE.md)
 - **API Documentation**: [docs/api/README.md](docs/api/README.md)
+- **GitHub Copilot Troubleshooting**: [docs/development/COPILOT_TROUBLESHOOTING.md](docs/development/COPILOT_TROUBLESHOOTING.md)
 
 ---
 

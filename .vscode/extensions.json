@@ -1,0 +1,48 @@
+{
+  "recommendations": [
+    // GitHub Copilot - AI pair programmer
+    "github.copilot",
+    "github.copilot-chat",
+    
+    // Python Development
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-python.black-formatter",
+    
+    // JavaScript/TypeScript/React
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "bradlc.vscode-tailwindcss",
+    
+    // Docker & Kubernetes
+    "ms-azuretools.vscode-docker",
+    "ms-kubernetes-tools.vscode-kubernetes-tools",
+    
+    // Database
+    "mtxr.sqltools",
+    "mtxr.sqltools-driver-pg",
+    
+    // API Development
+    "humao.rest-client",
+    
+    // Git
+    "eamodio.gitlens",
+    
+    // Markdown
+    "yzhang.markdown-all-in-one",
+    
+    // YAML
+    "redhat.vscode-yaml",
+    
+    // Environment Variables
+    "mikestead.dotenv",
+    
+    // Arabic Language Support
+    "ahmadalli.vscode-rtl",
+    
+    // Code Quality
+    "streetsidesoftware.code-spell-checker",
+    "editorconfig.editorconfig"
+  ],
+  "unwantedRecommendations": []
+}
