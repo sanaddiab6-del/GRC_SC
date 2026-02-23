@@ -59,6 +59,10 @@ def _load_models() -> None:
     from incident import models as _incident_models  # noqa: F401
     from risk import models as _risk_models  # noqa: F401
     from ai_governance import models as _ai_governance_models  # noqa: F401
+    from siem import models as _siem_models  # noqa: F401
+    from isms import models as _isms_models  # noqa: F401
+    from training import models as _training_models  # noqa: F401
+    from audit import models as _audit_models  # noqa: F401
     # Disabled to avoid duplicate table definitions (models already in module-specific files)
     # import enterprise_models as _enterprise_models  # noqa: F401 - Enterprise GRC
 

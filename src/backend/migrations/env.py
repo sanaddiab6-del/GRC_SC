@@ -19,13 +19,13 @@ try:
     from reporting.models import Report
     from auth.models import User, Role, Permission
     from privacy.models import Consent, DataSubjectRequest, DataBreachIncident
-    from incident.models import Incident, IncidentWorkflowLog
+    from incident.models import SecurityIncident, IncidentPlaybook
     from risk.models import Risk, RiskAssessment
-    from ai_governance.models import AIModel, BiasTestResult, AIPerformanceMetric, EthicalReview
-    from siem.models import SecurityEvent, ThreatIntelligence, SecurityAlert
-    from isms.models import Asset, Vendor
-    from training.models import TrainingModule, TrainingCompletion
-    from audit.models import AuditFinding, AuditWorkflow
+    from ai_governance.models import AIModel, BiasTestResult, ModelAudit, AIEthicsReview
+    from siem.models import SecurityEvent, ThreatIntelligence, VulnerabilityScan
+    from isms.models import ISMSPolicy, AssetInventory
+    from training.models import TrainingCourse, TrainingEnrollment
+    from audit.models import AuditFinding, AuditEngagement
     import enterprise_models  # Import all enterprise models
 except ImportError as e:
     print(f"Warning: Could not import some models: {e}")
