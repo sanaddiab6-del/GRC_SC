@@ -57,6 +57,9 @@ pytest-cov==4.1.0
 # Background tasks for privacy automation
 apscheduler==3.10.4
 
+# GeoIP2 for Saudi IP validation (optional)
+geoip2==4.7.0
+
 # Development
 black==23.12.1
 flake8==7.0.0

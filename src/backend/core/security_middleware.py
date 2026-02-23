@@ -1,40 +1,12 @@
-"""
-Security middleware for SICO GRC Platform.
-Implements NCA ECC and PDPL security requirements.
-"""
-from fastapi import Request, HTTPException, status
-from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.middleware.cors import CORSMiddleware
-from starlette.middleware.trustedhost import TrustedHostMiddleware
-import time
-from datetime import datetime, timedelta
-from collections import defaultdict
-from typing import Dict, Tuple
-import logging
-
-from core.config import settings
-
-
-logger = logging.getLogger(__name__)
-
-
-class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    """
-    Add security headers to all responses.
-    Implements OWASP security best practices and NCA ECC-IS-3 requirements.
-    """
-    
-    async def dispatch(self, request: Request, call_next):
-        response = await call_next(request)
+import secrets
+import base64
+    Uses nonce-based CSP for enhanced security.
+        # Generate unique nonce for this request
+        nonce_bytes = secrets.token_bytes(16)
+        nonce = base64.b64encode(nonce_bytes).decode('utf-8')
         
-        # OWASP recommended security headers (NCA ECC-IS-3)
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["X-XSS-Protection"] = "1; mode=block"
-        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"  # HSTS with preload
-        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        # Store nonce in request state for use in templates
+        request.state.csp_nonce = nonce
         
         # Content Security Policy - Restrictive (adjust for your frontend)
         # Production: Use nonce-based CSP instead of 'unsafe-inline' and 'unsafe-eval'
@@ -260,3 +232,7 @@ def setup_security_middleware(app):
     app.add_middleware(InputValidationMiddleware)
     
     logger.info("Security middleware configured successfully")
+        # Content Security Policy - Nonce-based (OWASP best practice)
+        # Removed 'unsafe-inline' and 'unsafe-eval' for better security
+            f"script-src 'self' 'nonce-{nonce}'; "  # Nonce-based script loading
+            f"style-src 'self' 'nonce-{nonce}' https://fonts.googleapis.com; "  # Nonce-based styles

@@ -1,0 +1,284 @@
+{
+  "pack_id": "SICO-ECC-BASELINE-2024",
+  "name_en": "NCA Essential Cybersecurity Controls - Baseline Pack",
+  "name_ar": "حزمة الضوابط السيبرانية الأساسية للهيئة الوطنية للأمن السيبراني",
+  "version": "1.0.0",
+  "framework": "NCA-ECC",
+  "release_date": "2024-01-01",
+  "description_en": "Comprehensive implementation pack for Saudi National Cybersecurity Authority (NCA) Essential Cybersecurity Controls. Includes 23 baseline controls mapped to ISO 27001 and NIST CSF.",
+  "description_ar": "حزمة تنفيذ شاملة للضوابط السيبرانية الأساسية للهيئة الوطنية للأمن السيبراني السعودية. تتضمن 23 ضابطاً أساسياً مع الربط بمعيار ISO 27001 وإطار عمل NIST للأمن السيبراني.",
+  "target_audience": [
+    "All organizations operating in Saudi Arabia",
+    "Critical infrastructure operators",
+    "Government entities",
+    "Financial institutions",
+    "Healthcare providers"
+  ],
+  "compliance_frameworks": {
+    "nca_ecc": "100%",
+    "iso_27001": "85%",
+    "nist_csf": "80%",
+    "pdpl": "60%"
+  },
+  "controls": [
+    {
+      "control_id": "ECC-GV-1",
+      "domain": "Governance",
+      "title_en": "Cybersecurity Governance",
+      "title_ar": "حوكمة الأمن السيبراني",
+      "description_en": "Establish a cybersecurity governance framework approved by senior management",
+      "description_ar": "إنشاء إطار حوكمة للأمن السيبراني معتمد من الإدارة العليا",
+      "priority": "critical",
+      "implementation_level": "organization",
+      "iso_27001_mapping": ["A.5.1", "A.5.2"],
+      "nist_csf_mapping": ["ID.GV-1", "ID.GV-2"],
+      "evidence_required": [
+        "Cybersecurity policy document",
+        "Board/Management approval record",
+        "Organizational structure chart",
+        "Roles and responsibilities matrix"
+      ]
+    },
+    {
+      "control_id": "ECC-GV-2",
+      "domain": "Governance",
+      "title_en": "Risk Management",
+      "title_ar": "إدارة المخاطر",
+      "description_en": "Implement a cybersecurity risk management process",
+      "description_ar": "تنفيذ عملية إدارة مخاطر الأمن السيبراني",
+      "priority": "critical",
+      "implementation_level": "organization",
+      "iso_27001_mapping": ["A.5.7", "A.8.2"],
+      "nist_csf_mapping": ["ID.RM-1", "ID.RM-2", "ID.RM-3"],
+      "evidence_required": [
+        "Risk assessment methodology",
+        "Risk register",
+        "Risk treatment plan",
+        "Management review records"
+      ]
+    },
+    {
+      "control_id": "ECC-GV-3",
+      "domain": "Governance",
+      "title_en": "Asset Management",
+      "title_ar": "إدارة الأصول",
+      "description_en": "Maintain an inventory of information assets and assign ownership",
+      "description_ar": "الاحتفاظ بسجل للأصول المعلوماتية وتعيين مسؤولين عنها",
+      "priority": "high",
+      "implementation_level": "organization",
+      "iso_27001_mapping": ["A.5.9", "A.5.10"],
+      "nist_csf_mapping": ["ID.AM-1", "ID.AM-2"],
+      "evidence_required": [
+        "Asset inventory database",
+        "Asset classification scheme",
+        "Asset ownership records",
+        "Quarterly inventory review"
+      ]
+    },
+    {
+      "control_id": "ECC-IS-1",
+      "domain": "Information Security",
+      "title_en": "Access Control",
+      "title_ar": "التحكم في الوصول",
+      "description_en": "Implement logical access controls based on least privilege and need-to-know",
+      "description_ar": "تنفيذ ضوابط الوصول المنطقي بناءً على الحد الأدنى من الصلاحيات والحاجة للمعرفة",
+      "priority": "critical",
+      "implementation_level": "system",
+      "iso_27001_mapping": ["A.5.15", "A.5.16", "A.8.2", "A.8.3"],
+      "nist_csf_mapping": ["PR.AC-1", "PR.AC-4"],
+      "evidence_required": [
+        "Access control policy",
+        "User access matrix",
+        "Access request/approval logs",
+        "Quarterly access review records"
+      ]
+    },
+    {
+      "control_id": "ECC-IS-2",
+      "domain": "Information Security",
+      "title_en": "Cryptography",
+      "title_ar": "التشفير",
+      "description_en": "Implement cryptographic controls to protect data confidentiality and integrity",
+      "description_ar": "تنفيذ ضوابط التشفير لحماية سرية البيانات وسلامتها",
+      "priority": "critical",
+      "implementation_level": "system",
+      "iso_27001_mapping": ["A.8.24"],
+      "nist_csf_mapping": ["PR.DS-1", "PR.DS-5"],
+      "evidence_required": [
+        "Cryptography standard document",
+        "Key management procedures",
+        "Encryption implementation records",
+        "Certificate inventory"
+      ]
+    },
+    {
+      "control_id": "ECC-IS-3",
+      "domain": "Information Security",
+      "title_en": "Authentication",
+      "title_ar": "المصادقة",
+      "description_en": "Implement strong authentication mechanisms including multi-factor authentication for privileged access",
+      "description_ar": "تنفيذ آليات مصادقة قوية تشمل المصادقة متعددة العوامل للوصول المميز",
+      "priority": "critical",
+      "implementation_level": "system",
+      "iso_27001_mapping": ["A.5.17", "A.5.18"],
+      "nist_csf_mapping": ["PR.AC-1", "PR.AC-7"],
+      "evidence_required": [
+        "Authentication policy",
+        "MFA implementation records",
+        "Password complexity settings",
+        "Failed authentication monitoring"
+      ]
+    },
+    {
+      "control_id": "ECC-IS-4",
+      "domain": "Information Security",
+      "title_en": "Network Security",
+      "title_ar": "أمن الشبكات",
+      "description_en": "Implement network segmentation and boundary protection controls",
+      "description_ar": "تنفيذ تقسيم الشبكة وضوابط حماية الحدود",
+      "priority": "high",
+      "implementation_level": "infrastructure",
+      "iso_27001_mapping": ["A.8.20", "A.8.21", "A.8.22"],
+      "nist_csf_mapping": ["PR.AC-5", "PR.PT-4"],
+      "evidence_required": [
+        "Network architecture diagram",
+        "Firewall rule sets",
+        "IDS/IPS configuration",
+        "Quarterly vulnerability scans"
+      ]
+    },
+    {
+      "control_id": "ECC-IS-5",
+      "domain": "Information Security",
+      "title_en": "Incident Response",
+      "title_ar": "الاستجابة للحوادث",
+      "description_en": "Establish and maintain an incident response capability",
+      "description_ar": "إنشاء والحفاظ على قدرة الاستجابة للحوادث",
+      "priority": "critical",
+      "implementation_level": "organization",
+      "iso_27001_mapping": ["A.5.24", "A.5.25", "A.5.26", "A.5.27"],
+      "nist_csf_mapping": ["RS.RP-1", "RS.CO-1", "RS.AN-1"],
+      "evidence_required": [
+        "Incident response plan",
+        "Incident response team roster",
+        "Incident logs and reports",
+        "Annual tabletop exercise"
+      ]
+    },
+    {
+      "control_id": "ECC-IS-6",
+      "domain": "Information Security",
+      "title_en": "Logging and Monitoring",
+      "title_ar": "التسجيل والمراقبة",
+      "description_en": "Implement security event logging and continuous monitoring",
+      "description_ar": "تنفيذ تسجيل الأحداث الأمنية والمراقبة المستمرة",
+      "priority": "high",
+      "implementation_level": "system",
+      "iso_27001_mapping": ["A.8.15", "A.8.16"],
+      "nist_csf_mapping": ["DE.CM-1", "DE.CM-3", "DE.CM-7"],
+      "evidence_required": [
+        "Logging policy",
+        "Log retention schedule",
+        "SIEM configuration",
+        "Monthly log review records"
+      ]
+    },
+    {
+      "control_id": "ECC-IS-7",
+      "domain": "Information Security",
+      "title_en": "Vulnerability Management",
+      "title_ar": "إدارة الثغرات",
+      "description_en": "Implement a vulnerability management program including regular scanning and patching",
+      "description_ar": "تنفيذ برنامج إدارة الثغرات بما في ذلك المسح الدوري والتصحيح",
+      "priority": "high",
+      "implementation_level": "infrastructure",
+      "iso_27001_mapping": ["A.8.8"],
+      "nist_csf_mapping": ["DE.CM-4", "DE.CM-8", "RS.MI-3"],
+      "evidence_required": [
+        "Vulnerability management policy",
+        "Scan reports (quarterly)",
+        "Patch management records",
+        "Exception tracking"
+      ]
+    },
+    {
+      "control_id": "ECC-IS-8",
+      "domain": "Information Security",
+      "title_en": "Backup and Recovery",
+      "title_ar": "النسخ الاحتياطي والاسترجاع",
+      "description_en": "Implement backup procedures and test recovery capabilities",
+      "description_ar": "تنفيذ إجراءات النسخ الاحتياطي واختبار قدرات الاسترجاع",
+      "priority": "critical",
+      "implementation_level": "system",
+      "iso_27001_mapping": ["A.8.13"],
+      "nist_csf_mapping": ["PR.IP-4", "RC.RP-1"],
+      "evidence_required": [
+        "Backup policy",
+        "Backup schedules",
+        "Recovery time objectives (RTO)",
+        "Annual recovery testing"
+      ]
+    }
+  ],
+  "implementation_phases": [
+    {
+      "phase": 1,
+      "name": "Foundation",
+      "duration_weeks": 4,
+      "controls": ["ECC-GV-1", "ECC-GV-2", "ECC-GV-3"],
+      "deliverables": [
+        "Cybersecurity governance framework",
+        "Risk management methodology",
+        "Asset inventory"
+      ]
+    },
+    {
+      "phase": 2,
+      "name": "Access Controls",
+      "duration_weeks": 6,
+      "controls": ["ECC-IS-1", "ECC-IS-3"],
+      "deliverables": [
+        "Access control policy",
+        "RBAC implementation",
+        "MFA deployment"
+      ]
+    },
+    {
+      "phase": 3,
+      "name": "Data Protection",
+      "duration_weeks": 4,
+      "controls": ["ECC-IS-2"],
+      "deliverables": [
+        "Encryption implementation",
+        "Key management system",
+        "Certificate management"
+      ]
+    },
+    {
+      "phase": 4,
+      "name": "Infrastructure Security",
+      "duration_weeks": 6,
+      "controls": ["ECC-IS-4", "ECC-IS-7"],
+      "deliverables": [
+        "Network segmentation",
+        "Firewall rules",
+        "Vulnerability scanning program"
+      ]
+    },
+    {
+      "phase": 5,
+      "name": "Operations",
+      "duration_weeks": 6,
+      "controls": ["ECC-IS-5", "ECC-IS-6", "ECC-IS-8"],
+      "deliverables": [
+        "Incident response plan",
+        "SIEM deployment",
+        "Backup and recovery procedures"
+      ]
+    }
+  ],
+  "total_implementation_time_weeks": 26,
+  "estimated_cost_range_sar": "500000-1500000",
+  "maintenance_effort": "2-3 FTE ongoing",
+  "audit_readiness_months": 12
+}
