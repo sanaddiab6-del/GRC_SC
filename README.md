@@ -17,7 +17,19 @@ SICO GRC Platform is a comprehensive Saudi regulatory compliance engine that pro
 
 ## 🚀 Quick Start
 
-### Clone Repository
+### Option 1: GitHub Codespaces (Easiest) ⚡
+
+Launch a complete development environment in your browser:
+
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://github.com/codespaces/new?hide_repo_select=true&ref=main&repo=sonaiso/sanadcom)
+
+**No installation required!** All dependencies and services are pre-configured.
+
+📖 **New to Codespaces?** See [CODESPACES_GUIDE.md](CODESPACES_GUIDE.md) for detailed instructions.
+
+### Option 2: Local Development
+
+#### Clone Repository
 ```bash
 git clone https://github.com/sonaiso/sanadcom.git
 cd sanadcom
@@ -42,6 +54,7 @@ This will check:
 - ✅ Service connectivity
 
 ### Prerequisites
+#### Prerequisites
 - **Python 3.11+**
 - **Node.js 20+**
 - **Docker & Docker Compose**
