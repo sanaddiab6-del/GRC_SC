@@ -165,7 +165,7 @@ langchain-community==0.0.16
 sentence-transformers==2.3.1
 chromadb==0.4.22
 torch>=2.0.0
-transformers==4.37.0
+transformers==4.48.0
 
 # NLP & Text Processing
 spacy==3.7.2
