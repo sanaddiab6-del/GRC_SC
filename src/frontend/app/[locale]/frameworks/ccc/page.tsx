@@ -1,6 +1,37 @@
-import FrameworkPage from '@/components/FrameworkPage';
+'use client';
+
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { apiClient } from '@/lib/api-client';
 
 export default function CCCFrameworkPage() {
+  const params = useParams();
+  const locale = params.locale as string;
+  const isArabic = locale === 'ar';
+  const [stats, setStats] = useState({ total: 0, compliant: 0, inProgress: 0, nonCompliant: 0 });
+  const [domains, setDomains] = useState<Record<string, any[]>>({});
+
+  useEffect(() => {
+    apiClient.get('/api/v1/controls/?framework=CCC&limit=500')
+      .then((res) => {
+        const controls: any[] = res.data?.controls ?? [];
+        const grouped: Record<string, any[]> = {};
+        let compliant = 0, inProgress = 0, nonCompliant = 0;
+        controls.forEach((c: any) => {
+          const d = c.domain || 'General';
+          if (!grouped[d]) grouped[d] = [];
+          grouped[d].push(c);
+          if (c.status === 'compliant') compliant++;
+          else if (c.status === 'in_progress') inProgress++;
+          else nonCompliant++;
+        });
+        setDomains(grouped);
+        setStats({ total: controls.length, compliant, inProgress, nonCompliant });
+      })
+      .catch(() => {});
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       {/* Header */}

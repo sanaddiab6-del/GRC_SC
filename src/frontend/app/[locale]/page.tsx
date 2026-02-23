@@ -1,11 +1,11 @@
-import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 
-export default function HomePage({
-  params: { locale }
+export default async function HomePage({
+  params
 }: {
-  params: { locale: string };
+  params: Promise<{ locale: string }>;
 }) {
+  const { locale } = await params;
   const isArabic = locale === 'ar';
 
   return (
