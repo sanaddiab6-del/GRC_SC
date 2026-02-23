@@ -37,7 +37,7 @@ jobs:
         if: matrix.component == 'frontend'
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20.11.1'
 
       - name: Install dependencies (Backend)
         if: matrix.component == 'backend'
@@ -177,7 +177,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20.11.1'
 
       - name: Install CycloneDX tools
         run: |

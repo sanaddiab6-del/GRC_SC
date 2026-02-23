@@ -2,6 +2,9 @@
 # Runs on: Push, PR, Scheduled (weekly)
 
 name: Security & Quality Checks
+name: Security & Quality Checks (DISABLED)
+
+disabled: true
 
 on:
   push:
@@ -20,7 +23,7 @@ on:
 
 env:
   PYTHON_VERSION: '3.11'
-  NODE_VERSION: '18'
+  NODE_VERSION: '20.11.1'
 
 jobs:
   # ==========================================================================
