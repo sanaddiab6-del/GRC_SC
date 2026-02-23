@@ -8,6 +8,7 @@ import useSWR from 'swr';
 import apiClient from '@/lib/api-client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { PermissionGuard } from '@/components/PermissionGuard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
@@ -157,8 +158,12 @@ export default function RiskManagementPage() {
           <p className="text-sm text-muted-foreground">{t('description')}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">{t('export')}</Button>
-          <Button size="sm">{t('create')}</Button>
+          <PermissionGuard action="generate_report">
+            <Button variant="outline" size="sm">{t('export')}</Button>
+          </PermissionGuard>
+          <PermissionGuard action="approve_risk">
+            <Button size="sm">{t('create')}</Button>
+          </PermissionGuard>
         </div>
       </div>
 

@@ -35,6 +35,7 @@ export default function EvidenceUploadModal({
   const [file, setFile] = useState<File | null>(null);
   const [controls, setControls] = useState<Control[]>([]);
   const [loading, setLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [loadingControls, setLoadingControls] = useState(false);
 
@@ -74,7 +75,34 @@ export default function EvidenceUploadModal({
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
+      const selectedFile = e.target.files[0];
+      // Enforce 25MB max
+      if (selectedFile.size > 25 * 1024 * 1024) {
+        setError(isArabic ? 'حجم الملف يجب أن يكون أقل من 25 ميجابايت' : 'File size must be less than 25MB');
+        setFile(null);
+        return;
+      }
+      // Validate MIME type
+      const allowedTypes = [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'image/png',
+        'image/jpeg',
+        'text/plain',
+        'text/csv',
+        'application/zip',
+        'application/x-zip-compressed',
+        'text/log',
+      ];
+      if (!allowedTypes.includes(selectedFile.type)) {
+        setError(isArabic ? 'نوع الملف غير مدعوم' : 'Unsupported file type');
+        setFile(null);
+        return;
+      }
+      setFile(selectedFile);
       if (error) setError('');
     }
   };
@@ -89,9 +117,30 @@ export default function EvidenceUploadModal({
       return false;
     }
     // File is optional - metadata can be submitted without actual file
-    if (file && file.size > 50 * 1024 * 1024) {
-      setError(isArabic ? 'حجم الملف يجب أن يكون أقل من 50 ميجابايت' : 'File size must be less than 50MB');
+    if (file && file.size > 25 * 1024 * 1024) {
+      setError(isArabic ? 'حجم الملف يجب أن يكون أقل من 25 ميجابايت' : 'File size must be less than 25MB');
       return false;
+    }
+    // Validate MIME type again (defensive)
+    if (file) {
+      const allowedTypes = [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'image/png',
+        'image/jpeg',
+        'text/plain',
+        'text/csv',
+        'application/zip',
+        'application/x-zip-compressed',
+        'text/log',
+      ];
+      if (!allowedTypes.includes(file.type)) {
+        setError(isArabic ? 'نوع الملف غير مدعوم' : 'Unsupported file type');
+        return false;
+      }
     }
     return true;
   };
@@ -105,6 +154,7 @@ export default function EvidenceUploadModal({
 
     setLoading(true);
     setError('');
+    setUploadProgress(null);
 
     try {
       // Generate evidence ID
@@ -113,6 +163,29 @@ export default function EvidenceUploadModal({
 
       // Get auth token from localStorage (adjust based on your auth implementation)
       const token = localStorage.getItem('access_token');
+
+      // If file is present, upload file first (simulate upload progress)
+      if (file) {
+        // Simulate file upload with progress (replace with real upload API if available)
+        const formDataObj = new FormData();
+        formDataObj.append('file', file);
+        // Example: upload to /api/v1/evidence/upload (adjust as needed)
+        await axios.post(
+          'http://localhost:8000/api/v1/evidence/upload',
+          formDataObj,
+          {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+              ...(token && { Authorization: `Bearer ${token}` }),
+            },
+            onUploadProgress: (progressEvent) => {
+              if (progressEvent.total) {
+                setUploadProgress(Math.round((progressEvent.loaded * 100) / progressEvent.total));
+              }
+            },
+          }
+        );
+      }
 
       // Create evidence data (JSON, not FormData for now - backend expects JSON)
       const evidenceData = {
@@ -142,10 +215,7 @@ export default function EvidenceUploadModal({
       );
 
       if (response.status === 201 || response.status === 200) {
-        // Success - show toast and close modal
         showSuccessToast(isArabic ? 'تم رفع الدليل بنجاح' : 'Evidence uploaded successfully');
-        
-        // Reset form
         setFormData({
           title: '',
           description: '',
@@ -153,11 +223,8 @@ export default function EvidenceUploadModal({
           control_id: '',
         });
         setFile(null);
-        
-        // Notify parent to refresh list
+        setUploadProgress(null);
         onSuccess();
-        
-        // Close modal
         onClose();
       }
     } catch (err: any) {
@@ -167,6 +234,7 @@ export default function EvidenceUploadModal({
       setError(errorMessage);
     } finally {
       setLoading(false);
+      setUploadProgress(null);
     }
   };
 
@@ -354,8 +422,8 @@ export default function EvidenceUploadModal({
                 </span>
                 <span className="text-xs text-gray-500 mt-1">
                   {isArabic
-                    ? 'PDF, Word, Excel, صورة، أو ملف نصي (حد أقصى 50 ميجابايت)'
-                    : 'PDF, Word, Excel, Image, or Text file (Max 50MB)'}
+                    ? 'PDF, Word, Excel, صورة، أو ملف نصي (حد أقصى 25 ميجابايت)'
+                    : 'PDF, Word, Excel, Image, or Text file (Max 25MB)'}
                 </span>
               </label>
             </div>
@@ -383,6 +451,18 @@ export default function EvidenceUploadModal({
                 >
                   {isArabic ? 'إزالة' : 'Remove'}
                 </button>
+              </div>
+            )}
+            {/* Upload Progress Bar */}
+            {uploadProgress !== null && (
+              <div className="mt-2 w-full bg-gray-200 rounded-full h-3">
+                <div
+                  className="bg-blue-600 h-3 rounded-full transition-all duration-300"
+                  style={{ width: `${uploadProgress}%` }}
+                ></div>
+                <div className="text-xs text-gray-700 mt-1 text-center">
+                  {isArabic ? `جاري رفع الملف... ${uploadProgress}%` : `Uploading file... ${uploadProgress}%`}
+                </div>
               </div>
             )}
           </div>

@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
+import apiClient from '@/lib/api-client';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -44,6 +45,7 @@ export default function ControlsPage() {
   const [controls, setControls] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [stats, setStats] = useState({ total: 0, ecc: 0, ccc: 0, pdpl: 0 });
 
   // Edit Modal State
@@ -52,19 +54,23 @@ export default function ControlsPage() {
 
   const fetchControls = async () => {
     setLoading(true);
+    setErrorMsg(null);
     try {
       const params = new URLSearchParams();
       if (framework !== 'all') params.append('framework', framework);
       if (status !== 'all') params.append('status', status);
       params.append('offset', String((page - 1) * limit));
       params.append('limit', String(limit));
-      
-      const response = await fetch(`http://localhost:8000/api/v1/controls?${params}`);
-      const data = await response.json();
-      setControls(data.items || []);
+      const source = apiClient.CancelToken.source();
+      const timeout = setTimeout(() => source.cancel('Request timed out'), 10000);
+      const response = await apiClient.get(`/api/v1/controls?${params}`, { cancelToken: source.token });
+      clearTimeout(timeout);
+      const data = response.data;
+      setControls(Array.isArray(data.items) ? data.items : []);
       setTotal(data.total || 0);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch controls:', error);
+      setErrorMsg(error?.message || 'Failed to fetch controls');
     } finally {
       setLoading(false);
     }
@@ -118,6 +124,16 @@ export default function ControlsPage() {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-foreground"></div>
+      </div>
+    );
+  }
+  if (errorMsg) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="text-center">
+          <div className="text-red-600 text-lg font-bold mb-2">{errorMsg}</div>
+          <div className="text-gray-500">Please check the API and browser console for details.</div>
+        </div>
       </div>
     );
   }

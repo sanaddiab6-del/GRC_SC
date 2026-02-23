@@ -4,85 +4,139 @@ import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import useSWR from 'swr';
 import apiClient from '@/lib/api-client';
+import axios from 'axios';
 
 const fetcher = (url: string) => apiClient.get(url).then((res) => res.data);
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+
 export default function ReportsPage() {
   const t = useTranslations('reports');
-  const [selectedReport, setSelectedReport] = useState<string>('compliance');
+  const [selectedReport, setSelectedReport] = useState<string>('compliance_summary');
   const [framework, setFramework] = useState<string>('');
   const [dateRange, setDateRange] = useState({
     start: new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString().split('T')[0],
     end: new Date().toISOString().split('T')[0],
   });
+  const [exportFormat, setExportFormat] = useState<string>('pdf');
   const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const { data: dashboardData } = useSWR('/api/v1/dashboard', fetcher);
 
   const reportTypes = [
     {
-      id: 'compliance',
+      id: 'compliance_summary',
       name: 'Compliance Status Report',
       description: 'Comprehensive overview of compliance across all frameworks',
       icon: 'COMP',
     },
     {
-      id: 'gaps',
-      name: 'Gap Analysis Report',
-      description: 'Identify non-compliant controls and remediation actions',
-      icon: 'GAP',
+      id: 'control_posture',
+      name: 'Control Posture Report',
+      description: 'Detailed analysis of control implementation status',
+      icon: 'CTRL',
     },
     {
-      id: 'executive',
-      name: 'Executive Summary',
-      description: 'High-level summary for leadership and stakeholders',
-      icon: 'EXEC',
-    },
-    {
-      id: 'evidence',
+      id: 'evidence_status',
       name: 'Evidence Coverage Report',
       description: 'Evidence collection status and missing documentation',
       icon: 'EVD',
     },
     {
-      id: 'audit',
+      id: 'risk_heatmap',
+      name: 'Risk Heatmap',
+      description: 'Visual representation of risk distribution',
+      icon: 'RISK',
+    },
+    {
+      id: 'audit_readiness',
       name: 'Audit Trail Report',
       description: 'Complete audit log of all system activities',
       icon: 'AUD',
     },
+    {
+      id: 'executive_dashboard',
+      name: 'Executive Summary',
+      description: 'High-level summary for leadership and stakeholders',
+      icon: 'EXEC',
+    },
   ];
+
+  // Helper function to get auth headers
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('access_token');
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  };
 
   const handleGenerateReport = async () => {
     setGenerating(true);
+    setError(null);
+    setSuccessMessage(null);
+
     try {
-      // Simulate report generation
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const headers = getAuthHeaders();
       
-      // In a real app, this would call the backend API and download the report
-      const reportData = {
-        type: selectedReport,
-        framework,
-        dateRange,
-        generatedAt: new Date().toISOString(),
-        data: dashboardData,
+      // Prepare request payload
+      const requestData = {
+        report_type: selectedReport,
+        framework_filter: framework ? [framework] : ['ECC', 'CCC', 'PDPL'],
+        date_range_start: dateRange.start ? new Date(dateRange.start).toISOString() : null,
+        date_range_end: dateRange.end ? new Date(dateRange.end).toISOString() : null,
+        file_format: exportFormat,
       };
 
-      // Create and download the report
-      const blob = new Blob([JSON.stringify(reportData, null, 2)], {
-        type: 'application/json',
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${selectedReport}-report-${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      // Call backend API
+      const response = await axios.post(
+        `${API_BASE}/reports`,
+        requestData,
+        {
+          headers,
+          responseType: exportFormat === 'json' ? 'json' : 'blob', // Handle both JSON and blob
+        }
+      );
 
-      alert('Report generated successfully!');
-    } catch (error) {
-      alert('Failed to generate report');
+      // Handle blob response (PDF/Excel)
+      if (exportFormat === 'pdf' || exportFormat === 'excel') {
+        const blob = new Blob([response.data], {
+          type: exportFormat === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${selectedReport}-report-${new Date().toISOString().split('T')[0]}.${exportFormat === 'pdf' ? 'pdf' : 'xlsx'}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } else {
+        // Handle JSON response
+        const reportData = response.data;
+        const blob = new Blob([JSON.stringify(reportData, null, 2)], {
+          type: 'application/json',
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${selectedReport}-report-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+
+      setSuccessMessage('Report generated and downloaded successfully!');
+      
+      // Clear success message after 5 seconds
+      setTimeout(() => setSuccessMessage(null), 5000);
+    } catch (err: any) {
+      console.error('Failed to generate report:', err);
+      const errorMessage = err.response?.data?.detail?.message_en 
+        || err.response?.data?.detail 
+        || err.message 
+        || 'Failed to generate report. Please try again.';
+      setError(errorMessage);
     } finally {
       setGenerating(false);
     }
@@ -171,24 +225,54 @@ export default function ReportsPage() {
                 <div>
                   <label className="block text-sm font-semibold mb-2">Export Format</label>
                   <div className="grid grid-cols-3 gap-3">
-                    {['PDF', 'Excel', 'JSON'].map((format) => (
+                    {['pdf', 'excel', 'json'].map((format) => (
                       <button
                         key={format}
-                        className="px-4 py-2 border-2 border-gray-300 rounded-lg font-semibold hover:border-primary-600 hover:bg-primary-50"
+                        type="button"
+                        onClick={() => setExportFormat(format)}
+                        className={`px-4 py-2 border-2 rounded-lg font-semibold transition-all ${
+                          exportFormat === format
+                            ? 'border-primary-600 bg-primary-50 text-primary-700'
+                            : 'border-gray-300 hover:border-primary-600 hover:bg-primary-50'
+                        }`}
                       >
-                        {format}
+                        {format.toUpperCase()}
                       </button>
                     ))}
                   </div>
                 </div>
 
+                {/* Error Message */}
+                {error && (
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-sm text-red-700">{error}</p>
+                  </div>
+                )}
+
+                {/* Success Message */}
+                {successMessage && (
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <p className="text-sm text-green-700">✓ {successMessage}</p>
+                  </div>
+                )}
+
                 {/* Generate Button */}
                 <button
                   onClick={handleGenerateReport}
                   disabled={generating}
-                  className="w-full bg-gray-900 text-white px-6 py-3 rounded-md font-semibold hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  className="w-full bg-gray-900 text-white px-6 py-3 rounded-md font-semibold hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
                 >
-                  {generating ? 'Generating Report...' : 'Generate & Download Report'}
+                  {generating ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span>Generating Report...</span>
+                    </>
+                  ) : (
+                    'Generate & Download Report'
+                  )}
                 </button>
               </div>
             </div>

@@ -17,10 +17,32 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { useState } from 'react';
 
 const fetcher = (url: string) => apiClient.get(url).then((res) => res.data);
 
 export default function EvidenceDetailPage() {
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState('');
+    // Download handler
+    const handleDownload = async () => {
+      setDownloading(true);
+      setDownloadError('');
+      try {
+        // Fetch signed URL from backend
+        const res = await apiClient.get(`/api/v1/evidence/${evidenceId}/download-url`);
+        const { signed_url } = res.data;
+        if (signed_url) {
+          window.open(signed_url, '_blank');
+        } else {
+          setDownloadError(t('downloadError') || 'Download link unavailable');
+        }
+      } catch (err) {
+        setDownloadError(t('downloadError') || 'Download failed');
+      } finally {
+        setDownloading(false);
+      }
+    };
   const params = useParams();
   const locale = params.locale as string;
   const evidenceId = params.id as string;
@@ -91,6 +113,17 @@ export default function EvidenceDetailPage() {
                 <Badge variant="outline">{t('type')}: {evidence.evidence_type || t('notAvailable')}</Badge>
                 <Badge variant="outline">{t('source')}: {evidence.source || t('notAvailable')}</Badge>
               </div>
+              {/* Download Button */}
+              {evidence.file_name && (
+                <div className="mt-4">
+                  <Button onClick={handleDownload} disabled={downloading} variant="outline" size="sm">
+                    {downloading ? t('downloading') || 'Downloading...' : t('download') || 'Download Evidence'}
+                  </Button>
+                  {downloadError && (
+                    <div className="text-xs text-red-600 mt-2">{downloadError}</div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex flex-wrap gap-2">
               <Badge variant="outline">{t('classification')}: {evidence.classification || t('notAvailable')}</Badge>

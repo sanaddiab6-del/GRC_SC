@@ -2,11 +2,13 @@ import axios from 'axios';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
+// DO NOT set axios.defaults.responseType globally!
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
+  // responseType intentionally omitted to default to 'json'
 });
 
 // Request interceptor for adding auth token

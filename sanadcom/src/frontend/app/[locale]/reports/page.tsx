@@ -55,10 +55,24 @@ export default function ReportsPage() {
   const handleGenerateReport = async () => {
     setGenerating(true);
     try {
-      // Simulate report generation
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      
-      // In a real app, this would call the backend API and download the report
+      // Example: Download report from backend as blob (PDF/Excel/JSON)
+      // Only this request should use responseType: 'blob'
+      // Uncomment and adapt when backend endpoint is ready:
+      // const response = await apiClient.get(`/api/v1/reports/${selectedReport}`, {
+      //   params: { framework, start: dateRange.start, end: dateRange.end },
+      //   responseType: 'blob',
+      // });
+      // const blob = new Blob([response.data], { type: response.headers['content-type'] });
+      // const url = URL.createObjectURL(blob);
+      // const a = document.createElement('a');
+      // a.href = url;
+      // a.download = `${selectedReport}-report.${getFileExtension(response.headers['content-type'])}`;
+      // document.body.appendChild(a);
+      // a.click();
+      // document.body.removeChild(a);
+      // URL.revokeObjectURL(url);
+
+      // Simulate report generation (JSON download)
       const reportData = {
         type: selectedReport,
         framework,
@@ -66,8 +80,6 @@ export default function ReportsPage() {
         generatedAt: new Date().toISOString(),
         data: dashboardData,
       };
-
-      // Create and download the report
       const blob = new Blob([JSON.stringify(reportData, null, 2)], {
         type: 'application/json',
       });

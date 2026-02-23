@@ -49,8 +49,10 @@ export default function ControlLibraryPage() {
     try {
       const response = await fetch('http://localhost:8000/api/v1/controls/?limit=1000');
       const data = await response.json();
-      setControls(data);
-      calculateStats(data);
+      // Always use data.items if present, fallback to data (legacy)
+      const controlsArr = Array.isArray(data.items) ? data.items : data;
+      setControls(controlsArr);
+      calculateStats(controlsArr);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching controls:', error);
