@@ -120,19 +120,19 @@ jobs:
           bandit -r ai -f json -o bandit-ai-report.json
           bandit -r scripts -f json -o bandit-scripts-report.json || true
 
-      - name: Convert Bandit to SARIF
-        continue-on-error: true
-        run: |
-          pip install bandit-sarif-formatter
-          bandit -r src/backend -f sarif -o bandit.sarif || true
+      # - name: Convert Bandit to SARIF
+      #   continue-on-error: true
+      #   run: |
+      #     pip install bandit-sarif-formatter
+      #     bandit -r src/backend -f sarif -o bandit.sarif || true
 
-      - name: Upload SARIF to GitHub Security
-        if: always()
-        continue-on-error: true
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: bandit.sarif
-          category: bandit
+      # - name: Upload SARIF to GitHub Security
+      #   if: always()
+      #   continue-on-error: true
+      #   uses: github/codeql-action/upload-sarif@v4
+      #   with:
+      #     sarif_file: bandit.sarif
+      #     category: bandit
 
       - name: Upload Bandit reports
         uses: actions/upload-artifact@v4
@@ -142,47 +142,48 @@ jobs:
             bandit-report.json
             bandit-ai-report.json
             bandit-scripts-report.json
-            bandit.sarif
           retention-days: 30
 
-  codeql-analysis:
-    name: CodeQL Analysis
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-    strategy:
-      fail-fast: false
-      matrix:
-        language: ["python", "javascript"]
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
-        with:
-          languages: ${{ matrix.language }}
-          queries: security-and-quality
-
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v4
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4
-        with:
-          category: "/language:${{ matrix.language }}"
-          upload: false
-
-      - name: Upload CodeQL SARIF
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: codeql-sarif-${{ matrix.language }}
-          path: results/${{ matrix.language }}.sarif
-          retention-days: 30
+  # CodeQL Analysis disabled to skip Code Scanning requirement
+  # Uncomment below to enable full CodeQL security analysis
+  # codeql-analysis:
+  #   name: CodeQL Analysis
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 45
+  #   permissions:
+  #     actions: read
+  #     contents: read
+  #     security-events: write
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       language: ["python", "javascript"]
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Initialize CodeQL
+  #       uses: github/codeql-action/init@v4
+  #       with:
+  #         languages: ${{ matrix.language }}
+  #         queries: security-and-quality
+  #
+  #     - name: Autobuild
+  #       uses: github/codeql-action/autobuild@v4
+  #
+  #     - name: Perform CodeQL Analysis
+  #       uses: github/codeql-action/analyze@v4
+  #       with:
+  #         category: "/language:${{ matrix.language }}"
+  #         upload: false
+  #
+  #     - name: Upload CodeQL SARIF
+  #       if: always()
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: codeql-sarif-${{ matrix.language }}
+  #         path: results/${{ matrix.language }}.sarif
+  #         retention-days: 30
 
   sbom-generation:
     name: Generate SBOM
@@ -265,7 +266,7 @@ jobs:
       -
         dependency-scan,
         sast-python,
-        codeql-analysis,
+        # codeql-analysis,  # Disabled
         sbom-generation,
         secret-scan,
       ]
@@ -282,11 +283,11 @@ jobs:
           echo "## Scan Results" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Dependency Scan: Completed" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ SAST (Bandit): Completed" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ CodeQL: Completed" >> $GITHUB_STEP_SUMMARY
+          echo "- ⏭️  CodeQL: Skipped (Code Scanning disabled)" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ SBOM Generation: Completed" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Secret Scan: Completed" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "📊 Review the Security tab for detailed findings" >> $GITHUB_STEP_SUMMARY
+          echo "📊 Security reports available in Artifacts" >> $GITHUB_STEP_SUMMARY
 
   container-scan:
     name: Container Security Scan
@@ -314,21 +315,21 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Run Trivy container scan
-        if: steps.build.outcome == 'success'
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: sico-grc-${{ matrix.component }}:${{ github.sha }}
-          format: "sarif"
-          output: "trivy-${{ matrix.component }}.sarif"
-          severity: "CRITICAL,HIGH,MEDIUM"
+      # - name: Run Trivy container scan
+      #   if: steps.build.outcome == 'success'
+      #   uses: aquasecurity/trivy-action@master
+      #   with:
+      #     image-ref: sico-grc-${{ matrix.component }}:${{ github.sha }}
+      #     format: "sarif"
+      #     output: "trivy-${{ matrix.component }}.sarif"
+      #     severity: "CRITICAL,HIGH,MEDIUM"
 
-      - name: Upload Trivy SARIF to GitHub Security
-        if: steps.build.outcome == 'success'
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: trivy-${{ matrix.component }}.sarif
-          category: trivy-${{ matrix.component }}
+      # - name: Upload Trivy SARIF to GitHub Security
+      #   if: steps.build.outcome == 'success'
+      #   uses: github/codeql-action/upload-sarif@v4
+      #   with:
+      #     sarif_file: trivy-${{ matrix.component }}.sarif
+      #     category: trivy-${{ matrix.component }}
 
       - name: Run Trivy JSON report
         if: steps.build.outcome == 'success'
@@ -366,7 +367,6 @@ jobs:
         with:
           name: trivy-${{ matrix.component }}
           path: |
-            trivy-${{ matrix.component }}.sarif
             trivy-${{ matrix.component }}.json
           retention-days: 90
 
@@ -378,7 +378,7 @@ jobs:
       [
         dependency-scan,
         sast-python,
-        codeql-analysis,
+        # codeql-analysis,  # Disabled
         container-scan,
         secret-scan,
       ]
@@ -397,9 +397,10 @@ jobs:
           echo "### Checks Performed:" >> $GITHUB_STEP_SUMMARY
           echo "- [x] Dependency vulnerabilities scanned" >> $GITHUB_STEP_SUMMARY
           echo "- [x] Static code analysis (SAST)" >> $GITHUB_STEP_SUMMARY
-          echo "- [x] CodeQL security analysis" >> $GITHUB_STEP_SUMMARY
+          echo "- [ ] CodeQL security analysis (disabled)" >> $GITHUB_STEP_SUMMARY
           echo "- [x] Container image scanning" >> $GITHUB_STEP_SUMMARY
           echo "- [x] Secret detection" >> $GITHUB_STEP_SUMMARY
           echo "- [x] SBOM generated" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "💡 To enable CodeQL: Uncomment codeql-analysis job in workflow" >> $GITHUB_STEP_SUMMARY
           echo "📋 See [Security Attestation Template](SECURITY-ATTESTATION.md) for PR requirements" >> $GITHUB_STEP_SUMMARY
