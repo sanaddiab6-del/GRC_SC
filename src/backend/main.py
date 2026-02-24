@@ -37,6 +37,7 @@ from backup import router as backup_router
 import enterprise_router
 from isms import router as isms_router
 from audit import router as audit_router
+from assessment.router import router as assessment_router
 
 # Configure logging
 logging.basicConfig(
@@ -193,6 +194,7 @@ async def health_check():
                 "evidence_tamper_protection": True,
                 "regulatory_version_register": True,
                 "commercial_packs": True,
+                "assessment_execution": True,
             },
             "message_en": "All systems operational - Phase 2.4 complete",
             "message_ar": "جميع الأنظمة تعمل - المرحلة 2.4 مكتملة",
@@ -282,6 +284,7 @@ app.include_router(backup_router, prefix="/api/v1", tags=["Backup & Disaster Rec
 app.include_router(enterprise_router.router, prefix="/api/v1", tags=["Enterprise GRC"])
 app.include_router(isms_router, prefix="/api/v1", tags=["ISMS & ISO 27001"])
 app.include_router(audit_router, prefix="/api/v1", tags=["Audit Management"])
+app.include_router(assessment_router, prefix="/api/v1", tags=["Assessment Execution"])
 
 # Regulatory version register and commercial packs are loaded dynamically
 try:

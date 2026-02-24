@@ -28,7 +28,8 @@ Write-Host "   URL: http://localhost:8000" -ForegroundColor White
 Write-Host "   API Docs: http://localhost:8000/docs" -ForegroundColor White
 Write-Host ""
 
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$backendPath'; python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000"
+$backendCmd = "Set-Location '$PWD\$backendPath'; python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", $backendCmd
 
 Start-Sleep -Seconds 3
 
@@ -39,8 +40,10 @@ Write-Host ""
 
 $frontendPath = "src\frontend"
 if (Test-Path "$frontendPath\package.json") {
-    Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$frontendPath'; npm run dev"
-} else {
+    $frontendCmd = "Set-Location '$PWD\$frontendPath'; npm run dev"
+    Start-Process powershell -ArgumentList "-NoExit", "-Command", $frontendCmd
+}
+else {
     Write-Host "⚠️  Frontend not found - skipping" -ForegroundColor Yellow
 }
 
