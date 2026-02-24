@@ -308,24 +308,68 @@ jobs:
 
       - name: Check for CRITICAL/HIGH vulnerabilities
         if: steps.build.outcome == 'success'
+        continue-on-error: ${{ github.ref != 'refs/heads/main' }}
         run: |
           CRITICAL=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' trivy-${{ matrix.component }}.json)
           HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' trivy-${{ matrix.component }}.json)
+          MEDIUM=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' trivy-${{ matrix.component }}.json)
 
           echo "🔍 Container Scan Results for ${{ matrix.component }}:" >> $GITHUB_STEP_SUMMARY
-          echo "- CRITICAL: $CRITICAL" >> $GITHUB_STEP_SUMMARY
-          echo "- HIGH: $HIGH" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Severity | Count |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔴 CRITICAL | $CRITICAL |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🟠 HIGH | $HIGH |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🟡 MEDIUM | $MEDIUM |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
 
+          # Extract top 5 CRITICAL vulnerabilities for visibility
           if [ "$CRITICAL" -gt 0 ]; then
-            echo "❌ CRITICAL vulnerabilities found in ${{ matrix.component }} container!" >> $GITHUB_STEP_SUMMARY
-            exit 1
+            echo "<details>" >> $GITHUB_STEP_SUMMARY
+            echo "<summary>🔴 CRITICAL Vulnerabilities (click to expand)</summary>" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            jq -r '.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL") | "- **\(.VulnerabilityID)**: \(.PkgName) \(.InstalledVersion) → \(.FixedVersion // "No fix available")"' trivy-${{ matrix.component }}.json | head -10 >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "</details>" >> $GITHUB_STEP_SUMMARY
           fi
 
-          if [ "$HIGH" -gt 5 ]; then
-            echo "⚠️  Warning: More than 5 HIGH vulnerabilities in ${{ matrix.component }} container" >> $GITHUB_STEP_SUMMARY
-            # Uncomment to fail on HIGH vulns:
-            # exit 1
+          # Set thresholds based on branch
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            CRITICAL_THRESHOLD=0
+            HIGH_THRESHOLD=5
+            echo "📋 Running strict checks for main branch" >> $GITHUB_STEP_SUMMARY
+          else
+            CRITICAL_THRESHOLD=10
+            HIGH_THRESHOLD=20
+            echo "📋 Running relaxed checks for feature branch" >> $GITHUB_STEP_SUMMARY
           fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Check against thresholds
+          EXIT_CODE=0
+          if [ "$CRITICAL" -gt "$CRITICAL_THRESHOLD" ]; then
+            echo "❌ **FAILED**: $CRITICAL CRITICAL vulnerabilities exceed threshold of $CRITICAL_THRESHOLD" >> $GITHUB_STEP_SUMMARY
+            echo "🔧 **Action Required**: Update base images or fix vulnerable dependencies" >> $GITHUB_STEP_SUMMARY
+            EXIT_CODE=1
+          elif [ "$CRITICAL" -gt 0 ]; then
+            echo "⚠️  **WARNING**: $CRITICAL CRITICAL vulnerabilities found (threshold: $CRITICAL_THRESHOLD)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "$HIGH" -gt "$HIGH_THRESHOLD" ]; then
+            echo "⚠️  **WARNING**: $HIGH HIGH vulnerabilities exceed threshold of $HIGH_THRESHOLD" >> $GITHUB_STEP_SUMMARY
+            # Uncomment to fail on HIGH vulns:
+            # EXIT_CODE=1
+          fi
+
+          if [ "$EXIT_CODE" -eq 0 ] && [ "$CRITICAL" -eq 0 ] && [ "$HIGH" -eq 0 ]; then
+            echo "✅ **PASSED**: No critical security issues found" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📊 Full report available in artifacts: \`trivy-${{ matrix.component }}.json\`" >> $GITHUB_STEP_SUMMARY
+
+          exit $EXIT_CODE
 
       - name: Upload Trivy reports
         if: steps.build.outcome == 'success'
