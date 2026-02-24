@@ -65,12 +65,12 @@ async def test_get_dashboard(db: AsyncSession = Depends(get_db)):
         risk_result = await db.execute(text("SELECT COUNT(*) as count FROM risks"))
         audit_result = await db.execute(text("SELECT COUNT(*) as count FROM audit_findings"))
         dsar_result = await db.execute(text("SELECT COUNT(*) as count FROM dsar_requests"))
-        
+
         org_row = org_result.first()
         risk_row = risk_result.first()
         audit_row = audit_result.first()
         dsar_row = dsar_result.first()
-        
+
         return {
             "organizations": org_row[0] if org_row else 0,
             "risks": risk_row[0] if risk_row else 0,
@@ -91,7 +91,7 @@ class OrganizationResponse(BaseModel):
     org_type: Optional[str]
     license_type: Optional[str]
     is_active: bool
-    
+
     class Config:
         from_attributes = True
 
@@ -104,7 +104,7 @@ class UserResponse(BaseModel):
     full_name_ar: Optional[str]
     role: str
     is_active: bool
-    
+
     class Config:
         from_attributes = True
 
@@ -119,7 +119,7 @@ class AssetResponse(BaseModel):
     classification: Optional[str]
     environment: Optional[str]
     is_active: bool
-    
+
     class Config:
         from_attributes = True
 
@@ -139,7 +139,7 @@ class RiskResponse(BaseModel):
     risk_score_residual: Optional[float]
     risk_level_residual: Optional[str]
     status: str
-    
+
     class Config:
         from_attributes = True
 
@@ -154,7 +154,7 @@ class AuditFindingResponse(BaseModel):
     status: str
     target_closure_date: Optional[date]
     is_overdue: bool
-    
+
     class Config:
         from_attributes = True
 
@@ -171,7 +171,7 @@ class RoPAResponse(BaseModel):
     activity_name_ar: Optional[str]
     legal_basis: str
     status: str
-    
+
     class Config:
         from_attributes = True
 
@@ -185,7 +185,7 @@ class DSARResponse(BaseModel):
     due_date: date
     is_overdue: bool
     status: str
-    
+
     class Config:
         from_attributes = True
 
@@ -199,7 +199,7 @@ class DataBreachResponse(BaseModel):
     severity: str
     sdaia_notified: bool
     status: str
-    
+
     class Config:
         from_attributes = True
 
@@ -213,7 +213,7 @@ class WorkflowCaseResponse(BaseModel):
     priority: Optional[str]
     status: str
     is_overdue: bool
-    
+
     class Config:
         from_attributes = True
 
@@ -228,7 +228,7 @@ class VendorResponse(BaseModel):
     risk_level: Optional[str]
     is_data_processor: bool
     status: str
-    
+
     class Config:
         from_attributes = True
 
@@ -243,7 +243,7 @@ class ComplianceMetricsResponse(BaseModel):
     total_risks: Optional[int]
     critical_risks: Optional[int]
     open_findings: Optional[int]
-    
+
     class Config:
         from_attributes = True
 
@@ -424,11 +424,11 @@ async def get_organizations(
     """Get all organizations with optional filtering (requires authentication)"""
     query = "SELECT * FROM organizations WHERE 1=1"
     params = {}
-    
+
     if org_type:
         query += " AND org_type = :org_type"
         params['org_type'] = org_type
-    
+
     result = await db.execute(text(query), params)
     return [dict(row._mapping) for row in result]
 
@@ -440,10 +440,10 @@ async def get_organization(org_id: int, db: AsyncSession = Depends(get_db)):
         text("SELECT * FROM organizations WHERE id = :id"),
         {"id": org_id}
     )).fetchone()
-    
+
     if not result:
         raise HTTPException(status_code=404, detail="Organization not found")
-    
+
     return dict(result._mapping)
 
 
@@ -456,7 +456,7 @@ async def create_organization(
     """Create a new organization (Admin only)"""
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
-    
+
     try:
         await db.execute(text("""
             INSERT INTO organizations (name_en, name_ar, org_type, parent_org_id, license_type, is_active)
@@ -469,7 +469,7 @@ async def create_organization(
             "license_type": org.license_type
         })
         await db.commit()
-        
+
         # Fetch created organization
         result = await db.execute(text("""
             SELECT * FROM organizations WHERE name_en = :name_en LIMIT 1
@@ -493,16 +493,16 @@ async def update_organization(
     """Update an organization (Admin only)"""
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
-    
+
     # Check exists
     result = await db.execute(text("SELECT id FROM organizations WHERE id = :id"), {"id": org_id})
     if not result.fetchone():
         raise HTTPException(status_code=404, detail="Organization not found")
-    
+
     try:
         updates = []
         params: dict = {"id": org_id}
-        
+
         if org.name_en:
             updates.append("name_en = :name_en")
             params["name_en"] = org.name_en
@@ -518,11 +518,11 @@ async def update_organization(
         if org.is_active is not None:
             updates.append("is_active = :is_active")
             params["is_active"] = str(1 if org.is_active else 0)
-        
+
         if updates:
             await db.execute(text(f"UPDATE organizations SET {', '.join(updates)} WHERE id = :id"), params)
             await db.commit()
-        
+
         # Fetch updated organization
         result = await db.execute(text("SELECT * FROM organizations WHERE id = :id"), {"id": org_id})
         row = result.first()
@@ -543,12 +543,12 @@ async def delete_organization(
     """Delete an organization (Admin only)"""
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
-    
+
     # Check exists
     result = await db.execute(text("SELECT id FROM organizations WHERE id = :id"), {"id": org_id})
     if not result.fetchone():
         raise HTTPException(status_code=404, detail="Organization not found")
-    
+
     try:
         await db.execute(text("DELETE FROM organizations WHERE id = :id"), {"id": org_id})
         await db.commit()
@@ -571,15 +571,15 @@ async def get_users(
     """Get all users with optional filtering (requires authentication)"""
     query = "SELECT * FROM users WHERE 1=1"
     params = {}
-    
+
     if role:
         query += " AND role = :role"
         params['role'] = role
-    
+
     if organization_id:
         query += " AND organization_id = :org_id"
         params['org_id'] = organization_id
-    
+
     result = await db.execute(text(query), params)
     return [dict(row._mapping) for row in result]
 
@@ -598,19 +598,19 @@ async def get_assets(
     """Get assets with filtering"""
     query = "SELECT * FROM assets WHERE is_active = 1"
     params = {}
-    
+
     if asset_type:
         query += " AND asset_type = :asset_type"
         params['asset_type'] = asset_type
-    
+
     if criticality:
         query += " AND criticality = :criticality"
         params['criticality'] = criticality
-    
+
     if organization_id:
         query += " AND organization_id = :org_id"
         params['org_id'] = organization_id
-    
+
     result = await db.execute(text(query), params)
     return [dict(row._mapping) for row in result]
 
@@ -636,7 +636,7 @@ async def create_asset(
     """Create a new asset"""
     if current_user.role not in ["admin", "compliance_owner"]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     try:
         await db.execute(text("""
             INSERT INTO assets (organization_id, asset_id, asset_type, name_en, name_ar, criticality, classification, environment, is_active)
@@ -672,15 +672,15 @@ async def update_asset(
     """Update an asset"""
     if current_user.role not in ["admin", "compliance_owner"]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     result = await db.execute(text("SELECT id FROM assets WHERE asset_id = :asset_id"), {"asset_id": asset_id})
     if not result.fetchone():
         raise HTTPException(status_code=404, detail="Asset not found")
-    
+
     try:
         updates = []
         params = {"asset_id": asset_id}
-        
+
         if asset.name_en:
             updates.append("name_en = :name_en")
             params["name_en"] = asset.name_en
@@ -699,11 +699,11 @@ async def update_asset(
         if asset.is_active is not None:
             updates.append("is_active = :is_active")
             params["is_active"] = str(1 if asset.is_active else 0)
-        
+
         if updates:
             await db.execute(text(f"UPDATE assets SET {', '.join(updates)} WHERE asset_id = :asset_id"), params)
             await db.commit()
-        
+
         result = await db.execute(text("SELECT * FROM assets WHERE asset_id = :asset_id"), {"asset_id": asset_id})
         row = result.first()
         if not row:
@@ -723,11 +723,11 @@ async def delete_asset(
     """Delete an asset"""
     if current_user.role not in ["admin", "compliance_owner"]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     result = await db.execute(text("SELECT id FROM assets WHERE asset_id = :asset_id"), {"asset_id": asset_id})
     if not result.fetchone():
         raise HTTPException(status_code=404, detail="Asset not found")
-    
+
     try:
         await db.execute(text("DELETE FROM assets WHERE asset_id = :asset_id"), {"asset_id": asset_id})
         await db.commit()
@@ -751,23 +751,23 @@ async def get_risks(
     """Get enterprise risks with filtering"""
     query = "SELECT * FROM risks WHERE 1=1"
     params = {}
-    
+
     if risk_type:
         query += " AND risk_type = :risk_type"
         params['risk_type'] = risk_type
-    
+
     if risk_level:
         query += " AND risk_level_inherent = :risk_level"
         params['risk_level'] = risk_level
-    
+
     if status:
         query += " AND status = :status"
         params['status'] = status
-    
+
     if organization_id:
         query += " AND organization_id = :org_id"
         params['org_id'] = organization_id
-    
+
     result = await db.execute(text(query), params)
     return [dict(row._mapping) for row in result]
 
@@ -779,7 +779,7 @@ async def get_risk_dashboard(db: AsyncSession = Depends(get_db)):
     critical = ((await db.execute(text("SELECT COUNT(*) FROM risks WHERE risk_level_inherent = 'critical'"))).fetchone() or (0,))[0]
     high = ((await db.execute(text("SELECT COUNT(*) FROM risks WHERE risk_level_inherent = 'high'"))).fetchone() or (0,))[0]
     within_appetite = ((await db.execute(text("SELECT COUNT(*) FROM risks WHERE is_within_appetite = 1"))).fetchone() or (0,))[0]
-    
+
     return {
         "total_risks": total,
         "critical_risks": critical,
@@ -798,11 +798,11 @@ async def create_risk(
     """Create a new risk"""
     if current_user.role not in ["admin", "risk_owner"]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     try:
         risk_score = risk.likelihood_inherent * risk.impact_inherent
         await db.execute(text("""
-            INSERT INTO risks (organization_id, risk_id, risk_type, title_en, title_ar, description_en, 
+            INSERT INTO risks (organization_id, risk_id, risk_type, title_en, title_ar, description_en,
             likelihood_inherent, impact_inherent, risk_score_inherent, status)
             VALUES (:org_id, :risk_id, :risk_type, :title_en, :title_ar, :desc_en, :likelihood, :impact, :score, 'open')
         """), {
@@ -837,15 +837,15 @@ async def update_risk(
     """Update a risk"""
     if current_user.role not in ["admin", "risk_owner"]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     result = await db.execute(text("SELECT id FROM risks WHERE risk_id = :risk_id"), {"risk_id": risk_id})
     if not result.fetchone():
         raise HTTPException(status_code=404, detail="Risk not found")
-    
+
     try:
         updates = []
         params = {"risk_id": risk_id}
-        
+
         if risk.title_en:
             updates.append("title_en = :title_en")
             params["title_en"] = risk.title_en
@@ -867,11 +867,11 @@ async def update_risk(
         if risk.status:
             updates.append("status = :status")
             params["status"] = risk.status
-        
+
         if updates:
             await db.execute(text(f"UPDATE risks SET {', '.join(updates)} WHERE risk_id = :risk_id"), params)
             await db.commit()
-        
+
         result = await db.execute(text("SELECT * FROM risks WHERE risk_id = :risk_id"), {"risk_id": risk_id})
         row = result.first()
         if not row:
@@ -891,11 +891,11 @@ async def delete_risk(
     """Delete a risk"""
     if current_user.role not in ["admin", "risk_owner"]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     result = await db.execute(text("SELECT id FROM risks WHERE risk_id = :risk_id"), {"risk_id": risk_id})
     if not result.fetchone():
         raise HTTPException(status_code=404, detail="Risk not found")
-    
+
     try:
         await db.execute(text("DELETE FROM risks WHERE risk_id = :risk_id"), {"risk_id": risk_id})
         await db.commit()
@@ -917,15 +917,15 @@ async def get_audit_programs(
     """Get audit programs"""
     query = "SELECT * FROM audit_programs WHERE 1=1"
     params = {}
-    
+
     if framework:
         query += " AND framework = :framework"
         params['framework'] = framework
-    
+
     if status:
         query += " AND status = :status"
         params['status'] = status
-    
+
     result = await db.execute(text(query), params)
     return [dict(row._mapping) for row in result]
 
@@ -944,15 +944,15 @@ async def get_audit_findings(
     base_query = "FROM audit_findings WHERE 1=1"
     params = {}
     filters = []
-    
+
     if severity:
         filters.append("severity = :severity")
         params['severity'] = severity
-    
+
     if status:
         filters.append("status = :status")
         params['status'] = status
-    
+
     if overdue_only:
         filters.append("is_overdue = 1")
 
@@ -1002,7 +1002,7 @@ async def create_audit_finding(
     """Create a new audit finding"""
     if current_user.role not in ["admin", "auditor"]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     try:
         await db.execute(text("""
             INSERT INTO audit_findings (organization_id, finding_id, title_en, title_ar, description_en, severity, control_id, status)
@@ -1037,15 +1037,15 @@ async def update_audit_finding(
     """Update an audit finding"""
     if current_user.role not in ["admin", "auditor"]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     result = await db.execute(text("SELECT id FROM audit_findings WHERE finding_id = :id"), {"id": finding_id})
     if not result.fetchone():
         raise HTTPException(status_code=404, detail="Finding not found")
-    
+
     try:
         updates = []
         params = {"id": finding_id}
-        
+
         if finding.title_en:
             updates.append("title_en = :title_en")
             params["title_en"] = finding.title_en
@@ -1061,11 +1061,11 @@ async def update_audit_finding(
         if finding.target_closure_date:
             updates.append("target_closure_date = :closure_date")
             params["closure_date"] = str(finding.target_closure_date)
-        
+
         if updates:
             await db.execute(text(f"UPDATE audit_findings SET {', '.join(updates)} WHERE finding_id = :id"), params)
             await db.commit()
-        
+
         result = await db.execute(text("SELECT * FROM audit_findings WHERE finding_id = :id"), {"id": finding_id})
         row = result.first()
         if not row:
@@ -1085,11 +1085,11 @@ async def delete_audit_finding(
     """Delete an audit finding"""
     if current_user.role not in ["admin", "auditor"]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     result = await db.execute(text("SELECT id FROM audit_findings WHERE finding_id = :id"), {"id": finding_id})
     if not result.fetchone():
         raise HTTPException(status_code=404, detail="Finding not found")
-    
+
     try:
         await db.execute(text("DELETE FROM audit_findings WHERE finding_id = :id"), {"id": finding_id})
         await db.commit()
@@ -1106,7 +1106,7 @@ async def get_findings_dashboard(db: AsyncSession = Depends(get_db)):
     high = ((await db.execute(text("SELECT COUNT(*) FROM audit_findings WHERE severity = 'high'"))).fetchone() or (0,))[0]
     overdue = ((await db.execute(text("SELECT COUNT(*) FROM audit_findings WHERE is_overdue = 1"))).fetchone() or (0,))[0]
     open_findings = ((await db.execute(text("SELECT COUNT(*) FROM audit_findings WHERE status IN ('open', 'in_progress')"))).fetchone() or (0,))[0]
-    
+
     return {
         "total_findings": total,
         "critical_findings": critical,
@@ -1128,11 +1128,11 @@ async def get_ropa_records(
     """Get Records of Processing Activities (RoPA)"""
     query = "SELECT * FROM ropa_records WHERE 1=1"
     params = {}
-    
+
     if status:
         query += " AND status = :status"
         params['status'] = status
-    
+
     result = await db.execute(text(query), params)
     return [dict(row._mapping) for row in result]
 
@@ -1146,7 +1146,7 @@ async def create_ropa_record(
     """Create a new RoPA record"""
     if current_user.role not in ["admin", "compliance_owner"]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     try:
         await db.execute(text("""
             INSERT INTO ropa_records (organization_id, activity_id, processing_purpose_en, processing_purpose_ar, data_categories, recipients_en, retention_period, status)
@@ -1181,15 +1181,15 @@ async def update_ropa_record(
     """Update a RoPA record"""
     if current_user.role not in ["admin", "compliance_owner"]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     result = await db.execute(text("SELECT id FROM ropa_records WHERE activity_id = :id"), {"id": activity_id})
     if not result.fetchone():
         raise HTTPException(status_code=404, detail="RoPA record not found")
-    
+
     try:
         updates = []
         params = {"id": activity_id}
-        
+
         if ropa.processing_purpose_en:
             updates.append("processing_purpose_en = :purpose")
             params["purpose"] = ropa.processing_purpose_en
@@ -1205,11 +1205,11 @@ async def update_ropa_record(
         if ropa.status:
             updates.append("status = :status")
             params["status"] = ropa.status
-        
+
         if updates:
             await db.execute(text(f"UPDATE ropa_records SET {', '.join(updates)} WHERE activity_id = :id"), params)
             await db.commit()
-        
+
         result = await db.execute(text("SELECT * FROM ropa_records WHERE activity_id = :id"), {"id": activity_id})
         row = result.first()
         if not row:
@@ -1229,11 +1229,11 @@ async def delete_ropa_record(
     """Delete a RoPA record"""
     if current_user.role not in ["admin", "compliance_owner"]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     result = await db.execute(text("SELECT id FROM ropa_records WHERE activity_id = :id"), {"id": activity_id})
     if not result.fetchone():
         raise HTTPException(status_code=404, detail="RoPA record not found")
-    
+
     try:
         await db.execute(text("DELETE FROM ropa_records WHERE activity_id = :id"), {"id": activity_id})
         await db.commit()
@@ -1251,14 +1251,14 @@ async def get_dsar_requests(
     """Get Data Subject Access Requests (DSAR)"""
     query = "SELECT * FROM dsar_requests WHERE 1=1"
     params = {}
-    
+
     if status:
         query += " AND status = :status"
         params['status'] = status
-    
+
     if overdue_only:
         query += " AND is_overdue = 1"
-    
+
     result = await db.execute(text(query), params)
     return [dict(row._mapping) for row in result]
 
@@ -1272,7 +1272,7 @@ async def create_dsar_request(
     """Create a new DSAR request"""
     if current_user.role not in ["admin", "compliance_owner"]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     try:
         await db.execute(text("""
             INSERT INTO dsar_requests (organization_id, dsar_id, data_subject_name, request_date, request_type, response_deadline, status)
@@ -1306,15 +1306,15 @@ async def update_dsar_request(
     """Update a DSAR request"""
     if current_user.role not in ["admin", "compliance_owner"]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     result = await db.execute(text("SELECT id FROM dsar_requests WHERE dsar_id = :id"), {"id": dsar_id})
     if not result.fetchone():
         raise HTTPException(status_code=404, detail="DSAR request not found")
-    
+
     try:
         updates = []
         params = {"id": dsar_id}
-        
+
         if dsar.status:
             updates.append("status = :status")
             params["status"] = dsar.status
@@ -1327,11 +1327,11 @@ async def update_dsar_request(
         if dsar.notes:
             updates.append("notes = :notes")
             params["notes"] = dsar.notes
-        
+
         if updates:
             await db.execute(text(f"UPDATE dsar_requests SET {', '.join(updates)} WHERE dsar_id = :id"), params)
             await db.commit()
-        
+
         result = await db.execute(text("SELECT * FROM dsar_requests WHERE dsar_id = :id"), {"id": dsar_id})
         row = result.first()
         if not row:
@@ -1351,11 +1351,11 @@ async def delete_dsar_request(
     """Delete a DSAR request"""
     if current_user.role not in ["admin", "compliance_owner"]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     result = await db.execute(text("SELECT id FROM dsar_requests WHERE dsar_id = :id"), {"id": dsar_id})
     if not result.fetchone():
         raise HTTPException(status_code=404, detail="DSAR request not found")
-    
+
     try:
         await db.execute(text("DELETE FROM dsar_requests WHERE dsar_id = :id"), {"id": dsar_id})
         await db.commit()
@@ -1372,11 +1372,11 @@ async def get_data_breaches(
     """Get data breach register"""
     query = "SELECT * FROM data_breaches WHERE 1=1"
     params = {}
-    
+
     if severity:
         query += " AND severity = :severity"
         params['severity'] = severity
-    
+
     result = await db.execute(text(query), params)
     return [dict(row._mapping) for row in result]
 
@@ -1390,7 +1390,7 @@ async def create_data_breach(
     """Create a new data breach record"""
     if current_user.role not in ["admin", "compliance_owner"]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     try:
         await db.execute(text("""
             INSERT INTO data_breaches (organization_id, breach_id, breach_date, suspected_date, description_en, affected_data_types, severity, status)
@@ -1425,15 +1425,15 @@ async def update_data_breach(
     """Update a data breach record"""
     if current_user.role not in ["admin", "compliance_owner"]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     result = await db.execute(text("SELECT id FROM data_breaches WHERE breach_id = :id"), {"id": breach_id})
     if not result.fetchone():
         raise HTTPException(status_code=404, detail="Data breach not found")
-    
+
     try:
         updates = []
         params = {"id": breach_id}
-        
+
         if breach.breach_date:
             updates.append("breach_date = :breach_date")
             params["breach_date"] = str(breach.breach_date)
@@ -1449,11 +1449,11 @@ async def update_data_breach(
         if breach.sdaia_notified is not None:
             updates.append("sdaia_notified = :notified")
             params["notified"] = str(1 if breach.sdaia_notified else 0)
-        
+
         if updates:
             await db.execute(text(f"UPDATE data_breaches SET {', '.join(updates)} WHERE breach_id = :id"), params)
             await db.commit()
-        
+
         result = await db.execute(text("SELECT * FROM data_breaches WHERE breach_id = :id"), {"id": breach_id})
         row = result.first()
         if not row:
@@ -1473,11 +1473,11 @@ async def delete_data_breach(
     """Delete a data breach record"""
     if current_user.role not in ["admin", "compliance_owner"]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     result = await db.execute(text("SELECT id FROM data_breaches WHERE breach_id = :id"), {"id": breach_id})
     if not result.fetchone():
         raise HTTPException(status_code=404, detail="Data breach not found")
-    
+
     try:
         await db.execute(text("DELETE FROM data_breaches WHERE breach_id = :id"), {"id": breach_id})
         await db.commit()
@@ -1494,7 +1494,7 @@ async def get_pdpl_dashboard(db: AsyncSession = Depends(get_db)):
     overdue_dsar = ((await db.execute(text("SELECT COUNT(*) FROM dsar_requests WHERE is_overdue = 1"))).fetchone() or (0,))[0]
     total_breaches = ((await db.execute(text("SELECT COUNT(*) FROM data_breaches"))).fetchone() or (0,))[0]
     sdaia_notified = ((await db.execute(text("SELECT COUNT(*) FROM data_breaches WHERE sdaia_notified = 1"))).fetchone() or (0,))[0]
-    
+
     return {
         "ropa_records": total_ropa,
         "dsar_requests": total_dsar,
@@ -1519,22 +1519,22 @@ async def get_workflow_cases(
     """Get workflow cases"""
     query = "SELECT * FROM workflow_cases WHERE 1=1"
     params = {}
-    
+
     if case_type:
         query += " AND case_type = :case_type"
         params['case_type'] = case_type
-    
+
     if status:
         query += " AND status = :status"
         params['status'] = status
-    
+
     if priority:
         query += " AND priority = :priority"
         params['priority'] = priority
-    
+
     if overdue_only:
         query += " AND is_overdue = 1"
-    
+
     result = await db.execute(text(query), params)
     return [dict(row._mapping) for row in result]
 
@@ -1548,7 +1548,7 @@ async def create_workflow_case(
     """Create a new workflow case"""
     if current_user.role not in ["admin", "compliance_owner", "control_owner"]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     try:
         case_id = f"WC-{datetime.now().strftime('%Y%m%d%H%M%S')}"
         await db.execute(text("""
@@ -1585,15 +1585,15 @@ async def update_workflow_case(
     """Update a workflow case"""
     if current_user.role not in ["admin", "compliance_owner", "control_owner"]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     result = await db.execute(text("SELECT id FROM workflow_cases WHERE case_id = :id"), {"id": case_id})
     if not result.fetchone():
         raise HTTPException(status_code=404, detail="Case not found")
-    
+
     try:
         updates = []
         params: dict = {"id": case_id}
-        
+
         if case.status:
             updates.append("status = :status")
             params["status"] = case.status
@@ -1606,11 +1606,11 @@ async def update_workflow_case(
         if case.due_date:
             updates.append("due_date = :due_date")
             params["due_date"] = str(case.due_date)
-        
+
         if updates:
             await db.execute(text(f"UPDATE workflow_cases SET {', '.join(updates)} WHERE case_id = :id"), params)
             await db.commit()
-        
+
         result = await db.execute(text("SELECT * FROM workflow_cases WHERE case_id = :id"), {"id": case_id})
         row = result.first()
         if not row:
@@ -1630,11 +1630,11 @@ async def delete_workflow_case(
     """Delete a workflow case"""
     if current_user.role not in ["admin", "compliance_owner"]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     result = await db.execute(text("SELECT id FROM workflow_cases WHERE case_id = :id"), {"id": case_id})
     if not result.fetchone():
         raise HTTPException(status_code=404, detail="Case not found")
-    
+
     try:
         await db.execute(text("DELETE FROM workflow_cases WHERE case_id = :id"), {"id": case_id})
         await db.commit()
@@ -1650,7 +1650,7 @@ async def get_workflow_dashboard(db: AsyncSession = Depends(get_db)):
     open_cases = ((await db.execute(text("SELECT COUNT(*) FROM workflow_cases WHERE status = 'open'"))).fetchone() or (0,))[0]
     in_progress = ((await db.execute(text("SELECT COUNT(*) FROM workflow_cases WHERE status = 'in_progress'"))).fetchone() or (0,))[0]
     overdue = ((await db.execute(text("SELECT COUNT(*) FROM workflow_cases WHERE is_overdue = 1"))).fetchone() or (0,))[0]
-    
+
     return {
         "total_cases": total,
         "open_cases": open_cases,
@@ -1673,19 +1673,19 @@ async def get_vendors(
     """Get vendors/third-parties"""
     query = "SELECT * FROM vendors WHERE status = 'active'"
     params = {}
-    
+
     if vendor_type:
         query += " AND vendor_type = :vendor_type"
         params['vendor_type'] = vendor_type
-    
+
     if criticality:
         query += " AND criticality = :criticality"
         params['criticality'] = criticality
-    
+
     if is_data_processor is not None:
         query += " AND is_data_processor = :is_processor"
         params['is_processor'] = 1 if is_data_processor else 0
-    
+
     result = await db.execute(text(query), params)
     return [dict(row._mapping) for row in result]
 
@@ -1699,7 +1699,7 @@ async def create_vendor(
     """Create a new vendor"""
     if current_user.role not in ["admin", "compliance_owner"]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     try:
         await db.execute(text("""
             INSERT INTO vendors (organization_id, vendor_id, name_en, name_ar, vendor_type, criticality, contact_email, status)
@@ -1734,15 +1734,15 @@ async def update_vendor(
     """Update a vendor"""
     if current_user.role not in ["admin", "compliance_owner"]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     result = await db.execute(text("SELECT id FROM vendors WHERE vendor_id = :id"), {"id": vendor_id})
     if not result.fetchone():
         raise HTTPException(status_code=404, detail="Vendor not found")
-    
+
     try:
         updates = []
         params = {"id": vendor_id}
-        
+
         if vendor.name_en:
             updates.append("name_en = :name_en")
             params["name_en"] = vendor.name_en
@@ -1758,11 +1758,11 @@ async def update_vendor(
         if vendor.status:
             updates.append("status = :status")
             params["status"] = vendor.status
-        
+
         if updates:
             await db.execute(text(f"UPDATE vendors SET {', '.join(updates)} WHERE vendor_id = :id"), params)
             await db.commit()
-        
+
         result = await db.execute(text("SELECT * FROM vendors WHERE vendor_id = :id"), {"id": vendor_id})
         row = result.first()
         if not row:
@@ -1782,11 +1782,11 @@ async def delete_vendor(
     """Delete a vendor"""
     if current_user.role not in ["admin", "compliance_owner"]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     result = await db.execute(text("SELECT id FROM vendors WHERE vendor_id = :id"), {"id": vendor_id})
     if not result.fetchone():
         raise HTTPException(status_code=404, detail="Vendor not found")
-    
+
     try:
         await db.execute(text("DELETE FROM vendors WHERE vendor_id = :id"), {"id": vendor_id})
         await db.commit()
@@ -1802,7 +1802,7 @@ async def get_vendor_dashboard(db: AsyncSession = Depends(get_db)):
     critical = ((await db.execute(text("SELECT COUNT(*) FROM vendors WHERE criticality = 'critical'"))).fetchone() or (0,))[0]
     data_processors = ((await db.execute(text("SELECT COUNT(*) FROM vendors WHERE is_data_processor = 1"))).fetchone() or (0,))[0]
     high_risk = ((await db.execute(text("SELECT COUNT(*) FROM vendors WHERE risk_level = 'high' OR risk_level = 'critical'"))).fetchone() or (0,))[0]
-    
+
     return {
         "total_vendors": total,
         "critical_vendors": critical,
@@ -1823,11 +1823,11 @@ async def get_compliance_metrics(
     """Get compliance metrics"""
     query = "SELECT * FROM compliance_metrics ORDER BY metric_date DESC LIMIT 30"
     params = {}
-    
+
     if framework:
         query = "SELECT * FROM compliance_metrics WHERE framework = :framework ORDER BY metric_date DESC LIMIT 30"
         params['framework'] = framework
-    
+
     result = await db.execute(text(query), params)
     return [dict(row._mapping) for row in result]
 
@@ -1835,7 +1835,7 @@ async def get_compliance_metrics(
 @router.get("/metrics/executive-dashboard")
 async def get_executive_dashboard(db: AsyncSession = Depends(get_db)):
     """Get executive KPIs and KRIs"""
-    
+
     # Compliance
     latest_ecc = (await db.execute(
         text("SELECT compliance_percentage FROM compliance_metrics WHERE framework = 'ECC' ORDER BY metric_date DESC LIMIT 1")
@@ -1846,18 +1846,18 @@ async def get_executive_dashboard(db: AsyncSession = Depends(get_db)):
     latest_pdpl = (await db.execute(
         text("SELECT compliance_percentage FROM compliance_metrics WHERE framework = 'PDPL' ORDER BY metric_date DESC LIMIT 1")
     )).fetchone()
-    
+
     # Risks
     total_risks = ((await db.execute(text("SELECT COUNT(*) FROM risks"))).fetchone() or (0,))[0]
     critical_risks = ((await db.execute(text("SELECT COUNT(*) FROM risks WHERE risk_level_inherent = 'critical'"))).fetchone() or (0,))[0]
-    
+
     # Findings
     open_findings = ((await db.execute(text("SELECT COUNT(*) FROM audit_findings WHERE status IN ('open', 'in_progress')"))).fetchone() or (0,))[0]
     overdue_findings = ((await db.execute(text("SELECT COUNT(*) FROM audit_findings WHERE is_overdue = 1"))).fetchone() or (0,))[0]
-    
+
     # PDPL
     overdue_dsar = ((await db.execute(text("SELECT COUNT(*) FROM dsar_requests WHERE is_overdue = 1"))).fetchone() or (0,))[0]
-    
+
     return {
         "compliance": {
             "ecc_percentage": latest_ecc[0] if latest_ecc else 0,
@@ -1890,11 +1890,11 @@ async def get_integrations(
     """Get system integrations"""
     query = "SELECT * FROM integrations WHERE 1=1"
     params = {}
-    
+
     if integration_type:
         query += " AND integration_type = :type"
         params['type'] = integration_type
-    
+
     result = await db.execute(text(query), params)
     return [dict(row._mapping) for row in result]
 
@@ -1904,7 +1904,7 @@ async def get_integrations_health(db: AsyncSession = Depends(get_db)):
     """Get integration health status"""
     total = ((await db.execute(text("SELECT COUNT(*) FROM integrations"))).fetchone() or (0,))[0]
     active = ((await db.execute(text("SELECT COUNT(*) FROM integrations WHERE is_active = 1"))).fetchone() or (0,))[0]
-    
+
     return {
         "total_integrations": total,
         "active_integrations": active,
