@@ -379,7 +379,9 @@ class ModelPerformanceMonitoringService:
                 "severity": "medium",
                 "message_en": f"Precision dropped from {model.precision:.2%} to {precision:.2%}",
                 "message_ar": f"انخفضت الدقة من {model.precision:.2%} إلى {precision:.2%}"
-            })if model.recall and recall < float(model.recall) * 0.9:  # type: ignore
+            })
+        
+        if model.recall and recall < float(model.recall) * 0.9:  # type: ignore
             alerts.append({
                 "type": "recall_drop",
                 "severity": "medium",

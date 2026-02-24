@@ -6,20 +6,8 @@ import apiClient from '@/lib/api-client';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
-import { usePermission } from '@/lib/role-guard';
-  const canApprove = usePermission('approve_evidence');
-  const canReject = usePermission('approve_evidence');
-  const canAssign = usePermission('manage_users');
-  const canArchive = usePermission('edit_control');
-  const canDelete = usePermission('delete_control');
-
-  const [selected, setSelected] = useState<string[]>([]);
-  const [selectAll, setSelectAll] = useState(false);
-  const [bulkLoading, setBulkLoading] = useState(false);
-  const [assignOwner, setAssignOwner] = useState('');
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { PermissionGuard } from '@/components/PermissionGuard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
@@ -87,38 +75,6 @@ export default function EvidenceListPage() {
     );
   }, [items, search]);
 
-  // Handle select all
-  const handleSelectAll = () => {
-    if (selectAll) {
-      setSelected([]);
-      setSelectAll(false);
-    } else {
-      setSelected(filteredItems.map((item: any) => item.id));
-      setSelectAll(true);
-    }
-  };
-
-  const handleSelect = (id: string) => {
-    setSelected((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
-  };
-
-  // Bulk actions
-  const handleBulkAction = async (action: string) => {
-    setBulkLoading(true);
-    try {
-      if (action === 'assign_owner') {
-        await Promise.all(selected.map(id => apiClient.patch(`/api/v1/evidence/${id}`, { owner: assignOwner })));
-      } else {
-        await Promise.all(selected.map(id => apiClient.patch(`/api/v1/evidence/${id}`, { status: action })));
-      }
-      setSelected([]);
-      setSelectAll(false);
-      setAssignOwner('');
-    } finally {
-      setBulkLoading(false);
-    }
-  };
-
   const total = evidence?.total ?? filteredItems.length;
 
   const validationVariant: Record<string, 'success' | 'warning' | 'destructive' | 'muted'> = {
@@ -143,16 +99,12 @@ export default function EvidenceListPage() {
           <p className="text-sm text-muted-foreground">{t('description')}</p>
         </div>
         <div className="flex items-center gap-2">
-          <PermissionGuard action="generate_report">
-            <Button variant="outline" size="sm">
-              {t('export')}
-            </Button>
-          </PermissionGuard>
-          <PermissionGuard action="approve_evidence">
-            <Button size="sm" asChild>
-              <Link href={`/${locale}/evidence/upload`}>{t('upload')}</Link>
-            </Button>
-          </PermissionGuard>
+          <Button variant="outline" size="sm">
+            {t('export')}
+          </Button>
+          <Button size="sm" asChild>
+            <Link href={`/${locale}/evidence/upload`}>{t('upload')}</Link>
+          </Button>
         </div>
       </div>
 
@@ -226,14 +178,6 @@ export default function EvidenceListPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>
-                  <input
-                    type="checkbox"
-                    checked={selectAll}
-                    onChange={handleSelectAll}
-                    aria-label="Select all"
-                  />
-                </TableHead>
                 <TableHead>{t('titleColumn')}</TableHead>
                 {visibleColumns.control && <TableHead>{t('control')}</TableHead>}
                 {visibleColumns.type && <TableHead>{t('type')}</TableHead>}
@@ -253,15 +197,7 @@ export default function EvidenceListPage() {
                 </TableRow>
               ) : (
                 filteredItems.map((item: any) => (
-                  <TableRow key={item.id} className={selected.includes(item.id) ? 'bg-blue-50' : ''}>
-                    <TableCell>
-                      <input
-                        type="checkbox"
-                        checked={selected.includes(item.id)}
-                        onChange={() => handleSelect(item.id)}
-                        aria-label="Select row"
-                      />
-                    </TableCell>
+                  <TableRow key={item.id}>
                     <TableCell>
                       <div className="font-semibold text-sm">{item.title}</div>
                       {item.description && (
@@ -306,30 +242,6 @@ export default function EvidenceListPage() {
           </Table>
         </CardContent>
       </Card>
-
-      {/* Bulk action bar */}
-      {selected.length > 0 && (
-        <div className="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 shadow-lg z-50 p-4 flex items-center gap-4">
-          <span className="font-semibold">{selected.length} selected</span>
-          {canApprove && <Button size="sm" disabled={bulkLoading} onClick={() => handleBulkAction('approved')}>Approve</Button>}
-          {canReject && <Button size="sm" disabled={bulkLoading} onClick={() => handleBulkAction('rejected')}>Reject</Button>}
-          {canAssign && (
-            <>
-              <Input
-                placeholder="Assign owner..."
-                value={assignOwner}
-                onChange={e => setAssignOwner(e.target.value)}
-                className="w-32"
-                disabled={bulkLoading}
-              />
-              <Button size="sm" disabled={bulkLoading || !assignOwner} onClick={() => handleBulkAction('assign_owner')}>Assign Owner</Button>
-            </>
-          )}
-          {canArchive && <Button size="sm" disabled={bulkLoading} onClick={() => handleBulkAction('archived')}>Archive</Button>}
-          {canDelete && <Button size="sm" disabled={bulkLoading} onClick={() => handleBulkAction('deleted')}>Delete</Button>}
-          {bulkLoading && <span className="ml-4 animate-spin h-5 w-5 border-b-2 border-blue-500 rounded-full"></span>}
-        </div>
-      )}
 
       <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
         <div>{t('results', { count: filteredItems.length, total })}</div>

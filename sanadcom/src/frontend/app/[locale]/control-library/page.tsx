@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
+import apiClient from '@/lib/api-client';
 
 // Types
 interface Control {
@@ -47,12 +48,12 @@ export default function ControlLibraryPage() {
 
   const fetchControls = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/v1/controls/?limit=1000');
-      const data = await response.json();
-      // Always use data.items if present, fallback to data (legacy)
-      const controlsArr = Array.isArray(data.items) ? data.items : data;
-      setControls(controlsArr);
-      calculateStats(controlsArr);
+      const response = await apiClient.get('/api/v1/controls', { params: { limit: 1000 } });
+      // API returns { items: [...], total: N } — unwrap the array
+      const payload = response.data;
+      const items: Control[] = Array.isArray(payload) ? payload : (payload.items ?? []);
+      setControls(items);
+      calculateStats(items);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching controls:', error);

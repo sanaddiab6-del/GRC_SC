@@ -39,8 +39,7 @@ export default function ControlsListPage() {
     try {
       const res = await fetch('http://localhost:8000/api/v1/controls/');
       const data = await res.json();
-      // Always use data.items if present, fallback to data (legacy)
-      setControls(Array.isArray(data.items) ? data.items : data);
+      setControls(data);
       setLoading(false);
     } catch (error) {
       console.error('Error loading controls:', error);

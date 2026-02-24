@@ -34,15 +34,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-const fetcher = async (url: string) => {
-  const res = await apiClient.get(url);
-  console.log('[ControlsPage] axios response:', {
-    responseType: res.config.responseType,
-    isArray: Array.isArray(res.data?.items),
-    dataSample: Array.isArray(res.data?.items) ? res.data.items[0] : res.data,
-  });
-  return res.data;
-};
+const fetcher = (url: string) => apiClient.get(url).then((res) => res.data);
 
 export default function ControlsPage() {
   const t = useTranslations('controlsList');
@@ -73,25 +65,7 @@ export default function ControlsPage() {
     fetcher
   );
 
-
-  // Defensive: handle missing or malformed data
-  let items: any[] = [];
-  let dataError = null;
-  if (data && Array.isArray(data.items)) {
-    items = data.items;
-  } else if (Array.isArray(data)) {
-    items = data;
-  } else if (data && typeof data === 'object') {
-    dataError = 'Malformed controls data: missing items array.';
-    console.error('Malformed controls data:', data);
-  } else if (error) {
-    dataError = 'Error loading controls: ' + (error.message || error);
-    console.error('Error loading controls:', error);
-  } else {
-    dataError = 'No controls data received.';
-    console.error('No controls data received:', data);
-  }
-
+  const items = data?.items || [];
   const filteredItems = useMemo(() => {
     if (!search) return items;
     const term = search.toLowerCase();
@@ -120,22 +94,10 @@ export default function ControlsPage() {
     setSelected((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-foreground"></div>
-      </div>
-    );
-  }
-
-  if (dataError) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <div className="text-center">
-          <div className="text-red-600 text-lg font-bold mb-2">{dataError}</div>
-          <div className="text-gray-500">Please check the API response and browser console for details.</div>
-        </div>
       </div>
     );
   }

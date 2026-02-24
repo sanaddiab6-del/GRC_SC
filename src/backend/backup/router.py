@@ -18,6 +18,7 @@ from backup.schemas import (
 from backup.service import BackupService
 from core.database import get_db
 from auth.dependencies import require_permission
+from auth.security import require_permission
 
 router = APIRouter(prefix="/api/v1/backup", tags=["Backup & Disaster Recovery"])
 backup_service = BackupService()
