@@ -1,204 +1,86 @@
 # Python dependencies for SICO GRC Backend
-# FastAPI and server
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
-python-multipart==0.0.6
+
+# FastAPI and server (single, stable FastAPI declaration; Pydantic v2 compatible)
+fastapi==0.129.0
+uvicorn[standard]==0.34.0
+python-multipart==0.0.22
 
 # Database
-sqlalchemy[asyncio]==2.0.25
-asyncpg==0.29.0  # Async driver for runtime
-# psycopg2-binary==2.9.9  # Sync driver for Alembic migrations
-alembic==1.13.1
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.29.0
+psycopg2-binary==2.9.10
+alembic==1.14.0
+aiosqlite==0.19.0
 
-# Redis
-redis==5.0.1
+# Redis / queues
+redis==5.2.1
 aioredis==2.0.1
+hiredis==2.3.2
+celery==5.4.0
 
 # Pydantic and validation
-pydantic==2.5.3
-pydantic-settings==2.1.0
+pydantic==2.10.5
+pydantic-settings==2.7.1
+pydantic-extra-types==2.4.1
 email-validator==2.1.0
 
-# Authentication & Security (NCA ECC-IS-3, PDPL Article 29)
+# Authentication & security
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 python-dotenv==1.0.0
-cryptography==41.0.7  # Field-level encryption for PII
-PyJWT==2.8.0  # JWT token handling
-pyotp==2.9.0  # MFA TOTP support
-qrcode==7.4.2  # QR code generation for MFA
-pillow==10.2.0  # Image processing for QR codes
-aiosqlite==0.19.0  # Async SQLite driver
-
-# Azure Key Vault integration (for production secrets)
-azure-identity==1.15.0
-azure-keyvault-secrets==4.7.0
-
-# AI/RAG Dependencies
-langchain==0.1.0
-langchain-community==0.0.13
-sentence-transformers==2.3.1
-chromadb==0.4.22
-openai==1.10.0
-
-# HTTP clients
-httpx==0.27.2  # 0.27+ required for ASGITransport lifespan parameter
-aiohttp==3.9.1
-
-# Data processing
-pandas==2.1.4
-openpyxl==3.1.2
-
-# GeoIP for IP geolocation (NCA ECC requirements)
-geoip2==4.7.0
-maxminddb==2.6.2
-
-# Testing
-pytest==7.4.4
-pytest-asyncio==0.23.3
-pytest-cov==4.1.0
-
-# Background tasks for privacy automation
-apscheduler==3.10.4
-
-# GeoIP2 for Saudi IP validation (optional)
-geoip2==4.7.0
-
-# Development
-black==23.12.1
-flake8==7.0.0
-mypy==1.8.0
-fastapi>=0.109.0
-uvicorn[standard]>=0.27.0
-sqlalchemy>=2.0.0
-alembic>=1.13.0
-psycopg2-binary>=2.9.0
-redis>=5.0.0
-pydantic>=2.5.0
-pydantic-settings>=2.1.0
-python-multipart>=0.0.6
-python-jose[cryptography]>=3.3.0
-passlib[bcrypt]>=1.7.4
-python-dotenv>=1.0.0
-
-# AI/NLP - optional for basic functionality
-# langchain>=0.1.0
-# chromadb>=0.4.0
-# sentence-transformers>=2.3.0
-# transformers>=4.36.0
-# torch>=2.5.0
-
-# Data processing
-pandas>=2.1.0
-openpyxl>=3.1.0
-pyyaml>=6.0.0
-jinja2>=3.1.0
-
-# Testing
-pytest>=7.4.0
-pytest-asyncio>=0.23.0
-pytest-cov>=4.1.0
-httpx>=0.26.0
-
-# Development
-black>=23.12.0
-flake8>=7.0.0
-mypy>=1.8.0
-fastapi==0.115.6
-uvicorn[standard]==0.34.0
-pydantic==2.10.5
-pydantic-settings==2.7.1
-sqlalchemy==2.0.36
-psycopg2-binary==2.9.10
-alembic==1.14.0
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
-python-multipart==0.0.22
-redis==5.2.1
-celery==5.4.0
-PyYAML==6.0.2
-langchain==0.3.16
-langchain-openai==0.2.14
-chromadb==0.5.23
-sentence-transformers==3.3.1
-transformers==4.48.0
-pandas==2.2.0
-openpyxl==3.1.2
-python-docx==1.1.0
-jinja2==3.1.3
-aiofiles==23.2.1
-httpx==0.26.0
-pytest==7.4.4
-pytest-asyncio==0.23.3
-pytest-cov==4.1.0
-black==24.1.1
-flake8==7.0.0
-# FastAPI Framework
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
-pydantic==2.6.0
-pydantic-settings==2.1.0
-
-# Database
-sqlalchemy==2.0.25
-asyncpg==0.29.0
-alembic==1.13.1
-psycopg2-binary==2.9.9
-
-# Redis (Caching & Rate Limiting)
-redis==5.0.1
-hiredis==2.3.2
-
-# Authentication & Security
-PyJWT==2.8.0
-passlib[bcrypt]==1.7.4
-python-multipart==0.0.6
 cryptography==42.0.0
+PyJWT==2.8.0
+pyotp==2.9.0
+qrcode==7.4.2
+pillow==10.2.0
 
-# Azure Integration
+# Azure integration
 azure-identity==1.15.0
 azure-keyvault-secrets==4.7.0
 
-# AI/ML Dependencies
+# AI / RAG
 langchain==0.1.4
 langchain-community==0.0.16
 sentence-transformers==2.3.1
 chromadb==0.4.22
-torch>=2.0.0
+openai==1.10.0
 transformers==4.48.0
-
-# NLP & Text Processing
+torch>=2.0.0
 spacy==3.7.2
-# ar-core-news-sm can be installed separately with: python -m spacy download ar_core_news_sm
 
-# HTTP Client
-httpx==0.26.0
+# HTTP clients
+httpx==0.27.2
 aiohttp==3.9.1
 
-# Utilities
-python-dotenv==1.0.0
-pydantic-extra-types==2.4.1
-python-jose[cryptography]==3.3.0
+# Data processing / templating
+pandas==2.2.0
+openpyxl==3.1.2
+python-docx==1.1.0
+jinja2==3.1.3
+PyYAML==6.0.2
+aiofiles==23.2.1
+
+# GeoIP and background tasks
+geoip2==4.7.0
+maxminddb==2.6.2
+apscheduler==3.10.4
 
 # Testing
 pytest==7.4.4
 pytest-asyncio==0.23.3
 pytest-cov==4.1.0
-httpx==0.26.0
 
-# Code Quality
+# Code quality
 ruff==0.1.14
 mypy==1.8.0
 black==24.1.1
+flake8==7.0.0
 isort==5.13.2
 
-# Security Scanning
+# Security scanning
 bandit==1.7.6
 safety==3.0.1
 
-# Logging & Monitoring
+# Logging / monitoring
 python-json-logger==2.0.7
 structlog==24.1.0
-
-# CORS
-python-multipart==0.0.6
