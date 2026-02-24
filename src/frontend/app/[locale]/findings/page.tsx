@@ -295,7 +295,7 @@ export default function FindingsListPage() {
           <Button
             variant="outline"
             size="sm"
-            disabled={items.length < limit}
+            disabled={page * limit >= total}
             onClick={() => setPage(page + 1)}
           >
             {t('next')}
