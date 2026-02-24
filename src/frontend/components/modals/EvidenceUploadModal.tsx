@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
 interface Control {
@@ -39,14 +39,7 @@ export default function EvidenceUploadModal({
   const [error, setError] = useState('');
   const [loadingControls, setLoadingControls] = useState(false);
 
-  // Fetch controls when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      fetchControls();
-    }
-  }, [isOpen]);
-
-  const fetchControls = async () => {
+  const fetchControls = useCallback(async () => {
     setLoadingControls(true);
     try {
       const response = await axios.get('http://localhost:8000/api/v1/controls', {
@@ -59,7 +52,14 @@ export default function EvidenceUploadModal({
     } finally {
       setLoadingControls(false);
     }
-  };
+  }, [isArabic]);
+
+  // Fetch controls when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchControls();
+    }
+  }, [isOpen, fetchControls]);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>

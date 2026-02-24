@@ -5,7 +5,7 @@
  * Complete CRUD with filtering, sorting, and export
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import {
@@ -27,15 +27,7 @@ export default function ControlsListPage() {
   const [filters, setFilters] = useState<any>({});
   const [sortBy, setSortBy] = useState<'priority' | 'status' | 'framework'>('priority');
 
-  useEffect(() => {
-    loadControls();
-  }, []);
-
-  useEffect(() => {
-    applyFilters();
-  }, [controls, searchTerm, filters, sortBy]);
-
-  const loadControls = async () => {
+  const loadControls = useCallback(async () => {
     try {
       const res = await fetch('/api/v1/controls/');
       const data = await res.json();
@@ -45,9 +37,9 @@ export default function ControlsListPage() {
       console.error('Error loading controls:', error);
       setLoading(false);
     }
-  };
+  }, []);
 
-  const applyFilters = () => {
+  const applyFilters = useCallback(() => {
     let filtered = [...controls];
 
     // Search filter
@@ -88,7 +80,15 @@ export default function ControlsListPage() {
     }
 
     setFilteredControls(filtered);
-  };
+  }, [controls, searchTerm, filters, sortBy]);
+
+  useEffect(() => {
+    loadControls();
+  }, [loadControls]);
+
+  useEffect(() => {
+    applyFilters();
+  }, [applyFilters]);
 
   const exportToCSV = () => {
     const headers = ['Control ID', 'Framework', 'Domain', 'Title (AR)', 'Title (EN)', 'Priority', 'Status'];

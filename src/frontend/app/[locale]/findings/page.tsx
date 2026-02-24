@@ -76,13 +76,14 @@ export default function FindingsListPage() {
     fetcher
   );
 
-  const items: FindingItem[] = data?.items || [];
-
   useEffect(() => {
     setPage(1);
   }, [search, severity, status]);
 
-  const filteredItems = useMemo(() => items, [items]);
+  const filteredItems = useMemo(() => {
+    const items: FindingItem[] = data?.items || [];
+    return items;
+  }, [data?.items]);
 
   const severityVariant: Record<string, 'success' | 'warning' | 'destructive' | 'muted'> = {
     critical: 'destructive',

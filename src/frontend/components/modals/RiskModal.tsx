@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
 interface Control {
@@ -108,14 +108,7 @@ export default function RiskModal({
     }
   }, [isOpen, isEdit, riskData, isArabic]);
 
-  // Fetch controls and users when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      fetchDropdownData();
-    }
-  }, [isOpen]);
-
-  const fetchDropdownData = async () => {
+  const fetchDropdownData = useCallback(async () => {
     setLoadingData(true);
     try {
       // Fetch controls
@@ -150,7 +143,14 @@ export default function RiskModal({
     } finally {
       setLoadingData(false);
     }
-  };
+  }, [isArabic]);
+
+  // Fetch controls and users when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchDropdownData();
+    }
+  }, [isOpen, fetchDropdownData]);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>

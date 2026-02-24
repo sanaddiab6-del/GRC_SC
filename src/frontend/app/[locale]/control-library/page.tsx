@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 
@@ -37,15 +37,7 @@ export default function ControlLibraryPage() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [frameworkStats, setFrameworkStats] = useState<Record<string, FrameworkStats>>({});
 
-  useEffect(() => {
-    fetchControls();
-  }, []);
-
-  useEffect(() => {
-    filterControls();
-  }, [controls, selectedFramework, selectedDomain, searchQuery]);
-
-  const fetchControls = async () => {
+  const fetchControls = useCallback(async () => {
     try {
       const response = await fetch('/api/v1/controls/?limit=1000');
       const data = await response.json();
@@ -56,25 +48,9 @@ export default function ControlLibraryPage() {
       console.error('Error fetching controls:', error);
       setLoading(false);
     }
-  };
+  }, []);
 
-  const calculateStats = (controlsData: Control[]) => {
-    const stats: Record<string, FrameworkStats> = {};
-    
-    ['ECC', 'CCC', 'PDPL'].forEach(framework => {
-      const frameworkControls = controlsData.filter(c => c.framework === framework);
-      stats[framework] = {
-        total: frameworkControls.length,
-        implemented: frameworkControls.filter(c => c.status === 'implemented').length,
-        inProgress: frameworkControls.filter(c => c.status === 'in_progress').length,
-        notStarted: frameworkControls.filter(c => c.status === 'not_started').length,
-      };
-    });
-    
-    setFrameworkStats(stats);
-  };
-
-  const filterControls = () => {
+  const filterControls = useCallback(() => {
     let filtered = [...controls];
     
     if (selectedFramework !== 'ALL') {
@@ -97,6 +73,30 @@ export default function ControlLibraryPage() {
     }
     
     setFilteredControls(filtered);
+  }, [controls, selectedFramework, selectedDomain, searchQuery]);
+
+  useEffect(() => {
+    fetchControls();
+  }, [fetchControls]);
+
+  useEffect(() => {
+    filterControls();
+  }, [filterControls]);
+
+  const calculateStats = (controlsData: Control[]) => {
+    const stats: Record<string, FrameworkStats> = {};
+    
+    ['ECC', 'CCC', 'PDPL'].forEach(framework => {
+      const frameworkControls = controlsData.filter(c => c.framework === framework);
+      stats[framework] = {
+        total: frameworkControls.length,
+        implemented: frameworkControls.filter(c => c.status === 'implemented').length,
+        inProgress: frameworkControls.filter(c => c.status === 'in_progress').length,
+        notStarted: frameworkControls.filter(c => c.status === 'not_started').length,
+      };
+    });
+    
+    setFrameworkStats(stats);
   };
 
   const getUniqueDomains = () => {

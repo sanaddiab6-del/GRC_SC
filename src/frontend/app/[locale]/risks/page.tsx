@@ -89,13 +89,12 @@ export default function RiskManagementPage() {
     fetcher
   );
 
-  const risks: RiskItem[] = Array.isArray(data) ? data : [];
-
   useEffect(() => {
     setPage(1);
   }, [search, severity, status]);
 
   const filteredItems = useMemo(() => {
+    const risks: RiskItem[] = Array.isArray(data) ? data : [];
     return risks.filter((risk) => {
       const riskLevel = risk.residual_risk_level || risk.inherent_risk_level || '';
       const matchesSearch = !search
@@ -107,7 +106,7 @@ export default function RiskManagementPage() {
       const matchesStatus = status === 'all' || risk.status === status;
       return matchesSearch && matchesSeverity && matchesStatus;
     });
-  }, [risks, search, severity, status]);
+  }, [data, search, severity, status]);
 
   const severityVariant: Record<string, 'success' | 'warning' | 'destructive' | 'muted'> = {
     critical: 'destructive',

@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import apiClient from '@/lib/api-client';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -52,7 +52,7 @@ export default function ControlsPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedControl, setSelectedControl] = useState<any>(null);
 
-  const fetchControls = async () => {
+  const fetchControls = useCallback(async () => {
     setLoading(true);
     setErrorMsg(null);
     const controller = new AbortController();
@@ -82,11 +82,11 @@ export default function ControlsPage() {
       clearTimeout(timeout);
       setLoading(false);
     }
-  };
+  }, [framework, status, page]);
 
   useEffect(() => {
     fetchControls();
-  }, [framework, status, page]);
+  }, [fetchControls]);
 
   useEffect(() => {
     const fetchStats = async () => {

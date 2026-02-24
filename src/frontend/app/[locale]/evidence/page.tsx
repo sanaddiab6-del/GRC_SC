@@ -97,15 +97,15 @@ export default function EvidenceListPage() {
     fetcher
   );
 
-  const items = evidence?.items || [];
   const filteredItems = useMemo(() => {
+    const items = evidence?.items || [];
     if (!search) return items;
     const term = search.toLowerCase();
     return items.filter((item: any) =>
       item.title?.toLowerCase().includes(term) ||
       item.control_id?.toLowerCase().includes(term)
     );
-  }, [items, search]);
+  }, [evidence?.items, search]);
 
   const total = evidence?.total ?? filteredItems.length;
 
