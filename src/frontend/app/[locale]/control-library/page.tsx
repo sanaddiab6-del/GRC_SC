@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { useTranslations } from 'next-intl';
-import Link from 'next/link';
+import { useTranslations } from "next-intl";
+import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
 
 // Types
 interface Control {
   control_id: string;
-  framework: 'ECC' | 'CCC' | 'PDPL';
+  framework: "ECC" | "CCC" | "PDPL";
   title_en: string;
   title_ar: string;
   description_en: string;
@@ -32,46 +32,49 @@ export default function ControlLibraryPage() {
   const [controls, setControls] = useState<Control[]>([]);
   const [filteredControls, setFilteredControls] = useState<Control[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedFramework, setSelectedFramework] = useState<string>('ALL');
-  const [selectedDomain, setSelectedDomain] = useState<string>('ALL');
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [frameworkStats, setFrameworkStats] = useState<Record<string, FrameworkStats>>({});
+  const [selectedFramework, setSelectedFramework] = useState<string>("ALL");
+  const [selectedDomain, setSelectedDomain] = useState<string>("ALL");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [frameworkStats, setFrameworkStats] = useState<
+    Record<string, FrameworkStats>
+  >({});
 
   const fetchControls = useCallback(async () => {
     try {
-      const response = await fetch('/api/v1/controls/?limit=1000');
+      const response = await fetch("/api/v1/controls/?limit=1000");
       const data = await response.json();
       setControls(data);
       calculateStats(data);
       setLoading(false);
     } catch (error) {
-      console.error('Error fetching controls:', error);
+      console.error("Error fetching controls:", error);
       setLoading(false);
     }
   }, []);
 
   const filterControls = useCallback(() => {
     let filtered = [...controls];
-    
-    if (selectedFramework !== 'ALL') {
-      filtered = filtered.filter(c => c.framework === selectedFramework);
+
+    if (selectedFramework !== "ALL") {
+      filtered = filtered.filter((c) => c.framework === selectedFramework);
     }
-    
-    if (selectedDomain !== 'ALL') {
-      filtered = filtered.filter(c => c.domain === selectedDomain);
+
+    if (selectedDomain !== "ALL") {
+      filtered = filtered.filter((c) => c.domain === selectedDomain);
     }
-    
+
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(c =>
-        c.control_id.toLowerCase().includes(query) ||
-        c.title_en.toLowerCase().includes(query) ||
-        c.title_ar.includes(query) ||
-        c.description_en.toLowerCase().includes(query) ||
-        c.description_ar.includes(query)
+      filtered = filtered.filter(
+        (c) =>
+          c.control_id.toLowerCase().includes(query) ||
+          c.title_en.toLowerCase().includes(query) ||
+          c.title_ar.includes(query) ||
+          c.description_en.toLowerCase().includes(query) ||
+          c.description_ar.includes(query),
       );
     }
-    
+
     setFilteredControls(filtered);
   }, [controls, selectedFramework, selectedDomain, searchQuery]);
 
@@ -85,50 +88,68 @@ export default function ControlLibraryPage() {
 
   const calculateStats = (controlsData: Control[]) => {
     const stats: Record<string, FrameworkStats> = {};
-    
-    ['ECC', 'CCC', 'PDPL'].forEach(framework => {
-      const frameworkControls = controlsData.filter(c => c.framework === framework);
+
+    ["ECC", "CCC", "PDPL"].forEach((framework) => {
+      const frameworkControls = controlsData.filter(
+        (c) => c.framework === framework,
+      );
       stats[framework] = {
         total: frameworkControls.length,
-        implemented: frameworkControls.filter(c => c.status === 'implemented').length,
-        inProgress: frameworkControls.filter(c => c.status === 'in_progress').length,
-        notStarted: frameworkControls.filter(c => c.status === 'not_started').length,
+        implemented: frameworkControls.filter((c) => c.status === "implemented")
+          .length,
+        inProgress: frameworkControls.filter((c) => c.status === "in_progress")
+          .length,
+        notStarted: frameworkControls.filter((c) => c.status === "not_started")
+          .length,
       };
     });
-    
+
     setFrameworkStats(stats);
   };
 
   const getUniqueDomains = () => {
-    const domains = new Set(controls.map(c => c.domain));
+    const domains = new Set(controls.map((c) => c.domain));
     return Array.from(domains).sort();
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority.toLowerCase()) {
-      case 'critical': return 'bg-red-100 text-red-800 border-red-300';
-      case 'high': return 'bg-orange-100 text-orange-800 border-orange-300';
-      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-      case 'low': return 'bg-green-100 text-green-800 border-green-300';
-      default: return 'bg-gray-100 text-gray-800 border-gray-300';
+      case "critical":
+        return "bg-red-100 text-red-800 border-red-300";
+      case "high":
+        return "bg-orange-100 text-orange-800 border-orange-300";
+      case "medium":
+        return "bg-yellow-100 text-yellow-800 border-yellow-300";
+      case "low":
+        return "bg-green-100 text-green-800 border-green-300";
+      default:
+        return "bg-gray-100 text-gray-800 border-gray-300";
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
-      case 'implemented': return 'bg-green-100 text-green-800';
-      case 'in_progress': return 'bg-blue-100 text-blue-800';
-      case 'not_started': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case "implemented":
+        return "bg-green-100 text-green-800";
+      case "in_progress":
+        return "bg-blue-100 text-blue-800";
+      case "not_started":
+        return "bg-gray-100 text-gray-800";
+      default:
+        return "bg-gray-100 text-gray-800";
     }
   };
 
   const getFrameworkColor = (framework: string) => {
     switch (framework) {
-      case 'ECC': return 'bg-purple-100 text-purple-800 border-purple-300';
-      case 'CCC': return 'bg-blue-100 text-blue-800 border-blue-300';
-      case 'PDPL': return 'bg-green-100 text-green-800 border-green-300';
-      default: return 'bg-gray-100 text-gray-800 border-gray-300';
+      case "ECC":
+        return "bg-purple-100 text-purple-800 border-purple-300";
+      case "CCC":
+        return "bg-blue-100 text-blue-800 border-blue-300";
+      case "PDPL":
+        return "bg-green-100 text-green-800 border-green-300";
+      default:
+        return "bg-gray-100 text-gray-800 border-gray-300";
     }
   };
 
@@ -170,11 +191,16 @@ export default function ControlLibraryPage() {
       {/* Framework Stats */}
       <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {['ECC', 'CCC', 'PDPL'].map(framework => (
-            <div key={framework} className="bg-white p-6 rounded-lg shadow-sm border">
+          {["ECC", "CCC", "PDPL"].map((framework) => (
+            <div
+              key={framework}
+              className="bg-white p-6 rounded-lg shadow-sm border"
+            >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold text-gray-900">{framework}</h3>
-                <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getFrameworkColor(framework)}`}>
+                <span
+                  className={`px-3 py-1 rounded-full text-sm font-medium border ${getFrameworkColor(framework)}`}
+                >
                   {frameworkStats[framework]?.total || 0} ضابط
                 </span>
               </div>
@@ -204,12 +230,17 @@ export default function ControlLibraryPage() {
                     <div
                       className="bg-green-600 h-2 rounded-full transition-all"
                       style={{
-                        width: `${(frameworkStats[framework].implemented / frameworkStats[framework].total) * 100}%`
+                        width: `${(frameworkStats[framework].implemented / frameworkStats[framework].total) * 100}%`,
                       }}
                     ></div>
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
-                    {Math.round((frameworkStats[framework].implemented / frameworkStats[framework].total) * 100)}% نسبة التنفيذ
+                    {Math.round(
+                      (frameworkStats[framework].implemented /
+                        frameworkStats[framework].total) *
+                        100,
+                    )}
+                    % نسبة التنفيذ
                   </p>
                 </div>
               )}
@@ -257,8 +288,10 @@ export default function ControlLibraryPage() {
                 className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
               >
                 <option value="ALL">جميع المجالات</option>
-                {getUniqueDomains().map(domain => (
-                  <option key={domain} value={domain}>{domain}</option>
+                {getUniqueDomains().map((domain) => (
+                  <option key={domain} value={domain}>
+                    {domain}
+                  </option>
                 ))}
               </select>
             </div>
@@ -267,7 +300,9 @@ export default function ControlLibraryPage() {
                 النتائج
               </label>
               <div className="px-4 py-2 bg-gray-100 rounded-lg">
-                <span className="font-bold text-purple-600">{filteredControls.length}</span>
+                <span className="font-bold text-purple-600">
+                  {filteredControls.length}
+                </span>
                 <span className="text-gray-600"> ضابط</span>
               </div>
             </div>
@@ -276,7 +311,7 @@ export default function ControlLibraryPage() {
 
         {/* Controls List */}
         <div className="space-y-4">
-          {filteredControls.map(control => (
+          {filteredControls.map((control) => (
             <div
               key={control.control_id}
               className="bg-white p-6 rounded-lg shadow-sm border hover:shadow-md transition"
@@ -287,25 +322,35 @@ export default function ControlLibraryPage() {
                     <span className="font-mono font-bold text-lg text-gray-900">
                       {control.control_id}
                     </span>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getFrameworkColor(control.framework)}`}>
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-medium border ${getFrameworkColor(control.framework)}`}
+                    >
                       {control.framework}
                     </span>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getPriorityColor(control.priority)}`}>
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-medium border ${getPriorityColor(control.priority)}`}
+                    >
                       {control.priority}
                     </span>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(control.status)}`}>
-                      {control.status === 'implemented' ? 'منفذ' : control.status === 'in_progress' ? 'قيد التنفيذ' : 'لم يبدأ'}
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(control.status)}`}
+                    >
+                      {control.status === "implemented"
+                        ? "منفذ"
+                        : control.status === "in_progress"
+                          ? "قيد التنفيذ"
+                          : "لم يبدأ"}
                     </span>
                   </div>
                   <h3 className="text-xl font-bold text-gray-900 mb-2">
                     {control.title_ar}
                   </h3>
-                  <p className="text-gray-600 mb-3">
-                    {control.description_ar}
-                  </p>
+                  <p className="text-gray-600 mb-3">{control.description_ar}</p>
                   <div className="flex items-center gap-4 text-sm text-gray-500">
                     <span>المجال: {control.domain_ar}</span>
-                    <span>الأدلة: {control.evidence_types?.length || 0} نوع أدلة</span>
+                    <span>
+                      الأدلة: {control.evidence_types?.length || 0} نوع أدلة
+                    </span>
                   </div>
                 </div>
                 <Link
@@ -331,7 +376,9 @@ export default function ControlLibraryPage() {
 
         {filteredControls.length === 0 && (
           <div className="text-center py-12 bg-white rounded-lg border">
-            <p className="text-gray-500 text-lg">لا توجد ضوابط تطابق معايير البحث</p>
+            <p className="text-gray-500 text-lg">
+              لا توجد ضوابط تطابق معايير البحث
+            </p>
           </div>
         )}
       </div>
