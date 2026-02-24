@@ -57,7 +57,7 @@ async def list_controls(
         count_query = count_query.where(Control.domain == domain)
 
     total_result = await db.execute(count_query)
-    total = total_result.scalar()
+    total = int(total_result.scalar() or 0)
 
     # Apply pagination in database
     query = query.offset(offset).limit(limit)
@@ -159,7 +159,7 @@ async def update_control(
         setattr(control, "lifecycle_updated_at", datetime.utcnow())
 
     control = await update_model(item=control, update_data=control_data, db=db)
-    
+
     # Update only provided fields
     update_data = control_data.model_dump(exclude_unset=True)
 

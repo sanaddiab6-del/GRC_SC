@@ -1,8 +1,3 @@
-"""
-Empty __init__.py to make models a package
-"""
-Models Package
-Database models for SICO GRC Platform
-"""
+"""Models package for backend database models."""
 
-__all__ = []
+__all__: list[str] = []
