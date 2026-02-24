@@ -10,24 +10,26 @@ This document outlines best practices for managing container security vulnerabil
 
 ### 1. Severity Classification
 
-| Severity | Response Time | Action Required |
-|----------|---------------|-----------------|
+| Severity     | Response Time   | Action Required                |
+| ------------ | --------------- | ------------------------------ |
 | **CRITICAL** | Immediate (24h) | Block deployment, fix required |
-| **HIGH** | 1 week | Fix in next sprint |
-| **MEDIUM** | 1 month | Schedule for fix |
-| **LOW** | Quarterly | Review and assess |
+| **HIGH**     | 1 week          | Fix in next sprint             |
+| **MEDIUM**   | 1 month         | Schedule for fix               |
+| **LOW**      | Quarterly       | Review and assess              |
 
 ### 2. Branch-Based Thresholds
 
 Our CI/CD pipeline uses different thresholds based on the branch:
 
 #### Main Branch (Production)
+
 ```yaml
 CRITICAL: 0 (must fix immediately)
 HIGH: ≤5 (warnings only)
 ```
 
 #### Feature Branches (Development)
+
 ```yaml
 CRITICAL: ≤10 (allows development progress)
 HIGH: ≤20 (relaxed for faster iteration)
@@ -38,9 +40,11 @@ HIGH: ≤20 (relaxed for faster iteration)
 ## Common Vulnerability Sources
 
 ### 1. Base Image Vulnerabilities
+
 **Problem**: Official images (node:20-alpine, python:3.11-slim) may contain OS-level vulnerabilities.
 
 **Solutions**:
+
 - Use minimal base images (Alpine, Distroless)
 - Regularly update to latest patch versions
 - Consider using Google's Distroless images
@@ -55,18 +59,22 @@ FROM node:20.11.1-alpine3.19@sha256:abc123...
 ```
 
 ### 2. Dependency Vulnerabilities
+
 **Problem**: npm/pip packages may have known vulnerabilities.
 
 **Solutions**:
+
 - Run `npm audit fix` / `pip-audit` regularly
 - Use Dependabot for automated updates
 - Review and merge security PRs promptly
 - Use lockfiles (package-lock.json, poetry.lock)
 
 ### 3. Multi-Stage Build Vulnerabilities
+
 **Problem**: Build tools carried into production image.
 
 **Solutions**:
+
 - Use multi-stage builds
 - Only copy necessary artifacts to final image
 - Remove build dependencies
@@ -91,6 +99,7 @@ CMD ["node", "server.js"]
 ## Workflow for Handling CRITICAL Vulnerabilities
 
 ### Step 1: Identify the Issue
+
 When CI fails with CRITICAL vulnerabilities:
 
 1. Download the `trivy-{component}.json` artifact from GitHub Actions
@@ -100,7 +109,9 @@ When CI fails with CRITICAL vulnerabilities:
    ```
 
 ### Step 2: Assess the Impact
+
 For each vulnerability, determine:
+
 - **Is it exploitable in our context?** (e.g., server-side vs client-side)
 - **Is there a fix available?** (check `FixedVersion`)
 - **What is the mitigation?** (upgrade, patch, remove dependency)
@@ -108,6 +119,7 @@ For each vulnerability, determine:
 ### Step 3: Choose Action Path
 
 #### Option A: Update Dependency
+
 ```bash
 # For npm packages
 npm update <package-name>
@@ -118,6 +130,7 @@ npm audit fix
 ```
 
 #### Option B: Add to .trivyignore (Temporary)
+
 ```bash
 # Add CVE with justification and review date
 echo "# CVE-2024-12345 - False positive, reviewed 2026-02-24" >> .trivyignore
@@ -125,9 +138,11 @@ echo "CVE-2024-12345" >> .trivyignore
 ```
 
 #### Option C: Apply Workaround
+
 Document the mitigation in `SECURITY.md` and add compensating controls.
 
 ### Step 4: Re-run Scan
+
 ```bash
 # Local test before pushing
 make security-container
@@ -169,19 +184,23 @@ CRITICAL_THRESHOLD=5  # Increase from 0
 ## Monitoring & Reporting
 
 ### GitHub Security Tab
+
 - Navigate to: `Security > Code scanning alerts > Trivy`
 - Filter by severity, status, or package
 - Assign alerts to team members
 - Track remediation progress
 
 ### Artifacts
+
 Every scan produces:
+
 - `trivy-{component}.sarif` - GitHub Security format
 - `trivy-{component}.json` - Detailed findings
 
 **Download**: Go to Actions run → Artifacts section → Download `trivy-*`
 
 ### Weekly Review Process
+
 1. **Monday 9 AM UTC**: Automated weekly scan runs
 2. **Security Team**: Reviews new findings
 3. **Assign**: Critical issues to respective teams
@@ -193,6 +212,7 @@ Every scan produces:
 ## Preventive Measures
 
 ### 1. Use Renovate/Dependabot
+
 Enable automated dependency updates:
 
 ```yaml
@@ -209,6 +229,7 @@ updates:
 ```
 
 ### 2. Lock Base Image Versions
+
 Always use digests for reproducible builds:
 
 ```dockerfile
@@ -216,12 +237,14 @@ FROM node:20.11.1-alpine3.19@sha256:[digest]
 ```
 
 ### 3. Regular Update Cadence
+
 - **Weekly**: Review and merge security PRs
 - **Monthly**: Manual dependency updates
 - **Quarterly**: Review .trivyignore entries
 - **Yearly**: Base image major version updates
 
 ### 4. Container Hardening
+
 ```dockerfile
 # Run as non-root user
 USER node
@@ -242,6 +265,7 @@ cap_add:
 ## Reference Commands
 
 ### Local Scanning
+
 ```bash
 # Scan an image
 trivy image sico-grc-frontend:latest
@@ -260,6 +284,7 @@ trivy image --ignore-unfixed sico-grc-frontend:latest
 ```
 
 ### Debugging
+
 ```bash
 # List all packages in image
 trivy image --list-all-pkgs sico-grc-frontend:latest
@@ -283,6 +308,7 @@ jq '[.Results[]?.Vulnerabilities[]? | .Severity] | group_by(.) | map({severity: 
 6. **Merge** and verify CI passes
 
 **Emergency Hot-Fix Process**:
+
 - For actively exploited CVEs
 - Skip feature branch, direct to main (with approval)
 - Immediate deployment post-merge
@@ -308,6 +334,6 @@ jq '[.Results[]?.Vulnerabilities[]? | .Severity] | group_by(.) | map({severity: 
 
 ---
 
-**Last Updated**: February 24, 2026  
-**Next Review**: May 24, 2026  
+**Last Updated**: February 24, 2026
+**Next Review**: May 24, 2026
 **Owner**: Security & DevOps Team

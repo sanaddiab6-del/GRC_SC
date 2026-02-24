@@ -9,6 +9,7 @@ Fixed CRITICAL container vulnerabilities in both frontend and backend by impleme
 ## 📦 Files Changed
 
 ### Frontend
+
 ```
 src/frontend/Dockerfile         ✅ Updated - Multi-stage build
 src/frontend/next.config.js     ✅ Updated - Added standalone output
@@ -16,12 +17,14 @@ src/frontend/.dockerignore      ✅ Created - Exclude unnecessary files
 ```
 
 ### Backend
+
 ```
-src/backend/Dockerfile          ✅ Updated - Multi-stage build  
+src/backend/Dockerfile          ✅ Updated - Multi-stage build
 src/backend/.dockerignore       ✅ Created - Exclude unnecessary files
 ```
 
 ### Documentation
+
 ```
 FRONTEND_SECURITY_FIX.md        ✅ Created - Detailed explanation
 CONTAINER_SECURITY_GUIDE.md     ✅ Created - Best practices guide
@@ -33,6 +36,7 @@ CONTAINER_SECURITY_GUIDE.md     ✅ Created - Best practices guide
 ## 🔧 Quick Test Commands
 
 ### Build Both Containers
+
 ```bash
 # Frontend
 cd src/frontend
@@ -44,6 +48,7 @@ docker build -t sico-grc-backend:secure .
 ```
 
 ### Scan for Vulnerabilities
+
 ```bash
 # Frontend
 trivy image --severity CRITICAL,HIGH sico-grc-frontend:secure
@@ -53,12 +58,14 @@ trivy image --severity CRITICAL,HIGH sico-grc-backend:secure
 ```
 
 ### Expected Results
+
 ```
 ✅ CRITICAL: 0
 ✅ HIGH: 0-2 (within threshold of 5)
 ```
 
 ### Run Locally
+
 ```bash
 # Frontend
 docker run -d -p 3000:3000 \
@@ -81,6 +88,7 @@ docker exec backend whoami    # Should output: appuser
 ## 🚀 Deploy to CI/CD
 
 ### Commit Changes
+
 ```bash
 git add src/frontend/Dockerfile \
         src/frontend/next.config.js \
@@ -119,6 +127,7 @@ git push origin main
 ```
 
 ### Monitor GitHub Actions
+
 1. Go to: https://github.com/sonaiso/sanadcom/actions
 2. Wait for "Container Security Scan" jobs
 3. Verify both frontend and backend show:
@@ -131,22 +140,23 @@ git push origin main
 
 ## 📊 Before vs After
 
-| Component | Old | New | Status |
-|-----------|-----|-----|--------|
-| **Frontend Node.js** | 18 (EOL 2025) | 20 LTS (EOL 2026) | ✅ |
-| **Frontend User** | root (UID 0) | nextjs (UID 1001) | ✅ |
-| **Frontend Size** | ~350MB | ~150MB | ✅ |
-| **Frontend CRITICAL CVEs** | 3-5 | 0 | ✅ |
-| **Backend Python** | 3.11-slim | 3.11.8-slim | ✅ |
-| **Backend User** | root (UID 0) | appuser (UID 1000) | ✅ |
-| **Backend Build Tools** | In production | Removed | ✅ |
-| **Backend CRITICAL CVEs** | 2-4 | 0 | ✅ |
+| Component                  | Old           | New                | Status |
+| -------------------------- | ------------- | ------------------ | ------ |
+| **Frontend Node.js**       | 18 (EOL 2025) | 20 LTS (EOL 2026)  | ✅     |
+| **Frontend User**          | root (UID 0)  | nextjs (UID 1001)  | ✅     |
+| **Frontend Size**          | ~350MB        | ~150MB             | ✅     |
+| **Frontend CRITICAL CVEs** | 3-5           | 0                  | ✅     |
+| **Backend Python**         | 3.11-slim     | 3.11.8-slim        | ✅     |
+| **Backend User**           | root (UID 0)  | appuser (UID 1000) | ✅     |
+| **Backend Build Tools**    | In production | Removed            | ✅     |
+| **Backend CRITICAL CVEs**  | 2-4           | 0                  | ✅     |
 
 ---
 
 ## 🔒 Security Improvements
 
 ### Frontend
+
 1. ✅ Multi-stage build (deps → builder → runner)
 2. ✅ Node.js 20.11.1 Alpine 3.19 (latest patches)
 3. ✅ Next.js standalone output (minimal dependencies)
@@ -156,6 +166,7 @@ git push origin main
 7. ✅ Signal handling with dumb-init
 
 ### Backend
+
 1. ✅ Multi-stage build (builder → runtime)
 2. ✅ Python 3.11.8 Debian Bookworm
 3. ✅ Non-root user (appuser:1000)
@@ -169,6 +180,7 @@ git push origin main
 ## ❌ What NOT to Do
 
 Don't:
+
 - ❌ Relax CI/CD thresholds (fix root cause instead)
 - ❌ Add CVEs to .trivyignore without security review
 - ❌ Use `latest` tags without version pinning
@@ -190,6 +202,6 @@ If issues persist:
 
 ---
 
-**Status**: ✅ Ready for Production  
-**Last Updated**: February 24, 2026  
+**Status**: ✅ Ready for Production
+**Last Updated**: February 24, 2026
 **CI/CD**: Should pass on next push

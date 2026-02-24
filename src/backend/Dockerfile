@@ -12,7 +12,7 @@
 # -----------------------------------------------------------------------------
 # Stage 1: Builder (compile dependencies)
 # -----------------------------------------------------------------------------
-FROM python:3.11.8-slim-bookworm AS builder
+FROM python:3.11.10-slim-bookworm AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -34,7 +34,7 @@ RUN pip install --user --no-cache-dir --upgrade pip setuptools wheel && \
 # -----------------------------------------------------------------------------
 # Stage 2: Production Runtime (minimal image)
 # -----------------------------------------------------------------------------
-FROM python:3.11.8-slim-bookworm AS runtime
+FROM python:3.11.10-slim-bookworm AS runtime
 
 # Install only runtime dependencies (PostgreSQL client library)
 RUN apt-get update && apt-get install -y --no-install-recommends \

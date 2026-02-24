@@ -55,8 +55,8 @@ FROM node:20.11.1-alpine3.19 AS runner
 
 # Install only essential runtime dependencies
 RUN apk add --no-cache \
-    dumb-init \
-    && rm -rf /var/cache/apk/*
+  dumb-init \
+  && rm -rf /var/cache/apk/*
 
 WORKDIR /app
 
@@ -67,9 +67,9 @@ ENV PORT=3000
 
 # Create non-root user for running application
 RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs && \
-    mkdir -p /app/.next && \
-    chown -R nextjs:nodejs /app
+  adduser --system --uid 1001 nextjs && \
+  mkdir -p /app/.next && \
+  chown -R nextjs:nodejs /app
 
 # Copy only production files from builder
 # Next.js standalone output includes only necessary dependencies
@@ -85,7 +85,7 @@ EXPOSE 3000
 
 # Health check endpoint
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})" || exit 1
+  CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})" || exit 1
 
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]

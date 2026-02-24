@@ -92,97 +92,113 @@ CMD ["npm", "start"]         # 4. Running via npm (unnecessary overhead)
 ### Key Security Improvements
 
 #### 1. **Node.js 20 LTS** (`node:20.11.1-alpine3.19`)
-   - Latest security patches (as of Feb 2024)
-   - CVE-2024-* vulnerabilities patched
-   - Long-term support until April 2026
-   - Uses Alpine 3.19 (minimal attack surface)
+
+- Latest security patches (as of Feb 2024)
+- CVE-2024-\* vulnerabilities patched
+- Long-term support until April 2026
+- Uses Alpine 3.19 (minimal attack surface)
 
 #### 2. **Multi-Stage Build**
-   ```dockerfile
-   FROM node:20-alpine AS deps      # Dependencies only
-   FROM node:20-alpine AS builder   # Build process
-   FROM node:20-alpine AS runner    # Final minimal image
-   ```
-   - Separates build-time from runtime dependencies
-   - Final image: **~150MB** vs old **~350MB**
-   - Reduces vulnerability count by **~75%**
+
+```dockerfile
+FROM node:20-alpine AS deps      # Dependencies only
+FROM node:20-alpine AS builder   # Build process
+FROM node:20-alpine AS runner    # Final minimal image
+```
+
+- Separates build-time from runtime dependencies
+- Final image: **~150MB** vs old **~350MB**
+- Reduces vulnerability count by **~75%**
 
 #### 3. **Next.js Standalone Output**
-   ```javascript
-   // next.config.js
-   output: 'standalone'
-   ```
-   - Generates self-contained production server
-   - Includes only imported dependencies (tree-shaking)
-   - Excludes: devDependencies, unused node_modules, source files
+
+```javascript
+// next.config.js
+output: "standalone";
+```
+
+- Generates self-contained production server
+- Includes only imported dependencies (tree-shaking)
+- Excludes: devDependencies, unused node_modules, source files
 
 #### 4. **Non-Root User**
-   ```dockerfile
-   RUN addgroup --system --gid 1001 nodejs && \
-       adduser --system --uid 1001 nextjs
-   USER nextjs
-   ```
-   - Application runs as UID 1001 (non-privileged)
-   - If container compromised, attacker cannot:
-     - Install packages
-     - Modify system files
-     - Escalate privileges
+
+```dockerfile
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
+USER nextjs
+```
+
+- Application runs as UID 1001 (non-privileged)
+- If container compromised, attacker cannot:
+  - Install packages
+  - Modify system files
+  - Escalate privileges
 
 #### 5. **Direct Node Execution**
-   ```dockerfile
-   CMD ["node", "server.js"]  # Not: npm start
-   ```
-   - Removes npm from runtime attack surface
-   - Faster startup (no npm overhead)
-   - Better signal handling (SIGTERM/SIGINT)
+
+```dockerfile
+CMD ["node", "server.js"]  # Not: npm start
+```
+
+- Removes npm from runtime attack surface
+- Faster startup (no npm overhead)
+- Better signal handling (SIGTERM/SIGINT)
 
 #### 6. **Minimal System Dependencies**
-   ```dockerfile
-   RUN apk add --no-cache dumb-init && \
-       rm -rf /var/cache/apk/*
-   ```
-   - Only `dumb-init` added (PID 1 init system)
-   - No bash, curl, git, python in final image
-   - Each removed package = fewer CVEs to track
+
+```dockerfile
+RUN apk add --no-cache dumb-init && \
+    rm -rf /var/cache/apk/*
+```
+
+- Only `dumb-init` added (PID 1 init system)
+- No bash, curl, git, python in final image
+- Each removed package = fewer CVEs to track
 
 #### 7. **Health Check**
-   ```dockerfile
-   HEALTHCHECK --interval=30s --timeout=3s \
-       CMD node -e "require('http').get(...)"
-   ```
-   - Container orchestrators can detect failures
-   - Auto-restart unhealthy containers
-   - Improved availability
+
+```dockerfile
+HEALTHCHECK --interval=30s --timeout=3s \
+    CMD node -e "require('http').get(...)"
+```
+
+- Container orchestrators can detect failures
+- Auto-restart unhealthy containers
+- Improved availability
 
 #### 8. **Digest Pinning**
-   ```dockerfile
-   FROM node:20.11.1-alpine3.19  # Specific version
-   ```
-   - Reproducible builds
-   - Can add @sha256:... for immutability
-   - Prevents supply-chain attacks
+
+```dockerfile
+FROM node:20.11.1-alpine3.19  # Specific version
+```
+
+- Reproducible builds
+- Can add @sha256:... for immutability
+- Prevents supply-chain attacks
 
 ---
 
 ## 📊 Security Impact Comparison
 
-| Metric | Old Image | New Image | Improvement |
-|--------|-----------|-----------|-------------|
-| **Base OS** | Node 18 Alpine | Node 20 Alpine | ✅ +18 months LTS |
-| **Image Size** | ~350MB | ~150MB | ✅ 57% smaller |
-| **Total Packages** | ~800 | ~50 | ✅ 93% reduction |
-| **CRITICAL CVEs** | 3-5 | 0 | ✅ **Eliminated** |
-| **HIGH CVEs** | 12-18 | 0-2 | ✅ 90% reduction |
-| **User Privilege** | root (UID 0) | nextjs (UID 1001) | ✅ Non-root |
-| **Runtime Process** | npm → node | node | ✅ No npm overhead |
-| **Build Artifacts** | Included | Stripped | ✅ Cleaner image |
-| **Health Check** | None | Enabled | ✅ Auto-recovery |
+| Metric              | Old Image      | New Image         | Improvement        |
+| ------------------- | -------------- | ----------------- | ------------------ |
+| **Base OS**         | Node 18 Alpine | Node 20 Alpine    | ✅ +18 months LTS  |
+| **Image Size**      | ~350MB         | ~150MB            | ✅ 57% smaller     |
+| **Total Packages**  | ~800           | ~50               | ✅ 93% reduction   |
+| **CRITICAL CVEs**   | 3-5            | 0                 | ✅ **Eliminated**  |
+| **HIGH CVEs**       | 12-18          | 0-2               | ✅ 90% reduction   |
+| **User Privilege**  | root (UID 0)   | nextjs (UID 1001) | ✅ Non-root        |
+| **Runtime Process** | npm → node     | node              | ✅ No npm overhead |
+| **Build Artifacts** | Included       | Stripped          | ✅ Cleaner image   |
+| **Health Check**    | None           | Enabled           | ✅ Auto-recovery   |
 
 ---
 
 ## 🚀 How to Build & Test Locally
 
 ### Prerequisites
+
 ```bash
 # Install Trivy
 brew install aquasecurity/trivy/trivy  # macOS
@@ -191,6 +207,7 @@ curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/inst
 ```
 
 ### Step 1: Build New Image
+
 ```bash
 cd src/frontend
 
@@ -202,6 +219,7 @@ docker images | grep sico-grc-frontend
 ```
 
 ### Step 2: Scan for Vulnerabilities
+
 ```bash
 # Full scan (all severities)
 trivy image sico-grc-frontend:secure
@@ -227,6 +245,7 @@ fi
 ```
 
 ### Step 3: Test Runtime
+
 ```bash
 # Run container
 docker run -d -p 3000:3000 \
@@ -256,6 +275,7 @@ docker rm frontend-test
 ```
 
 ### Step 4: Compare Before/After
+
 ```bash
 # Scan old image (if still exists)
 docker build -f Dockerfile.old -t sico-grc-frontend:old .
@@ -273,6 +293,7 @@ diff scan-old.txt scan-new.txt
 ## 🔧 Additional Hardening (Optional)
 
 ### 1. Use Distroless Base (Even More Minimal)
+
 ```dockerfile
 # Instead of node:20-alpine
 FROM gcr.io/distroless/nodejs20-debian12
@@ -281,6 +302,7 @@ FROM gcr.io/distroless/nodejs20-debian12
 ```
 
 ### 2. Scan During Build (Fail Fast)
+
 ```dockerfile
 # Add to Dockerfile after builder stage
 FROM aquasec/trivy:latest AS scanner
@@ -289,6 +311,7 @@ RUN trivy fs --exit-code 1 --severity CRITICAL /scan
 ```
 
 ### 3. Read-Only Filesystem
+
 ```yaml
 # docker-compose.yml or kubernetes deployment
 security_opt:
@@ -300,12 +323,13 @@ tmpfs:
 ```
 
 ### 4. Resource Limits
+
 ```yaml
 # Prevent DoS attacks
 deploy:
   resources:
     limits:
-      cpus: '1'
+      cpus: "1"
       memory: 512M
     reservations:
       memory: 256M
@@ -331,9 +355,11 @@ deploy:
 ## 🐛 Troubleshooting
 
 ### Issue: "Module not found" errors
+
 **Cause**: Standalone output missing required files
 
 **Fix**:
+
 ```dockerfile
 # Ensure these lines are in runner stage
 COPY --from=builder /app/public ./public
@@ -342,9 +368,11 @@ COPY --from=builder /app/.next/static ./.next/static
 ```
 
 ### Issue: "EACCES: permission denied"
+
 **Cause**: Non-root user can't write to directory
 
 **Fix**:
+
 ```dockerfile
 # Set ownership before switching user
 RUN chown -R nextjs:nodejs /app
@@ -352,13 +380,15 @@ USER nextjs
 ```
 
 ### Issue: Health check always fails
+
 **Cause**: Application not exposing health endpoint
 
 **Fix**: Add health route in Next.js:
+
 ```javascript
 // pages/api/health.js
 export default function handler(req, res) {
-  res.status(200).json({ status: 'healthy' });
+  res.status(200).json({ status: "healthy" });
 }
 ```
 
@@ -380,6 +410,7 @@ export default function handler(req, res) {
 After applying these changes:
 
 1. **GitHub Actions** should show:
+
    ```
    ✅ Container Security Scan (frontend) - PASSED
    🔍 Container Scan Results:
@@ -403,6 +434,6 @@ After applying these changes:
 
 ---
 
-**Last Updated**: February 24, 2026  
-**Next Review**: May 24, 2026  
+**Last Updated**: February 24, 2026
+**Next Review**: May 24, 2026
 **Security Team**: ✅ Approved for Production
