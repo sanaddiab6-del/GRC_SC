@@ -23,19 +23,19 @@ Error: The operation was canceled.
 ```yaml
 jobs:
   dependency-scan:
-    timeout-minutes: 30  # ✅ حد زمني 30 دقيقة
-  
+    timeout-minutes: 30 # ✅ حد زمني 30 دقيقة
+
   sast-python:
-    timeout-minutes: 20  # ✅ حد زمني 20 دقيقة
-  
+    timeout-minutes: 20 # ✅ حد زمني 20 دقيقة
+
   codeql-analysis:
-    timeout-minutes: 45  # ✅ حد زمني 45 دقيقة (CodeQL يحتاج وقت أطول)
-  
+    timeout-minutes: 45 # ✅ حد زمني 45 دقيقة (CodeQL يحتاج وقت أطول)
+
   sbom-generation:
-    timeout-minutes: 25  # ✅ حد زمني 25 دقيقة
-  
+    timeout-minutes: 25 # ✅ حد زمني 25 دقيقة
+
   container-scan:
-    timeout-minutes: 40  # ✅ حد زمني 40 دقيقة
+    timeout-minutes: 40 # ✅ حد زمني 40 دقيقة
 ```
 
 ### 2. تحرير مساحة القرص | Free Disk Space
@@ -56,6 +56,7 @@ jobs:
 ### 3. تخفيف الحزم المثبتة | Reduce Packages
 
 #### قبل (Before) ❌
+
 ```yaml
 - name: Install dependencies (Backend)
   run: |
@@ -65,6 +66,7 @@ jobs:
 ```
 
 #### بعد (After) ✅
+
 ```yaml
 - name: Install dependencies (Backend)
   run: |
@@ -79,6 +81,7 @@ jobs:
 ```
 
 **الحزم المتخطاة** (لا حاجة لها في الفحص الأمني):
+
 - ❌ `torch` (~2GB)
 - ❌ `transformers` (~500MB)
 - ❌ `sentence-transformers` (~300MB)
@@ -86,7 +89,8 @@ jobs:
 - ❌ `chromadb` + dependencies (~200MB)
 - ❌ `spacy` + models (~500MB)
 
-**النتيجة**: 
+**النتيجة**:
+
 - من ~200 حزمة → ~15 حزمة أساسية
 - من ~5GB → ~500MB
 - من 60+ دقيقة → 5-8 دقائق
@@ -98,7 +102,7 @@ jobs:
   uses: actions/setup-python@v5
   with:
     python-version: "3.11"
-    cache: "pip"  # ✅ تفعيل الـ cache
+    cache: "pip" # ✅ تفعيل الـ cache
     cache-dependency-path: src/backend/requirements.txt
 ```
 
@@ -117,12 +121,14 @@ pip install --no-cache-dir package-name
 ## النتيجة | Results
 
 ### قبل التحسين | Before
+
 - ⏱️ الوقت: 60+ دقيقة
 - 💾 المساحة: ~15GB مستخدمة
 - ❌ النتيجة: **Operation canceled** بسبب timeout
 - 📦 الحزم: ~200 حزمة
 
 ### بعد التحسين | After
+
 - ⏱️ الوقت: 15-20 دقيقة
 - 💾 المساحة: ~2GB مستخدمة
 - ✅ النتيجة: **Success** - CI يكمل بنجاح
@@ -132,16 +138,16 @@ pip install --no-cache-dir package-name
 
 ## Jobs الآن | Current Jobs
 
-| Job | Timeout | Status | هدف الـ Job |
-|-----|---------|--------|-------------|
-| dependency-scan | 30 min | ✅ Pass | فحص ثغرات الحزم |
-| sast-python | 20 min | ✅ Pass | تحليل أمني ثابت |
-| codeql-analysis | 45 min | ✅ Pass | تحليل CodeQL متقدم |
-| sbom-generation | 25 min | ✅ Pass | إنشاء قائمة المكونات |
-| secret-scan | 15 min | ✅ Pass | البحث عن أسرار في الكود |
-| container-scan | 40 min | ✅ Pass | فحص صور Docker |
-| security-summary | 10 min | ✅ Pass | ملخص النتائج |
-| quality-gate | 10 min | ✅ Pass | بوابة الجودة |
+| Job              | Timeout | Status  | هدف الـ Job             |
+| ---------------- | ------- | ------- | ----------------------- |
+| dependency-scan  | 30 min  | ✅ Pass | فحص ثغرات الحزم         |
+| sast-python      | 20 min  | ✅ Pass | تحليل أمني ثابت         |
+| codeql-analysis  | 45 min  | ✅ Pass | تحليل CodeQL متقدم      |
+| sbom-generation  | 25 min  | ✅ Pass | إنشاء قائمة المكونات    |
+| secret-scan      | 15 min  | ✅ Pass | البحث عن أسرار في الكود |
+| container-scan   | 40 min  | ✅ Pass | فحص صور Docker          |
+| security-summary | 10 min  | ✅ Pass | ملخص النتائج            |
+| quality-gate     | 10 min  | ✅ Pass | بوابة الجودة            |
 
 **إجمالي وقت التشغيل**: ~20-25 دقيقة (مع التشغيل المتوازي)
 
@@ -150,23 +156,26 @@ pip install --no-cache-dir package-name
 ## ملاحظات مهمة | Important Notes
 
 ### 1. الحزم المتخطاة لا تؤثر على الفحص الأمني
+
 - فحص الأمان يركز على:
   - ثغرات الحزم المستخدمة ✅
   - الـ SAST (Static Analysis) ✅
   - CodeQL Analysis ✅
   - Secret Detection ✅
-  
+
 - **لا يحتاج** لتثبيت كامل حزم ML/AI لأن:
   - `safety check` يقرأ من `requirements.txt` مباشرة
   - `bandit` يحلل الكود الثابت (لا يحتاج runtime)
   - `codeql` يبني semantic model من الكود فقط
 
 ### 2. SBOM يحتوي على الحزم الأساسية فقط
+
 - الـ SBOM النهائي يحتوي على 15-20 حزمة بدلاً من 200+
 - هذا كافٍ لتتبع التبعيات الحرجة
 - الحزم الثقيلة (ML/AI) يمكن إضافتها يدويًا في SBOM النهائي
 
 ### 3. الاختبارات الكاملة في ci.yml
+
 - ملف `ci.yml` يحتوي على اختبارات API الكاملة
 - `security-scanning.yml` للفحص الأمني فقط
 - الفصل بينهما يحسن الأداء والوضوح
@@ -176,18 +185,21 @@ pip install --no-cache-dir package-name
 ## كيف تتحقق من النجاح | How to Verify
 
 ### 1. فحص سجلات GitHub Actions
+
 ```bash
 # انتظر انتهاء التشغيل ثم افحص
 https://github.com/sonaiso/sanadcom/actions
 ```
 
 ### 2. تحقق من رفع نتائج CodeQL
+
 ```bash
 # افحص Security tab
 https://github.com/sonaiso/sanadcom/security/code-scanning
 ```
 
 ### 3. تحقق من SBOM
+
 ```bash
 # افحص Artifacts في Action run
 # يجب أن تجد sbom-python.json و sbom-nodejs.json
@@ -200,20 +212,23 @@ https://github.com/sonaiso/sanadcom/security/code-scanning
 ### خطوات التشخيص
 
 1. **فحص السجلات** (Logs):
+
    ```
    انظر لآخر line قبل الخطأ
    ابحث عن: "killed", "out of memory", "timeout"
    ```
 
 2. **فحص المساحة**:
+
    ```yaml
    - name: Check disk space
      run: df -h
    ```
 
 3. **زيادة Timeout**:
+
    ```yaml
-   timeout-minutes: 60  # زيادة من 45 إلى 60
+   timeout-minutes: 60 # زيادة من 45 إلى 60
    ```
 
 4. **تقليل حزم إضافية**:
@@ -231,8 +246,9 @@ https://github.com/sonaiso/sanadcom/security/code-scanning
 1. **Self-hosted Runner**:
    - استخدام runner خاص بك بمساحة أكبر
    - تكلفة: $0 إذا كان لديك server
-   
+
 2. **Docker Layer Caching**:
+
    ```yaml
    cache-from: type=gha
    cache-to: type=gha,mode=max
@@ -257,12 +273,15 @@ https://github.com/sonaiso/sanadcom/security/code-scanning
 ## الخلاصة | Summary
 
 ### المشكلة كانت
+
 ❌ تثبيت 200+ حزمة (5GB) استغرق 60+ دقيقة وتم إلغاؤه
 
 ### الحل
+
 ✅ تثبيت 15 حزمة أساسية (500MB) يستغرق 5-8 دقائق وينجح
 
 ### الفائدة
+
 - 🚀 سرعة أكبر: 80% تحسين في الوقت
 - 💾 مساحة أقل: 90% توفير في المساحة
 - ✅ نجاح CI: جميع الفحوصات تعمل
