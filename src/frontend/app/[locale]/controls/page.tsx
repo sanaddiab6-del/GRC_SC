@@ -55,23 +55,31 @@ export default function ControlsPage() {
   const fetchControls = async () => {
     setLoading(true);
     setErrorMsg(null);
+    const controller = new AbortController();
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, 10000);
     try {
       const params = new URLSearchParams();
       if (framework !== 'all') params.append('framework', framework);
       if (status !== 'all') params.append('status', status);
       params.append('offset', String((page - 1) * limit));
       params.append('limit', String(limit));
-      const source = apiClient.CancelToken.source();
-      const timeout = setTimeout(() => source.cancel('Request timed out'), 10000);
-      const response = await apiClient.get(`/api/v1/controls?${params}`, { cancelToken: source.token });
-      clearTimeout(timeout);
+      const response = await apiClient.get(`/api/v1/controls?${params}`, { signal: controller.signal });
       const data = response.data;
       setControls(Array.isArray(data.items) ? data.items : []);
       setTotal(data.total || 0);
     } catch (error: any) {
       console.error('Failed to fetch controls:', error);
-      setErrorMsg(error?.message || 'Failed to fetch controls');
+      if (timedOut || error?.code === 'ERR_CANCELED') {
+        setErrorMsg('Request timed out');
+      } else {
+        setErrorMsg(error?.message || 'Failed to fetch controls');
+      }
     } finally {
+      clearTimeout(timeout);
       setLoading(false);
     }
   };
