@@ -3,6 +3,7 @@ Tests for Backup and Disaster Recovery module
 """
 import pytest
 from datetime import datetime, timedelta
+from typing import cast
 from backup.models import BackupJob, RecoveryTest, DisasterRecoveryPlan, BackupType, BackupStatus, RecoveryStatus
 from backup.schemas import (
     BackupJobCreate, RecoveryTestCreate, DisasterRecoveryPlanCreate,
@@ -24,10 +25,10 @@ def test_backup_job_model():
         retention_days=90
     )
     
-    assert backup.id == "BACKUP-20240210-TEST01"
-    assert backup.backup_type == BackupType.FULL
-    assert backup.status == BackupStatus.COMPLETED
-    assert backup.encrypted is True
+    assert cast(str, backup.id) == "BACKUP-20240210-TEST01"
+    assert cast(BackupType, backup.backup_type) == BackupType.FULL
+    assert cast(BackupStatus, backup.status) == BackupStatus.COMPLETED
+    assert cast(bool, backup.encrypted) is True
 
 
 def test_recovery_test_model():
@@ -44,10 +45,10 @@ def test_recovery_test_model():
         scheduled_date=datetime.now() + timedelta(days=7)
     )
     
-    assert test.id == "RT-20240210-TEST01"
-    assert test.rto_target_minutes == 240
-    assert test.rpo_target_minutes == 60
-    assert test.status == RecoveryStatus.SCHEDULED
+    assert cast(str, test.id) == "RT-20240210-TEST01"
+    assert cast(int, test.rto_target_minutes) == 240
+    assert cast(int, test.rpo_target_minutes) == 60
+    assert cast(RecoveryStatus, test.status) == RecoveryStatus.SCHEDULED
 
 
 def test_disaster_recovery_plan_schema():
