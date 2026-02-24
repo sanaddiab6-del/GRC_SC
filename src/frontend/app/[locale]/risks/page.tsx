@@ -326,7 +326,7 @@ export default function RiskManagementPage() {
           <Button
             variant="outline"
             size="sm"
-            disabled={risks.length < limit}
+            disabled={filteredItems.length < limit}
             onClick={() => setPage(page + 1)}
           >
             {t('next')}

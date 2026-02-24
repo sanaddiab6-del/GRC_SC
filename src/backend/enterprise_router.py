@@ -66,11 +66,16 @@ async def test_get_dashboard(db: AsyncSession = Depends(get_db)):
         audit_result = await db.execute(text("SELECT COUNT(*) as count FROM audit_findings"))
         dsar_result = await db.execute(text("SELECT COUNT(*) as count FROM dsar_requests"))
         
+        org_row = org_result.first()
+        risk_row = risk_result.first()
+        audit_row = audit_result.first()
+        dsar_row = dsar_result.first()
+        
         return {
-            "organizations": org_result.first()[0],
-            "risks": risk_result.first()[0],
-            "audit_findings": audit_result.first()[0],
-            "dsar_requests": dsar_result.first()[0]
+            "organizations": org_row[0] if org_row else 0,
+            "risks": risk_row[0] if risk_row else 0,
+            "audit_findings": audit_row[0] if audit_row else 0,
+            "dsar_requests": dsar_row[0] if dsar_row else 0
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -342,12 +347,19 @@ class WorkflowCaseCreate(BaseModel):
     title_ar: Optional[str] = None
     description_en: Optional[str] = None
     priority: Optional[str] = None
+    subject_en: Optional[str] = None
+    subject_ar: Optional[str] = None
+    assigned_to: Optional[int] = None
+    due_date: Optional[date] = None
 
 
 class WorkflowCaseUpdate(BaseModel):
     status: Optional[str] = None
     assigned_to_id: Optional[int] = None
+    assigned_to: Optional[int] = None
     resolution_notes: Optional[str] = None
+    priority: Optional[str] = None
+    due_date: Optional[date] = None
 
 
 class RoPACreate(BaseModel):
@@ -462,7 +474,10 @@ async def create_organization(
         result = await db.execute(text("""
             SELECT * FROM organizations WHERE name_en = :name_en LIMIT 1
         """), {"name_en": org.name_en})
-        return dict(result.first()._mapping)
+        row = result.first()
+        if not row:
+            raise HTTPException(status_code=500, detail="Failed to create organization")
+        return dict(row._mapping)
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
@@ -486,7 +501,7 @@ async def update_organization(
     
     try:
         updates = []
-        params = {"id": org_id}
+        params: dict = {"id": org_id}
         
         if org.name_en:
             updates.append("name_en = :name_en")
@@ -502,7 +517,7 @@ async def update_organization(
             params["license_type"] = org.license_type
         if org.is_active is not None:
             updates.append("is_active = :is_active")
-            params["is_active"] = 1 if org.is_active else 0
+            params["is_active"] = str(1 if org.is_active else 0)
         
         if updates:
             await db.execute(text(f"UPDATE organizations SET {', '.join(updates)} WHERE id = :id"), params)
@@ -510,7 +525,10 @@ async def update_organization(
         
         # Fetch updated organization
         result = await db.execute(text("SELECT * FROM organizations WHERE id = :id"), {"id": org_id})
-        return dict(result.first()._mapping)
+        row = result.first()
+        if not row:
+            raise HTTPException(status_code=404, detail="Organization not found after update")
+        return dict(row._mapping)
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
@@ -635,7 +653,10 @@ async def create_asset(
         })
         await db.commit()
         result = await db.execute(text("SELECT * FROM assets WHERE asset_id = :asset_id"), {"asset_id": asset.asset_id})
-        return dict(result.first()._mapping)
+        row = result.first()
+        if not row:
+            raise HTTPException(status_code=500, detail="Failed to create asset")
+        return dict(row._mapping)
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
@@ -677,14 +698,17 @@ async def update_asset(
             params["environment"] = asset.environment
         if asset.is_active is not None:
             updates.append("is_active = :is_active")
-            params["is_active"] = 1 if asset.is_active else 0
+            params["is_active"] = str(1 if asset.is_active else 0)
         
         if updates:
             await db.execute(text(f"UPDATE assets SET {', '.join(updates)} WHERE asset_id = :asset_id"), params)
             await db.commit()
         
         result = await db.execute(text("SELECT * FROM assets WHERE asset_id = :asset_id"), {"asset_id": asset_id})
-        return dict(result.first()._mapping)
+        row = result.first()
+        if not row:
+            raise HTTPException(status_code=404, detail="Asset not found after update")
+        return dict(row._mapping)
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
@@ -794,7 +818,10 @@ async def create_risk(
         })
         await db.commit()
         result = await db.execute(text("SELECT * FROM risks WHERE risk_id = :risk_id"), {"risk_id": risk.risk_id})
-        return dict(result.first()._mapping)
+        row = result.first()
+        if not row:
+            raise HTTPException(status_code=500, detail="Failed to create risk")
+        return dict(row._mapping)
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
@@ -827,16 +854,16 @@ async def update_risk(
             params["title_ar"] = risk.title_ar
         if risk.likelihood_inherent:
             updates.append("likelihood_inherent = :likelihood")
-            params["likelihood"] = risk.likelihood_inherent
+            params["likelihood"] = str(risk.likelihood_inherent)
         if risk.impact_inherent:
             updates.append("impact_inherent = :impact")
-            params["impact"] = risk.impact_inherent
+            params["impact"] = str(risk.impact_inherent)
         if risk.likelihood_residual:
             updates.append("likelihood_residual = :likelihood_res")
-            params["likelihood_res"] = risk.likelihood_residual
+            params["likelihood_res"] = str(risk.likelihood_residual)
         if risk.impact_residual:
             updates.append("impact_residual = :impact_res")
-            params["impact_res"] = risk.impact_residual
+            params["impact_res"] = str(risk.impact_residual)
         if risk.status:
             updates.append("status = :status")
             params["status"] = risk.status
@@ -846,7 +873,10 @@ async def update_risk(
             await db.commit()
         
         result = await db.execute(text("SELECT * FROM risks WHERE risk_id = :risk_id"), {"risk_id": risk_id})
-        return dict(result.first()._mapping)
+        row = result.first()
+        if not row:
+            raise HTTPException(status_code=404, detail="Risk not found after update")
+        return dict(row._mapping)
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
@@ -988,7 +1018,10 @@ async def create_audit_finding(
         })
         await db.commit()
         result = await db.execute(text("SELECT * FROM audit_findings WHERE finding_id = :id"), {"id": finding.finding_id})
-        return dict(result.first()._mapping)
+        row = result.first()
+        if not row:
+            raise HTTPException(status_code=500, detail="Failed to create audit finding")
+        return dict(row._mapping)
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
@@ -1027,14 +1060,17 @@ async def update_audit_finding(
             params["status"] = finding.status
         if finding.target_closure_date:
             updates.append("target_closure_date = :closure_date")
-            params["closure_date"] = finding.target_closure_date
+            params["closure_date"] = str(finding.target_closure_date)
         
         if updates:
             await db.execute(text(f"UPDATE audit_findings SET {', '.join(updates)} WHERE finding_id = :id"), params)
             await db.commit()
         
         result = await db.execute(text("SELECT * FROM audit_findings WHERE finding_id = :id"), {"id": finding_id})
-        return dict(result.first()._mapping)
+        row = result.first()
+        if not row:
+            raise HTTPException(status_code=404, detail="Audit finding not found after update")
+        return dict(row._mapping)
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
@@ -1126,7 +1162,10 @@ async def create_ropa_record(
         })
         await db.commit()
         result = await db.execute(text("SELECT * FROM ropa_records WHERE activity_id = :id"), {"id": ropa.activity_id})
-        return dict(result.first()._mapping)
+        row = result.first()
+        if not row:
+            raise HTTPException(status_code=500, detail="Failed to create RoPA record")
+        return dict(row._mapping)
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
@@ -1172,7 +1211,10 @@ async def update_ropa_record(
             await db.commit()
         
         result = await db.execute(text("SELECT * FROM ropa_records WHERE activity_id = :id"), {"id": activity_id})
-        return dict(result.first()._mapping)
+        row = result.first()
+        if not row:
+            raise HTTPException(status_code=404, detail="RoPA record not found after update")
+        return dict(row._mapping)
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
@@ -1239,13 +1281,16 @@ async def create_dsar_request(
             "org_id": current_user.organization_id,
             "dsar_id": dsar.dsar_id,
             "subject_name": dsar.data_subject_name,
-            "request_date": dsar.request_date,
+            "request_date": str(dsar.request_date),
             "request_type": dsar.request_type,
-            "deadline": dsar.response_deadline
+            "deadline": str(dsar.response_deadline)
         })
         await db.commit()
         result = await db.execute(text("SELECT * FROM dsar_requests WHERE dsar_id = :id"), {"id": dsar.dsar_id})
-        return dict(result.first()._mapping)
+        row = result.first()
+        if not row:
+            raise HTTPException(status_code=500, detail="Failed to create DSAR request")
+        return dict(row._mapping)
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
@@ -1275,7 +1320,7 @@ async def update_dsar_request(
             params["status"] = dsar.status
         if dsar.response_date:
             updates.append("response_date = :response_date")
-            params["response_date"] = dsar.response_date
+            params["response_date"] = str(dsar.response_date)
         if dsar.response_format:
             updates.append("response_format = :format")
             params["format"] = dsar.response_format
@@ -1288,7 +1333,10 @@ async def update_dsar_request(
             await db.commit()
         
         result = await db.execute(text("SELECT * FROM dsar_requests WHERE dsar_id = :id"), {"id": dsar_id})
-        return dict(result.first()._mapping)
+        row = result.first()
+        if not row:
+            raise HTTPException(status_code=404, detail="DSAR request not found after update")
+        return dict(row._mapping)
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
@@ -1350,15 +1398,18 @@ async def create_data_breach(
         """), {
             "org_id": current_user.organization_id,
             "breach_id": breach.breach_id,
-            "breach_date": breach.breach_date,
-            "suspected_date": breach.suspected_date,
+            "breach_date": str(breach.breach_date),
+            "suspected_date": str(breach.suspected_date) if breach.suspected_date else None,
             "description": breach.description_en,
             "data_types": breach.affected_data_types,
             "severity": breach.severity
         })
         await db.commit()
         result = await db.execute(text("SELECT * FROM data_breaches WHERE breach_id = :id"), {"id": breach.breach_id})
-        return dict(result.first()._mapping)
+        row = result.first()
+        if not row:
+            raise HTTPException(status_code=500, detail="Failed to create data breach record")
+        return dict(row._mapping)
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
@@ -1385,7 +1436,7 @@ async def update_data_breach(
         
         if breach.breach_date:
             updates.append("breach_date = :breach_date")
-            params["breach_date"] = breach.breach_date
+            params["breach_date"] = str(breach.breach_date)
         if breach.description_en:
             updates.append("description_en = :description")
             params["description"] = breach.description_en
@@ -1397,14 +1448,17 @@ async def update_data_breach(
             params["status"] = breach.status
         if breach.sdaia_notified is not None:
             updates.append("sdaia_notified = :notified")
-            params["notified"] = 1 if breach.sdaia_notified else 0
+            params["notified"] = str(1 if breach.sdaia_notified else 0)
         
         if updates:
             await db.execute(text(f"UPDATE data_breaches SET {', '.join(updates)} WHERE breach_id = :id"), params)
             await db.commit()
         
         result = await db.execute(text("SELECT * FROM data_breaches WHERE breach_id = :id"), {"id": breach_id})
-        return dict(result.first()._mapping)
+        row = result.first()
+        if not row:
+            raise HTTPException(status_code=404, detail="Data breach not found after update")
+        return dict(row._mapping)
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
@@ -1508,11 +1562,14 @@ async def create_workflow_case(
             "subject_ar": case.subject_ar,
             "priority": case.priority,
             "assigned_to": case.assigned_to,
-            "due_date": case.due_date
+            "due_date": str(case.due_date) if case.due_date else None
         })
         await db.commit()
         result = await db.execute(text("SELECT * FROM workflow_cases WHERE case_id = :id"), {"id": case_id})
-        return dict(result.first()._mapping)
+        row = result.first()
+        if not row:
+            raise HTTPException(status_code=500, detail="Failed to create workflow case")
+        return dict(row._mapping)
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
@@ -1535,7 +1592,7 @@ async def update_workflow_case(
     
     try:
         updates = []
-        params = {"id": case_id}
+        params: dict = {"id": case_id}
         
         if case.status:
             updates.append("status = :status")
@@ -1548,14 +1605,17 @@ async def update_workflow_case(
             params["assigned_to"] = case.assigned_to
         if case.due_date:
             updates.append("due_date = :due_date")
-            params["due_date"] = case.due_date
+            params["due_date"] = str(case.due_date)
         
         if updates:
             await db.execute(text(f"UPDATE workflow_cases SET {', '.join(updates)} WHERE case_id = :id"), params)
             await db.commit()
         
         result = await db.execute(text("SELECT * FROM workflow_cases WHERE case_id = :id"), {"id": case_id})
-        return dict(result.first()._mapping)
+        row = result.first()
+        if not row:
+            raise HTTPException(status_code=404, detail="Workflow case not found after update")
+        return dict(row._mapping)
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
@@ -1655,7 +1715,10 @@ async def create_vendor(
         })
         await db.commit()
         result = await db.execute(text("SELECT * FROM vendors WHERE vendor_id = :id"), {"id": vendor.vendor_id})
-        return dict(result.first()._mapping)
+        row = result.first()
+        if not row:
+            raise HTTPException(status_code=500, detail="Failed to create vendor")
+        return dict(row._mapping)
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
@@ -1701,7 +1764,10 @@ async def update_vendor(
             await db.commit()
         
         result = await db.execute(text("SELECT * FROM vendors WHERE vendor_id = :id"), {"id": vendor_id})
-        return dict(result.first()._mapping)
+        row = result.first()
+        if not row:
+            raise HTTPException(status_code=404, detail="Vendor not found after update")
+        return dict(row._mapping)
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
