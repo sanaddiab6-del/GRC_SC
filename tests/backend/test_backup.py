@@ -24,7 +24,7 @@ def test_backup_job_model():
         encrypted=True,
         retention_days=90
     )
-    
+
     assert cast(str, backup.id) == "BACKUP-20240210-TEST01"
     assert cast(BackupType, backup.backup_type) == BackupType.FULL
     assert cast(BackupStatus, backup.status) == BackupStatus.COMPLETED
@@ -44,7 +44,7 @@ def test_recovery_test_model():
         rpo_target_minutes=60,   # 1 hour
         scheduled_date=datetime.now() + timedelta(days=7)
     )
-    
+
     assert cast(str, test.id) == "RT-20240210-TEST01"
     assert cast(int, test.rto_target_minutes) == 240
     assert cast(int, test.rpo_target_minutes) == 60
@@ -61,7 +61,7 @@ def test_disaster_recovery_plan_schema():
         priority=1,
         dependencies=["PostgreSQL", "Redis", "Chroma"]
     )
-    
+
     recovery_proc = RecoveryProcedure(
         step_number=1,
         description="Restore PostgreSQL database from latest backup",
@@ -69,14 +69,14 @@ def test_disaster_recovery_plan_schema():
         responsible_role="Database Administrator",
         estimated_duration_minutes=30
     )
-    
+
     emergency_contact = EmergencyContact(
         name="Ahmed Al-Saud",
         role="IT Manager",
         phone="+966501234567",
         email="ahmed@company.sa"
     )
-    
+
     dr_plan = DisasterRecoveryPlanCreate(
         plan_name="SICO GRC DR Plan 2024",
         plan_name_ar="خطة التعافي من الكوارث لـ SICO GRC 2024",
@@ -90,7 +90,7 @@ def test_disaster_recovery_plan_schema():
         emergency_contacts=[emergency_contact],
         test_frequency_days=90
     )
-    
+
     assert dr_plan.version == "1.0"
     assert dr_plan.overall_rto_hours == 8
     assert len(dr_plan.critical_systems) == 1

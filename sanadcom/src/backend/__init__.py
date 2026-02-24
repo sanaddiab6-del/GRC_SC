@@ -1,1 +1,0 @@
-"""SICO GRC Backend API"""
