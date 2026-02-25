@@ -68,8 +68,8 @@ def _load_models() -> None:
         import regulatory_versions as _reg_versions  # noqa: F401
     except Exception:
         pass
-    # Disabled to avoid duplicate table definitions (models already in module-specific files)
-    # import enterprise_models as _enterprise_models  # noqa: F401 - Enterprise GRC
+    # Enterprise models are required for organization and enterprise-user FKs
+    import enterprise_models as _enterprise_models  # noqa: F401
 
 
 async def init_db():

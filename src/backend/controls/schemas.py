@@ -24,9 +24,9 @@ class ControlBase(BaseModel):
     procedure_guidance_en: Optional[str] = None
     procedure_guidance_ar: Optional[str] = None
     
-    priority: str = "medium"
-    status: str = "not_started"
-    maturity_level: int = 1
+    priority: Optional[str] = None
+    status: Optional[str] = None
+    maturity_level: Optional[int] = None
     
     evidence_types: Optional[List[str]] = None
     related_controls: Optional[Dict[str, List[str]]] = None

@@ -55,7 +55,7 @@ class Control(Base):
     id = Column(Integer, primary_key=True, index=True)
     control_id = Column(String(50), unique=True, index=True, nullable=False)
     framework = Column(
-        Enum(FrameworkType, native_enum=False),
+        String(20),
         nullable=False,
         index=True,
     )
@@ -76,8 +76,8 @@ class Control(Base):
     # Control metadata
     priority = Column(String(20), default="medium")  # low, medium, high, critical
     status = Column(
-        Enum(ControlStatus, native_enum=False),
-        default=ControlStatus.NOT_STARTED,
+        String(50),
+        default=ControlStatus.NOT_STARTED.value,
         index=True,
     )
     maturity_level = Column(Integer, default=1)  # 1-5 scale

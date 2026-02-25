@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 import jwt
 from fastapi import Depends, HTTPException, status
@@ -16,7 +16,21 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from passlib.context import CryptContext
 from pydantic import BaseModel, Field
 
-from ai.security.ai_security import AIRole, AIPermission, QueryContext
+# Try to import AI security - may not be available in all environments
+AI_SECURITY_AVAILABLE = False
+
+if TYPE_CHECKING:
+    from ai.security.ai_security import AIRole, AIPermission, QueryContext
+else:
+    try:
+        from ai.security.ai_security import AIRole, AIPermission, QueryContext
+        AI_SECURITY_AVAILABLE = True
+    except ImportError:
+        # Define placeholder classes when AI module is not available
+        AIRole = None
+        AIPermission = None
+        QueryContext = None
+        AI_SECURITY_AVAILABLE = False
 
 # JWT Configuration
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-in-production")

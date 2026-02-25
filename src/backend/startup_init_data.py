@@ -12,6 +12,10 @@ DB_PATH = Path(__file__).parent / "sico_grc.db"
 def check_and_initialize_data():
     """Check if database has data, populate with complete control libraries if needed"""
     
+    # TEMPORARILY DISABLED - causing database lock issues during local development
+    print("📝 Startup data initialization skipped (running manually)")
+    return
+    
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
@@ -25,7 +29,7 @@ def check_and_initialize_data():
         risk_count = cursor.fetchone()[0]
         
         # Check if evidence exists
-        cursor.execute("SELECT COUNT(*) FROM evidences")
+        cursor.execute("SELECT COUNT(*) FROM evidence")
         evidence_count = cursor.fetchone()[0]
         
         conn.close()

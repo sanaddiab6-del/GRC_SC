@@ -762,7 +762,7 @@ def insert_controls(controls, framework_name):
                 control.get('evidence_examples', '')[:1000] if control.get('evidence_examples') else '',  # Use as procedure guidance
                 control.get('subdomain', '')[:1000] if control.get('subdomain') else '',
                 control.get('priority', 'medium'),
-                control.get('status', 'active'),
+                'not_started',  # Use valid ControlStatus enum value
                 1,  # Default maturity level
                 datetime.now(),
                 datetime.now()
