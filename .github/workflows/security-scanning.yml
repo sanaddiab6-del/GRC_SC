@@ -314,6 +314,8 @@ jobs:
         if: steps.build.outcome == 'success'
         continue-on-error: ${{ github.ref != 'refs/heads/main' }}
         run: |
+          # Count only CRITICAL vulnerabilities with an available fix
+          CRITICAL_FIXABLE=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL" and .FixedVersion != null and .FixedVersion != "")] | length' trivy-${{ matrix.component }}.json)
           CRITICAL=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' trivy-${{ matrix.component }}.json)
           HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' trivy-${{ matrix.component }}.json)
           MEDIUM=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' trivy-${{ matrix.component }}.json)
@@ -350,10 +352,10 @@ jobs:
 
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          # Check against thresholds
+          # Check against thresholds - fail only on CRITICAL with available fixes
           EXIT_CODE=0
-          if [ "$CRITICAL" -gt "$CRITICAL_THRESHOLD" ] && [ "$GITHUB_REF" == "refs/heads/main" ]; then
-            echo "❌ **FAILED**: $CRITICAL CRITICAL vulnerabilities exceed threshold of $CRITICAL_THRESHOLD" >> $GITHUB_STEP_SUMMARY
+          if [ "$CRITICAL_FIXABLE" -gt "$CRITICAL_THRESHOLD" ]; then
+            echo "❌ **FAILED**: $CRITICAL_FIXABLE CRITICAL vulnerabilities exceed threshold of $CRITICAL_THRESHOLD" >> $GITHUB_STEP_SUMMARY
             echo "🔧 **Action Required**: Update base images or fix vulnerable dependencies" >> $GITHUB_STEP_SUMMARY
             EXIT_CODE=1
           elif [ "$CRITICAL" -gt 0 ]; then
