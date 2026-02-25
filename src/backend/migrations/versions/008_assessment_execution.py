@@ -30,6 +30,33 @@ branch_labels = None
 depends_on = None
 
 
+class GUID(sa.TypeDecorator):
+    """Platform-independent GUID type (matches users.user_id)."""
+    impl = sa.CHAR
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == 'postgresql':
+            return dialect.type_descriptor(postgresql.UUID())
+        return dialect.type_descriptor(sa.CHAR(32))
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
+        if dialect.name == 'postgresql':
+            return str(value)
+        if isinstance(value, uuid.UUID):
+            return "%.32x" % value.int
+        return "%.32x" % uuid.UUID(value).int
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return value
+        if not isinstance(value, uuid.UUID):
+            value = uuid.UUID(value)
+        return value
+
+
 def upgrade():
     """Create assessment execution tables"""
 
@@ -58,10 +85,10 @@ def upgrade():
         sa.Column('domain_scope', sa.JSON, nullable=True),   # List of domain IDs
 
         # Ownership and assignment
-        sa.Column('created_by_id', sa.Integer, sa.ForeignKey('users.id', ondelete='SET NULL'), nullable=True),
-        sa.Column('assigned_assessor_id', sa.Integer, sa.ForeignKey('users.id', ondelete='SET NULL'), nullable=True, index=True),
-        sa.Column('reviewer_id', sa.Integer, sa.ForeignKey('users.id', ondelete='SET NULL'), nullable=True),
-        sa.Column('approver_id', sa.Integer, sa.ForeignKey('users.id', ondelete='SET NULL'), nullable=True),
+        sa.Column('created_by_id', GUID(), sa.ForeignKey('users.user_id', ondelete='SET NULL'), nullable=True),
+        sa.Column('assigned_assessor_id', GUID(), sa.ForeignKey('users.user_id', ondelete='SET NULL'), nullable=True, index=True),
+        sa.Column('reviewer_id', GUID(), sa.ForeignKey('users.user_id', ondelete='SET NULL'), nullable=True),
+        sa.Column('approver_id', GUID(), sa.ForeignKey('users.user_id', ondelete='SET NULL'), nullable=True),
         sa.Column('organization_id', sa.Integer, nullable=True),
 
         # Lifecycle status
@@ -150,14 +177,14 @@ def upgrade():
         # Remediation tracking
         sa.Column('remediation_required', sa.Boolean, default=False),
         sa.Column('remediation_deadline', sa.DateTime, nullable=True),
-        sa.Column('remediation_owner_id', sa.Integer, sa.ForeignKey('users.id', ondelete='SET NULL'), nullable=True),
+        sa.Column('remediation_owner_id', GUID(), sa.ForeignKey('users.user_id', ondelete='SET NULL'), nullable=True),
 
         # Scoring
         sa.Column('control_weight', sa.Float, default=1.0),
         sa.Column('control_score', sa.Float, nullable=True),
 
         # Metadata
-        sa.Column('assessed_by_id', sa.Integer, sa.ForeignKey('users.id', ondelete='SET NULL'), nullable=True),
+        sa.Column('assessed_by_id', GUID(), sa.ForeignKey('users.user_id', ondelete='SET NULL'), nullable=True),
         sa.Column('assessed_at', sa.DateTime, nullable=True),
         sa.Column('reviewer_comment', sa.Text, nullable=True),
         sa.Column('reviewed_at', sa.DateTime, nullable=True),
@@ -188,7 +215,7 @@ def upgrade():
         sa.Column('assessment_id', sa.Integer, sa.ForeignKey('assessment_instances.id', ondelete='CASCADE'), nullable=False, index=True),
         sa.Column('from_status', sa.String(20), nullable=False),
         sa.Column('to_status', sa.String(20), nullable=False, index=True),
-        sa.Column('changed_by_id', sa.Integer, sa.ForeignKey('users.id', ondelete='SET NULL'), nullable=True),
+        sa.Column('changed_by_id', GUID(), sa.ForeignKey('users.user_id', ondelete='SET NULL'), nullable=True),
 
         # Audit trail
         sa.Column('changed_at', sa.DateTime, nullable=False, server_default=sa.text('CURRENT_TIMESTAMP'), index=True),
