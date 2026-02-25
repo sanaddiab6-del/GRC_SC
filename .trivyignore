@@ -1,63 +1,28 @@
-# Trivy Ignore File - SICO GRC Platform
-
-# This file lists CVE IDs that should be ignored during container scanning
-
-# Format: One CVE ID per line, with optional comment explaining why
-
+﻿# =============================================================================
+# Trivy Vulnerability Ignore List - SICO GRC Platform
+# Format: <CVE-ID> [expiry-date YYYY-MM-DD]  # reason
+# Reference: https://aquasecurity.github.io/trivy/latest/docs/configuration/filtering/#trivyignore
+# =============================================================================
+# POLICY:
+#   1. Only add CVEs AFTER security review confirms risk is accepted or no fix exists.
+#   2. Every entry MUST have a comment with: reason + tracking issue ref.
+#   3. Temporary ignores MUST include an expiry date (max 90 days).
+#   4. Permanent ignores require security team sign-off.
+#   5. Review this file each 90 days and remove entries where patches now exist.
+#
+# Scan commands for ad-hoc review:
+#   trivy image --severity CRITICAL,HIGH --ignore-unfixed <IMAGE>
+#   trivy image --list-all-pkgs <IMAGE>
+#   See: https://aquasecurity.github.io/trivy/latest/docs/configuration/filtering/
 # =============================================================================
 
-# TEMPORARY IGNORES (Review Quarterly)
+# --- TEMPORARY IGNORES (must have expiry date) ---
+# Last review: 2026-02-25 - Node.js base image upgraded to 22-alpine.
+# Re-evaluate any new entries after next upstream Node.js LTS release.
+# (No active temporary ignores at this time.)
 
-# Last Review: 2026-02-24
+# --- PERMANENT IGNORES (justification required) ---
+# (No permanent ignores at this time.)
 
-# =============================================================================
-h
-# Base Image Vulnerabilities (Node.js)
-
-# TODO: Update to Node.js 20.12 LTS when available
-
-# CVE-2024-XXXXX
-
-# Base Image Vulnerabilities (Python)
-
-# TODO: Update to Python 3.11.8 when Alpine image available
-
-# CVE-2024-YYYYY
-
-# =============================================================================
-
-# PERMANENT IGNORES (With Justification)
-
-# =============================================================================
-
-# Example: CVE-2023-12345 - Only affects Windows, we use Linux containers
-
-# CVE-2023-12345
-
-# =============================================================================
-
-# INSTRUCTIONS FOR USE
-
-# =============================================================================
-
-# 1. Only add CVEs after thorough security review
-
-# 2. Always add a comment explaining why it's ignored
-
-# 3. Set a review date for temporary ignores
-
-# 4. Get security team approval for permanent ignores
-
-# 5. Document mitigation measures in SECURITY.md
-
-# =============================================================================
-
-# NOTES
-
-# =============================================================================
-
-# - Run `trivy image --list-all-pkgs IMAGE` to see all packages
-
-# - Run `trivy image --severity CRITICAL,HIGH IMAGE` for focused scan
-
-# - See: https://aquasecurity.github.io/trivy/latest/docs/configuration/filtering/
+# --- HOW TO ADD AN ENTRY ---
+# CVE-2024-XXXXX 2026-05-25  # pkg: example-lib - only exploitable via X, mitigated by Y - GRC-###

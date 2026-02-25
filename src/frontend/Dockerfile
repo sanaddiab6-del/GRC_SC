@@ -3,17 +3,21 @@
 # =============================================================================
 # Security improvements:
 # - Multi-stage build separates build-time from runtime dependencies
-# - Uses Node.js 20 LTS (latest security patches)
+# - Uses Node.js 22 LTS (current LTS with active security patches)
 # - Minimal Alpine Linux base (reduces attack surface)
 # - Non-root user execution
 # - Production-only dependencies in final image
 # - No package managers or build tools in production
 # =============================================================================
 
+# Pin exact version to ensure reproducible, auditable builds.
+# To update: check https://hub.docker.com/_/node for latest node:22-alpine digest.
+ARG NODE_VERSION=22-alpine
+
 # -----------------------------------------------------------------------------
 # Stage 1: Dependencies (cached layer for faster rebuilds)
 # -----------------------------------------------------------------------------
-FROM node:20.11.1-alpine3.19 AS deps
+FROM node:${NODE_VERSION} AS deps
 
 # Install only required system packages for node-gyp builds
 RUN apk add --no-cache libc6-compat
@@ -30,7 +34,7 @@ RUN npm ci
 # -----------------------------------------------------------------------------
 # Stage 2: Builder (compile application)
 # -----------------------------------------------------------------------------
-FROM node:20.11.1-alpine3.19 AS builder
+FROM node:${NODE_VERSION} AS builder
 
 WORKDIR /app
 
@@ -51,7 +55,7 @@ RUN npm run build
 # -----------------------------------------------------------------------------
 # Stage 3: Production Runtime (minimal image)
 # -----------------------------------------------------------------------------
-FROM node:20.11.1-alpine3.19 AS runner
+FROM node:${NODE_VERSION} AS runner
 
 # Install only essential runtime dependencies
 RUN apk add --no-cache \

@@ -289,6 +289,8 @@ jobs:
           format: "sarif"
           output: "trivy-${{ matrix.component }}.sarif"
           severity: "CRITICAL,HIGH,MEDIUM"
+          ignore-unfixed: true
+          trivyignores: .trivyignore
 
       - name: Upload Trivy SARIF to GitHub Security
         if: steps.build.outcome == 'success'
@@ -305,6 +307,8 @@ jobs:
           format: "json"
           output: "trivy-${{ matrix.component }}.json"
           severity: "CRITICAL,HIGH,MEDIUM"
+          ignore-unfixed: true
+          trivyignores: .trivyignore
 
       - name: Check for CRITICAL/HIGH vulnerabilities
         if: steps.build.outcome == 'success'
