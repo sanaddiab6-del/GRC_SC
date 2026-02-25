@@ -131,12 +131,19 @@ docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=sico_grc
 # Start Redis
 docker run -d -p 6379:6379 redis:7
 
-# Run database migrations
+# Run database migrations (recommended - handles multiple heads automatically)
+.\scripts\run-alembic-migrations.ps1
+
+# Or use make command (Linux/Mac/WSL)
+make migrate
+
+# Or use alembic directly (if needed)
 cd src\backend
-alembic upgrade head
+python -m alembic upgrade head
 
 # Start FastAPI
-uvicorn main:app --reload --port 8000
+cd src\backend
+python -m uvicorn main:app --reload --port 8000
 ```
 
 ### Start Frontend Only

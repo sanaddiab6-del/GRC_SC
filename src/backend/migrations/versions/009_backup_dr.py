@@ -1,7 +1,7 @@
 """Add backup and disaster recovery tables
 
-Revision ID: 005_backup_dr
-Revises: 004_privacy_data_protection
+Revision ID: 009_backup_dr
+Revises: 008_assessment_execution
 Create Date: 2024-02-10
 
 Implements NCA ECC-BC-1, ECC-BC-2 requirements
@@ -11,8 +11,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = '005_backup_dr'
-down_revision = '007_lifecycle_tamper_versions'
+revision = '009_backup_dr'
+down_revision = '008_assessment_execution'
 branch_labels = None
 depends_on = None
 

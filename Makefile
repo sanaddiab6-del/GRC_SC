@@ -153,9 +153,9 @@ check-conflicts:
 
 
 migrate:
-@echo "Running database migrations..."
-cd src/backend && alembic upgrade head
-@echo " Migrations applied successfully"
+	@echo "Running database migrations (with multiple heads handling)..."
+	@bash scripts/run-alembic-migrations.sh upgrade
+	@echo "Migrations applied successfully"
 
 populate-controls:
 @echo "Populating OFFICIAL NCA control libraries from CSV (ECC, CCC, PDPL)..."

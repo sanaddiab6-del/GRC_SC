@@ -80,8 +80,8 @@ jobs:
           ENCRYPTION_KEY: vS8-vS8-vS8-vS8-vS8-vS8-vS8-vS8-vS8-vS8-vS8=
           CI_SKIP_AI: "true"
         run: |
-          cd src/backend
-          alembic upgrade head
+          chmod +x scripts/run-alembic-migrations.sh
+          bash scripts/run-alembic-migrations.sh upgrade
 
       - name: Run backend tests
         env:
