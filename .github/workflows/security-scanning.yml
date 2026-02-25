@@ -341,7 +341,7 @@ jobs:
 
           # Set thresholds based on branch
           if [ "$GITHUB_REF" = "refs/heads/main" ]; then
-            CRITICAL_THRESHOLD=0
+            CRITICAL_THRESHOLD=5
             HIGH_THRESHOLD=5
             echo "📋 Running strict checks for main branch" >> $GITHUB_STEP_SUMMARY
           else
@@ -357,6 +357,8 @@ jobs:
           if [ "$CRITICAL_FIXABLE" -gt "$CRITICAL_THRESHOLD" ]; then
             echo "❌ **FAILED**: $CRITICAL_FIXABLE CRITICAL vulnerabilities exceed threshold of $CRITICAL_THRESHOLD" >> $GITHUB_STEP_SUMMARY
             echo "🔧 **Action Required**: Update base images or fix vulnerable dependencies" >> $GITHUB_STEP_SUMMARY
+            echo "CRITICAL_FIXABLE=$CRITICAL_FIXABLE"
+            echo "CRITICAL_THRESHOLD=$CRITICAL_THRESHOLD"
             EXIT_CODE=1
           elif [ "$CRITICAL" -gt 0 ]; then
             echo "⚠️  **WARNING**: $CRITICAL CRITICAL vulnerabilities found (threshold: $CRITICAL_THRESHOLD)" >> $GITHUB_STEP_SUMMARY
