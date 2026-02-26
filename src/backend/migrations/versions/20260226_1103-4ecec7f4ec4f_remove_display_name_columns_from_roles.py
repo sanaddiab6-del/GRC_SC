@@ -79,7 +79,6 @@ def upgrade() -> None:
     op.create_index(op.f('ix_audit_engagements_engagement_id'), 'audit_engagements', ['engagement_id'], unique=False)
     op.create_unique_constraint(None, 'audit_engagements', ['engagement_code'])
     op.drop_constraint(op.f('audit_engagements_lead_auditor_id_fkey'), 'audit_engagements', type_='foreignkey')
-    op.create_foreign_key(None, 'audit_engagements', 'audit_programs', ['program_id'], ['program_id'])
     op.drop_column('audit_engagements', 'lead_auditor_id')
     op.add_column('audit_evidence', sa.Column('title_en', sa.String(length=500), nullable=False))
     op.add_column('audit_evidence', sa.Column('title_ar', sa.String(length=500), nullable=False))
@@ -109,7 +108,6 @@ def upgrade() -> None:
                existing_nullable=False)
     op.create_index(op.f('ix_audit_evidence_evidence_id'), 'audit_evidence', ['evidence_id'], unique=False)
     op.create_unique_constraint(None, 'audit_evidence', ['evidence_reference'])
-    op.add_column('audit_findings', sa.Column('program_id', sa.Integer(), nullable=False))
     op.add_column('audit_findings', sa.Column('description_en', sa.Text(), nullable=False))
     op.add_column('audit_findings', sa.Column('description_ar', sa.Text(), nullable=False))
     op.add_column('audit_findings', sa.Column('evidence_reference_en', sa.Text(), nullable=False))
@@ -155,7 +153,6 @@ def upgrade() -> None:
                existing_nullable=False)
     op.create_index(op.f('ix_audit_findings_finding_id'), 'audit_findings', ['finding_id'], unique=False)
     op.create_unique_constraint(None, 'audit_findings', ['finding_number'])
-    op.create_foreign_key(None, 'audit_findings', 'audit_programs', ['program_id'], ['program_id'])
     op.alter_column('audit_logs', 'resource',
                existing_type=sa.VARCHAR(length=100),
                type_=sa.String(length=50),
@@ -611,7 +608,6 @@ def downgrade() -> None:
     op.drop_column('audit_findings', 'evidence_reference_en')
     op.drop_column('audit_findings', 'description_ar')
     op.drop_column('audit_findings', 'description_en')
-    op.drop_column('audit_findings', 'program_id')
     op.drop_constraint(None, 'audit_evidence', type_='unique')
     op.drop_index(op.f('ix_audit_evidence_evidence_id'), table_name='audit_evidence')
     op.alter_column('audit_evidence', 'status',
@@ -641,7 +637,6 @@ def downgrade() -> None:
     op.drop_column('audit_evidence', 'title_ar')
     op.drop_column('audit_evidence', 'title_en')
     op.add_column('audit_engagements', sa.Column('lead_auditor_id', sa.UUID(), autoincrement=False, nullable=False))
-    op.drop_constraint(None, 'audit_engagements', type_='foreignkey')
     op.create_foreign_key(op.f('audit_engagements_lead_auditor_id_fkey'), 'audit_engagements', 'users', ['lead_auditor_id'], ['user_id'])
     op.drop_constraint(None, 'audit_engagements', type_='unique')
     op.drop_index(op.f('ix_audit_engagements_engagement_id'), table_name='audit_engagements')

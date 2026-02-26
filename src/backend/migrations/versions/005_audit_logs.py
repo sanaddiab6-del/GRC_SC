@@ -1,7 +1,7 @@
 """Add audit logs table with cryptographic integrity
 
 Revision ID: 005
-Revises: 004
+Revises: d3a6b7c9e2f4
 Create Date: 2026-02-12 10:00:00.000000
 
 """
@@ -12,7 +12,7 @@ from sqlalchemy import inspect
 
 # revision identifiers, used by Alembic.
 revision = '005_audit_logs'
-down_revision = '004_isms_training_audit'
+down_revision = 'd3a6b7c9e2f4'
 branch_labels = None
 depends_on = None
 

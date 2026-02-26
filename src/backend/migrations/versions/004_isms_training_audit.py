@@ -7,7 +7,7 @@ Creates tables for:
 - External Audit Management (ISO 27001 Clause 9.2)
 
 Revision ID: 004_isms_training_audit
-Revises: 003_ai_governance_siem
+Revises: c1f0b0a7d5e1
 Create Date: 2026-02-09
 """
 
@@ -18,7 +18,7 @@ import uuid
 
 # revision identifiers
 revision = '004_isms_training_audit'
-down_revision = '003_ai_governance_siem'
+down_revision = 'c1f0b0a7d5e1'
 branch_labels = None
 depends_on = None
 
