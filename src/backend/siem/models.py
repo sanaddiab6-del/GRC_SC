@@ -2,7 +2,7 @@
 SIEM Integration models for security event management.
 """
 from sqlalchemy import Column, String, Boolean, DateTime, Integer, Text, Enum as SQLEnum, JSON, ForeignKey, Float
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Uuid
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -38,18 +38,18 @@ class SecurityEvent(Base):
     """Security events from SIEM"""
     __tablename__ = "security_events"
     
-    event_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    event_id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     
     # Event identification
-    event_type = Column(SQLEnum(SecurityEventType), nullable=False)
-    severity = Column(SQLEnum(SecurityEventSeverity), nullable=False)
+    event_type = Column(SQLEnum(SecurityEventType, native_enum=False), nullable=False)
+    severity = Column(SQLEnum(SecurityEventSeverity, native_enum=False), nullable=False)
     event_timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     
     # Source information
     source_system = Column(String(255))  # Which system generated the event
     source_ip = Column(String(45))
     source_hostname = Column(String(255))
-    source_user_id = Column(UUID(as_uuid=True), ForeignKey('users.user_id'))
+    source_user_id = Column(Uuid(as_uuid=True), ForeignKey('users.user_id'))
     
     # Event details
     event_name = Column(String(255), nullable=False)
@@ -71,7 +71,7 @@ class SecurityEvent(Base):
     auto_response_action = Column(String(255))
     requires_investigation = Column(Boolean, default=False)
     incident_created = Column(Boolean, default=False)
-    incident_id = Column(UUID(as_uuid=True), ForeignKey('security_incidents.incident_id'))
+    incident_id = Column(Uuid(as_uuid=True), ForeignKey('security_incidents.incident_id'))
     
     # Enrichment
     threat_intelligence = Column(JSON)  # External threat intel data
@@ -91,7 +91,7 @@ class VulnerabilityScan(Base):
     """Vulnerability scan results"""
     __tablename__ = "vulnerability_scans"
     
-    scan_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    scan_id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     
     # Scan metadata
     scan_name = Column(String(255), nullable=False)
@@ -130,7 +130,7 @@ class VulnerabilityScan(Base):
     scan_results_json = Column(JSON)  # Full scan output
     
     # Tracking
-    scan_initiated_by = Column(UUID(as_uuid=True), ForeignKey('users.user_id'))
+    scan_initiated_by = Column(Uuid(as_uuid=True), ForeignKey('users.user_id'))
     findings_reviewed = Column(Boolean, default=False)
     remediation_ticket_created = Column(Boolean, default=False)
     ticket_ids = Column(JSON)  # [ticket_id1, ticket_id2]
@@ -147,8 +147,8 @@ class VulnerabilityFinding(Base):
     """Individual vulnerability findings"""
     __tablename__ = "vulnerability_findings"
     
-    finding_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    scan_id = Column(UUID(as_uuid=True), ForeignKey('vulnerability_scans.scan_id', ondelete='CASCADE'), nullable=False)
+    finding_id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    scan_id = Column(Uuid(as_uuid=True), ForeignKey('vulnerability_scans.scan_id', ondelete='CASCADE'), nullable=False)
     
     # Vulnerability identification
     cve_id = Column(String(50), index=True)  # CVE-2023-12345
@@ -163,7 +163,7 @@ class VulnerabilityFinding(Base):
     
     # Asset information
     affected_asset = Column(String(500))  # hostname, IP, container, function
-    asset_owner = Column(UUID(as_uuid=True), ForeignKey('users.user_id'))
+    asset_owner = Column(Uuid(as_uuid=True), ForeignKey('users.user_id'))
     
     # Vulnerability details
     vulnerable_package = Column(String(255))  # package name if applicable
@@ -211,7 +211,7 @@ class ThreatIntelligence(Base):
     """Threat intelligence indicators"""
     __tablename__ = "threat_intelligence"
     
-    intel_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    intel_id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     
     # Indicator details
     indicator_type = Column(String(50), nullable=False)  # ip, domain, url, filehash, email

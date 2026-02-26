@@ -7,7 +7,7 @@ Supports NCA ECC-GV (Governance), ISO 27001 A.5 (Policies), A.7 (Asset Managemen
 
 from datetime import datetime, timedelta
 from typing import Optional
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, JSON, ForeignKey, Enum as SQLEnum
+from sqlalchemy import Uuid, Column, Integer, String, Text, DateTime, Boolean, JSON, ForeignKey, Enum as SQLEnum
 from sqlalchemy.orm import relationship
 from enum import Enum
 
@@ -60,7 +60,7 @@ class ISMSPolicy(Base):
 
     policy_id = Column(Integer, primary_key=True, index=True)
     policy_number = Column(String(50), unique=True, nullable=False)  # Format: POL-{TYPE}-{NUMBER}
-    policy_type = Column(SQLEnum(PolicyType), nullable=False)
+    policy_type = Column(SQLEnum(PolicyType, native_enum=False), nullable=False)
     
     # Bilingual content
     title_en = Column(String(500), nullable=False)
@@ -74,13 +74,13 @@ class ISMSPolicy(Base):
     
     # Document control
     version = Column(String(20), nullable=False, default="1.0")
-    status = Column(SQLEnum(PolicyStatus), nullable=False, default=PolicyStatus.DRAFT)
-    classification = Column(SQLEnum(DocumentClassification), nullable=False, default=DocumentClassification.INTERNAL)
+    status = Column(SQLEnum(PolicyStatus, native_enum=False), nullable=False, default=PolicyStatus.DRAFT)
+    classification = Column(SQLEnum(DocumentClassification, native_enum=False), nullable=False, default=DocumentClassification.INTERNAL)
     
     # Approval workflow
-    author_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
-    reviewer_id = Column(Integer, ForeignKey("users.user_id"), nullable=True)
-    approver_id = Column(Integer, ForeignKey("users.user_id"), nullable=True)
+    author_id = Column(Uuid(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
+    reviewer_id = Column(Uuid(as_uuid=True), ForeignKey("users.user_id"), nullable=True)
+    approver_id = Column(Uuid(as_uuid=True), ForeignKey("users.user_id"), nullable=True)
     
     # Lifecycle dates
     draft_date = Column(DateTime, nullable=False, default=datetime.utcnow)
@@ -130,7 +130,7 @@ class PolicyAcknowledgement(Base):
 
     acknowledgement_id = Column(Integer, primary_key=True, index=True)
     policy_id = Column(Integer, ForeignKey("isms_policies.policy_id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    user_id = Column(Uuid(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
     policy_version = Column(String(20), nullable=False)
     
     # Acknowledgement details
@@ -174,8 +174,8 @@ class PolicyException(Base):
     risk_acceptance_ar = Column(Text, nullable=False)
     
     # Approval
-    requested_by_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
-    approved_by_id = Column(Integer, ForeignKey("users.user_id"), nullable=True)
+    requested_by_id = Column(Uuid(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
+    approved_by_id = Column(Uuid(as_uuid=True), ForeignKey("users.user_id"), nullable=True)
     status = Column(String(50), nullable=False, default="pending")  # pending, approved, rejected, expired
     
     # Validity
@@ -187,7 +187,7 @@ class PolicyException(Base):
     
     # Risk assessment
     residual_risk_score = Column(Integer, nullable=True)  # 0-100
-    risk_owner_id = Column(Integer, ForeignKey("users.user_id"), nullable=True)
+    risk_owner_id = Column(Uuid(as_uuid=True), ForeignKey("users.user_id"), nullable=True)
     
     # Metadata
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
@@ -215,7 +215,7 @@ class DocumentVersion(Base):
     change_summary_en = Column(Text, nullable=False)
     change_summary_ar = Column(Text, nullable=False)
     change_type = Column(String(50), nullable=False)  # "minor_update", "major_revision", "emergency_change"
-    changed_by_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    changed_by_id = Column(Uuid(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
     
     # Document snapshot (full policy content at this version)
     document_content_json = Column(JSON, nullable=False)
@@ -251,14 +251,14 @@ class AssetInventory(Base):
     asset_category = Column(String(100), nullable=False)  # "hardware", "software", "data", "service", "people"
     
     # Classification
-    classification = Column(SQLEnum(DocumentClassification), nullable=False, default=DocumentClassification.INTERNAL)
+    classification = Column(SQLEnum(DocumentClassification, native_enum=False), nullable=False, default=DocumentClassification.INTERNAL)
     confidentiality_rating = Column(Integer, nullable=False, default=3)  # 1-5
     integrity_rating = Column(Integer, nullable=False, default=3)  # 1-5
     availability_rating = Column(Integer, nullable=False, default=3)  # 1-5
     
     # Ownership
-    owner_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
-    custodian_id = Column(Integer, ForeignKey("users.user_id"), nullable=True)
+    owner_id = Column(Uuid(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
+    custodian_id = Column(Uuid(as_uuid=True), ForeignKey("users.user_id"), nullable=True)
     location = Column(String(500), nullable=True)
     
     # Technical details

@@ -8,7 +8,7 @@ Bilingual training content and competency tracking.
 
 from datetime import datetime, timedelta
 from typing import Optional
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, JSON, ForeignKey, Enum as SQLEnum, Float
+from sqlalchemy import Uuid, Column, Integer, String, Text, DateTime, Boolean, JSON, ForeignKey, Enum as SQLEnum, Float
 from sqlalchemy.orm import relationship
 from enum import Enum
 
@@ -64,7 +64,7 @@ class TrainingCourse(Base):
     learning_objectives_ar = Column(JSON, nullable=False)
     
     # Training configuration
-    training_type = Column(SQLEnum(TrainingType), nullable=False)
+    training_type = Column(SQLEnum(TrainingType, native_enum=False), nullable=False)
     category = Column(String(100), nullable=False)  # "security_awareness", "privacy", "compliance", "technical", "governance"
     difficulty_level = Column(String(50), nullable=False)  # "beginner", "intermediate", "advanced"
     duration_minutes = Column(Integer, nullable=False)
@@ -88,8 +88,8 @@ class TrainingCourse(Base):
     sdaia_ai_principles = Column(JSON, nullable=True)
     
     # Course management
-    instructor_id = Column(Integer, ForeignKey("users.user_id"), nullable=True)
-    status = Column(SQLEnum(TrainingStatus), nullable=False, default=TrainingStatus.DRAFT)
+    instructor_id = Column(Uuid(as_uuid=True), ForeignKey("users.user_id"), nullable=True)
+    status = Column(SQLEnum(TrainingStatus, native_enum=False), nullable=False, default=TrainingStatus.DRAFT)
     published_date = Column(DateTime, nullable=True)
     last_updated_date = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -119,16 +119,16 @@ class TrainingEnrollment(Base):
 
     enrollment_id = Column(Integer, primary_key=True, index=True)
     course_id = Column(Integer, ForeignKey("training_courses.course_id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    user_id = Column(Uuid(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
     
     # Enrollment details
     enrolled_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     enrollment_method = Column(String(50), nullable=False)  # "auto_assigned", "self_enrolled", "manager_assigned"
-    assigned_by_id = Column(Integer, ForeignKey("users.user_id"), nullable=True)
+    assigned_by_id = Column(Uuid(as_uuid=True), ForeignKey("users.user_id"), nullable=True)
     due_date = Column(DateTime, nullable=True)
     
     # Progress tracking
-    status = Column(SQLEnum(EnrollmentStatus), nullable=False, default=EnrollmentStatus.ENROLLED)
+    status = Column(SQLEnum(EnrollmentStatus, native_enum=False), nullable=False, default=EnrollmentStatus.ENROLLED)
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
     progress_percentage = Column(Integer, nullable=False, default=0)  # 0-100
@@ -278,7 +278,7 @@ class AwarenessCampaign(Base):
     total_reported_phishing = Column(Integer, nullable=True)
     
     # Campaign management
-    created_by_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    created_by_id = Column(Uuid(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
     status = Column(String(50), nullable=False, default="draft")  # draft, scheduled, active, completed, cancelled
     
     # Metadata

@@ -6,7 +6,7 @@ NCA ECC/CCC/PDPL Assessment Lifecycle Management
 from datetime import datetime
 from enum import Enum
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Float, Boolean, JSON
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Uuid
 from sqlalchemy.orm import relationship
 from core.database import Base
 
@@ -57,10 +57,10 @@ class AssessmentInstance(Base):
     domain_scope = Column(JSON)  # List of domains
 
     # Ownership and assignment
-    created_by_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
-    assigned_assessor_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"))
-    reviewer_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"))
-    approver_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"))
+    created_by_id = Column(Uuid(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
+    assigned_assessor_id = Column(Uuid(as_uuid=True), ForeignKey("users.user_id"))
+    reviewer_id = Column(Uuid(as_uuid=True), ForeignKey("users.user_id"))
+    approver_id = Column(Uuid(as_uuid=True), ForeignKey("users.user_id"))
     organization_id = Column(Integer, ForeignKey("organizations.id"))
 
     # Status and lifecycle
@@ -144,14 +144,14 @@ class AssessmentResponse(Base):
     # Remediation
     remediation_required = Column(Boolean, default=False)
     remediation_deadline = Column(DateTime)
-    remediation_owner_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"))
+    remediation_owner_id = Column(Uuid(as_uuid=True), ForeignKey("users.user_id"))
 
     # Scoring (for weighted calculation)
     control_weight = Column(Float, default=1.0)  # Weight factor for scoring
     control_score = Column(Float)  # Individual control score
 
     # Assessor details
-    assessed_by_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
+    assessed_by_id = Column(Uuid(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
     assessed_at = Column(DateTime, default=datetime.utcnow)
 
     # Reviewer comments
@@ -183,7 +183,7 @@ class AssessmentStatusHistory(Base):
     to_status = Column(String(50), nullable=False)
 
     # Actor and timestamp
-    changed_by_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
+    changed_by_id = Column(Uuid(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
     changed_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     # Transition metadata

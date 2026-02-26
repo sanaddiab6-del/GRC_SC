@@ -8,7 +8,7 @@ Supports audit planning, evidence management, finding tracking, certification ma
 
 from datetime import datetime, timedelta
 from typing import Optional
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, JSON, ForeignKey, Enum as SQLEnum, Float
+from sqlalchemy import Uuid, Column, Integer, String, Text, DateTime, Boolean, JSON, ForeignKey, Enum as SQLEnum, Float
 from sqlalchemy.orm import relationship
 from enum import Enum
 
@@ -85,7 +85,7 @@ class AuditProgram(Base):
     
     # Program scope
     audit_year = Column(Integer, nullable=False)
-    audit_type = Column(SQLEnum(AuditType), nullable=False)
+    audit_type = Column(SQLEnum(AuditType, native_enum=False), nullable=False)
     scope_description_en = Column(Text, nullable=False)
     scope_description_ar = Column(Text, nullable=False)
     
@@ -106,13 +106,13 @@ class AuditProgram(Base):
     actual_end_date = Column(DateTime, nullable=True)
     
     # Audit team
-    lead_auditor_id = Column(Integer, ForeignKey("users.user_id"), nullable=True)
+    lead_auditor_id = Column(Uuid(as_uuid=True), ForeignKey("users.user_id"))
     audit_team_ids = Column(JSON, nullable=True)  # List of user IDs
     external_auditor_firm = Column(String(500), nullable=True)
     external_auditor_contact = Column(JSON, nullable=True)  # {name, email, phone}
     
     # Status and results
-    status = Column(SQLEnum(AuditStatus), nullable=False, default=AuditStatus.PLANNED)
+    status = Column(SQLEnum(AuditStatus, native_enum=False), nullable=False, default=AuditStatus.PLANNED)
     total_findings = Column(Integer, nullable=False, default=0)
     critical_findings = Column(Integer, nullable=False, default=0)
     high_findings = Column(Integer, nullable=False, default=0)
@@ -178,7 +178,7 @@ class AuditEngagement(Base):
     meeting_notes_ar = Column(Text, nullable=True)
     
     # Status
-    status = Column(SQLEnum(AuditStatus), nullable=False, default=AuditStatus.PLANNED)
+    status = Column(SQLEnum(AuditStatus, native_enum=False), nullable=False, default=AuditStatus.PLANNED)
     completion_percentage = Column(Integer, nullable=False, default=0)
     
     # Metadata
@@ -217,8 +217,8 @@ class AuditEvidence(Base):
     evidence_category = Column(String(100), nullable=False)  # "policy", "procedure", "record", "technical", "observation"
     
     # Collection
-    requested_by_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
-    provided_by_id = Column(Integer, ForeignKey("users.user_id"), nullable=True)
+    requested_by_id = Column(Uuid(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
+    provided_by_id = Column(Uuid(as_uuid=True), ForeignKey("users.user_id"), nullable=True)
     requested_date = Column(DateTime, nullable=False, default=datetime.utcnow)
     due_date = Column(DateTime, nullable=False)
     submitted_date = Column(DateTime, nullable=True)
@@ -230,8 +230,8 @@ class AuditEvidence(Base):
     file_size_bytes = Column(Integer, nullable=True)
     
     # Review
-    status = Column(SQLEnum(EvidenceStatus), nullable=False, default=EvidenceStatus.PENDING)
-    reviewed_by_id = Column(Integer, ForeignKey("users.user_id"), nullable=True)
+    status = Column(SQLEnum(EvidenceStatus, native_enum=False), nullable=False, default=EvidenceStatus.PENDING)
+    reviewed_by_id = Column(Uuid(as_uuid=True), ForeignKey("users.user_id"), nullable=True)
     reviewed_date = Column(DateTime, nullable=True)
     reviewer_notes_en = Column(Text, nullable=True)
     reviewer_notes_ar = Column(Text, nullable=True)
@@ -272,7 +272,7 @@ class AuditFinding(Base):
     evidence_reference_ar = Column(Text, nullable=False)
     
     # Classification
-    severity = Column(SQLEnum(FindingSeverity), nullable=False)
+    severity = Column(SQLEnum(FindingSeverity, native_enum=False), nullable=False)
     finding_type = Column(String(100), nullable=False)  # "non_conformity_major", "non_conformity_minor", "observation", "opportunity"
     
     # Control mapping
@@ -296,24 +296,24 @@ class AuditFinding(Base):
     # Remediation
     recommendation_en = Column(Text, nullable=False)
     recommendation_ar = Column(Text, nullable=False)
-    owner_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    owner_id = Column(Uuid(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
     due_date = Column(DateTime, nullable=False)
     
     # Corrective actions
     corrective_action_plan_en = Column(Text, nullable=True)
     corrective_action_plan_ar = Column(Text, nullable=True)
-    responsible_person_id = Column(Integer, ForeignKey("users.user_id"), nullable=True)
+    responsible_person_id = Column(Uuid(as_uuid=True), ForeignKey("users.user_id"), nullable=True)
     target_closure_date = Column(DateTime, nullable=True)
     actual_closure_date = Column(DateTime, nullable=True)
     
     # Status tracking
-    status = Column(SQLEnum(FindingStatus), nullable=False, default=FindingStatus.OPEN)
+    status = Column(SQLEnum(FindingStatus, native_enum=False), nullable=False, default=FindingStatus.OPEN)
     progress_percentage = Column(Integer, nullable=False, default=0)
     
     # Verification
     verification_evidence_en = Column(Text, nullable=True)
     verification_evidence_ar = Column(Text, nullable=True)
-    verified_by_id = Column(Integer, ForeignKey("users.user_id"), nullable=True)
+    verified_by_id = Column(Uuid(as_uuid=True), ForeignKey("users.user_id"), nullable=True)
     verification_date = Column(DateTime, nullable=True)
     verification_notes_en = Column(Text, nullable=True)
     verification_notes_ar = Column(Text, nullable=True)
@@ -322,7 +322,7 @@ class AuditFinding(Base):
     escalated = Column(Boolean, nullable=False, default=False)
     escalation_reason_en = Column(Text, nullable=True)
     escalation_reason_ar = Column(Text, nullable=True)
-    escalated_to_id = Column(Integer, ForeignKey("users.user_id"), nullable=True)
+    escalated_to_id = Column(Uuid(as_uuid=True), ForeignKey("users.user_id"), nullable=True)
     escalation_date = Column(DateTime, nullable=True)
     
     # Metadata
@@ -366,7 +366,7 @@ class CorrectiveAction(Base):
     action_steps_ar = Column(JSON, nullable=False)
     
     # Responsibility
-    owner_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    owner_id = Column(Uuid(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
     assigned_to_ids = Column(JSON, nullable=True)  # List of user IDs
     
     # Timeline
@@ -384,7 +384,7 @@ class CorrectiveAction(Base):
     verification_method_en = Column(Text, nullable=True)
     verification_method_ar = Column(Text, nullable=True)
     verification_date = Column(DateTime, nullable=True)
-    verified_by_id = Column(Integer, ForeignKey("users.user_id"), nullable=True)
+    verified_by_id = Column(Uuid(as_uuid=True), ForeignKey("users.user_id"), nullable=True)
     
     # Updates
     last_update_en = Column(Text, nullable=True)

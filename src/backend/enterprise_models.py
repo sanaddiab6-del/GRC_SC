@@ -141,8 +141,8 @@ class Asset(Base):
     name_ar = Column(String(255))
     description_en = Column(Text)
     description_ar = Column(Text)
-    criticality = Column(Enum(AssetCriticality), nullable=False)
-    classification = Column(Enum(DataClassification))
+    criticality = Column(Enum(AssetCriticality, native_enum=False), nullable=False)
+    classification = Column(Enum(DataClassification, native_enum=False))
     owner_id = Column(Integer, ForeignKey("enterprise_users.id"))
     location = Column(String(255))
     environment = Column(String(50))  # production, staging, development
@@ -199,7 +199,7 @@ class EnterpriseControl(Base):
     id = Column(Integer, primary_key=True, index=True)
     organization_id = Column(Integer, ForeignKey("organizations.id"))
     control_id = Column(String(50), nullable=False, index=True)
-    framework = Column(Enum(FrameworkType), nullable=False, index=True)
+    framework = Column(Enum(FrameworkType, native_enum=False), nullable=False, index=True)
     domain = Column(String(100), nullable=False)
     domain_ar = Column(String(100))
     
@@ -210,8 +210,8 @@ class EnterpriseControl(Base):
     description_ar = Column(Text, nullable=False)
     
     # Control lifecycle
-    status = Column(Enum(ControlStatus), default=ControlStatus.ACTIVE, nullable=False)
-    maturity_level = Column(Enum(ControlMaturity))
+    status = Column(Enum(ControlStatus, native_enum=False), default=ControlStatus.ACTIVE, nullable=False)
+    maturity_level = Column(Enum(ControlMaturity, native_enum=False))
     effectiveness_score = Column(Float)  # 0-100
     
     # Ownership & accountability
@@ -228,7 +228,7 @@ class EnterpriseControl(Base):
     test_frequency_days = Column(Integer)  # how often to test
     last_assessment_date = Column(Date)
     next_assessment_date = Column(Date)
-    last_assessment_result = Column(Enum(TestResult))
+    last_assessment_result = Column(Enum(TestResult, native_enum=False))
     
     # Applicability
     is_applicable = Column(Boolean, default=True)
@@ -368,8 +368,8 @@ class ControlAssessment(Base):
     assessor_id = Column(Integer, ForeignKey("enterprise_users.id"), nullable=False)
     
     # Results
-    test_result = Column(Enum(TestResult), nullable=False)
-    maturity_score = Column(Enum(ControlMaturity))
+    test_result = Column(Enum(TestResult, native_enum=False), nullable=False)
+    maturity_score = Column(Enum(ControlMaturity, native_enum=False))
     effectiveness_score = Column(Float)  # 0-100
     
     # Findings
@@ -421,15 +421,15 @@ class EnterpriseRisk(Base):
     likelihood_inherent = Column(Integer, nullable=False)  # 1-5
     impact_inherent = Column(Integer, nullable=False)  # 1-5
     risk_score_inherent = Column(Float)  # likelihood * impact
-    risk_level_inherent = Column(Enum(RiskLevel))
+    risk_level_inherent = Column(Enum(RiskLevel, native_enum=False))
     
     likelihood_residual = Column(Integer)  # after controls
     impact_residual = Column(Integer)
     risk_score_residual = Column(Float)
-    risk_level_residual = Column(Enum(RiskLevel))
+    risk_level_residual = Column(Enum(RiskLevel, native_enum=False))
     
     # Risk appetite & tolerance
-    risk_appetite_level = Column(Enum(RiskLevel))
+    risk_appetite_level = Column(Enum(RiskLevel, native_enum=False))
     is_within_appetite = Column(Boolean)
     
     # Ownership
@@ -475,7 +475,7 @@ class EnterpriseAuditProgram(Base):
     title_en = Column(String(500), nullable=False)
     title_ar = Column(String(500))
     audit_type = Column(String(50), nullable=False)  # internal, external, regulatory
-    framework = Column(Enum(FrameworkType))
+    framework = Column(Enum(FrameworkType, native_enum=False))
     scope_description = Column(Text)
     planned_start_date = Column(Date)
     planned_end_date = Column(Date)
@@ -502,8 +502,8 @@ class EnterpriseAuditFinding(Base):
     title_ar = Column(String(500))
     description_en = Column(Text, nullable=False)
     description_ar = Column(Text)
-    severity = Column(Enum(FindingSeverity), nullable=False)
-    risk_rating = Column(Enum(RiskLevel))
+    severity = Column(Enum(FindingSeverity, native_enum=False), nullable=False)
+    risk_rating = Column(Enum(RiskLevel, native_enum=False))
     
     # Remediation
     remediation_plan_en = Column(Text)
@@ -514,7 +514,7 @@ class EnterpriseAuditFinding(Base):
     is_overdue = Column(Boolean, default=False)
     
     # Status & workflow
-    status = Column(Enum(CaseStatus), default=CaseStatus.OPEN)
+    status = Column(Enum(CaseStatus, native_enum=False), default=CaseStatus.OPEN)
     verification_evidence_ids = Column(JSON)
     verified_by_id = Column(Integer, ForeignKey("enterprise_users.id"))
     verified_at = Column(DateTime)
@@ -598,7 +598,7 @@ class WorkflowCase(Base):
     escalated_to_id = Column(Integer, ForeignKey("enterprise_users.id"))
     
     # Status
-    status = Column(Enum(CaseStatus), default=CaseStatus.OPEN)
+    status = Column(Enum(CaseStatus, native_enum=False), default=CaseStatus.OPEN)
     resolution_notes = Column(Text)
     resolved_at = Column(DateTime)
     closed_at = Column(DateTime)
@@ -626,7 +626,7 @@ class Vendor(Base):
     name_en = Column(String(255), nullable=False)
     name_ar = Column(String(255))
     vendor_type = Column(String(100))  # technology, service, consulting
-    criticality = Column(Enum(AssetCriticality), nullable=False)
+    criticality = Column(Enum(AssetCriticality, native_enum=False), nullable=False)
     
     # Contact
     contact_person = Column(String(255))
@@ -637,7 +637,7 @@ class Vendor(Base):
     last_assessment_date = Column(Date)
     next_assessment_date = Column(Date)
     risk_score = Column(Float)
-    risk_level = Column(Enum(RiskLevel))
+    risk_level = Column(Enum(RiskLevel, native_enum=False))
     
     # PDPL compliance
     is_data_processor = Column(Boolean, default=False)
@@ -732,7 +732,7 @@ class EnterpriseDataSubjectRequest(Base):
     # Response
     response_provided = Column(Text)
     response_date = Column(Date)
-    status = Column(Enum(CaseStatus), default=CaseStatus.OPEN)
+    status = Column(Enum(CaseStatus, native_enum=False), default=CaseStatus.OPEN)
     
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -755,7 +755,7 @@ class DataBreach(Base):
     # Impact
     affected_data_subjects_count = Column(Integer)
     data_categories_affected = Column(JSON)
-    severity = Column(Enum(FindingSeverity), nullable=False)
+    severity = Column(Enum(FindingSeverity, native_enum=False), nullable=False)
     
     # Notification
     sdaia_notified = Column(Boolean, default=False)
@@ -818,7 +818,7 @@ class ComplianceMetric(Base):
     id = Column(Integer, primary_key=True, index=True)
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
     metric_date = Column(Date, nullable=False, index=True)
-    framework = Column(Enum(FrameworkType))
+    framework = Column(Enum(FrameworkType, native_enum=False))
     
     # Compliance metrics
     total_controls = Column(Integer)

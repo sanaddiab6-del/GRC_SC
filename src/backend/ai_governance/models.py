@@ -2,7 +2,7 @@
 AI Governance models for SDAIA AI Principles compliance.
 """
 from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey, Text, Enum as SQLEnum, Float, JSON
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Uuid
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -36,13 +36,13 @@ class AIModel(Base):
     """AI Model Registry (SDAIA AI Principles)"""
     __tablename__ = "ai_models"
     
-    model_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    model_id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     model_name = Column(String(255), nullable=False, unique=True)
     model_version = Column(String(50), nullable=False)
     
     # Classification
-    model_type = Column(SQLEnum(ModelType), nullable=False)
-    status = Column(SQLEnum(ModelStatus), default=ModelStatus.DEVELOPMENT, nullable=False)
+    model_type = Column(SQLEnum(ModelType, native_enum=False), nullable=False)
+    status = Column(SQLEnum(ModelStatus, native_enum=False), default=ModelStatus.DEVELOPMENT, nullable=False)
     
     # Description
     description_en = Column(Text, nullable=False)
@@ -103,8 +103,8 @@ class AIModel(Base):
     last_monitored_at = Column(DateTime)
     
     # Ownership
-    model_owner = Column(UUID(as_uuid=True), ForeignKey('users.user_id'), nullable=False)
-    created_by = Column(UUID(as_uuid=True), ForeignKey('users.user_id'), nullable=False)
+    model_owner = Column(Uuid(as_uuid=True), ForeignKey('users.user_id'), nullable=False)
+    created_by = Column(Uuid(as_uuid=True), ForeignKey('users.user_id'), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     # Relationships
@@ -116,14 +116,14 @@ class BiasTestResult(Base):
     """AI bias testing results (SDAIA AI Principles)"""
     __tablename__ = "bias_test_results"
     
-    test_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    model_id = Column(UUID(as_uuid=True), ForeignKey('ai_models.model_id', ondelete='CASCADE'), nullable=False)
+    test_id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    model_id = Column(Uuid(as_uuid=True), ForeignKey('ai_models.model_id', ondelete='CASCADE'), nullable=False)
     
     # Test details
     test_name = Column(String(255), nullable=False)
     test_type = Column(String(100), nullable=False)  # demographic_parity, equal_opportunity, calibration
     tested_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    tested_by = Column(UUID(as_uuid=True), ForeignKey('users.user_id'), nullable=False)
+    tested_by = Column(Uuid(as_uuid=True), ForeignKey('users.user_id'), nullable=False)
     
     # Protected attributes tested
     protected_attribute = Column(String(100), nullable=False)  # gender, age, nationality
@@ -162,13 +162,13 @@ class ModelAudit(Base):
     """AI model audit trail (SDAIA AI Principles)"""
     __tablename__ = "model_audits"
     
-    audit_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    model_id = Column(UUID(as_uuid=True), ForeignKey('ai_models.model_id', ondelete='CASCADE'), nullable=False)
+    audit_id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    model_id = Column(Uuid(as_uuid=True), ForeignKey('ai_models.model_id', ondelete='CASCADE'), nullable=False)
     
     # Audit event
     event_type = Column(String(100), nullable=False)  # created, updated, deployed, retired
     event_timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
-    performed_by = Column(UUID(as_uuid=True), ForeignKey('users.user_id'), nullable=False)
+    performed_by = Column(Uuid(as_uuid=True), ForeignKey('users.user_id'), nullable=False)
     
     # Changes
     changes = Column(JSON)  # {field: {old_value, new_value}}
@@ -190,12 +190,12 @@ class AIEthicsReview(Base):
     """AI ethics review (SDAIA AI Principles)"""
     __tablename__ = "ai_ethics_reviews"
     
-    review_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    model_id = Column(UUID(as_uuid=True), ForeignKey('ai_models.model_id', ondelete='CASCADE'), nullable=False)
+    review_id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    model_id = Column(Uuid(as_uuid=True), ForeignKey('ai_models.model_id', ondelete='CASCADE'), nullable=False)
     
     # Review details
     review_date = Column(DateTime, default=datetime.utcnow, nullable=False)
-    reviewer = Column(UUID(as_uuid=True), ForeignKey('users.user_id'), nullable=False)
+    reviewer = Column(Uuid(as_uuid=True), ForeignKey('users.user_id'), nullable=False)
     review_type = Column(String(50))  # initial, periodic, incident_triggered
     
     # SDAIA AI Principles assessment

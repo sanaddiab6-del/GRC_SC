@@ -20,7 +20,7 @@ backend_dir = Path(__file__).parent
 sys.path.insert(0, str(backend_dir))
 
 from core.config import settings
-from core.database import init_db, get_db, AsyncSessionLocal
+from core.database import init_db, validate_db_startup, get_db, AsyncSessionLocal
 from core.security_middleware import setup_security_middleware
 from controls import router as controls_router
 from evidence import router as evidence_router
@@ -56,6 +56,9 @@ async def lifespan(app: FastAPI):
     try:
         await init_db()
         logger.info("✓ Database initialized")
+
+        # Validate connectivity and migration state; never raises.
+        await validate_db_startup()
 
         try:
             from startup_init_data import check_and_initialize_data

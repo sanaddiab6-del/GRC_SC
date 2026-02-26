@@ -23,16 +23,35 @@ logger = logging.getLogger(__name__)
 
 
 def create_tables():
-    """Create all database tables"""
+    """Create all database tables.
+
+    For SQLite (local development): uses Base.metadata.create_all() for
+    convenience — no Alembic required.
+
+    For PostgreSQL (staging / production): schema creation is managed
+    exclusively by Alembic migrations.  create_all() is intentionally
+    skipped so that Alembic remains the single source of truth and
+    incremental migrations are not bypassed.
+    """
     database_url = os.getenv("DATABASE_URL", "sqlite:///./sico_grc.db")
-    # Use sync engine for table creation
-    sync_url = database_url.replace("+aiosqlite", "")
+    # Use sync engine (strip async driver prefix)
+    sync_url = database_url.replace("+aiosqlite", "").replace("+asyncpg", "")
     engine = create_engine(sync_url, echo=False)
-    
-    logger.info("Creating database tables...")
-    Base.metadata.create_all(bind=engine)
-    logger.info("✅ Database tables created successfully")
-    
+
+    is_sqlite = sync_url.startswith("sqlite")
+
+    if is_sqlite:
+        logger.info("Creating database tables via create_all (SQLite dev mode)...")
+        Base.metadata.create_all(bind=engine)
+        logger.info("✅ Database tables created successfully")
+    else:
+        # PostgreSQL: Alembic manages the schema — do NOT call create_all().
+        # Run:  alembic upgrade head
+        logger.info(
+            "PostgreSQL detected — skipping create_all(). "
+            "Run 'alembic upgrade head' to apply migrations."
+        )
+
     return engine
 
 

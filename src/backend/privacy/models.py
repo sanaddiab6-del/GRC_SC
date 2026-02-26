@@ -3,7 +3,7 @@ Privacy models for PDPL compliance.
 Implements consent management, DSAR, and data classification.
 """
 from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey, Text, Enum as SQLEnum, JSON
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Uuid
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -60,10 +60,10 @@ class Consent(Base):
     """User consent records for PDPL compliance"""
     __tablename__ = "consents"
     
-    consent_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
-    consent_type = Column(SQLEnum(ConsentType), nullable=False)
-    status = Column(SQLEnum(ConsentStatus), default=ConsentStatus.GIVEN, nullable=False)
+    consent_id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(Uuid(as_uuid=True), ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
+    consent_type = Column(SQLEnum(ConsentType, native_enum=False), nullable=False)
+    status = Column(SQLEnum(ConsentStatus, native_enum=False), default=ConsentStatus.GIVEN, nullable=False)
     purpose_en = Column(Text, nullable=False)  # What the data will be used for
     purpose_ar = Column(Text, nullable=False)
     legal_basis_en = Column(String(255))  # Legal basis for processing
@@ -87,10 +87,10 @@ class DataSubjectRequest(Base):
     """Data Subject Access Requests (PDPL Articles 4-9)"""
     __tablename__ = "data_subject_requests"
     
-    request_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey('users.user_id'), nullable=False)
-    request_type = Column(SQLEnum(DSARType), nullable=False)
-    status = Column(SQLEnum(DSARStatus), default=DSARStatus.PENDING, nullable=False)
+    request_id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(Uuid(as_uuid=True), ForeignKey('users.user_id'), nullable=False)
+    request_type = Column(SQLEnum(DSARType, native_enum=False), nullable=False)
+    status = Column(SQLEnum(DSARStatus, native_enum=False), default=DSARStatus.PENDING, nullable=False)
     description_en = Column(Text)
     description_ar = Column(Text)
     
@@ -102,10 +102,10 @@ class DataSubjectRequest(Base):
     # Identity verification (PDPL Article 10)
     verification_method = Column(String(100))  # email, phone, id_document
     verified_at = Column(DateTime)
-    verified_by = Column(UUID(as_uuid=True), ForeignKey('users.user_id'))
+    verified_by = Column(Uuid(as_uuid=True), ForeignKey('users.user_id'))
     
     # Processing
-    assigned_to = Column(UUID(as_uuid=True), ForeignKey('users.user_id'))
+    assigned_to = Column(Uuid(as_uuid=True), ForeignKey('users.user_id'))
     assigned_at = Column(DateTime)
     processor_notes = Column(Text)
     
@@ -126,13 +126,13 @@ class DataClassificationTag(Base):
     """Data classification tags for assets (NCA CCC)"""
     __tablename__ = "data_classification_tags"
     
-    tag_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tag_id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     resource_type = Column(String(50), nullable=False)  # users, controls, evidence, reports
     resource_id = Column(String(255), nullable=False)
-    classification = Column(SQLEnum(DataClassification), nullable=False)
+    classification = Column(SQLEnum(DataClassification, native_enum=False), nullable=False)
     reason_en = Column(Text)
     reason_ar = Column(Text)
-    classified_by = Column(UUID(as_uuid=True), ForeignKey('users.user_id'), nullable=False)
+    classified_by = Column(Uuid(as_uuid=True), ForeignKey('users.user_id'), nullable=False)
     classified_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     reviewed_at = Column(DateTime)
     
@@ -144,7 +144,7 @@ class DataBreachIncident(Base):
     """Data breach incident tracking (PDPL Article 27)"""
     __tablename__ = "data_breach_incidents"
     
-    incident_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    incident_id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     incident_number = Column(String(50), unique=True, nullable=False)  # BR-2026-001
     
     # Incident details
@@ -178,8 +178,8 @@ class DataBreachIncident(Base):
     root_cause_ar = Column(Text)
     
     # Responsible parties
-    discovered_by = Column(UUID(as_uuid=True), ForeignKey('users.user_id'))
-    incident_manager = Column(UUID(as_uuid=True), ForeignKey('users.user_id'))
+    discovered_by = Column(Uuid(as_uuid=True), ForeignKey('users.user_id'))
+    incident_manager = Column(Uuid(as_uuid=True), ForeignKey('users.user_id'))
     
     # Relationships
     discoverer = relationship("User", foreign_keys=[discovered_by])
@@ -190,7 +190,7 @@ class DataRetentionPolicy(Base):
     """Data retention policies (PDPL Article 12)"""
     __tablename__ = "data_retention_policies"
     
-    policy_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    policy_id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     resource_type = Column(String(50), nullable=False)  # users, audit_logs, evidence
     retention_period_days = Column(Integer, nullable=False)  # e.g., 2555 for 7 years
     legal_basis_en = Column(Text, nullable=False)
@@ -201,7 +201,7 @@ class DataRetentionPolicy(Base):
     deletion_method = Column(String(50))  # soft_delete, hard_delete, anonymize
     
     # Audit
-    created_by = Column(UUID(as_uuid=True), ForeignKey('users.user_id'), nullable=False)
+    created_by = Column(Uuid(as_uuid=True), ForeignKey('users.user_id'), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, onupdate=datetime.utcnow)
     
@@ -213,7 +213,7 @@ class PrivacyImpactAssessment(Base):
     """Privacy Impact Assessments (PDPL Article 33)"""
     __tablename__ = "privacy_impact_assessments"
     
-    pia_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    pia_id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_name_en = Column(String(255), nullable=False)
     project_name_ar = Column(String(255), nullable=False)
     description_en = Column(Text, nullable=False)
@@ -237,9 +237,9 @@ class PrivacyImpactAssessment(Base):
     
     # Status
     status = Column(String(50), default="draft")  # draft, under_review, approved, rejected
-    conducted_by = Column(UUID(as_uuid=True), ForeignKey('users.user_id'), nullable=False)
+    conducted_by = Column(Uuid(as_uuid=True), ForeignKey('users.user_id'), nullable=False)
     conducted_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    approved_by = Column(UUID(as_uuid=True), ForeignKey('users.user_id'))
+    approved_by = Column(Uuid(as_uuid=True), ForeignKey('users.user_id'))
     approved_at = Column(DateTime)
     
     # Review

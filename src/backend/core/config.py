@@ -6,7 +6,7 @@ Supports environment variables and .env file
 import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List, Union
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 
 
 class Settings(BaseSettings):
@@ -27,10 +27,47 @@ class Settings(BaseSettings):
             return [origin.strip() for origin in v.split(',')]
         return v
     
-      # Database
+    # Database
     DATABASE_URL: str = "sqlite+aiosqlite:///./sico_grc.db"  # Async for application
-    DATABASE_URL_SYNC: str = "sqlite:///./sico_grc.db"  # Synchronous for direct SQL scripts
+    DATABASE_URL_SYNC: str = "sqlite:///./sico_grc.db"  # Synchronous for Alembic/scripts
     DATABASE_ECHO: bool = False
+
+    @model_validator(mode="after")
+    def derive_sync_url(self) -> "Settings":
+        """
+        Auto-derive DATABASE_URL_SYNC from DATABASE_URL whenever DATABASE_URL_SYNC
+        was not explicitly overridden by the environment.
+
+        This ensures that switching DATABASE_URL to PostgreSQL (or any other
+        backend) does not require a separate DATABASE_URL_SYNC update unless a
+        non-default connection string is needed.
+        """
+        sqlite_sync_default = "sqlite:///./sico_grc.db"
+        if self.DATABASE_URL_SYNC == sqlite_sync_default and "sqlite" not in self.DATABASE_URL:
+            sync = self.DATABASE_URL
+            sync = sync.replace("sqlite+aiosqlite://", "sqlite://")
+            sync = sync.replace("postgresql+asyncpg://", "postgresql://")
+            sync = sync.replace("postgres://", "postgresql://")
+            self.DATABASE_URL_SYNC = sync
+        return self
+
+    @property
+    def db_backend(self) -> str:
+        """
+        Return the active database backend as a lower-case string.
+
+        Returns
+        -------
+        "sqlite"      – when DATABASE_URL references an SQLite file
+        "postgresql"  – when DATABASE_URL references a PostgreSQL server
+        "unknown"     – for any other scheme (allows future extensibility)
+        """
+        url = self.DATABASE_URL.lower()
+        if "sqlite" in url:
+            return "sqlite"
+        if "postgresql" in url or "postgres" in url:
+            return "postgresql"
+        return "unknown"
     
     # Vector Database
     VECTOR_DB_TYPE: str = "chroma"  # chroma or weaviate

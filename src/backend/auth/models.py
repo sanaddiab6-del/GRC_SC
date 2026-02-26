@@ -3,7 +3,7 @@ Authentication models compliant with NCA ECC and PDPL.
 Implements secure password storage and token management.
 """
 from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey, Table, JSON
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Uuid
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -15,17 +15,17 @@ from core.database import Base
 user_roles = Table(
     "user_roles",
     Base.metadata,
-    Column("user_id", UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), primary_key=True),
-    Column("role_id", UUID(as_uuid=True), ForeignKey("roles.role_id", ondelete="CASCADE"), primary_key=True),
+    Column("user_id", Uuid(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), primary_key=True),
+    Column("role_id", Uuid(as_uuid=True), ForeignKey("roles.role_id", ondelete="CASCADE"), primary_key=True),
     Column("assigned_at", DateTime, default=datetime.utcnow),
-    Column("assigned_by", UUID(as_uuid=True), ForeignKey("users.user_id"))
+    Column("assigned_by", Uuid(as_uuid=True), ForeignKey("users.user_id"))
 )
 
 role_permissions = Table(
     "role_permissions",
     Base.metadata,
-    Column("role_id", UUID(as_uuid=True), ForeignKey("roles.role_id", ondelete="CASCADE"), primary_key=True),
-    Column("permission_id", UUID(as_uuid=True), ForeignKey("permissions.permission_id", ondelete="CASCADE"), primary_key=True)
+    Column("role_id", Uuid(as_uuid=True), ForeignKey("roles.role_id", ondelete="CASCADE"), primary_key=True),
+    Column("permission_id", Uuid(as_uuid=True), ForeignKey("permissions.permission_id", ondelete="CASCADE"), primary_key=True)
 )
 
 
@@ -33,7 +33,7 @@ class User(Base):
     """User model with bilingual support and security features."""
     __tablename__ = "users"
     
-    user_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email = Column(String(255), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
     full_name_en = Column(String(255))
@@ -63,7 +63,7 @@ class Role(Base):
     """Role model for RBAC implementation."""
     __tablename__ = "roles"
     
-    role_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    role_id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     role_name = Column(String(50), unique=True, nullable=False)
     description_en = Column(String)
     description_ar = Column(String)
@@ -85,7 +85,7 @@ class Permission(Base):
     """Permission model for granular access control."""
     __tablename__ = "permissions"
     
-    permission_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    permission_id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     permission_name = Column(String(100), unique=True, nullable=False)
     resource = Column(String(50), nullable=False)  # controls, evidence, reports
     action = Column(String(20), nullable=False)  # create, read, update, delete
@@ -101,8 +101,8 @@ class RefreshToken(Base):
     """Refresh token model for secure session management."""
     __tablename__ = "refresh_tokens"
     
-    token_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
+    token_id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(Uuid(as_uuid=True), ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
     token_hash = Column(String(255), nullable=False)
     expires_at = Column(DateTime, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -116,14 +116,14 @@ class APIKey(Base):
     """API Key model for service-to-service authentication."""
     __tablename__ = "api_keys"
     
-    api_key_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    api_key_id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     key_hash = Column(String(255), nullable=False, unique=True)
     name = Column(String(100), nullable=False)
     description = Column(String)
     scopes = Column(JSON)  # ["controls:read", "evidence:write"]
     expires_at = Column(DateTime)
     last_used_at = Column(DateTime)
-    created_by = Column(UUID(as_uuid=True), ForeignKey('users.user_id'))
+    created_by = Column(Uuid(as_uuid=True), ForeignKey('users.user_id'))
     created_at = Column(DateTime, default=datetime.utcnow)
     revoked_at = Column(DateTime)
 
@@ -135,8 +135,8 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
     __table_args__ = {'extend_existing': True}  # Allow redefinition for compatibility
     
-    log_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey('users.user_id'), nullable=True)
+    log_id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(Uuid(as_uuid=True), ForeignKey('users.user_id'), nullable=True)
     action = Column(String(100), nullable=False)
     resource = Column(String(50), nullable=False)
     details = Column(JSON)

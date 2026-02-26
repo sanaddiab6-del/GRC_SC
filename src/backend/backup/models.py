@@ -44,8 +44,8 @@ class BackupJob(Base):
     id = Column(String, primary_key=True)
     job_name = Column(String, nullable=False, index=True)
     job_name_ar = Column(String, nullable=False)
-    backup_type = Column(SQLEnum(BackupType), nullable=False)
-    status = Column(SQLEnum(BackupStatus), nullable=False, default=BackupStatus.PENDING)
+    backup_type = Column(SQLEnum(BackupType, native_enum=False), nullable=False)
+    status = Column(SQLEnum(BackupStatus, native_enum=False), nullable=False, default=BackupStatus.PENDING)
     
     # Backup details
     database_name = Column(String, nullable=False)
@@ -91,7 +91,7 @@ class RecoveryTest(Base):
     # Test details
     backup_job_id = Column(String, nullable=False)
     test_type = Column(String, nullable=False)  # full_recovery, partial_recovery, validation
-    status = Column(SQLEnum(RecoveryStatus), nullable=False, default=RecoveryStatus.SCHEDULED)
+    status = Column(SQLEnum(RecoveryStatus, native_enum=False), nullable=False, default=RecoveryStatus.SCHEDULED)
     
     # RTO/RPO tracking (NCA requirements)
     rto_target_minutes = Column(Integer, nullable=False)  # Recovery Time Objective

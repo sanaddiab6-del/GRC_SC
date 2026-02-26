@@ -1,6 +1,15 @@
 """
 Database connection and session management
-Uses SQLAlchemy 2.0 async pattern
+Supports both SQLite (aiosqlite) and PostgreSQL (asyncpg) via DATABASE_URL.
+
+URL normalisation rules
+-----------------------
+  sqlite:///…                  → sqlite+aiosqlite:///…
+  sqlite+aiosqlite:///…        → unchanged
+  postgresql://…               → postgresql+asyncpg://…
+  postgresql+asyncpg://…       → unchanged
+  postgresql+psycopg2://…      → postgresql+asyncpg://…
+  postgres://…  (shorthand)    → postgresql+asyncpg://…
 """
 
 import os
@@ -11,17 +20,79 @@ from sqlalchemy.orm import declarative_base
 from sqlalchemy.pool import NullPool
 from core.config import settings
 
-# Convert postgresql:// to postgresql+asyncpg:// if needed
-if settings.DATABASE_URL.startswith("postgresql://"):
-    DATABASE_URL = settings.DATABASE_URL.replace(
-        "postgresql://", "postgresql+asyncpg://"
-    )
-else:
-    DATABASE_URL = settings.DATABASE_URL
 
-# Create async engine
-use_null_pool = bool(os.getenv("PYTEST_RUNNING")) or bool(os.getenv("PYTEST_CURRENT_TEST"))
-is_sqlite = "sqlite" in DATABASE_URL
+# ---------------------------------------------------------------------------
+# URL helpers (importable by migrations/env.py and scripts)
+# ---------------------------------------------------------------------------
+
+def resolve_async_url(raw_url: str) -> str:
+    """
+    Normalise *raw_url* so it always uses the correct async driver scheme.
+
+    Recognised schemes and their resolutions:
+
+      sqlite:///…              → sqlite+aiosqlite:///…
+      sqlite+aiosqlite:///…    → unchanged
+      postgresql://…           → postgresql+asyncpg://…
+      postgresql+asyncpg://…   → unchanged
+      postgresql+psycopg2://…  → postgresql+asyncpg://…
+      postgres://…             → postgresql+asyncpg://…
+    """
+    url = raw_url.strip()
+
+    # --- SQLite ---
+    if url.startswith("sqlite"):
+        if "+aiosqlite" not in url:
+            url = url.replace("sqlite://", "sqlite+aiosqlite://", 1)
+        return url
+
+    # --- PostgreSQL (including the heroku-style "postgres://" shorthand) ---
+    if url.startswith("postgres"):
+        # Normalise the postgres:// shorthand first
+        url = url.replace("postgres://", "postgresql://", 1)
+        if "+asyncpg" in url:
+            return url
+        # Strip any other driver specifier (e.g. +psycopg2) and inject asyncpg
+        if "+" in url:
+            scheme_part, rest = url.split("://", 1)
+            base_scheme = scheme_part.split("+")[0]      # e.g. "postgresql"
+            url = f"{base_scheme}+asyncpg://{rest}"
+        else:
+            url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return url
+
+    # Unknown scheme — pass through unchanged so the error surfaces in SQLAlchemy
+    return url
+
+
+def resolve_sync_url(async_url: str) -> str:
+    """
+    Convert an async-driver URL to its synchronous equivalent.
+
+    Used by Alembic migrations and direct-SQL helper scripts that cannot
+    accept an async driver specifier.
+
+      sqlite+aiosqlite:///…    → sqlite:///…
+      postgresql+asyncpg://…   → postgresql://…
+    """
+    url = async_url.strip()
+    url = url.replace("sqlite+aiosqlite://", "sqlite://")
+    url = url.replace("postgresql+asyncpg://", "postgresql://")
+    return url
+
+
+# ---------------------------------------------------------------------------
+# Engine setup
+# ---------------------------------------------------------------------------
+
+DATABASE_URL: str = resolve_async_url(settings.DATABASE_URL)
+is_sqlite: bool = DATABASE_URL.startswith("sqlite")
+is_postgresql: bool = DATABASE_URL.startswith("postgresql")
+
+use_null_pool: bool = (
+    bool(os.getenv("PYTEST_RUNNING"))
+    or bool(os.getenv("PYTEST_CURRENT_TEST"))
+)
 
 engine_kwargs: Dict[str, Any] = {
     "echo": settings.DATABASE_ECHO,
@@ -29,8 +100,11 @@ engine_kwargs: Dict[str, Any] = {
 }
 
 if use_null_pool or is_sqlite:
+    # SQLite doesn't benefit from connection pooling; tests use NullPool to
+    # avoid "database is locked" issues with concurrent connections.
     engine_kwargs["poolclass"] = NullPool
-else:
+elif is_postgresql:
+    # Use connection pooling for PostgreSQL in non-test environments.
     engine_kwargs["pool_pre_ping"] = True
     engine_kwargs["pool_size"] = 10
     engine_kwargs["max_overflow"] = 20
@@ -84,6 +158,100 @@ async def init_db():
     except Exception as e:
         # Re-raise to let caller handle
         raise Exception(f"Database initialization failed: {str(e)}") from e
+
+
+async def validate_db_startup() -> bool:
+    """
+    Perform lightweight startup validation against the configured database.
+
+    Checks
+    ------
+    1. **Connectivity** – runs ``SELECT 1`` to confirm the engine can reach
+       the database server or file.
+    2. **Migration state** – reads ``alembic_version`` to verify that at
+       least one migration has been applied.  A missing or empty table emits
+       a WARNING rather than raising an exception so that a fresh development
+       environment (before the first ``alembic upgrade head``) is never
+       blocked from starting.
+
+    Returns
+    -------
+    bool
+        ``True``  – connection succeeded (migration warnings do not affect
+                    this value).
+        ``False`` – connection itself failed; app will run in API-only mode.
+    """
+    import logging
+    from sqlalchemy import text
+    from urllib.parse import urlparse
+
+    _log = logging.getLogger(__name__)
+
+    backend_label = "postgresql" if is_postgresql else "sqlite"
+
+    # Mask any password embedded in the URL before logging.
+    try:
+        parsed = urlparse(DATABASE_URL)
+        if parsed.password:
+            safe_url = DATABASE_URL.replace(parsed.password, "***")
+        else:
+            safe_url = DATABASE_URL
+    except Exception:
+        safe_url = DATABASE_URL
+
+    _log.info("  DB backend : %s", backend_label)
+    _log.info("  DB URL     : %s", safe_url)
+
+    # ── 1. Connectivity ──────────────────────────────────────────────────
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        _log.info("\u2713 Database connection OK")
+    except Exception as exc:
+        _log.error(
+            "\u2717 Database connection FAILED – the application will run in "
+            "API-only mode until the database is reachable.\n"
+            "  Backend : %s\n"
+            "  URL     : %s\n"
+            "  Error   : %s",
+            backend_label,
+            safe_url,
+            exc,
+        )
+        return False
+
+    # ── 2. Migration state ───────────────────────────────────────────────
+    try:
+        async with engine.connect() as conn:
+            result = await conn.execute(
+                text("SELECT version_num FROM alembic_version")
+            )
+            rows = result.fetchall()
+
+        if not rows:
+            _log.warning(
+                "\u26a0\ufe0f  alembic_version table is empty – no migrations have been "
+                "applied yet.  Run: alembic upgrade head"
+            )
+        else:
+            applied = ", ".join(r[0] for r in rows)
+            _log.info("\u2713 Migrations applied: %s", applied)
+
+    except Exception as exc:
+        err_lower = str(exc).lower()
+        if (
+            "no such table" in err_lower          # SQLite
+            or "does not exist" in err_lower       # PostgreSQL
+            or "alembic_version" in err_lower
+        ):
+            _log.warning(
+                "\u26a0\ufe0f  alembic_version table not found – migrations may not have "
+                "been run yet.  Run: alembic upgrade head"
+            )
+        else:
+            _log.warning("\u26a0\ufe0f  Could not read migration state: %s", exc)
+
+    return True
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
