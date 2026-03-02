@@ -5,7 +5,7 @@
  * Redesigned to match Risk Pilot's professional standards
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { StatCard, ChartCard, Card, TableCard } from '@/components/ui/Cards';
 import { RiskHeatMap } from '@/components/dashboard/RiskHeatMap';
@@ -31,7 +31,15 @@ import {
 export default function ProfessionalDashboard() {
   const params = useParams();
   const locale = (params?.locale as 'ar' | 'en') || 'en';
-  const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [lastUpdatedText, setLastUpdatedText] = useState<string | null>(null);
+
+  useEffect(() => {
+    const now = new Date();
+    const formatted = locale === 'ar'
+      ? `آخر تحديث: ${now.toLocaleTimeString('ar-SA')}`
+      : `Last updated: ${now.toLocaleTimeString('en-US')}`;
+    setLastUpdatedText(formatted);
+  }, [locale]);
 
   // Demo Data - Professional level
   const kpiData = {
@@ -180,10 +188,7 @@ export default function ProfessionalDashboard() {
             {locale === 'ar' ? 'لوحة المعلومات التنفيذية' : 'Executive Dashboard'}
           </h1>
           <p className="text-sm text-gray-500">
-            {locale === 'ar' 
-              ? `آخر تحديث: ${lastUpdated.toLocaleTimeString('ar-SA')}` 
-              : `Last updated: ${lastUpdated.toLocaleTimeString('en-US')}`
-            }
+            {lastUpdatedText ?? (locale === 'ar' ? 'آخر تحديث: --' : 'Last updated: --')}
           </p>
         </div>
         <div className="flex gap-3">
