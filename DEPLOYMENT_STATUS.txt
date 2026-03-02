@@ -164,7 +164,7 @@ RUN TESTS:
   (Expected: All tests passing)
 
 VERIFY DEPLOYMENT:
-  bash verify-launch.sh
+  Run smoke tests manually (health check + key endpoints)
   (Expected: All endpoints accessible, no 405 errors)
 
 ================================================================================

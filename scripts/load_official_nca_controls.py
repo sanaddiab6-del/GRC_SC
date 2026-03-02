@@ -168,6 +168,19 @@ def parse_related_controls(mapping_field: str) -> List[str]:
     return cleaned_controls
 
 
+def parse_optional_int(value: Optional[str]) -> Optional[int]:
+    """Safely parse optional ints from CSV fields."""
+    if value is None:
+        return None
+    value = value.strip()
+    if not value:
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return None
+
+
 async def load_ecc_controls(session: AsyncSession) -> int:
     """Load ECC controls from official CSV"""
     logger.info("Loading ECC controls from CSV...")
@@ -193,7 +206,7 @@ async def load_ecc_controls(session: AsyncSession) -> int:
                 mapping_ccc = row.get('Mapping_CCC', '')
                 mapping_pdpl = row.get('Mapping_PDPL', '')
                 source_pdf = row.get('Source_PDF', 'ecc-en.pdf')
-                source_page = int(row.get('Source_Page', 0)) if row.get('Source_Page') else None
+                source_page = parse_optional_int(row.get('Source_Page'))
                 
                 # Generate title from subdomain
                 title_en = subdomain if subdomain else domain
@@ -217,29 +230,21 @@ async def load_ecc_controls(session: AsyncSession) -> int:
                     "pdpl": related_pdpl,
                 }
                 
-                # Create control
+                # Create control (map only to fields supported by the model)
                 control = Control(
                     control_id=control_id,
                     framework=FrameworkType.ECC,
-                    framework_version="ECC-1:2018",
                     domain=domain,
-                    subdomain=subdomain,
                     title_en=title_en,
                     title_ar=title_ar,
-                    control_clause_en=control_clause_en,
-                    control_clause_ar=control_clause_ar,
-                    description_en=f"Official NCA ECC control: {control_clause_en[:200]}...",
-                    description_ar=f"ضابط NCA ECC الرسمي: {control_clause_ar[:100]}...",
-                    evidence_examples=evidence_examples,
-                    priority=priority,
-                    status=ControlStatus.NOT_STARTED,
+                    description_en=control_clause_en,
+                    description_ar=control_clause_ar,
+                    policy_guidance_en=evidence_examples or None,
+                    priority=priority.lower(),
+                    status=ControlStatus.NOT_STARTED.value,
                     maturity_level=1,
                     evidence_types=evidence_types,
                     related_controls=related_controls,
-                    source_pdf=source_pdf,
-                    source_page=source_page,
-                    mapping_ccc=mapping_ccc,
-                    mapping_pdpl=mapping_pdpl,
                 )
                 
                 session.add(control)
@@ -280,7 +285,7 @@ async def load_ccc_controls(session: AsyncSession) -> int:
                 control_clause_en = row['Control_Clause']
                 mapping_ecc = row.get('Mapping_ECC', '')
                 source_pdf = row.get('Source_PDF', 'CCC-2-2024-EN.pdf')
-                source_page = int(row.get('Source_Page', 0)) if row.get('Source_Page') else None
+                source_page = parse_optional_int(row.get('Source_Page'))
                 
                 # Generate title from subdomain
                 title_en = subdomain if subdomain else domain
@@ -306,27 +311,20 @@ async def load_ccc_controls(session: AsyncSession) -> int:
                 if "audit" in control_clause_en.lower():
                     evidence_types.append("AUDIT")
                 
-                # Create control
+                # Create control (map only to fields supported by the model)
                 control = Control(
                     control_id=control_id,
                     framework=FrameworkType.CCC,
-                    framework_version="CCC-2:2024",
                     domain=domain,
-                    subdomain=subdomain,
                     title_en=title_en,
                     title_ar=title_ar,
-                    control_clause_en=control_clause_en,
-                    control_clause_ar=control_clause_ar,
-                    description_en=f"Official NCA CCC cloud control: {control_clause_en[:200]}...",
-                    description_ar=f"ضابط NCA CCC السحابي الرسمي: {control_clause_ar[:100]}...",
-                    priority=priority,
-                    status=ControlStatus.NOT_STARTED,
+                    description_en=control_clause_en,
+                    description_ar=control_clause_ar,
+                    priority=priority.lower(),
+                    status=ControlStatus.NOT_STARTED.value,
                     maturity_level=1,
                     evidence_types=evidence_types,
                     related_controls=related_controls,
-                    source_pdf=source_pdf,
-                    source_page=source_page,
-                    mapping_ecc=mapping_ecc,
                 )
                 
                 session.add(control)
@@ -397,28 +395,20 @@ async def load_pdpl_controls(session: AsyncSession) -> int:
                 if "DPO" in control_clause_en:
                     evidence_types.append("APPOINTMENT")
                 
-                # Create control
+                # Create control (map only to fields supported by the model)
                 control = Control(
                     control_id=control_id,
                     framework=FrameworkType.PDPL,
-                    framework_version="PDPL 2021/2022",
                     domain=domain,
-                    subdomain=article,
                     title_en=title_en,
                     title_ar=title_ar,
-                    control_clause_en=control_clause_en,
-                    control_clause_ar=control_clause_ar,
-                    description_en=f"PDPL {source_article} requirement: {control_clause_en[:200]}...",
-                    description_ar=f"متطلب PDPL {source_article}: {control_clause_ar[:100]}...",
-                    priority=priority,
-                    status=ControlStatus.NOT_STARTED,
+                    description_en=control_clause_en,
+                    description_ar=control_clause_ar,
+                    priority=priority.lower(),
+                    status=ControlStatus.NOT_STARTED.value,
                     maturity_level=1,
                     evidence_types=evidence_types,
                     related_controls=related_controls,
-                    source_pdf="PDPL Law",
-                    source_page=None,
-                    mapping_ecc=related_ecc,
-                    mapping_ccc=related_ccc,
                 )
                 
                 session.add(control)

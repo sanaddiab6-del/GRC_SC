@@ -25,8 +25,6 @@ Launch a complete development environment in your browser:
 
 **No installation required!** All dependencies and services are pre-configured.
 
-📖 **New to Codespaces?** See [CODESPACES_GUIDE.md](CODESPACES_GUIDE.md) for detailed instructions.
-
 ### Option 2: Local Development
 
 #### Clone Repository
@@ -63,9 +61,7 @@ This will check:
 
 ### Development Tools
 - **VS Code** (recommended) - See [VS Code setup guide](.vscode/README.md)
-- **GitHub Copilot** - AI pair programming (troubleshooting: [docs/development/COPILOT_TROUBLESHOOTING.md](docs/development/COPILOT_TROUBLESHOOTING.md))
-
-> **⚠️ GitHub Copilot Error?** If you see "client not supported: bad request: the specified API version is no longer supported", see our [Copilot Troubleshooting Guide](docs/development/COPILOT_TROUBLESHOOTING.md) for quick fixes.
+- **GitHub Copilot** - AI pair programming
 
 ---
 
@@ -77,12 +73,6 @@ sanadcom/
 ├── README.md                          # Project overview
 ├── LICENSE
 ├── .gitignore
-│
-├── docs/                              # Documentation
-│   ├── architecture/                  # System architecture
-│   ├── deliverables/                  # 12 Key deliverables
-│   ├── user-guides/                   # User manuals
-│   └── api/                           # API documentation
 │
 ├── data/                              # Regulatory Core (Deliverables 1-5)
 │   ├── controls/                      
@@ -264,8 +254,6 @@ View security findings in:
 - **Actions Artifacts**: Detailed JSON/SARIF reports
 - **Pull Request Checks**: Automated status checks
 
-📖 **Full Documentation**: See [docs/SECURITY_PIPELINE.md](docs/SECURITY_PIPELINE.md)
-
 ---
 
 ## 📊 Development Roadmap
@@ -294,20 +282,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 - Development workflow
 - Code standards
 - Testing requirements
-- **Merge conflict resolution** - See [Conflict Resolution Guide](docs/CONFLICT_RESOLUTION_GUIDE.md)
 - Pull request process
-
-### Key Resources for Contributors
-
-- **Getting Started**: [CONTRIBUTING.md](CONTRIBUTING.md)
-- **Project Analysis**: [docs/PROJECT_ANALYSIS.md](docs/PROJECT_ANALYSIS.md) 🆕
-- **Analysis Dashboard**: [docs/ANALYSIS_SUMMARY.md](docs/ANALYSIS_SUMMARY.md) 🆕
-- **Compliance Status**: [docs/compliance/EXECUTIVE_SUMMARY.md](docs/compliance/EXECUTIVE_SUMMARY.md)
-- **Security Remediation**: [docs/compliance/PHASE_2.1_REMEDIATION_PLAN.md](docs/compliance/PHASE_2.1_REMEDIATION_PLAN.md)
-- **Conflict Resolution**: [docs/CONFLICT_RESOLUTION_GUIDE.md](docs/CONFLICT_RESOLUTION_GUIDE.md)
-- **Security Pipeline**: [docs/SECURITY_PIPELINE.md](docs/SECURITY_PIPELINE.md)
-- **API Documentation**: [docs/api/README.md](docs/api/README.md)
-- **GitHub Copilot Troubleshooting**: [docs/development/COPILOT_TROUBLESHOOTING.md](docs/development/COPILOT_TROUBLESHOOTING.md)
 
 ---
 

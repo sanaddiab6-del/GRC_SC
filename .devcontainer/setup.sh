@@ -61,14 +61,11 @@ fi
 # Set permissions
 echo "🔒 Setting permissions..."
 chmod +x scripts/*.sh
-chmod +x start-dev.ps1
-chmod +x deploy-launch.sh
 
 echo "✅ Development environment setup complete!"
 echo ""
 echo "🎯 Quick Start Commands:"
 echo "   Backend:  cd src/backend && uvicorn app.main:app --reload"
 echo "   Frontend: cd src/frontend && npm run dev"
-echo "   Full:     ./start-dev.ps1"
 echo ""
-echo "📚 Read QUICK_START.md for detailed instructions"
+echo "📚 Read README.md for detailed instructions"
