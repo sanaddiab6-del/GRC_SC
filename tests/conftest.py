@@ -7,8 +7,6 @@ import pytest_asyncio
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from alembic import command
-from alembic.config import Config
 
 # Set test environment variables before any imports
 os.environ.setdefault("PYTEST_RUNNING", "1")
@@ -36,6 +34,12 @@ def apply_migrations() -> None:
 	(which does not support all PostgreSQL migration operations).
 	"""
 	try:
+		try:
+			from alembic import command
+			from alembic.config import Config
+		except ModuleNotFoundError as exc:
+			raise RuntimeError("Alembic is not installed") from exc
+
 		repo_root = Path(__file__).resolve().parents[1]
 		backend_dir = repo_root / "src" / "backend"
 		alembic_cfg = Config(str(backend_dir / "alembic.ini"))
