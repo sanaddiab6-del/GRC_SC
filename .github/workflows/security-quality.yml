@@ -1,38 +1,34 @@
 # GitHub Actions - Security & Quality Pipeline
-# Runs on: Push, PR, Scheduled (weekly)
-
 name: Security & Quality Checks
-name: Security & Quality Checks (DISABLED)
-
-disabled: true
 
 on:
   push:
     branches: [main, develop]
     paths:
-      - '**.py'
-      - 'pyproject.toml'
-      - 'requirements.txt'
-      - '.github/workflows/**'
+      - "**.py"
+      - "pyproject.toml"
+      - "requirements.txt"
+      - ".github/workflows/**"
   pull_request:
     branches: [main, develop]
   schedule:
-    # Weekly security scan (every Monday at 00:00 UTC)
-    - cron: '0 0 * * 1'
+    - cron: "0 0 * * 1"
   workflow_dispatch:
 
 env:
-  PYTHON_VERSION: '3.11'
-  NODE_VERSION: '20.11.1'
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "20.11.1"
 
 jobs:
-  # ==========================================================================
-  # Security Scanning
-  # ==========================================================================
+
+# ==========================================================
+# Security Scanning
+# ==========================================================
 
   security-scan:
     name: Security Scan (SAST)
     runs-on: ubuntu-latest
+
     permissions:
       security-events: write
       contents: read
@@ -41,7 +37,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Full history for better analysis
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -53,22 +49,18 @@ jobs:
           pip install --upgrade pip
           pip install bandit[toml] safety pip-audit
 
-      # Bandit - Security issues in Python code
       - name: Run Bandit (SAST)
         run: |
           bandit -r ai/ src/ -f sarif -o bandit-report.sarif -c pyproject.toml
         continue-on-error: true
 
       - name: Upload Bandit SARIF
-        if: ${{ exists('bandit-report.sarif') }}
-        if: ${{ exists('bandit-report.sarif') }}
-        if: ${{ exists('bandit-report.sarif') }}
+        if: ${{ hashFiles('bandit-report.sarif') != '' }}
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: bandit-report.sarif
           category: bandit
 
-      # Safety - Known vulnerabilities in dependencies
       - name: Check dependencies (Safety)
         run: |
           safety check --json --output safety-report.json
@@ -80,51 +72,44 @@ jobs:
           name: safety-report
           path: safety-report.json
 
-      # pip-audit - PyPI vulnerabilities
       - name: Audit Python packages
         run: |
           pip-audit --format json --output pip-audit-report.json
         continue-on-error: true
 
-      # Secrets detection
       - name: Detect secrets (Gitleaks)
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Trivy - Container & filesystem scanning
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.24.0
         with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-          severity: 'CRITICAL,HIGH'
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
 
       - name: Upload Trivy SARIF
-        if: ${{ exists('trivy-results.sarif') }}
-        if: ${{ exists('trivy-results.sarif') }}
-        if: ${{ exists('trivy-results.sarif') }}
+        if: ${{ hashFiles('trivy-results.sarif') != '' }}
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-results.sarif
           category: trivy
 
-  # ==========================================================================
-  # AI Security Tests (Prompt Injection, PII Leakage)
-  # ==========================================================================
+# ==========================================================
+# AI Security Tests
+# ==========================================================
 
   ai-security-tests:
     name: AI Security Tests
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -133,13 +118,13 @@ jobs:
           pip install --upgrade pip
           pip install -r ai/requirements.txt
           pip install -r src/backend/requirements.txt
-          pip install pytest pytest-cov pytest-asyncio
+          pip install pytest pytest-cov pytest-asyncio httpx
 
       - name: Run AI Security Tests
         run: |
           pytest tests/security/ -v --tb=short --cov=ai --cov-report=xml
         env:
-          PYTHONPATH: .
+          PYTHONPATH: ./src
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -148,26 +133,18 @@ jobs:
           flags: ai-security
           name: ai-security-coverage
 
-      - name: Security test results
-        if: failure()
-        run: |
-          echo "::error::AI Security tests failed - BLOCKING DEPLOYMENT"
-          exit 1
-
-  # ==========================================================================
-  # Code Quality (Linting, Type Checking)
-  # ==========================================================================
+# ==========================================================
+# Code Quality
+# ==========================================================
 
   code-quality:
     name: Code Quality Checks
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -178,41 +155,31 @@ jobs:
           pip install -r ai/requirements.txt
           pip install -r src/backend/requirements.txt
 
-      # Ruff - Fast linter
       - name: Run Ruff
-        run: |
-          ruff check . --output-format=github
+        run: ruff check .
 
-      # MyPy - Type checking
       - name: Run MyPy
-        run: |
-          mypy ai/ src/ --config-file=pyproject.toml
+        run: mypy ai/ src/ --config-file=pyproject.toml
         continue-on-error: true
 
-      # Black - Code formatting check
-      - name: Check code formatting (Black)
-        run: |
-          black --check ai/ src/ --config=pyproject.toml
+      - name: Check formatting (Black)
+        run: black --check ai/ src/ --config=pyproject.toml
 
-      # isort - Import sorting check
-      - name: Check import sorting (isort)
-        run: |
-          isort --check-only ai/ src/ --settings-path=pyproject.toml
+      - name: Check imports (isort)
+        run: isort --check-only ai/ src/ --settings-path=pyproject.toml
 
-  # ==========================================================================
-  # Unit Tests
-  # ==========================================================================
+# ==========================================================
+# Unit Tests
+# ==========================================================
 
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -221,7 +188,7 @@ jobs:
           pip install --upgrade pip
           pip install -r ai/requirements.txt
           pip install -r src/backend/requirements.txt
-          pip install pytest pytest-cov pytest-asyncio
+          pip install pytest pytest-cov pytest-asyncio httpx
 
       - name: Run unit tests
         run: |
@@ -231,7 +198,7 @@ jobs:
             --cov-report=term-missing \
             --cov-fail-under=80
         env:
-          PYTHONPATH: .
+          PYTHONPATH: ./src
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
@@ -240,32 +207,30 @@ jobs:
           flags: unit-tests
           name: unit-test-coverage
 
-  # ==========================================================================
-  # SBOM Generation (Software Bill of Materials)
-  # ==========================================================================
+# ==========================================================
+# SBOM Generation
+# ==========================================================
 
   sbom-generation:
     name: Generate SBOM
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install dependencies
+      - name: Install CycloneDX
         run: |
           pip install --upgrade pip
           pip install cyclonedx-bom
 
-      - name: Generate SBOM (CycloneDX)
+      - name: Generate SBOM
         run: |
-          cyclonedx-py -r -i ai/requirements.txt -o sbom-ai.json
-          cyclonedx-py -r -i src/backend/requirements.txt -o sbom-backend.json
+          cyclonedx-py requirements ai/requirements.txt -o sbom-ai.json
+          cyclonedx-py requirements src/backend/requirements.txt -o sbom-backend.json
 
       - name: Upload SBOM
         uses: actions/upload-artifact@v4
@@ -275,9 +240,9 @@ jobs:
             sbom-ai.json
             sbom-backend.json
 
-  # ==========================================================================
-  # Gate Check Summary
-  # ==========================================================================
+# ==========================================================
+# Gate Check
+# ==========================================================
 
   gate-check:
     name: Gate Check Summary
@@ -286,7 +251,7 @@ jobs:
     if: always()
 
     steps:
-      - name: Check all jobs passed
+      - name: Check results
         run: |
           if [ "${{ needs.security-scan.result }}" != "success" ]; then
             echo "::error::Security scan failed"
@@ -294,12 +259,12 @@ jobs:
           fi
 
           if [ "${{ needs.ai-security-tests.result }}" != "success" ]; then
-            echo "::error::AI Security tests failed - CRITICAL"
+            echo "::error::AI Security tests failed"
             exit 1
           fi
 
           if [ "${{ needs.code-quality.result }}" != "success" ]; then
-            echo "::error::Code quality checks failed"
+            echo "::error::Code quality failed"
             exit 1
           fi
 
@@ -308,52 +273,23 @@ jobs:
             exit 1
           fi
 
-          echo "✅ All gate checks passed - Deployment approved"
+          echo "All gate checks passed"
 
-      - name: Post PR comment (on failure)
-        if: failure() && github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const message = `
-            ## ❌ Gate Checks Failed
-
-            One or more gate checks failed. Please review the logs:
-
-            - Security Scan: ${{ needs.security-scan.result }}
-            - AI Security Tests: ${{ needs.ai-security-tests.result }}
-            - Code Quality: ${{ needs.code-quality.result }}
-            - Unit Tests: ${{ needs.unit-tests.result }}
-
-            **DEPLOYMENT BLOCKED** until all checks pass.
-            `;
-
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: message
-            });
-
-  # ==========================================================================
-  # Notify on Success/Failure
-  # ==========================================================================
+# ==========================================================
+# Notifications
+# ==========================================================
 
   notify:
     name: Notify Team
     runs-on: ubuntu-latest
-    needs: [gate-check]
+    needs: gate-check
     if: always()
 
     steps:
       - name: Success notification
         if: needs.gate-check.result == 'success'
-        run: |
-          echo "✅ All security & quality checks passed"
-          # Add Slack/Teams notification here
+        run: echo "All security & quality checks passed"
 
       - name: Failure notification
         if: needs.gate-check.result == 'failure'
-        run: |
-          echo "❌ Security or quality checks failed - DEPLOYMENT BLOCKED"
-          # Add Slack/Teams notification here
+        run: echo "Security or quality checks failed"
