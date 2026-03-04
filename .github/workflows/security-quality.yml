@@ -119,12 +119,18 @@ jobs:
           pip install -r ai/requirements.txt
           pip install -r src/backend/requirements.txt
           pip install pytest pytest-cov pytest-asyncio httpx
+          pip install pydantic-settings PyJWT alembic
+
+      - name: Clean pytest cache
+        run: |
+          find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
 
       - name: Run AI Security Tests
         run: |
           pytest tests/security/ -v --tb=short --cov=ai --cov-report=xml
         env:
-          PYTHONPATH: ./src
+          PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/src:${{ github.workspace }}/src/backend:${{ github.workspace }}/ai
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -189,6 +195,12 @@ jobs:
           pip install -r ai/requirements.txt
           pip install -r src/backend/requirements.txt
           pip install pytest pytest-cov pytest-asyncio httpx
+          pip install pydantic-settings PyJWT alembic
+
+      - name: Clean pytest cache
+        run: |
+          find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
 
       - name: Run unit tests
         run: |
@@ -198,7 +210,7 @@ jobs:
             --cov-report=term-missing \
             --cov-fail-under=80
         env:
-          PYTHONPATH: ./src
+          PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/src:${{ github.workspace }}/src/backend:${{ github.workspace }}/ai
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
