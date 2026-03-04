@@ -1,7 +1,16 @@
 # Backend Tests
+from pathlib import Path
+import sys
+
 import pytest
 from httpx import AsyncClient, ASGITransport
-from src.backend.main import app
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+SRC_PATH = PROJECT_ROOT / "src"
+if str(SRC_PATH) not in sys.path:
+    sys.path.insert(0, str(SRC_PATH))
+
+from backend.main import app
 
 @pytest.mark.asyncio
 async def test_health_check():
