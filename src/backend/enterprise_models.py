@@ -852,8 +852,5 @@ class ComplianceMetric(Base):
 # Import backup models
 from backup.models import BackupJob, RecoveryTest, DisasterRecoveryPlan
 
-
-print("✅ Enterprise GRC Database Schema Created")
-print("📊 Entities: 30+")
-print("🔒 Features: Multi-tenancy, RBAC, Full audit trail, Workflow engine, Backup & DR")
-print("✅ Tier-1 Platform Ready")
+import logging as _logging
+_logging.getLogger(__name__).info("Enterprise GRC Database Schema loaded (30+ entities)")

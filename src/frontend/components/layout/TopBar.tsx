@@ -5,9 +5,10 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -19,6 +20,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { logout, fetchCurrentUser } from '@/lib/auth';
 
 interface TopBarProps {
   locale: 'ar' | 'en';
@@ -28,7 +30,22 @@ interface TopBarProps {
 export function TopBar({ locale, sidebarCollapsed = false }: TopBarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
+  const [currentUser, setCurrentUser] = useState<{ email: string; full_name_en?: string | null } | null>(null);
   const t = useTranslations('shell');
+  const router = useRouter();
+
+  useEffect(() => {
+    fetchCurrentUser().then((u) => {
+      if (u) setCurrentUser(u);
+    });
+  }, []);
+
+  const handleLogout = async () => {
+    await logout();
+    router.push(`/${locale}/login`);
+  };
+
+  const displayName = currentUser?.full_name_en || currentUser?.email || (locale === 'ar' ? 'المستخدم' : 'User');
 
   const notifications = [
     {
@@ -166,14 +183,37 @@ export function TopBar({ locale, sidebarCollapsed = false }: TopBarProps) {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm">
-                {locale === 'ar' ? 'المستخدم' : 'User'}
+                {displayName}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>{t('userMenu')}</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>{locale === 'ar' ? 'الملف الشخصي' : 'Profile'}</DropdownMenuItem>
-              <DropdownMenuItem>{locale === 'ar' ? 'تسجيل الخروج' : 'Log out'}</DropdownMenuItem>
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={() => {
+                  console.log('[TopBar] Profile clicked → navigating to', `/${locale}/profile`);
+                  router.push(`/${locale}/profile`);
+                }}
+              >
+                {locale === 'ar' ? 'الملف الشخصي' : 'Profile'}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={() => {
+                  console.log('[TopBar] Executive Report clicked → navigating to', `/${locale}/executive-report`);
+                  router.push(`/${locale}/executive-report`);
+                }}
+              >
+                {locale === 'ar' ? 'التقرير التنفيذي' : 'Executive Report'}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-red-600 focus:text-red-600 cursor-pointer"
+                onClick={handleLogout}
+              >
+                {locale === 'ar' ? 'تسجيل الخروج' : 'Log out'}
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

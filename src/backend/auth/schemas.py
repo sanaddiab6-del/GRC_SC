@@ -1,7 +1,7 @@
 """
 Pydantic schemas for authentication and authorization.
 """
-from pydantic import BaseModel, EmailStr, Field, validator
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
 from typing import Optional, List
 from datetime import datetime
 from uuid import UUID
@@ -18,9 +18,11 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     """Schema for user creation."""
     password: str = Field(..., min_length=12)
+    organization_name: Optional[str] = None
     
-    @validator('password')
-    def password_strength(cls, v):
+    @field_validator('password')
+    @classmethod
+    def password_strength(cls, v: str) -> str:
         """
         Validate password strength (PDPL Article 29 + NCA ECC-IS-3).
         Requirements:
@@ -54,12 +56,12 @@ class UserResponse(UserBase):
     user_id: UUID
     is_active: bool
     is_verified: bool
+    organization_name: Optional[str] = None
     last_login_at: Optional[datetime]
     created_at: datetime
-    roles: List[str] = []
-    
-    class Config:
-        from_attributes = True
+    roles: List[str] = Field(default_factory=list)
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserUpdate(BaseModel):
@@ -68,6 +70,13 @@ class UserUpdate(BaseModel):
     full_name_ar: Optional[str] = None
     is_active: Optional[bool] = None
     is_verified: Optional[bool] = None
+
+
+class AdminUserCreate(UserCreate):
+    """Schema for admin-created users."""
+    role_name: Optional[str] = None
+    is_active: bool = True
+    is_verified: bool = True
 
 
 class TokenResponse(BaseModel):
@@ -93,8 +102,9 @@ class PasswordChange(BaseModel):
     old_password: str
     new_password: str = Field(..., min_length=12)
     
-    @validator('new_password')
-    def password_strength(cls, v):
+    @field_validator('new_password')
+    @classmethod
+    def password_strength(cls, v: str) -> str:
         """Validate new password strength."""
         if len(v) < 12:
             raise ValueError('Password must be at least 12 characters long')
@@ -125,9 +135,8 @@ class RoleResponse(RoleBase):
     """Schema for role response."""
     role_id: UUID
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PermissionBase(BaseModel):
@@ -147,15 +156,31 @@ class PermissionCreate(PermissionBase):
 class PermissionResponse(PermissionBase):
     """Schema for permission response."""
     permission_id: UUID
-    
-    class Config:
-        from_attributes = True
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserRoleAssignment(BaseModel):
     """Schema for assigning roles to users."""
     user_id: UUID
     role_ids: List[UUID]
+
+
+class AdminStatsResponse(BaseModel):
+    """Aggregated admin dashboard stats."""
+    total_users: int
+    active_users: int
+    total_controls: int
+    total_evidence: int
+    total_reports: int
+
+
+class SystemStatusResponse(BaseModel):
+    """System status summary for admin dashboard."""
+    backend_ok: bool
+    database_ok: bool
+    security_ok: bool
+    database_size_bytes: Optional[int] = None
 
 
 class AuditLogResponse(BaseModel):
@@ -168,7 +193,6 @@ class AuditLogResponse(BaseModel):
     ip_address: Optional[str]
     status: str
     details: Optional[dict]
-    created_at: datetime
-    
-    class Config:
-        from_attributes = True
+    timestamp: datetime
+
+    model_config = ConfigDict(from_attributes=True)

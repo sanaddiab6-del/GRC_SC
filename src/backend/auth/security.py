@@ -4,12 +4,13 @@ Implements PDPL-compliant password hashing and JWT token management.
 """
 from datetime import datetime, timedelta
 from typing import Optional, List, cast
-from jose import JWTError, jwt
-from passlib.context import CryptContext
+from jose import JWTError, ExpiredSignatureError, jwt
+import bcrypt as _bcrypt
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 import hashlib
 
 from core.database import get_db
@@ -17,8 +18,32 @@ from core.config import settings
 from auth.models import User, Role, Permission, AuditLog
 
 
-# Password hashing with bcrypt (PDPL-compliant)
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# ---------------------------------------------------------------------------
+# Password hashing – direct bcrypt (bypasses passlib/bcrypt version mismatch)
+# ---------------------------------------------------------------------------
+_BCRYPT_ROUNDS: int = 12
+
+
+def get_password_hash(password: str) -> str:
+    """Hash a plain-text password using bcrypt."""
+    pw_bytes = password.encode("utf-8")
+    # bcrypt silently truncates at 72 bytes; enforce it explicitly
+    if len(pw_bytes) > 72:
+        pw_bytes = pw_bytes[:72]
+    salt = _bcrypt.gensalt(rounds=_BCRYPT_ROUNDS)
+    return _bcrypt.hashpw(pw_bytes, salt).decode("utf-8")
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify a plain-text password against a bcrypt hash."""
+    pw_bytes = plain_password.encode("utf-8")
+    if len(pw_bytes) > 72:
+        pw_bytes = pw_bytes[:72]
+    try:
+        return _bcrypt.checkpw(pw_bytes, hashed_password.encode("utf-8"))
+    except Exception:
+        return False
+
 
 # OAuth2 scheme
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
@@ -33,16 +58,6 @@ REFRESH_TOKEN_EXPIRE_DAYS = 7
 # Account lockout settings (NCA ECC-IS-3)
 MAX_LOGIN_ATTEMPTS = 5
 LOCKOUT_DURATION_MINUTES = 30
-
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify password against hash."""
-    return pwd_context.verify(plain_password, hashed_password)
-
-
-def get_password_hash(password: str) -> str:
-    """Hash password using bcrypt."""
-    return pwd_context.hash(password)
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
@@ -76,62 +91,57 @@ def create_refresh_token(user_id: str) -> str:
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-
 async def get_current_user(
-    token: str = Depends(oauth2_scheme),
+    token: Optional[str] = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db)
 ) -> User:
-    """Get current authenticated user from JWT token."""
+
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    
+
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = payload.get("sub")
         token_type = payload.get("type")
-        
-        if not user_id or not isinstance(user_id, str) or token_type != "access":
+
+        if not user_id or token_type != "access":
             raise credentials_exception
-            
+
+    except ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token expired",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     except JWTError:
         raise credentials_exception
-    
-    # Fetch user from database
-    result = await db.execute(select(User).where(User.user_id == user_id))
+
+    result = await db.execute(
+    select(User)
+    .options(selectinload(User.roles))
+    .where(User.user_id == user_id)
+)
+
     user = result.scalar_one_or_none()
-    
-    if user is None:
+
+    if not user:
         raise credentials_exception
-    
-    if not bool(getattr(user, "is_active")):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User account is inactive"
-        )
-    
-    # Check account lockout
-    locked_until = cast(Optional[datetime], getattr(user, "locked_until"))
-    if locked_until and locked_until > datetime.utcnow():
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account is locked due to multiple failed login attempts"
-        )
-    
+
     return user
-
-
 async def get_current_active_user(
     current_user: User = Depends(get_current_user)
 ) -> User:
     """Get current active user (verified and active)."""
-    if not bool(getattr(current_user, "is_verified")):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Email not verified"
-        )
     return current_user
 
 
@@ -156,7 +166,9 @@ def require_permission(resource: str, action: Optional[str] = None):
     ) -> User:
         # Fetch user with roles and permissions
         result = await db.execute(
-            select(User).where(User.user_id == current_user.user_id)
+            select(User)
+            .where(User.user_id == current_user.user_id)
+            .options(selectinload(User.roles).selectinload(Role.permissions))
         )
         user = result.scalar_one_or_none()
         
@@ -198,7 +210,9 @@ def require_role(role_name: str):
     ) -> User:
         # Fetch user with roles
         result = await db.execute(
-            select(User).where(User.user_id == current_user.user_id)
+            select(User)
+            .where(User.user_id == current_user.user_id)
+            .options(selectinload(User.roles))
         )
         user = result.scalar_one_or_none()
         

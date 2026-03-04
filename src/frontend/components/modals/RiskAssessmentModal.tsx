@@ -90,7 +90,7 @@ export default function RiskAssessmentModal({
     setError('');
 
     try {
-      const token = localStorage.getItem('access_token');
+      const token = sessionStorage.getItem('access_token');
 
       const response = await axios.post(
         `http://localhost:8000/api/v1/risks/${riskId}/assess`,

@@ -11,8 +11,8 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Depends
-from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Ensure the backend directory is on sys.path
@@ -26,6 +26,8 @@ from controls import router as controls_router
 from evidence import router as evidence_router
 from reporting import router as reporting_router
 from auth.router import router as auth_router
+from auth.web_router import router as web_router
+from auth.seeder import seed_admin_user
 from auth.rbac_setup import initialize_rbac
 import ai_router
 from privacy import router as privacy_router
@@ -72,6 +74,13 @@ async def lifespan(app: FastAPI):
             logger.info("✓ RBAC system initialized")
         except Exception as e:
             logger.warning(f"⚠️ RBAC initialization failed: {str(e)}")
+
+        try:
+            async with AsyncSessionLocal() as db:
+                await seed_admin_user(db)
+            logger.info("✓ Admin user seeder complete")
+        except Exception as e:
+            logger.warning(f"⚠️ Admin seeder warning: {str(e)}")
     except Exception as e:
         logger.error(f"⚠️ Database connection failed: {str(e)}")
         logger.warning("   Server running in API-only mode (no database)")
@@ -133,36 +142,45 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # In production, restrict to known origins
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORS must be registered immediately after app creation (before any custom middleware)
+raw_origins = settings.CORS_ORIGINS
+if isinstance(raw_origins, str):
+    cors_origins = [o.strip() for o in raw_origins.split(",") if o.strip()]
+else:
+    cors_origins = [str(o).strip() for o in raw_origins if str(o).strip()]
 
+for dev_origin in [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]:
+    if dev_origin not in cors_origins:
+        cors_origins.append(dev_origin)
 # Security middleware (rate limiting, headers, etc.)
 setup_security_middleware(app)
 logger.info("✓ Security middleware configured")
 
+# Local dev CORS: explicit origins required when credentials are enabled.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["X-Process-Time"],
+)
+
+# Security middleware (rate limiting, headers, etc.)
 
 # ============================================================================
 # Health check endpoints (public, no auth required)
 # ============================================================================
 
-@app.get("/", tags=["Health"])
+@app.get("/", tags=["Health"], include_in_schema=False)
 async def root():
-    """Root endpoint - API health check."""
-    return JSONResponse(
-        content={
-            "status": "healthy",
-            "service": "SICO GRC Platform API",
-            "version": "2.4.0",
-            "message_en": "Saudi Regulatory Compliance Engine - Operational",
-            "message_ar": "محرك الامتثال التنظيمي السعودي - يعمل",
-        }
-    )
+    """Root path redirects to the web login page."""
+    return RedirectResponse(url="/auth/login", status_code=302)
 
 
 @app.get("/health", tags=["Health"])
@@ -272,6 +290,9 @@ async def security_status():
 # ============================================================================
 # Register all routers with versioned prefix
 # ============================================================================
+
+# Web UI routes (no /api/v1 prefix – full-page HTML responses)
+app.include_router(web_router)
 
 app.include_router(auth_router, prefix="/api/v1", tags=["Authentication"])
 app.include_router(controls_router, prefix="/api/v1", tags=["Controls"])

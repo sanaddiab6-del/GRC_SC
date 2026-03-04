@@ -3,9 +3,25 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import axios from 'axios';
+import { AdminGuard } from '@/components/auth/AuthGuard';
+import { get, post, patch } from '@/lib/api-client';
+import { getErrorMessage } from '@/lib/api-client';
 
-interface User {
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface UserResponse {
+  user_id: string;
+  email: string;
+  full_name_en?: string | null;
+  full_name_ar?: string | null;
+  organization_name?: string | null;
+  is_active: boolean;
+  is_verified: boolean;
+  created_at: string;
+  roles: string[];
+}
+
+interface AdminUser {
   id: string;
   name: string;
   email: string;
@@ -13,20 +29,15 @@ interface User {
   status: string;
 }
 
-interface UserRequest {
-  id: string;
-  fullName: string;
-  email: string;
-  password: string;
-  organization: string;
-  jobTitle: string;
-  phone: string;
-  reason: string;
-  status: 'pending' | 'approved' | 'rejected';
-  requestDate: string;
+interface AdminStatsApi {
+  total_users: number;
+  active_users: number;
+  total_controls: number;
+  total_evidence: number;
+  total_reports: number;
 }
 
-interface SystemStats {
+interface AdminStats {
   totalUsers: number;
   totalControls: number;
   totalEvidence: number;
@@ -34,268 +45,257 @@ interface SystemStats {
   activeUsers: number;
 }
 
-export default function AdminPage() {
+interface SystemStatusApi {
+  backend_ok: boolean;
+  database_ok: boolean;
+  security_ok: boolean;
+  database_size_bytes?: number | null;
+}
+
+interface SystemStatus {
+  backendOk: boolean;
+  databaseOk: boolean;
+  securityOk: boolean;
+  databaseSizeBytes: number | null;
+}
+
+interface AuditLogEntry {
+  log_id: string;
+  user_id?: string | null;
+  action: string;
+  resource: string;
+  resource_id?: string | null;
+  status: string;
+  timestamp: string;
+}
+
+// ── Main Component ────────────────────────────────────────────────────────────
+
+function AdminPageContent() {
   const params = useParams();
   const locale = params.locale as string;
   const isArabic = locale === 'ar';
 
+  // ── State ───────────────────────────────────────────────────────────────────
+
   const [selectedTab, setSelectedTab] = useState<'users' | 'requests' | 'system' | 'settings' | 'audit'>('users');
   const [showAddUserModal, setShowAddUserModal] = useState(false);
-  const [userRequests, setUserRequests] = useState<UserRequest[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
-  const [stats, setStats] = useState<SystemStats>({
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [userRequests, setUserRequests] = useState<UserResponse[]>([]);
+  const [stats, setStats] = useState<AdminStats>({
     totalUsers: 0,
     totalControls: 0,
     totalEvidence: 0,
     totalReports: 0,
-    activeUsers: 0,
+    activeUsers: 0
   });
-  
+  const [userDirectory, setUserDirectory] = useState<Record<string, string>>({});
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+  const [systemStatus, setSystemStatus] = useState<SystemStatus>({
+    backendOk: false,
+    databaseOk: false,
+    securityOk: false,
+    databaseSizeBytes: null
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [newUser, setNewUser] = useState({
     name: '',
     email: '',
     role: 'Analyst',
-    password: '',
+    password: ''
   });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+
+  // ── Data Fetching ───────────────────────────────────────────────────────────
 
   useEffect(() => {
     fetchData();
   }, []);
 
+  const formatBytes = (bytes: number | null): string => {
+    if (!bytes || bytes <= 0) return isArabic ? 'غير متاح' : 'N/A';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+    const value = bytes / Math.pow(1024, exponent);
+    return `${value.toFixed(1)} ${units[exponent]}`;
+  };
+
   const fetchData = async () => {
-    setLoading(true);
     try {
-      const token = localStorage.getItem('access_token');
-      if (!token) {
-        setError('No authentication token found');
-        return;
-      }
+      setLoading(true);
+      setError(null);
 
-      // Fetch users from backend
-      const usersResponse = await axios.get('http://localhost:8000/api/v1/auth/users', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      const fetchedUsers = usersResponse.data.map((user: any) => ({
+      const emptyStats: AdminStatsApi = {
+        total_users: 0,
+        active_users: 0,
+        total_controls: 0,
+        total_evidence: 0,
+        total_reports: 0,
+      };
+
+      const [usersData, requestsData, statsData, auditData, statusData] = await Promise.all([
+        get<UserResponse[]>('/api/v1/auth/users').catch(() => []),
+        get<UserResponse[]>('/api/v1/auth/pending-registrations').catch(() => []),
+        get<AdminStatsApi>('/api/v1/auth/admin/stats').catch(() => emptyStats),
+        get<AuditLogEntry[]>('/api/v1/auth/admin/audit-logs?limit=50').catch(() => []),
+        get<SystemStatusApi>('/api/v1/auth/admin/system-status').catch(() => null),
+      ]);
+
+      const unwrap = <T,>(payload: T | { data: T }): T => {
+        if (payload && typeof payload === 'object' && 'data' in payload) {
+          return (payload as { data: T }).data;
+        }
+        return payload as T;
+      };
+
+      const rawUsers = unwrap<UserResponse[]>(usersData) || [];
+      const rawRequests = unwrap<UserResponse[]>(requestsData) || [];
+      const rawStats = unwrap<AdminStatsApi>(statsData) || emptyStats;
+      const rawAuditLogs = unwrap<AuditLogEntry[]>(auditData) || [];
+      const rawStatus = statusData ? unwrap<SystemStatusApi | null>(statusData) : null;
+
+      const mappedUsers = rawUsers.map((user) => ({
         id: user.user_id,
-        name: user.full_name_en || user.email,
+        name: user.full_name_en || user.full_name_ar || user.email,
         email: user.email,
-        role: user.roles && user.roles.length > 0 ? user.roles[0] : 'Viewer',
-        status: user.is_active ? 'Active' : 'Inactive'
-      }));
-      setUsers(fetchedUsers);
-
-      // Fetch system stats
-      const controlsResponse = await fetch('http://localhost:8000/api/v1/controls?limit=1');
-      const controlsData = await controlsResponse.json();
-      setStats(prev => ({
-        ...prev,
-        totalControls: controlsData.total || 495,
-        activeUsers: fetchedUsers.filter((u: any) => u.status === 'Active').length
+        role: user.roles?.length ? user.roles.join(', ') : (isArabic ? 'غير محدد' : 'Unassigned'),
+        status: user.is_active ? 'Active' : 'Inactive',
       }));
 
-      // Load pending user requests from localStorage (temporary until backend endpoint exists)
-      const requests = JSON.parse(localStorage.getItem('userRequests') || '[]');
-      setUserRequests(requests);
-    } catch (error: any) {
-      console.error('Failed to fetch data:', error);
-      setError(error.response?.data?.detail || 'Failed to load data');
-    } finally {
-      setLoading(false);
-    }
-  };
+      const directory = rawUsers.reduce<Record<string, string>>((acc, user) => {
+        acc[user.user_id] = user.email;
+        return acc;
+      }, {});
 
-  const handleApproveRequest = async (requestId: string) => {
-    const request = userRequests.find((r) => r.id === requestId);
-    if (!request) return;
-
-    setLoading(true);
-    try {
-      const token = localStorage.getItem('access_token');
-      if (!token) {
-        alert(isArabic ? 'خطأ في المصادقة' : 'Authentication error');
-        return;
-      }
-
-      // Create user via backend API
-      const registerResponse = await axios.post(
-        'http://localhost:8000/api/v1/auth/register',
-        {
-          email: request.email,
-          password: request.password,
-          full_name_en: request.fullName,
-          full_name_ar: request.fullName
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      const newUserId = registerResponse.data.user_id;
-
-      // Assign default Analyst role
-      const rolesResponse = await axios.get('http://localhost:8000/api/v1/auth/roles', {
-        headers: { Authorization: `Bearer ${token}` }
+      setUsers(mappedUsers);
+      setUserDirectory(directory);
+      setUserRequests(rawRequests);
+      setAuditLogs(rawAuditLogs);
+      setStats({
+        totalUsers: rawStats.total_users || 0,
+        activeUsers: rawStats.active_users || 0,
+        totalControls: rawStats.total_controls || 0,
+        totalEvidence: rawStats.total_evidence || 0,
+        totalReports: rawStats.total_reports || 0,
       });
-      const analystRole = rolesResponse.data.find((r: any) => r.role_name === 'Analyst');
-      
-      if (analystRole) {
-        await axios.post(
-          `http://localhost:8000/api/v1/auth/users/${newUserId}/roles`,
-          { user_id: newUserId, role_ids: [analystRole.role_id] },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-      }
-
-      // Update request status in localStorage
-      const requests = JSON.parse(localStorage.getItem('userRequests') || '[]');
-      const updatedRequests = requests.map((r: UserRequest) =>
-        r.id === requestId ? { ...r, status: 'approved' as const } : r
-      );
-      localStorage.setItem('userRequests', JSON.stringify(updatedRequests));
-      setUserRequests(updatedRequests);
-
-      // Refresh users list
-      await fetchData();
-
-      alert(isArabic ? 'تمت الموافقة على المستخدم بنجاح!' : 'User approved successfully!');
-    } catch (error: any) {
-      console.error('Failed to approve user:', error);
-      alert(
-        isArabic
-          ? `فشل في الموافقة على المستخدم: ${error.response?.data?.detail || error.message}`
-          : `Failed to approve user: ${error.response?.data?.detail || error.message}`
-      );
+      setSystemStatus({
+        backendOk: rawStatus?.backend_ok ?? false,
+        databaseOk: rawStatus?.database_ok ?? false,
+        securityOk: rawStatus?.security_ok ?? false,
+        databaseSizeBytes: rawStatus?.database_size_bytes ?? null,
+      });
+    } catch (err) {
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRejectRequest = (requestId: string) => {
-    const requests = JSON.parse(localStorage.getItem('userRequests') || '[]');
-    const updatedRequests = requests.map((r: UserRequest) =>
-      r.id === requestId ? { ...r, status: 'rejected' as const } : r
-    );
-    localStorage.setItem('userRequests', JSON.stringify(updatedRequests));
-    setUserRequests(updatedRequests);
-    
-    alert(isArabic ? 'تم رفض الطلب' : 'Request rejected');
-  };
+  // ── Event Handlers ──────────────────────────────────────────────────────────
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!newUser.name || !newUser.email || !newUser.password) {
-      alert(isArabic ? 'الرجاء ملء جميع الحقول المطلوبة' : 'Please fill all required fields');
-      return;
-    }
-
-    if (newUser.password.length < 12) {
-      alert(isArabic ? 'كلمة المرور يجب أن تكون 12 حرفاً على الأقل' : 'Password must be at least 12 characters');
-      return;
-    }
-
-    setLoading(true);
     try {
-      const token = localStorage.getItem('access_token');
-      if (!token) {
-        alert(isArabic ? 'خطأ في المصادقة' : 'Authentication error');
-        return;
-      }
-
-      // Create user via backend API
-      const registerResponse = await axios.post(
-        'http://localhost:8000/api/v1/auth/register',
-        {
-          email: newUser.email,
-          password: newUser.password,
-          full_name_en: newUser.name,
-          full_name_ar: newUser.name
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      const newUserId = registerResponse.data.user_id;
-
-      // Assign selected role
-      const rolesResponse = await axios.get('http://localhost:8000/api/v1/auth/roles', {
-        headers: { Authorization: `Bearer ${token}` }
+      setLoading(true);
+      await post('/api/v1/auth/users', {
+        email: newUser.email,
+        password: newUser.password,
+        full_name_en: newUser.name,
+        full_name_ar: isArabic ? newUser.name : undefined,
+        role_name: newUser.role,
+        is_active: true,
+        is_verified: true,
       });
-      const selectedRole = rolesResponse.data.find((r: any) => r.role_name === newUser.role);
-      
-      if (selectedRole) {
-        await axios.post(
-          `http://localhost:8000/api/v1/auth/users/${newUserId}/roles`,
-          { user_id: newUserId, role_ids: [selectedRole.role_id] },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-      }
-
-      // Refresh users list
       await fetchData();
-
       setShowAddUserModal(false);
       setNewUser({ name: '', email: '', role: 'Analyst', password: '' });
-      
-      alert(isArabic ? 'تمت إضافة المستخدم بنجاح!' : 'User added successfully!');
-    } catch (error: any) {
-      console.error('Failed to add user:', error);
-      alert(
-        isArabic
-          ? `فشل في إضافة المستخدم: ${error.response?.data?.detail || error.message}`
-          : `Failed to add user: ${error.response?.data?.detail || error.message}`
-      );
+    } catch (err) {
+      alert(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
   };
 
-  const pendingRequestsCount = userRequests.filter(r => r.status === 'pending').length;
+  const handleApproveUser = async (userId: string) => {
+    if (!confirm(isArabic ? 'هل أنت متأكد من الموافقة على هذا المستخدم؟' : 'Are you sure you want to approve this user?')) {
+      return;
+    }
+    try {
+      setLoading(true);
+      await post(`/api/v1/auth/users/${userId}/approve`, {});
+      await fetchData();
+    } catch (err) {
+      alert(getErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRejectUser = async (userId: string) => {
+    if (!confirm(isArabic ? 'هل أنت متأكد من رفض هذا المستخدم؟' : 'Are you sure you want to reject this user?')) {
+      return;
+    }
+    try {
+      setLoading(true);
+      await post(`/api/v1/auth/users/${userId}/deny`, {});
+      await fetchData();
+    } catch (err) {
+      alert(getErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleDeactivateUser = async (userId: string) => {
-    const user = users.find((u) => u.id === userId);
-    if (!user) return;
-
-    const action = user.status === 'Active' ? 'deactivate' : 'activate';
-    const confirmMessage = isArabic
-      ? `\u0647\u0644 \u0623\u0646\u062a \u0645\u062a\u0623\u0643\u062f \u0645\u0646 ${action === 'deactivate' ? '\u062a\u0639\u0637\u064a\u0644' : '\u062a\u0641\u0639\u064a\u0644'} \u0647\u0630\u0627 \u0627\u0644\u0645\u0633\u062a\u062e\u062f\u0645\u061f`
-      : `Are you sure you want to ${action} this user?`;
-
-    if (!confirm(confirmMessage)) return;
-
-    setLoading(true);
+    if (!confirm(isArabic ? 'هل أنت متأكد من تعطيل هذا المستخدم؟' : 'Are you sure you want to deactivate this user?')) {
+      return;
+    }
     try {
-      const token = localStorage.getItem('access_token');
-      if (!token) {
-        alert(isArabic ? 'خطأ في المصادقة' : 'Authentication error');
-        return;
-      }
-
-      // Update user status via backend API
-      await axios.patch(
-        `http://localhost:8000/api/v1/auth/users/${userId}`,
-        { is_active: user.status !== 'Active' },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
+      setLoading(true);
+      await patch(`/api/v1/auth/users/${userId}/deactivate`, {});
       await fetchData();
-
-      alert(
-        isArabic
-          ? `تم ${action === 'deactivate' ? 'تعطيل' : 'تفعيل'} المستخدم بنجاح`
-          : `User ${action}d successfully`
-      );
-    } catch (error: any) {
-      console.error(`Failed to ${action} user:`, error);
-      alert(
-        isArabic
-          ? `فشل في ${action === 'deactivate' ? 'تعطيل' : 'تفعيل'} المستخدم: ${error.response?.data?.detail || error.message}`
-          : `Failed to ${action} user: ${error.response?.data?.detail || error.message}`
-      );
+    } catch (err) {
+      alert(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
   };
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+
+  if (loading && !users.length) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <svg className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          <p className="text-sm text-gray-500">{isArabic ? 'جاري التحقّق من الصلاحيات...' : 'Verifying permissions...'}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && !users.length) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="bg-white border border-red-200 rounded-xl p-8 max-w-lg text-center shadow">
+          <div className="text-4xl mb-4">⛔</div>
+          <h2 className="text-xl font-bold text-red-700 mb-2">
+            {isArabic ? 'خطأ في التحميل' : 'Failed to Load Admin Panel'}
+          </h2>
+          <p className="text-sm text-red-600 mb-4">{error}</p>
+          <button
+            onClick={() => fetchData()}
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700"
+          >
+            {isArabic ? 'إعادة المحاولة' : 'Retry'}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50">
@@ -325,95 +325,80 @@ export default function AdminPage() {
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
           <div className="bg-white rounded-xl shadow-lg border p-6">
-            <div className="text-xs font-semibold tracking-wide text-gray-500 mb-2">USR</div>
-            <div className="text-3xl font-bold text-blue-600 mb-1">{users.length}</div>
-            <div className="text-sm text-gray-600">{isArabic ? 'إجمالي المستخدمين' : 'Total Users'}</div>
+            <div className="text-xs font-semibold tracking-wide text-gray-500 mb-2">
+              {isArabic ? 'المستخدمون' : 'USERS'}
+            </div>
+            <div className="text-3xl font-bold text-blue-600 mb-1">{stats.activeUsers}</div>
+            <div className="text-sm text-gray-600">{isArabic ? 'مستخدم نشط' : 'Active Users'}</div>
           </div>
+
           <div className="bg-white rounded-xl shadow-lg border p-6">
-            <div className="text-xs font-semibold tracking-wide text-gray-500 mb-2">CTRL</div>
-            <div className="text-3xl font-bold text-purple-600 mb-1">{stats.totalControls}</div>
-            <div className="text-sm text-gray-600">{isArabic ? 'الضوابط المحملة' : 'Controls Loaded'}</div>
+            <div className="text-xs font-semibold tracking-wide text-gray-500 mb-2">
+              {isArabic ? 'الطلبات' : 'REQUESTS'}
+            </div>
+            <div className="text-3xl font-bold text-orange-600 mb-1">{userRequests.length}</div>
+            <div className="text-sm text-gray-600">{isArabic ? 'طلب معلق' : 'Pending Requests'}</div>
           </div>
+
           <div className="bg-white rounded-xl shadow-lg border p-6">
-            <div className="text-xs font-semibold tracking-wide text-gray-500 mb-2">EVD</div>
-            <div className="text-3xl font-bold text-green-600 mb-1">{stats.totalEvidence}</div>
-            <div className="text-sm text-gray-600">{isArabic ? 'الأدلة المحملة' : 'Evidence Items'}</div>
+            <div className="text-xs font-semibold tracking-wide text-gray-500 mb-2">
+              {isArabic ? 'الضوابط' : 'CONTROLS'}
+            </div>
+            <div className="text-3xl font-bold text-green-600 mb-1">{stats.totalControls}</div>
+            <div className="text-sm text-gray-600">{isArabic ? 'إجمالي الضوابط' : 'Total Controls'}</div>
           </div>
+
           <div className="bg-white rounded-xl shadow-lg border p-6">
-            <div className="text-xs font-semibold tracking-wide text-gray-500 mb-2">RPT</div>
-            <div className="text-3xl font-bold text-orange-600 mb-1">{stats.totalReports}</div>
-            <div className="text-sm text-gray-600">{isArabic ? 'التقارير المنشأة' : 'Reports Generated'}</div>
+            <div className="text-xs font-semibold tracking-wide text-gray-500 mb-2">
+              {isArabic ? 'الأدلة' : 'EVIDENCE'}
+            </div>
+            <div className="text-3xl font-bold text-purple-600 mb-1">{stats.totalEvidence}</div>
+            <div className="text-sm text-gray-600">{isArabic ? 'ملف مرفوع' : 'Uploaded Files'}</div>
           </div>
+
           <div className="bg-white rounded-xl shadow-lg border p-6">
-            <div className="text-xs font-semibold tracking-wide text-gray-500 mb-2">ACT</div>
-            <div className="text-3xl font-bold text-teal-600 mb-1">{users.filter(u => u.status === 'Active').length}</div>
-            <div className="text-sm text-gray-600">{isArabic ? 'المستخدمون النشطون' : 'Active Users'}</div>
+            <div className="text-xs font-semibold tracking-wide text-gray-500 mb-2">
+              {isArabic ? 'التقارير' : 'REPORTS'}
+            </div>
+            <div className="text-3xl font-bold text-indigo-600 mb-1">{stats.totalReports}</div>
+            <div className="text-sm text-gray-600">{isArabic ? 'تقرير منشأ' : 'Generated Reports'}</div>
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="bg-white rounded-xl shadow-lg border overflow-hidden">
-          <div className="border-b">
-            <div className="flex overflow-x-auto">
+        <div className="bg-white border-b rounded-t-xl shadow-sm">
+          <nav className="flex gap-1 p-2">
+            {[
+              { key: 'users', label: isArabic ? 'المستخدمون' : 'Users', icon: '👥' },
+              { key: 'requests', label: isArabic ? 'الطلبات المعلقة' : 'Pending Requests', icon: '⏳', badge: userRequests.length },
+              { key: 'system', label: isArabic ? 'حالة النظام' : 'System Status', icon: '🖥' },
+              { key: 'settings', label: isArabic ? 'الإعدادات' : 'Settings', icon: '⚙️' },
+              { key: 'audit', label: isArabic ? 'سجل التدقيق' : 'Audit Log', icon: '📋' },
+            ].map((tab) => (
               <button
-                onClick={() => setSelectedTab('users')}
-                className={`px-6 py-4 font-semibold transition whitespace-nowrap ${
-                  selectedTab === 'users'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                key={tab.key}
+                onClick={() => setSelectedTab(tab.key as typeof selectedTab)}
+                className={`relative flex-1 px-5 py-3 rounded-lg font-semibold transition ${
+                  selectedTab === tab.key
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                {isArabic ? '👥 المستخدمون' : '👥 Users'}
-              </button>
-              <button
-                onClick={() => setSelectedTab('requests')}
-                className={`px-6 py-4 font-semibold transition whitespace-nowrap relative ${
-                  selectedTab === 'requests'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                {isArabic ? '📥 طلبات الوصول' : '📥 Access Requests'}
-                {pendingRequestsCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
-                    {pendingRequestsCount}
+                <span className="mr-2">{tab.icon}</span>
+                {tab.label}
+                {tab.badge !== undefined && tab.badge > 0 && (
+                  <span className="absolute top-1 right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                    {tab.badge}
                   </span>
                 )}
               </button>
-              <button
-                onClick={() => setSelectedTab('system')}
-                className={`px-6 py-4 font-semibold transition whitespace-nowrap ${
-                  selectedTab === 'system'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                {isArabic ? '⚙️ النظام' : '⚙️ System'}
-              </button>
-              <button
-                onClick={() => setSelectedTab('settings')}
-                className={`px-6 py-4 font-semibold transition whitespace-nowrap ${
-                  selectedTab === 'settings'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                {isArabic ? '🔧 الإعدادات' : '🔧 Settings'}
-              </button>
-              <button
-                onClick={() => setSelectedTab('audit')}
-                className={`px-6 py-4 font-semibold transition whitespace-nowrap ${
-                  selectedTab === 'audit'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                {isArabic ? '📋 سجل التدقيق' : '📋 Audit Log'}
-              </button>
-            </div>
-          </div>
+            ))}
+          </nav>
+        </div>
 
-          <div className="p-6">
+        {/* Tab Content */}
+        <div className="bg-white rounded-b-xl shadow-lg p-8">
+          <div className="space-y-6">
             {/* Users Tab */}
             {selectedTab === 'users' && (
               <div>
@@ -421,66 +406,41 @@ export default function AdminPage() {
                   <h2 className="text-2xl font-bold text-gray-900">
                     {isArabic ? 'إدارة المستخدمين' : 'User Management'}
                   </h2>
-                  <button 
+                  <button
                     onClick={() => setShowAddUserModal(true)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition shadow"
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold transition shadow"
                   >
-                    {isArabic ? '+ إضافة مستخدم' : '+ Add User'}
+                    ➕ {isArabic ? 'إضافة مستخدم' : 'Add User'}
                   </button>
                 </div>
 
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="bg-gray-50 border-b">
-                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
-                          {isArabic ? 'الاسم' : 'Name'}
-                        </th>
-                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
-                          {isArabic ? 'البريد الإلكتروني' : 'Email'}
-                        </th>
-                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
-                          {isArabic ? 'الدور' : 'Role'}
-                        </th>
-                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
-                          {isArabic ? 'الحالة' : 'Status'}
-                        </th>
-                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
-                          {isArabic ? 'الإجراءات' : 'Actions'}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {users.map((user) => (
-                        <tr key={user.id} className="border-b hover:bg-gray-50 transition">
-                          <td className="px-6 py-4 text-sm text-gray-900 font-medium">{user.name}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600">{user.email}</td>
-                          <td className="px-6 py-4">
-                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800">
-                              {user.role}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
-                              {user.status}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <button className="text-blue-600 hover:text-blue-800 font-semibold text-sm mr-4">
-                              {isArabic ? 'تعديل' : 'Edit'}
-                            </button>
-                            <button 
-                              onClick={() => handleDeactivateUser(user.id)}
-                              className="text-red-600 hover:text-red-800 font-semibold text-sm"
-                              disabled={loading}
-                            >
-                              {user.status === 'Active' ? (isArabic ? 'تعطيل' : 'Deactivate') : (isArabic ? 'تفعيل' : 'Activate')}
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="space-y-3">
+                  {users.map((user) => (
+                    <div key={user.id} className="flex items-center justify-between bg-gray-50 rounded-lg p-4 border hover:shadow-md transition">
+                      <div>
+                        <h3 className="font-semibold text-gray-900">{user.name}</h3>
+                        <p className="text-sm text-gray-600">{user.email}</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold">
+                          {user.role}
+                        </span>
+                        <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                          user.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {user.status}
+                        </span>
+                        {user.status === 'Active' && (
+                          <button
+                            onClick={() => handleDeactivateUser(user.id)}
+                            className="text-red-600 hover:text-red-800 font-semibold text-sm"
+                          >
+                            {isArabic ? 'تعطيل' : 'Deactivate'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -488,73 +448,53 @@ export default function AdminPage() {
             {/* Pending Requests Tab */}
             {selectedTab === 'requests' && (
               <div>
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    {isArabic ? 'طلبات وصول المستخدمين' : 'User Access Requests'}
-                  </h2>
-                  <div className="text-sm text-gray-600">
-                    {isArabic ? `${pendingRequestsCount} طلب قيد الانتظار` : `${pendingRequestsCount} Pending Requests`}
-                  </div>
-                </div>
-
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">
+                  {isArabic ? 'طلبات التسجيل المعلقة' : 'Pending Registration Requests'}
+                </h2>
                 {userRequests.length === 0 ? (
-                  <div className="text-center py-12 bg-gray-50 rounded-lg border">
-                    <div className="text-6xl mb-4">📥</div>
-                    <p className="text-gray-600 text-lg">
-                      {isArabic ? 'لا توجد طلبات وصول' : 'No access requests'}
+                  <div className="text-center py-12 bg-gray-50 rounded-xl">
+                    <div className="text-6xl mb-4">✅</div>
+                    <p className="text-xl font-semibold text-gray-900">
+                      {isArabic ? 'لا توجد طلبات معلقة' : 'No Pending Requests'}
+                    </p>
+                    <p className="text-sm text-gray-600 mt-2">
+                      {isArabic ? 'جميع طلبات التسجيل تم معالجتها' : 'All registration requests have been processed'}
                     </p>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {userRequests.map((request) => (
-                      <div key={request.id} className="bg-white border rounded-lg p-6 shadow-sm hover:shadow-md transition">
-                        <div className="flex items-start justify-between mb-4">
+                    {userRequests.map((req) => (
+                      <div key={req.user_id} className="bg-gradient-to-r from-orange-50 to-yellow-50 rounded-xl p-6 border border-orange-200 shadow">
+                        <div className="flex items-center justify-between">
                           <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <h3 className="text-xl font-bold text-gray-900">{request.fullName}</h3>
-                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
-                                request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                request.status === 'approved' ? 'bg-green-100 text-green-800' :
-                                'bg-red-100 text-red-800'
-                              }`}>
-                                {request.status === 'pending' && (isArabic ? '⏳ قيد المراجعة' : '⏳ Pending')}
-                                {request.status === 'approved' && (isArabic ? '✅ تمت الموافقة' : '✅ Approved')}
-                                {request.status === 'rejected' && (isArabic ? '❌ مرفوض' : '❌ Rejected')}
-                              </span>
-                            </div>
-                            <p className="text-gray-600 mb-1">✉️ {request.email}</p>
-                            <p className="text-gray-600 mb-1">🏢 {request.organization}</p>
-                            <p className="text-gray-600 mb-1">💼 {request.jobTitle}</p>
-                            {request.phone && <p className="text-gray-600 mb-1">📱 {request.phone}</p>}
-                            <p className="text-sm text-gray-500 mt-2">
-                              {isArabic ? 'تاريخ الطلب:' : 'Request Date:'} {new Date(request.requestDate).toLocaleDateString()}
+                            <h3 className="font-bold text-gray-900 text-lg">
+                              {req.full_name_en || req.email}
+                            </h3>
+                            <p className="text-sm text-gray-600 mt-1">{req.email}</p>
+                            {req.organization_name && (
+                              <p className="text-sm text-gray-600">
+                                {isArabic ? 'المنظمة:' : 'Organization:'} {req.organization_name}
+                              </p>
+                            )}
+                            <p className="text-xs text-gray-500 mt-2">
+                              {isArabic ? 'تاريخ الطلب:' : 'Requested on:'} {new Date(req.created_at).toLocaleString()}
                             </p>
                           </div>
-                        </div>
-
-                        <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                          <p className="text-sm font-semibold text-gray-700 mb-2">
-                            {isArabic ? 'سبب الطلب:' : 'Reason for Request:'}
-                          </p>
-                          <p className="text-gray-700">{request.reason}</p>
-                        </div>
-
-                        {request.status === 'pending' && (
                           <div className="flex gap-3">
                             <button
-                              onClick={() => handleApproveRequest(request.id)}
-                              className="flex-1 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition shadow"
+                              onClick={() => handleApproveUser(req.user_id)}
+                              className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-bold transition shadow"
                             >
-                              ✅ {isArabic ? 'الموافقة على الطلب' : 'Approve Request'}
+                              ✓ {isArabic ? 'موافقة' : 'Approve'}
                             </button>
                             <button
-                              onClick={() => handleRejectRequest(request.id)}
-                              className="flex-1 bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-semibold transition shadow"
+                              onClick={() => handleRejectUser(req.user_id)}
+                              className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-bold transition shadow"
                             >
-                              ❌ {isArabic ? 'رفض الطلب' : 'Reject Request'}
+                              ✗ {isArabic ? 'رفض' : 'Reject'}
                             </button>
                           </div>
-                        )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -562,34 +502,40 @@ export default function AdminPage() {
               </div>
             )}
 
-            {/* System Tab */}
+            {/* System Status Tab */}
             {selectedTab === 'system' && (
               <div>
                 <h2 className="text-2xl font-bold text-gray-900 mb-6">
-                  {isArabic ? 'معلومات النظام' : 'System Information'}
+                  {isArabic ? 'حالة النظام' : 'System Status'}
                 </h2>
                 <div className="space-y-6">
                   <div className="bg-gray-50 rounded-lg p-6 border">
                     <h3 className="font-semibold text-lg mb-4 text-gray-900">
-                      {isArabic ? 'حالة الخدمات' : 'Service Status'}
+                      {isArabic ? 'حالة الخدمات' : 'Service Health'}
                     </h3>
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="text-gray-700">{isArabic ? 'Backend API' : 'Backend API'}</span>
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
-                          ✓ {isArabic ? 'متصل' : 'Online'}
+                        <span className="text-gray-700">{isArabic ? 'خدمة الواجهة الخلفية' : 'Backend Service'}</span>
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                          systemStatus.backendOk ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        }`}>
+                          {systemStatus.backendOk ? '✓' : '✗'} {isArabic ? (systemStatus.backendOk ? 'نشط' : 'غير متصل') : (systemStatus.backendOk ? 'Active' : 'Down')}
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-gray-700">{isArabic ? 'قاعدة البيانات' : 'Database'}</span>
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
-                          ✓ {isArabic ? 'متصل' : 'Connected'}
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                          systemStatus.databaseOk ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        }`}>
+                          {systemStatus.databaseOk ? '✓' : '✗'} {isArabic ? (systemStatus.databaseOk ? 'نشط' : 'غير متصل') : (systemStatus.databaseOk ? 'Active' : 'Down')}
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-gray-700">{isArabic ? 'خدمة الأمان' : 'Security Service'}</span>
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
-                          ✓ {isArabic ? 'نشط' : 'Active'}
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                          systemStatus.securityOk ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        }`}>
+                          {systemStatus.securityOk ? '✓' : '✗'} {isArabic ? (systemStatus.securityOk ? 'نشط' : 'غير متصل') : (systemStatus.securityOk ? 'Active' : 'Down')}
                         </span>
                       </div>
                     </div>
@@ -606,7 +552,7 @@ export default function AdminPage() {
                       </div>
                       <div>
                         <p className="text-sm text-gray-600">{isArabic ? 'حجم قاعدة البيانات' : 'Database Size'}</p>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">2.4 MB</p>
+                        <p className="text-2xl font-bold text-gray-900 mt-1">{formatBytes(systemStatus.databaseSizeBytes)}</p>
                       </div>
                     </div>
                   </div>
@@ -688,24 +634,31 @@ export default function AdminPage() {
                   {isArabic ? 'سجل التدقيق' : 'Audit Log'}
                 </h2>
                 <div className="space-y-3">
-                  {[
-                    { time: '2026-02-22 14:45', user: 'admin@sico-grc.sa', action: 'User login', status: 'success' },
-                    { time: '2026-02-22 14:40', user: 'admin@sico-grc.sa', action: 'Control updated: ECC-1-1', status: 'success' },
-                    { time: '2026-02-22 14:35', user: 'compliance@sico-grc.sa', action: 'Evidence uploaded', status: 'success' },
-                    { time: '2026-02-22 14:30', user: 'auditor@sico-grc.sa', action: 'Report generated', status: 'success' },
-                  ].map((log, idx) => (
-                    <div key={idx} className="bg-gray-50 rounded-lg p-4 border hover:shadow-md transition">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-semibold text-gray-900">{log.action}</p>
-                          <p className="text-sm text-gray-600 mt-1">{log.user} • {log.time}</p>
-                        </div>
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
-                          ✓ {log.status}
-                        </span>
-                      </div>
+                  {auditLogs.length === 0 ? (
+                    <div className="text-center py-10 bg-gray-50 rounded-xl">
+                      <p className="text-sm text-gray-600">
+                        {isArabic ? 'لا توجد سجلات تدقيق حالياً' : 'No audit logs available'}
+                      </p>
                     </div>
-                  ))}
+                  ) : (
+                    auditLogs.map((log) => (
+                      <div key={log.log_id} className="bg-gray-50 rounded-lg p-4 border hover:shadow-md transition">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-semibold text-gray-900">{log.action}</p>
+                            <p className="text-sm text-gray-600 mt-1">
+                              {(log.user_id && userDirectory[log.user_id]) || (isArabic ? 'النظام' : 'System')} • {new Date(log.timestamp).toLocaleString()}
+                            </p>
+                          </div>
+                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                            log.status === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                          }`}>
+                            {log.status === 'success' ? '✓' : '✗'} {log.status}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             )}
@@ -767,7 +720,7 @@ export default function AdminPage() {
                   value={newUser.password}
                   onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder={isArabic ? '8 أحرف على الأقل' : 'At least 8 characters'}
+                  placeholder={isArabic ? '12 حرف على الأقل' : 'At least 12 characters'}
                   required
                 />
                 <p className="text-sm text-gray-500 mt-1">
@@ -811,9 +764,20 @@ export default function AdminPage() {
               <div className="flex gap-3 pt-4">
                 <button
                   type="submit"
-                  className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-3 rounded-lg font-bold transition shadow-lg"
+                  disabled={loading}
+                  className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 text-white px-8 py-3 rounded-lg font-bold transition shadow-lg"
                 >
-                  ✅ {isArabic ? 'إضافة المستخدم' : 'Add User'}
+                  {loading ? (
+                    <>
+                      <svg className="w-5 h-5 animate-spin mr-2" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      {isArabic ? 'جاري الإضافة...' : 'Adding...'}
+                    </>
+                  ) : (
+                    <>✅ {isArabic ? 'إضافة المستخدم' : 'Add User'}</>
+                  )}
                 </button>
                 <button
                   type="button"
@@ -830,6 +794,36 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+
+      {/* Loading Overlay */}
+      {loading && (
+        <div className="fixed inset-0 bg-black bg-opacity-25 flex items-center justify-center z-40">
+          <div className="bg-white rounded-lg p-6 shadow-xl">
+            <div className="flex items-center gap-3">
+              <svg className="w-6 h-6 animate-spin text-blue-600" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              <span className="font-medium text-gray-900">
+                {isArabic ? 'جاري التحديث...' : 'Updating...'}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+// ── Exported Component with AdminGuard ───────────────────────────────────────
+
+/**
+ * AdminPage with automatic role-based access control
+ */
+export default function AdminPage() {
+  return (
+    <AdminGuard>
+      <AdminPageContent />
+    </AdminGuard>
   );
 }

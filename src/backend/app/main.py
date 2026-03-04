@@ -6,6 +6,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from core.config import settings
+
 app = FastAPI(
     title="SICO GRC Platform API",
     description="Saudi Regulatory Compliance Engine - ECC, CCC, PDPL",
@@ -15,12 +17,29 @@ app = FastAPI(
 )
 
 # CORS Configuration
+raw_origins = settings.CORS_ORIGINS
+if isinstance(raw_origins, str):
+    cors_origins = [o.strip() for o in raw_origins.split(",") if o.strip()]
+else:
+    cors_origins = [str(o).strip() for o in raw_origins if str(o).strip()]
+
+for dev_origin in [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]:
+    if dev_origin not in cors_origins:
+        cors_origins.append(dev_origin)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:8000"],
+    allow_origins=cors_origins,
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Process-Time"],
 )
 
 

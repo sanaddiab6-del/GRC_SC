@@ -39,8 +39,8 @@ export default function EvidenceApprovalModal({
     setError('');
 
     try {
-      // Get auth token from localStorage
-      const token = localStorage.getItem('access_token');
+      // Get auth token from sessionStorage
+      const token = sessionStorage.getItem('access_token');
       
       // Get current user for validated_by field
       const currentUser = localStorage.getItem('currentUser');

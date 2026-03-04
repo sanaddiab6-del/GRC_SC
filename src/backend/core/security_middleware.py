@@ -234,16 +234,6 @@ def setup_security_middleware(app):
     Call this in main.py after creating the FastAPI app.
     """
     
-    # CORS (must be first)
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.CORS_ORIGINS,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-        expose_headers=["X-Process-Time"]
-    )
-    
     # Trusted Host (prevent host header injection)
     if settings.is_production:
         allowed_hosts = ["sico-grc.com", "*.sico-grc.com"]
@@ -263,5 +253,7 @@ def setup_security_middleware(app):
                       requests_per_hour=settings.RATE_LIMIT_PER_HOUR)
     app.add_middleware(AuditLoggingMiddleware)
     app.add_middleware(InputValidationMiddleware)
-    
+
+    # CORS is registered in main.py immediately after app creation to ensure
+    # it runs before any custom middleware. Do not re-register it here.
     logger.info("Security middleware configured successfully")

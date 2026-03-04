@@ -174,8 +174,8 @@ export default function EvidenceUploadModal({
       const timestamp = Date.now();
       const evidenceId = `EVD-${formData.control_id}-${timestamp}`;
 
-      // Get auth token from localStorage (adjust based on your auth implementation)
-      const token = localStorage.getItem("access_token");
+      // Get auth token from sessionStorage (adjust based on your auth implementation)
+      const token = sessionStorage.getItem("access_token");
 
       // If file is present, upload file first (simulate upload progress)
       if (file) {

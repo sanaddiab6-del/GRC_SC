@@ -86,8 +86,7 @@ def resolve_sync_url(async_url: str) -> str:
 # ---------------------------------------------------------------------------
 
 DATABASE_URL: str = resolve_async_url(settings.DATABASE_URL)
-is_sqlite: bool = DATABASE_URL.startswith("sqlite")
-is_postgresql: bool = DATABASE_URL.startswith("postgresql")
+is_postgresql: bool = True   # SQLite is not supported; PostgreSQL only
 
 use_null_pool: bool = (
     bool(os.getenv("PYTEST_RUNNING"))
@@ -99,12 +98,11 @@ engine_kwargs: Dict[str, Any] = {
     "future": True,
 }
 
-if use_null_pool or is_sqlite:
-    # SQLite doesn't benefit from connection pooling; tests use NullPool to
-    # avoid "database is locked" issues with concurrent connections.
+if use_null_pool:
+    # Tests use NullPool to avoid connection-pool interference.
     engine_kwargs["poolclass"] = NullPool
-elif is_postgresql:
-    # Use connection pooling for PostgreSQL in non-test environments.
+else:
+    # PostgreSQL connection pool defaults.
     engine_kwargs["pool_pre_ping"] = True
     engine_kwargs["pool_size"] = 10
     engine_kwargs["max_overflow"] = 20
@@ -187,8 +185,6 @@ async def validate_db_startup() -> bool:
 
     _log = logging.getLogger(__name__)
 
-    backend_label = "postgresql" if is_postgresql else "sqlite"
-
     # Mask any password embedded in the URL before logging.
     try:
         parsed = urlparse(DATABASE_URL)
@@ -199,7 +195,7 @@ async def validate_db_startup() -> bool:
     except Exception:
         safe_url = DATABASE_URL
 
-    _log.info("  DB backend : %s", backend_label)
+    _log.info("  DB backend : postgresql")
     _log.info("  DB URL     : %s", safe_url)
 
     # ── 1. Connectivity ──────────────────────────────────────────────────
@@ -211,10 +207,9 @@ async def validate_db_startup() -> bool:
         _log.error(
             "\u2717 Database connection FAILED – the application will run in "
             "API-only mode until the database is reachable.\n"
-            "  Backend : %s\n"
+            "  Backend : postgresql\n"
             "  URL     : %s\n"
             "  Error   : %s",
-            backend_label,
             safe_url,
             exc,
         )
@@ -240,8 +235,7 @@ async def validate_db_startup() -> bool:
     except Exception as exc:
         err_lower = str(exc).lower()
         if (
-            "no such table" in err_lower          # SQLite
-            or "does not exist" in err_lower       # PostgreSQL
+            "does not exist" in err_lower       # PostgreSQL
             or "alembic_version" in err_lower
         ):
             _log.warning(

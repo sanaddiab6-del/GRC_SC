@@ -135,7 +135,7 @@ export default function IncidentResponsePage() {
   // ==================== HELPER FUNCTIONS ====================
 
   const getAuthHeaders = () => {
-    const token = localStorage.getItem("access_token");
+    const token = sessionStorage.getItem("access_token");
     return { Authorization: `Bearer ${token}` };
   };
 

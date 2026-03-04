@@ -154,7 +154,7 @@ export default function PrivacyDashboardPage() {
   // ===== API FUNCTIONS =====
 
   const getAuthHeaders = () => {
-    const token = localStorage.getItem("access_token");
+    const token = sessionStorage.getItem("access_token");
     return { Authorization: `Bearer ${token}` };
   };
 

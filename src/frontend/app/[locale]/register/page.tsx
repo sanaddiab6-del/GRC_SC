@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import axios from 'axios';
+import { register } from '@/lib/auth';
 
 export default function RegisterPage() {
   const params = useParams();
@@ -86,38 +86,48 @@ export default function RegisterPage() {
     }
 
     setLoading(true);
-    try {
-      // Submit registration request to backend API
-      const response = await axios.post('http://localhost:8000/api/v1/auth/register', {
-        email: formData.email,
-        password: formData.password,
-        full_name_en: formData.fullName,
-        full_name_ar: formData.fullName
-      });
+    const result = await register({
+      email: formData.email,
+      password: formData.password,
+      full_name_en: formData.fullName,
+      full_name_ar: formData.fullName,
+      organization_name: formData.organization || undefined,
+    });
+    setLoading(false);
 
-      const newRequestId = `REQ-${Date.now()}`;
-      setRequestId(newRequestId);
+    if (!result.ok) {
+      const newErrors: Record<string, string> = {};
 
-      // Store request metadata in localStorage for admin approval tracking
-      // (In production, this would be handled entirely by backend)
-      const existingRequests = JSON.parse(localStorage.getItem('userRequests') || '[]');
-      const newRequest = {
-        id: newRequestId,
-        ...formData,
-        userId: response.data.user_id,
-        status: 'pending',
-        requestDate: new Date().toISOString(),
-      };
-      localStorage.setItem('userRequests', JSON.stringify([...existingRequests, newRequest]));
+      // 409 Conflict → attach error directly to the email field
+      if (result.status === 409) {
+        newErrors.email = isArabic
+          ? 'هذا البريد الإلكتروني مسجل مسبقاً. يرجى تسجيل الدخول أو استخدام بريد مختلف.'
+          : 'This email address is already registered. Please log in or use a different email.';
+      }
 
-      setSubmitted(true);
-    } catch (error: any) {
-      console.error('Registration failed:', error);
-      const errorMessage = error.response?.data?.detail || 'Registration failed. Please try again.';
-      setErrors({ submit: isArabic ? 'فشل التسجيل. حاول مرة أخرى.' : errorMessage });
-    } finally {
-      setLoading(false);
+      // 422 Unprocessable Entity → per-field errors from Pydantic
+      if (result.fieldErrors && Object.keys(result.fieldErrors).length > 0) {
+        for (const [field, msg] of Object.entries(result.fieldErrors)) {
+          newErrors[field] = msg;
+        }
+      }
+
+      // Fallback: no field-specific errors → show a banner
+      if (Object.keys(newErrors).length === 0) {
+        newErrors.submit =
+          result.error ??
+          (isArabic
+            ? 'فشل التسجيل. حاول مرة أخرى.'
+            : 'Registration failed. Please try again.');
+      }
+
+      setErrors(newErrors);
+      return;
     }
+
+    const newRequestId = `REQ-${Date.now()}`;
+    setRequestId(newRequestId);
+    setSubmitted(true);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -138,24 +148,29 @@ export default function RegisterPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-blue-50 flex items-center justify-center p-6">
         <div className="max-w-2xl w-full bg-white rounded-2xl shadow-2xl p-12 text-center">
-          <div className="text-6xl mb-6">✅</div>
+          <div className="text-6xl mb-6">📬</div>
           <h1 className="text-3xl font-bold text-gray-900 mb-4">
             {isArabic ? 'تم إرسال طلبك بنجاح!' : 'Request Submitted Successfully!'}
           </h1>
           <p className="text-gray-600 mb-8 text-lg">
             {isArabic
-              ? 'تم استلام طلب التسجيل الخاص بك. سيقوم المسؤول بمراجعة طلبك والموافقة عليه قريباً. ستتلقى إشعاراً عبر البريد الإلكتروني عند الموافقة.'
-              : 'Your registration request has been received. An administrator will review and approve your request shortly. You will receive an email notification once approved.'}
+              ? 'تم تلقي طلب التسجيل الخاص بك. سيقوم المسؤول بمراجعته والموافقة عليه. ستتلقى إشعاراً عبر البريد الإلكتروني عند الموافقة ليتسنى لك تسجيل الدخول.'
+              : 'Your registration request has been received and is pending admin approval. You will receive a confirmation email once approved — then you can log in.'}
           </p>
           <div className="bg-blue-50 rounded-lg p-6 mb-8">
-            <h3 className="font-semibold text-gray-900 mb-2">
-              {isArabic ? '📋 تفاصيل الطلب' : '📋 Request Details'}
+            <h3 className="font-semibold text-gray-900 mb-3">
+              {isArabic ? '📋 الخطوات التالية' : '📋 What happens next?'}
             </h3>
-            <div className="text-sm text-gray-700 space-y-1">
-              <p><strong>{isArabic ? 'رقم الطلب:' : 'Request ID:'}</strong> {requestId}</p>
-              <p><strong>{isArabic ? 'البريد الإلكتروني:' : 'Email:'}</strong> {formData.email}</p>
-              <p><strong>{isArabic ? 'الحالة:' : 'Status:'}</strong> <span className="text-yellow-600 font-semibold">{isArabic ? 'قيد المراجعة' : 'Pending Review'}</span></p>
-            </div>
+            <ol className="text-sm text-gray-700 space-y-2 text-left">
+              <li>1. {isArabic ? 'يراجع المسؤول طلبك' : 'An admin reviews your request'}</li>
+              <li>2. {isArabic ? 'تتلقى بريدًا إلكترونيًا للتأكيد' : 'You receive a confirmation email'}</li>
+              <li>3. {isArabic ? 'تسجيل الدخول باستخدام بريدك وكلمة مرورك' : 'Log in with your email and password'}</li>
+            </ol>
+          </div>
+          <div className="bg-gray-50 rounded-lg p-4 mb-8">
+            <p className="text-sm text-gray-600">
+              <strong>{isArabic ? 'البريد الإلكتروني:' : 'Email registered:'}</strong> {formData.email}
+            </p>
           </div>
           <Link
             href={`/${locale}`}

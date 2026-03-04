@@ -34,7 +34,7 @@ export default function EnterpriseDashboard({
   const t = useTranslations('dashboard');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [lastUpdatedText, setLastUpdatedText] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState(new Date());
 
   // Demo data - In production, this would come from API
   const [dashboardData, setDashboardData] = useState({
@@ -156,9 +156,6 @@ export default function EnterpriseDashboard({
   });
 
   useEffect(() => {
-    const now = new Date();
-    setLastUpdatedText(now.toLocaleTimeString());
-
     // Simulate data loading
     setTimeout(() => {
       setLoading(false);
@@ -176,7 +173,7 @@ export default function EnterpriseDashboard({
     setRefreshing(true);
     // In production: await fetch('/api/v1/dashboard')
     setTimeout(() => {
-      setLastUpdatedText(new Date().toLocaleTimeString());
+      setLastUpdated(new Date());
       setRefreshing(false);
     }, 1000);
   };
@@ -216,7 +213,7 @@ export default function EnterpriseDashboard({
                 {locale === 'ar' ? 'آخر تحديث' : 'Last Updated'}
               </div>
               <div className="text-sm font-semibold text-gray-900">
-                {lastUpdatedText ?? '--:--'}
+                {lastUpdated.toLocaleTimeString()}
               </div>
             </div>
             

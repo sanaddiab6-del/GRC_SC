@@ -38,6 +38,7 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     full_name_en = Column(String(255))
     full_name_ar = Column(String(255))
+    organization_name = Column(String(255), nullable=True)
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
     last_login_at = Column(DateTime)
@@ -139,5 +140,10 @@ class AuditLog(Base):
     user_id = Column(Uuid(as_uuid=True), ForeignKey('users.user_id'), nullable=True)
     action = Column(String(100), nullable=False)
     resource = Column(String(50), nullable=False)
+    resource_id = Column(String(100), nullable=True, index=True)
+    ip_address = Column(String(50), nullable=True)
+    user_agent = Column(String(500), nullable=True)
+    status = Column(String(20), nullable=False, default="success")
     details = Column(JSON)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
 

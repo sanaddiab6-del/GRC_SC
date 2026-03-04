@@ -248,7 +248,7 @@ export default function RiskModal({
     setError("");
 
     try {
-      const token = localStorage.getItem("access_token");
+      const token = sessionStorage.getItem("access_token");
 
       // Prepare request body
       const requestBody = isEdit
