@@ -19,12 +19,14 @@ os.environ.setdefault("REDIS_URL", "redis://localhost:6379")
 # Add src to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../src/backend")))
 
+
 @pytest_asyncio.fixture
 async def test_client():
 	"""Provide an async HTTP client bound to the FastAPI app."""
 	from main import app
 	async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
 		yield client
+
 
 @pytest.fixture(scope="session", autouse=True)
 def apply_migrations() -> None:

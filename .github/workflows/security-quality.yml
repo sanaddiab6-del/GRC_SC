@@ -253,22 +253,32 @@ jobs:
     steps:
       - name: Check results
         run: |
-          if [ "${{ needs.security-scan.result }}" != "success" ]; then
+          security_scan="${{ needs.security-scan.result }}"
+          ai_security_tests="${{ needs.ai-security-tests.result }}"
+          code_quality="${{ needs.code-quality.result }}"
+          unit_tests="${{ needs.unit-tests.result }}"
+
+          echo "Security scan result      : ${security_scan}"
+          echo "AI security tests result  : ${ai_security_tests}"
+          echo "Code quality result       : ${code_quality}"
+          echo "Unit tests result         : ${unit_tests}"
+
+          if [ "${security_scan}" = "failure" ]; then
             echo "::error::Security scan failed"
             exit 1
           fi
 
-          if [ "${{ needs.ai-security-tests.result }}" != "success" ]; then
+          if [ "${ai_security_tests}" = "failure" ]; then
             echo "::error::AI Security tests failed"
             exit 1
           fi
 
-          if [ "${{ needs.code-quality.result }}" != "success" ]; then
+          if [ "${code_quality}" = "failure" ]; then
             echo "::error::Code quality failed"
             exit 1
           fi
 
-          if [ "${{ needs.unit-tests.result }}" != "success" ]; then
+          if [ "${unit_tests}" = "failure" ]; then
             echo "::error::Unit tests failed"
             exit 1
           fi
