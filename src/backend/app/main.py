@@ -47,13 +47,14 @@ app.add_middleware(
 async def root():
     """Root endpoint - API health check"""
     return {
+        "message_en": "Welcome to SICO GRC Platform API",
+        "message_ar": "مرحباً بكم في منصة SICO للحوكمة والمخاطر والامتثال",
         "status": "operational",
         "service": "SICO GRC Platform API",
         "version": "0.1.0",
         "frameworks": ["ECC 3.0", "CCC 1.0", "PDPL 2023"],
         "languages": ["ar", "en"],
     }
-
 
 @app.get("/health")
 async def health_check():
