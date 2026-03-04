@@ -10,11 +10,12 @@
  * - Request/response interceptors
  */
 
-import axios, { 
-  AxiosInstance, 
-  AxiosError, 
-  AxiosResponse, 
-  InternalAxiosRequestConfig 
+import axios, {
+  AxiosInstance,
+  AxiosError,
+  AxiosResponse,
+  AxiosHeaders,
+  InternalAxiosRequestConfig,
 } from 'axios';
 import { 
   getAccessToken, 
@@ -51,10 +52,14 @@ interface ApiErrorResponse {
 export const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: REQUEST_TIMEOUT,
-  headers: {
+  headers: AxiosHeaders.from({
     'Content-Type': 'application/json',
-  },
+  }),
 });
+
+const ensureAxiosHeaders = (headers?: InternalAxiosRequestConfig['headers']): AxiosHeaders => {
+  return headers instanceof AxiosHeaders ? headers : AxiosHeaders.from(headers || {});
+};
 
 // ── Request Interceptor ───────────────────────────────────────────────────────
 
@@ -69,14 +74,17 @@ apiClient.interceptors.request.use(
     }
 
     const token = getAccessToken();
+    const headers = ensureAxiosHeaders(config.headers);
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+      headers.set('Authorization', `Bearer ${token}`);
     }
 
     // Add request ID for debugging
     if (process.env.NODE_ENV === 'development') {
-      config.headers['X-Request-ID'] = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      headers.set('X-Request-ID', `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
     }
+
+    config.headers = headers;
 
     return config;
   },
@@ -108,9 +116,9 @@ apiClient.interceptors.response.use(
         
         if (newTokenData) {
           // Update the authorization header with new token
-          if (originalRequest.headers) {
-            originalRequest.headers.Authorization = `Bearer ${newTokenData.access_token}`;
-          }
+          const headers = ensureAxiosHeaders(originalRequest.headers);
+          headers.set('Authorization', `Bearer ${newTokenData.access_token}`);
+          originalRequest.headers = headers;
           
           // Retry the original request
           return apiClient(originalRequest);
@@ -286,9 +294,9 @@ export const uploadFile = async (
   return authFetch(url, {
     method: 'POST',
     data: formData,
-    headers: {
+    headers: AxiosHeaders.from({
       'Content-Type': 'multipart/form-data',
-    },
+    }),
     onUploadProgress: (progressEvent) => {
       if (onProgress && progressEvent.total) {
         const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);

@@ -20,7 +20,7 @@ async def test_health_check():
 async def test_root_endpoint():
     """Test root endpoint returns bilingual message"""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        response = await client.get("/")
+        response = await client.get("/", follow_redirects=True)
         assert response.status_code == 200
         data = response.json()
         assert "message_en" in data
