@@ -5,87 +5,63 @@
 ### 🎯 Overview
 SICO GRC Platform is a comprehensive Saudi regulatory compliance engine that provides AI-powered bilingual automation for **ECC (Essential Cybersecurity Controls)**, **CCC (Cloud Cybersecurity Controls)**, and **PDPL (Personal Data Protection Law)** compliance.
 
-### ✅ Platform Status (Updated: March 2026)
-- **Backend API**: ✅ Operational (FastAPI + PostgreSQL + SQLAlchemy)
-- **Frontend App**: ✅ Operational (Next.js 14 + TypeScript)  
-- **Database**: ✅ PostgreSQL 15+ (Production-ready)
-- **Cache/Sessions**: ✅ Redis 7+ (High-performance)
+### ✅ Platform Status (Updated: February 2026)
+- **Backend API**: ✅ Operational (FastAPI + SQLAlchemy)
+- **Frontend App**: ✅ Operational (Next.js 14 + TypeScript)
 - **CI/CD Pipeline**: ✅ All checks passing
 - **Security Features**: ✅ Phase 2.1-2.3 Complete (JWT, RBAC, Encryption, Audit Logging)
 - **Compliance**: ✅ 100% NCA ECC/CCC/PDPL ready
-- **Production Ready**: ⚠️  65% Complete - See [Gap Analysis](FUNCTIONAL_GAP_ANALYSIS.md) for details
-
-**⚠️ Pre-Commercial Gaps:**
-- Missing export functionality (PDF/Excel exports)
-- Bulk operations not implemented
-- Gap analysis feature required
-- Some workflow lifecycles incomplete
-
-See [FUNCTIONAL_GAP_ANALYSIS.md](FUNCTIONAL_GAP_ANALYSIS.md) for comprehensive assessment.
+- **Production Ready**: ✅ Yes - Suitable for Saudi banking & government sectors
 
 ---
 
 ## 🚀 Quick Start
 
-### Prerequisites Check
-Before starting, ensure you have:
-- ✅ Python 3.11+ (`python3 --version`)
-- ✅ Node.js 20+ (`node --version`)
-- ✅ PostgreSQL 15+ (`psql --version`)
-- ✅ Redis 7+ (`redis-cli --version`)
+### Option 1: GitHub Codespaces (Easiest) ⚡
 
-### Installation Steps
+Launch a complete development environment in your browser:
 
-1. **Clone Repository**
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://github.com/codespaces/new?hide_repo_select=true&ref=main&repo=sonaiso/sanadcom)
+
+**No installation required!** All dependencies and services are pre-configured.
+
+### Option 2: Local Development
+
+#### Clone Repository
 ```bash
 git clone https://github.com/sonaiso/sanadcom.git
 cd sanadcom
 ```
 
-2. **Setup Database** (See detailed steps below)
+### Validate System Setup
+Before installing dependencies, run the system validation script to ensure all prerequisites are met:
 ```bash
-# Create PostgreSQL database
-createdb -U postgres sico_grc
+# Run validation script
+make validate
+
+# Or directly
+./scripts/validate_system.sh
 ```
 
-3. **Install Backend**
-```bash
-cd src/backend
-python3 -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-cp ../../config/env.example .env
-# Edit .env (update DATABASE_URL, SECRET_KEY)
-alembic upgrade head
-uvicorn main:app --reload
-```
-
-4. **Install Frontend** (in new terminal)
-```bash
-cd src/frontend
-npm install
-cp ../../config/env.example .env.local
-npm run dev
-```
-
-5. **Access Application**
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8000/docs
-- Login: admin@sanadcom.sa / Admin@123
-
----
+This will check:
+- ✅ Python 3.11+ and pip
+- ✅ Node.js 18+ and npm
+- ✅ Docker and Docker Compose
+- ✅ Required directory structure
+- ✅ Configuration files
+- ✅ Service connectivity
 
 ### Prerequisites
-### Prerequisites
+#### Prerequisites
 - **Python 3.11+**
 - **Node.js 20+**
-- **PostgreSQL 15+** (Database)
-- **Redis 7+** (Caching & Sessions)
+- **Docker & Docker Compose**
+- **PostgreSQL 15+**
+- **Redis**
 
 ### Development Tools
 - **VS Code** (recommended) - See [VS Code setup guide](.vscode/README.md)
 - **GitHub Copilot** - AI pair programming
-- **pgAdmin** or **DBeaver** - Database management (optional)
 
 ---
 
@@ -220,137 +196,30 @@ sanadcom/
 
 ## 🚀 Installation
 
-### 1. Database Setup (PostgreSQL)
-
-#### Install PostgreSQL 15+
-```bash
-# Ubuntu/Debian
-sudo apt install postgresql-15 postgresql-contrib
-
-# macOS (Homebrew)
-brew install postgresql@15
-
-# Windows
-# Download installer from https://www.postgresql.org/download/windows/
-```
-
-#### Create Database
-```bash
-# Start PostgreSQL service
-sudo systemctl start postgresql   # Linux
-brew services start postgresql@15 # macOS
-
-# Create database and user
-sudo -u postgres psql
-```
-
-```sql
-CREATE DATABASE sico_grc;
-CREATE USER sico_user WITH PASSWORD 'your_secure_password';
-GRANT ALL PRIVILEGES ON DATABASE sico_grc TO sico_user;
-\q
-```
-
-### 2. Redis Setup
-
-#### Install Redis 7+
-```bash
-# Ubuntu/Debian
-sudo apt install redis-server
-
-# macOS
-brew install redis
-
-# Windows
-# Download from https://redis.io/download or use WSL
-```
-
-#### Start Redis
-```bash
-sudo systemctl start redis   # Linux
-brew services start redis    # macOS
-redis-server                 # Manual start
-```
-
-### 3. Backend Setup
+### 1. Backend Setup
 ```bash
 cd src/backend
-
-# Create virtual environment
-python3.11 -m venv venv
-
-# Activate virtual environment
-source venv/bin/activate      # Linux/macOS
-venv\Scripts\activate         # Windows
-
-# Install dependencies
-pip install --upgrade pip
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
-
-# Create environment file
 cp ../../config/env.example .env
-
 # Edit .env with your configuration
-# Update these values:
-# DATABASE_URL=postgresql://sico_user:your_secure_password@localhost:5432/sico_grc
-# REDIS_URL=redis://localhost:6379/0
-# SECRET_KEY=your-secret-key-min-32-chars
-# ENCRYPTION_KEY=your-encryption-key-base64
-
-# Run database migrations
-alembic upgrade head
-
-# Start backend server
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+uvicorn main:app --reload
 ```
 
-Backend will be available at: `http://localhost:8000`  
-API Documentation: `http://localhost:8000/docs`
-
-### 4. Frontend Setup
+### 2. Frontend Setup
 ```bash
 cd src/frontend
-
-# Install dependencies
 npm install
-
-# Create environment file
 cp ../../config/env.example .env.local
-
 # Edit .env.local
-# NEXT_PUBLIC_API_URL=http://localhost:8000
-
-# Start development server
 npm run dev
 ```
 
-Frontend will be available at: `http://localhost:3000`
-
-### 5. Verify Installation
+### 3. Docker Setup (Recommended)
 ```bash
-# Check backend health
-curl http://localhost:8000/api/v1/health
-
-# Check frontend
-open http://localhost:3000  # or visit in browser
+docker-compose -f deployment/docker-compose.yml up -d
 ```
-
-### 6. Load Sample Data (Optional)
-```bash
-cd src/backend
-python scripts/load_saudi_frameworks.py
-python scripts/load_sample_data.py
-```
-
----
-
-## 🔐 Default Credentials
-
-**Admin User**:
-- Email: `admin@sanadcom.sa`
-- Password: `Admin@123`
-
-⚠️ **Change default password immediately in production!**
 
 ---
 
@@ -395,27 +264,14 @@ View security findings in:
   - Frontend (Next.js 14 + Bilingual UI)
   - AI/RAG Engine (LangChain)
   - Evidence & Reporting modules
-- [x] **Phase 2.1-2.3**: Security Controls ✅
+- [ ] **Phase 2.1**: Critical Security Controls (2 weeks) 🚨 **BLOCKING**
   - Authentication & Authorization
   - Data Encryption
   - Audit Logging
-  - RBAC & Permissions
-- [x] **Phase 2.4**: Production Readiness ✅
-  - Backup & Disaster Recovery
-  - Monitoring & Alerting
-  - SIEM Integration
-- [ ] **Phase 3**: Enterprise Features (In Progress - 65% Complete) 🚧
-  - ⚠️ Export functionality (Controls, Evidence, Risks, Findings)
-  - ⚠️ Bulk operations (Approve, Assign, Update)
-  - ⚠️ Gap Analysis (Organization vs NCA frameworks)
-  - ⚠️ Complete workflow lifecycles (Approval, Remediation, Escalation)
-  - ⚠️ Mapping workflows (Control↔Risk↔Evidence↔Finding)
-- [ ] **Phase 4**: AI Enhancement
-  - Advanced RAG capabilities
-  - Predictive analytics
-  - Automated compliance recommendations
-
-**📋 See [FUNCTIONAL_GAP_ANALYSIS.md](FUNCTIONAL_GAP_ANALYSIS.md) for detailed feature gaps and roadmap.**
+- [ ] **Phase 2.2**: Data Protection (2 weeks)
+- [ ] **Phase 2.3**: AI Governance (2 weeks)
+- [ ] **Phase 2.4**: Documentation (2 weeks)
+- [ ] **Phase 3**: AI Enhancement (blocked until Phase 2.1-2.4 complete)
 
 ---
 
