@@ -106,11 +106,19 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20.11.1"
+          cache: "npm"
+          cache-dependency-path: src/frontend/package-lock.json
 
       - name: Install dependencies
         run: |
           cd src/frontend
-          npm ci
+          # Retry npm ci up to 3 times on network failure
+          for i in 1 2 3; do
+            npm ci --prefer-offline --no-audit && break || {
+              echo "Attempt $i failed, retrying in 5 seconds..."
+              sleep 5
+            }
+          done
 
       - name: Clean build cache
         run: |
