@@ -1,7 +1,7 @@
 """Add dynamic configuration tables for Jira-style UI
 
 Revision ID: 8f1c2d3e4f5a
-Revises: b7c8d9e0f1a2
+Revises: c2d3e4f5a6b7
 Create Date: 2026-03-05 12:00:00.000000
 """
 
@@ -12,7 +12,7 @@ import uuid
 
 # revision identifiers
 revision = "8f1c2d3e4f5a"
-down_revision = "b7c8d9e0f1a2"
+down_revision = "c2d3e4f5a6b7"  # Updated to depend on organizations table creation
 branch_labels = None
 depends_on = None
 
