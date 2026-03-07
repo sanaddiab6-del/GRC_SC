@@ -31,8 +31,8 @@ def test_create_access_token():
     token = create_access_token(
         user_id="user123",
         tenant_id="tenant456",
-        role=AIRole.AI_OPERATOR,
-        permissions={AIPermission.QUERY_RAG, AIPermission.VIEW_DATA},
+        role=AIRole.ANALYST,
+        permissions={AIPermission.QUERY_RAG, AIPermission.VIEW_AUDIT_LOGS},
     )
     
     assert isinstance(token, str)
@@ -42,8 +42,8 @@ def test_create_access_token():
     payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
     assert payload["sub"] == "user123"
     assert payload["tenant_id"] == "tenant456"
-    assert payload["role"] == "ai_operator"
-    assert set(payload["permissions"]) == {"query_rag", "view_data"}
+    assert payload["role"] == "analyst"
+    assert set(payload["permissions"]) == {"query_rag", "view_audit_logs"}
     assert payload["type"] == "access"
 
 
@@ -70,7 +70,7 @@ def test_create_token_pair():
         user_id="user123",
         tenant_id="tenant456",
         role=AIRole.AI_ADMIN,
-        permissions={AIPermission.MANAGE_MODELS, AIPermission.APPROVE_MODELS},
+        permissions={AIPermission.MANAGE_MODELS, AIPermission.EXPORT_DATA},
     )
     
     assert tokens.token_type == "bearer"
@@ -115,7 +115,7 @@ def test_decode_valid_token():
     token = create_access_token(
         user_id="user123",
         tenant_id="tenant456",
-        role=AIRole.AI_OPERATOR,
+        role=AIRole.ANALYST,
         permissions={AIPermission.QUERY_RAG},
     )
     
@@ -123,7 +123,7 @@ def test_decode_valid_token():
     
     assert payload["sub"] == "user123"
     assert payload["tenant_id"] == "tenant456"
-    assert payload["role"] == "ai_operator"
+    assert payload["role"] == "analyst"
 
 
 def test_decode_invalid_token():
@@ -162,7 +162,7 @@ def test_get_token_data():
         user_id="user123",
         tenant_id="tenant456",
         role=AIRole.AI_ADMIN,
-        permissions={AIPermission.MANAGE_MODELS, AIPermission.APPROVE_MODELS},
+        permissions={AIPermission.MANAGE_MODELS, AIPermission.EXPORT_DATA},
     )
     
     token_data = get_token_data(token)
@@ -171,7 +171,7 @@ def test_get_token_data():
     assert token_data.tenant_id == "tenant456"
     assert token_data.role == AIRole.AI_ADMIN
     assert AIPermission.MANAGE_MODELS in token_data.permissions
-    assert AIPermission.APPROVE_MODELS in token_data.permissions
+    assert AIPermission.EXPORT_DATA in token_data.permissions
 
 
 def test_get_token_data_invalid_role():
@@ -244,11 +244,11 @@ def test_admin_permissions():
         role=AIRole.AI_ADMIN,
         permissions={
             AIPermission.MANAGE_MODELS,
-            AIPermission.APPROVE_MODELS,
-            AIPermission.QUERY_RAG,
-            AIPermission.VIEW_DATA,
             AIPermission.EXPORT_DATA,
-            AIPermission.MODIFY_SETTINGS,
+            AIPermission.QUERY_RAG,
+            AIPermission.VIEW_AUDIT_LOGS,
+            AIPermission.QUERY_WITH_PII,
+            AIPermission.BYPASS_RATE_LIMIT,
         },
     )
     
@@ -265,13 +265,13 @@ def test_viewer_limited_permissions():
         user_id="viewer",
         tenant_id="tenant1",
         role=AIRole.VIEWER,
-        permissions={AIPermission.VIEW_DATA},
+        permissions={AIPermission.VIEW_AUDIT_LOGS},
     )
     
     token_data = get_token_data(token)
     
     assert token_data.role == AIRole.VIEWER
-    assert AIPermission.VIEW_DATA in token_data.permissions
+    assert AIPermission.VIEW_AUDIT_LOGS in token_data.permissions
     assert AIPermission.MANAGE_MODELS not in token_data.permissions
     assert AIPermission.EXPORT_DATA not in token_data.permissions
 
@@ -286,14 +286,14 @@ def test_tenant_isolation():
     token1 = create_access_token(
         user_id="user1",
         tenant_id="tenant_a",
-        role=AIRole.AI_OPERATOR,
+        role=AIRole.ANALYST,
         permissions={AIPermission.QUERY_RAG},
     )
     
     token2 = create_access_token(
         user_id="user2",
         tenant_id="tenant_b",
-        role=AIRole.AI_OPERATOR,
+        role=AIRole.ANALYST,
         permissions={AIPermission.QUERY_RAG},
     )
     
@@ -321,7 +321,7 @@ def test_same_user_different_tenants():
         user_id=user_id,
         tenant_id="tenant_b",
         role=AIRole.VIEWER,
-        permissions={AIPermission.VIEW_DATA},
+        permissions={AIPermission.VIEW_AUDIT_LOGS},
     )
     
     data1 = get_token_data(token1)
@@ -343,7 +343,7 @@ def test_token_cannot_be_modified():
         user_id="user123",
         tenant_id="tenant456",
         role=AIRole.VIEWER,
-        permissions={AIPermission.VIEW_DATA},
+        permissions={AIPermission.VIEW_AUDIT_LOGS},
     )
     
     # Try to decode token parts

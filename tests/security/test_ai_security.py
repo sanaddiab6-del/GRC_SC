@@ -148,7 +148,7 @@ class TestPIIProtection:
         """Test: Saudi IBAN detection"""
         redactor = PIIRedactor()
         
-        text = "حساب البنك: SA1234567890123456789012"
+        text = "حساب البنك: SA0380000000608010167519"
         detections = redactor.detect_pii(text)
         
         assert any(d["type"] == "saudi_iban" for d in detections)
@@ -400,7 +400,7 @@ class TestCitationValidation:
         result = validator.validate_response(
             generated_text,
             citations=[],  # No citations
-            source_docs=[],
+            source_documents=[],
         )
         
         assert not result.is_valid

@@ -102,10 +102,10 @@ SAUDI_PII_PATTERNS: List[PIIPattern] = [
         pattern=r"\b(05|٠٥)[0-9٠-٩]{8}\b",
         risk_level="medium"
     ),
-    # IBAN (Saudi)
+    # IBAN (Saudi) - SA + 2 check digits + 20 account chars
     PIIPattern(
         name="saudi_iban",
-        pattern=r"\bSA\d{2}[A-Z0-9]{22}\b",
+        pattern=r"SA\d{2}[A-Z0-9]{20}",
         risk_level="high"
     ),
     # Email addresses
@@ -378,8 +378,8 @@ class PromptSanitizer:
     
     # Injection patterns (multi-language)
     INJECTION_PATTERNS = [
-        r"ignore\s+(previous|all)\s+instructions",
-        r"تجاهل\s+التعليمات",
+        r"ignore.*?instructions",  # Simplified to catch "ignore all previous instructions"
+        r"تجاهل.*?التعليمات",  # Arabic: ignore...instructions
         r"system\s*:",
         r"<\|.*?\|>",  # Special tokens
         r"```.*?```",  # Code blocks (suspicious in GRC queries)

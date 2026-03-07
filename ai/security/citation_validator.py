@@ -174,8 +174,8 @@ class RefusalPolicy:
     # Questions that should trigger refusal
     REFUSAL_PATTERNS = [
         # Off-topic queries
-        r"(weather|sports|entertainment|recipes)",
-        r"(الطقس|الرياضة|الترفيه|وصفات)",
+        r"(weather|sports|football|entertainment|recipes)",
+        r"(الطقس|الرياضة|كرة|الترفيه|وصفات)",
         
         # Requests for legal advice
         r"(legal advice|sue|lawsuit|attorney)",

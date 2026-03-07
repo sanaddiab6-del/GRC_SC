@@ -74,140 +74,165 @@ def test_environment_provider_list_secrets():
 # Test Azure Key Vault Provider (Mocked)
 # ============================================================================
 
-@patch("src.backend.core.secrets.ClientSecretCredential")
-@patch("src.backend.core.secrets.SecretClient")
-def test_azure_provider_initialization(mock_secret_client, mock_credential):
+# Check if Azure SDK is available
+try:
+    from azure.identity import ClientSecretCredential
+    from azure.keyvault.secrets import SecretClient
+    AZURE_SDK_AVAILABLE = True
+except ImportError:
+    AZURE_SDK_AVAILABLE = False
+
+skip_azure = pytest.mark.skipif(
+    not AZURE_SDK_AVAILABLE,
+    reason="Azure SDK not installed (azure-identity, azure-keyvault-secrets)"
+)
+
+
+@skip_azure
+def test_azure_provider_initialization():
     """Test Azure Key Vault provider initialization"""
-    # Mock Azure SDK
-    mock_cred_instance = Mock()
-    mock_credential.return_value = mock_cred_instance
-    
-    mock_client_instance = Mock()
-    mock_secret_client.return_value = mock_client_instance
-    
-    # Initialize provider
-    provider = AzureKeyVaultProvider(
-        vault_name="test-vault",
-        tenant_id="test-tenant",
-        client_id="test-client",
-        client_secret="test-secret",
-    )
-    
-    # Verify initialization
-    assert provider.vault_name == "test-vault"
-    assert provider.vault_url == "https://test-vault.vault.azure.net"
-    
-    # Verify Azure SDK was called
-    mock_credential.assert_called_once_with(
-        tenant_id="test-tenant",
-        client_id="test-client",
-        client_secret="test-secret",
-    )
+    with patch("azure.identity.ClientSecretCredential") as mock_credential, \
+         patch("azure.keyvault.secrets.SecretClient") as mock_secret_client:
+        
+        # Mock Azure SDK
+        mock_cred_instance = Mock()
+        mock_credential.return_value = mock_cred_instance
+        
+        mock_client_instance = Mock()
+        mock_secret_client.return_value = mock_client_instance
+        
+        # Initialize provider
+        provider = AzureKeyVaultProvider(
+            vault_name="test-vault",
+            tenant_id="test-tenant",
+            client_id="test-client",
+            client_secret="test-secret",
+        )
+        
+        # Verify initialization
+        assert provider.vault_name == "test-vault"
+        assert provider.vault_url == "https://test-vault.vault.azure.net"
+        
+        # Verify Azure SDK was called
+        mock_credential.assert_called_once_with(
+            tenant_id="test-tenant",
+            client_id="test-client",
+            client_secret="test-secret",
+        )
 
 
-@patch("src.backend.core.secrets.ClientSecretCredential")
-@patch("src.backend.core.secrets.SecretClient")
-def test_azure_provider_get_secret(mock_secret_client, mock_credential):
+@skip_azure
+def test_azure_provider_get_secret():
     """Test getting secret from Azure Key Vault"""
-    # Mock Azure SDK
-    mock_secret = Mock()
-    mock_secret.value = "secret_value_from_vault"
-    
-    mock_client_instance = Mock()
-    mock_client_instance.get_secret.return_value = mock_secret
-    mock_secret_client.return_value = mock_client_instance
-    
-    # Initialize provider
-    provider = AzureKeyVaultProvider(
-        vault_name="test-vault",
-        tenant_id="test-tenant",
-        client_id="test-client",
-        client_secret="test-secret",
-    )
-    
-    # Get secret
-    value = provider.get_secret("JWT-SECRET-KEY")
-    
-    assert value == "secret_value_from_vault"
-    mock_client_instance.get_secret.assert_called_once_with("JWT-SECRET-KEY")
+    with patch("azure.identity.ClientSecretCredential") as mock_credential, \
+         patch("azure.keyvault.secrets.SecretClient") as mock_secret_client:
+        
+        # Mock Azure SDK
+        mock_secret = Mock()
+        mock_secret.value = "secret_value_from_vault"
+        
+        mock_client_instance = Mock()
+        mock_client_instance.get_secret.return_value = mock_secret
+        mock_secret_client.return_value = mock_client_instance
+        
+        # Initialize provider
+        provider = AzureKeyVaultProvider(
+            vault_name="test-vault",
+            tenant_id="test-tenant",
+            client_id="test-client",
+            client_secret="test-secret",
+        )
+        
+        # Get secret
+        value = provider.get_secret("JWT-SECRET-KEY")
+        
+        assert value == "secret_value_from_vault"
+        mock_client_instance.get_secret.assert_called_once_with("JWT-SECRET-KEY")
 
 
-@patch("src.backend.core.secrets.ClientSecretCredential")
-@patch("src.backend.core.secrets.SecretClient")
-def test_azure_provider_set_secret(mock_secret_client, mock_credential):
+@skip_azure
+def test_azure_provider_set_secret():
     """Test setting secret in Azure Key Vault"""
-    mock_client_instance = Mock()
-    mock_secret_client.return_value = mock_client_instance
-    
-    provider = AzureKeyVaultProvider(
-        vault_name="test-vault",
-        tenant_id="test-tenant",
-        client_id="test-client",
-        client_secret="test-secret",
-    )
-    
-    # Set secret
-    provider.set_secret("NEW-SECRET", "new_value")
-    
-    mock_client_instance.set_secret.assert_called_once_with("NEW-SECRET", "new_value")
+    with patch("azure.identity.ClientSecretCredential"), \
+         patch("azure.keyvault.secrets.SecretClient") as mock_secret_client:
+        
+        mock_client_instance = Mock()
+        mock_secret_client.return_value = mock_client_instance
+        
+        provider = AzureKeyVaultProvider(
+            vault_name="test-vault",
+            tenant_id="test-tenant",
+            client_id="test-client",
+            client_secret="test-secret",
+        )
+        
+        # Set secret
+        provider.set_secret("NEW-SECRET", "new_value")
+        
+        mock_client_instance.set_secret.assert_called_once_with("NEW-SECRET", "new_value")
 
 
-@patch("src.backend.core.secrets.ClientSecretCredential")
-@patch("src.backend.core.secrets.SecretClient")
-def test_azure_provider_delete_secret(mock_secret_client, mock_credential):
+@skip_azure
+def test_azure_provider_delete_secret():
     """Test deleting secret from Azure Key Vault"""
-    mock_poller = Mock()
-    mock_poller.wait.return_value = None
-    
-    mock_client_instance = Mock()
-    mock_client_instance.begin_delete_secret.return_value = mock_poller
-    mock_secret_client.return_value = mock_client_instance
-    
-    provider = AzureKeyVaultProvider(
-        vault_name="test-vault",
-        tenant_id="test-tenant",
-        client_id="test-client",
-        client_secret="test-secret",
-    )
-    
-    # Delete secret
-    provider.delete_secret("OLD-SECRET")
-    
-    mock_client_instance.begin_delete_secret.assert_called_once_with("OLD-SECRET")
-    mock_poller.wait.assert_called_once()
+    with patch("azure.identity.ClientSecretCredential"), \
+         patch("azure.keyvault.secrets.SecretClient") as mock_secret_client:
+        
+        mock_poller = Mock()
+        mock_poller.wait.return_value = None
+        
+        mock_client_instance = Mock()
+        mock_client_instance.begin_delete_secret.return_value = mock_poller
+        mock_secret_client.return_value = mock_client_instance
+        
+        provider = AzureKeyVaultProvider(
+            vault_name="test-vault",
+            tenant_id="test-tenant",
+            client_id="test-client",
+            client_secret="test-secret",
+        )
+        
+        # Delete secret
+        provider.delete_secret("OLD-SECRET")
+        
+        mock_client_instance.begin_delete_secret.assert_called_once_with("OLD-SECRET")
+        mock_poller.wait.assert_called_once()
 
 
-@patch("src.backend.core.secrets.ClientSecretCredential")
-@patch("src.backend.core.secrets.SecretClient")
-def test_azure_provider_list_secrets(mock_secret_client, mock_credential):
+@skip_azure
+def test_azure_provider_list_secrets():
     """Test listing secrets from Azure Key Vault"""
-    # Mock secret properties
-    mock_secret1 = Mock()
-    mock_secret1.name = "SECRET-1"
-    
-    mock_secret2 = Mock()
-    mock_secret2.name = "SECRET-2"
-    
-    mock_client_instance = Mock()
-    mock_client_instance.list_properties_of_secrets.return_value = [
-        mock_secret1,
-        mock_secret2,
-    ]
-    mock_secret_client.return_value = mock_client_instance
-    
-    provider = AzureKeyVaultProvider(
-        vault_name="test-vault",
-        tenant_id="test-tenant",
-        client_id="test-client",
-        client_secret="test-secret",
-    )
-    
-    # List secrets
-    secrets = provider.list_secrets()
-    
-    assert secrets == ["SECRET-1", "SECRET-2"]
+    with patch("azure.identity.ClientSecretCredential"), \
+         patch("azure.keyvault.secrets.SecretClient") as mock_secret_client:
+        
+        # Mock secret properties
+        mock_secret1 = Mock()
+        mock_secret1.name = "SECRET-1"
+        
+        mock_secret2 = Mock()
+        mock_secret2.name = "SECRET-2"
+        
+        mock_client_instance = Mock()
+        mock_client_instance.list_properties_of_secrets.return_value = [
+            mock_secret1,
+            mock_secret2,
+        ]
+        mock_secret_client.return_value = mock_client_instance
+        
+        provider = AzureKeyVaultProvider(
+            vault_name="test-vault",
+            tenant_id="test-tenant",
+            client_id="test-client",
+            client_secret="test-secret",
+        )
+        
+        # List secrets
+        secrets = provider.list_secrets()
+        
+        assert secrets == ["SECRET-1", "SECRET-2"]
 
 
+@skip_azure
 def test_azure_provider_missing_config():
     """Test error when Azure configuration is incomplete"""
     with pytest.raises(ValueError) as exc_info:
@@ -374,9 +399,10 @@ def test_get_secrets_manager_singleton():
 # Test Error Handling
 # ============================================================================
 
-@patch("src.backend.core.secrets.ClientSecretCredential")
-@patch("src.backend.core.secrets.SecretClient")
-def test_azure_provider_error_handling(mock_secret_client, mock_credential):
+@skip_azure
+@patch("azure.keyvault.secrets.SecretClient")
+@patch("azure.identity.ClientSecretCredential")
+def test_azure_provider_error_handling(mock_credential, mock_secret_client):
     """Test error handling in Azure provider"""
     mock_client_instance = Mock()
     mock_client_instance.get_secret.side_effect = Exception("Connection failed")
