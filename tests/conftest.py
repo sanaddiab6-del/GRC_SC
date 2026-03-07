@@ -30,8 +30,7 @@ async def test_client():
 def apply_migrations() -> None:
 	"""Apply Alembic migrations before running API tests.
 
-	Falls back to creating tables via SQLAlchemy metadata for SQLite
-	(which does not support all PostgreSQL migration operations).
+	Falls back to creating tables via SQLAlchemy metadata if migrations fail.
 	"""
 	try:
 		try:

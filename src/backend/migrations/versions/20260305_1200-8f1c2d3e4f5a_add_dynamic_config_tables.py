@@ -223,16 +223,9 @@ def upgrade() -> None:
         op.create_index("ix_workflow_states_entity_org", "workflow_states", ["entity_type", "organization_id"], unique=False)
 
     if not _table_exists("workflow_transitions"):
-        # Detect if workflow_states uses UUID or INTEGER for id
-        ws_id_is_uuid = False
-        if _table_exists("workflow_states"):
-            for col in inspector.get_columns("workflow_states"):
-                if col.get("name") == "id":
-                    ws_id_is_uuid = isinstance(col.get("type"), postgresql.UUID)
-                    break
-        
-        # Use matching FK type
-        state_id_type = GUID() if ws_id_is_uuid else sa.Integer()
+        # workflow_states.id is always UUID (GUID type) as defined in table creation
+        # Therefore from_state and to_state must also be UUID to match FK constraint
+        state_id_type = GUID()
         
         op.create_table(
             "workflow_transitions",
@@ -244,25 +237,13 @@ def upgrade() -> None:
         )
     else:
         if not _column_exists("workflow_transitions", "from_state"):
-            # Detect workflow_states id type for FK
-            ws_id_is_uuid = False
-            if _table_exists("workflow_states"):
-                for col in inspector.get_columns("workflow_states"):
-                    if col.get("name") == "id":
-                        ws_id_is_uuid = isinstance(col.get("type"), postgresql.UUID)
-                        break
-            state_id_type = GUID() if ws_id_is_uuid else sa.Integer()
+            # workflow_states.id is always UUID, so FK columns must match
+            state_id_type = GUID()
             op.add_column("workflow_transitions", sa.Column("from_state", state_id_type, nullable=True))
         
         if not _column_exists("workflow_transitions", "to_state"):
-            # Detect workflow_states id type for FK
-            ws_id_is_uuid = False
-            if _table_exists("workflow_states"):
-                for col in inspector.get_columns("workflow_states"):
-                    if col.get("name") == "id":
-                        ws_id_is_uuid = isinstance(col.get("type"), postgresql.UUID)
-                        break
-            state_id_type = GUID() if ws_id_is_uuid else sa.Integer()
+            # workflow_states.id is always UUID, so FK columns must match
+            state_id_type = GUID()
             op.add_column("workflow_transitions", sa.Column("to_state", state_id_type, nullable=True))
         
         if not _column_exists("workflow_transitions", "action_label"):
@@ -327,15 +308,8 @@ def upgrade() -> None:
         sa.column("organization_id", sa.Integer),
     )
 
-    # Detect workflow_states id type for transitions
-    ws_id_is_uuid = False
-    if _table_exists("workflow_states"):
-        for col in inspector.get_columns("workflow_states"):
-            if col.get("name") == "id":
-                ws_id_is_uuid = isinstance(col.get("type"), postgresql.UUID)
-                break
-    
-    state_fk_type = GUID() if ws_id_is_uuid else sa.Integer()
+    # workflow_states.id is always UUID (GUID type) as defined in table creation
+    state_fk_type = GUID()
 
     transition_table = sa.table(
         "workflow_transitions",
@@ -414,33 +388,13 @@ def upgrade() -> None:
 
     inserted_states = False
     if _table_exists("workflow_states") and _is_table_empty("workflow_states"):
-        id_is_uuid = False
-        for col in inspector.get_columns("workflow_states"):
-            if col.get("name") == "id":
-                id_is_uuid = isinstance(col.get("type"), postgresql.UUID)
-                break
-
-        if id_is_uuid:
-            states_with_ids = []
-            for state in states:
-                state_id = uuid.uuid4()
-                state_ids[(state["entity_type"], state["state_key"])] = state_id
-                states_with_ids.append({**state, "id": state_id})
-            op.bulk_insert(state_table, states_with_ids)
-        else:
-            op.bulk_insert(state_table, states)
-            entity_values = list({s["entity_type"] for s in states})
-            result = bind.execute(
-                sa.text(
-                    "SELECT id, entity_type, state_key "
-                    "FROM workflow_states "
-                    "WHERE entity_type = ANY(:entities)"
-                ),
-                {"entities": entity_values},
-            )
-            for row in result:
-                state_ids[(row.entity_type, row.state_key)] = row.id
-
+        # workflow_states.id is always UUID (GUID type)
+        states_with_ids = []
+        for state in states:
+            state_id = uuid.uuid4()
+            state_ids[(state["entity_type"], state["state_key"])] = state_id
+            states_with_ids.append({**state, "id": state_id})
+        op.bulk_insert(state_table, states_with_ids)
         inserted_states = True
 
     def _add_transition(entity, from_key, to_key, label):
@@ -506,13 +460,8 @@ def upgrade() -> None:
     ]
 
     if inserted_states and _table_exists("workflow_transitions") and _is_table_empty("workflow_transitions"):
-        # Detect if workflow_transitions.id is UUID or INTEGER
-        wt_id_is_uuid = False
-        if _table_exists("workflow_transitions"):
-            for col in inspector.get_columns("workflow_transitions"):
-                if col.get("name") == "id":
-                    wt_id_is_uuid = isinstance(col.get("type"), postgresql.UUID)
-                    break
+        # workflow_transitions.id is always UUID (GUID type)
+        wt_id_is_uuid = True
         
         # Entity type to definition_id mapping
         entity_to_definition = {

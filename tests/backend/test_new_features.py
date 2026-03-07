@@ -181,7 +181,7 @@ async def test_framework_versions_endpoint_exists():
         # Accepts 200 (DB available) or 500/503 (DB unavailable in test env)
         assert response.status_code in (200, 500, 503)
     except Exception:
-        # SQLite test env may raise DB errors instead of HTTP responses; that's acceptable
+        # Test environment may raise DB errors instead of HTTP responses; that's acceptable
         pytest.skip("DB not available in this test environment")
 
 
