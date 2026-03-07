@@ -377,6 +377,7 @@
     "actions": "Actions",
     "noResults": "No risks match the current filters.",
     "view": "View",
+    "edit": "Edit",
     "auditTrail": "Audit Trail",
     "export": "Export",
     "create": "Create",

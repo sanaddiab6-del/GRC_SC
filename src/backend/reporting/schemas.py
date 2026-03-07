@@ -5,6 +5,7 @@ Reporting schemas for API validation
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
+from uuid import UUID
 
 
 class ReportRequest(BaseModel):
@@ -63,3 +64,31 @@ class DashboardData(BaseModel):
     pending_validations: int
     high_priority_gaps: List[Dict[str, str]]
     frameworks: List[str]
+
+
+class ReportTemplateBase(BaseModel):
+    template_key: str
+    name: str
+    entity_type: Optional[str] = None
+    query_config: Optional[Dict[str, Any]] = None
+    export_format: str = "pdf"
+
+
+class ReportTemplateCreate(ReportTemplateBase):
+    pass
+
+
+class ReportTemplateUpdate(BaseModel):
+    template_key: Optional[str] = None
+    name: Optional[str] = None
+    entity_type: Optional[str] = None
+    query_config: Optional[Dict[str, Any]] = None
+    export_format: Optional[str] = None
+
+
+class ReportTemplateResponse(ReportTemplateBase):
+    id: UUID
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

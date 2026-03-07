@@ -260,6 +260,7 @@ class AuditFinding(Base):
     __tablename__ = "audit_findings"
 
     finding_id = Column(Integer, primary_key=True, index=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
     program_id = Column(Integer, ForeignKey("audit_programs.program_id"), nullable=False)
     finding_number = Column(String(100), unique=True, nullable=False)  # Format: FIND-{PROGRAM}-{NUMBER}
     
@@ -331,6 +332,7 @@ class AuditFinding(Base):
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
+    organization = relationship("Organization", backref="audit_findings")
     program = relationship("AuditProgram", back_populates="findings")
     owner = relationship("User", foreign_keys=[owner_id])
     responsible_person = relationship("User", foreign_keys=[responsible_person_id])

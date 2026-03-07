@@ -76,6 +76,20 @@ DEFAULT_PERMISSIONS = [
      "desc_en": "Create/update ISMS policies", "desc_ar": "إنشاء/تحديث سياسات ISMS"},
     {"name": "isms:approve", "resource": "isms", "action": "approve",
      "desc_en": "Approve ISMS policies", "desc_ar": "الموافقة على سياسات ISMS"},
+    
+    # Risk Management permissions (NCA ECC-RM)
+    {"name": "risk:create", "resource": "risk", "action": "create",
+     "desc_en": "Create new risks", "desc_ar": "إنشاء مخاطر جديدة"},
+    {"name": "risk:read", "resource": "risk", "action": "read",
+     "desc_en": "View risks", "desc_ar": "عرض المخاطر"},
+    {"name": "risk:update", "resource": "risk", "action": "update",
+     "desc_en": "Update risks", "desc_ar": "تحديث المخاطر"},
+    {"name": "risk:delete", "resource": "risk", "action": "delete",
+     "desc_en": "Delete risks", "desc_ar": "حذف المخاطر"},
+    {"name": "risk:assess", "resource": "risk", "action": "assess",
+     "desc_en": "Conduct risk assessments", "desc_ar": "إجراء تقييمات المخاطر"},
+    {"name": "risk:manage", "resource": "risk", "action": "manage",
+     "desc_en": "Manage third-party vendor risks", "desc_ar": "إدارة مخاطر الطرف الثالث"},
 ]
 
 
@@ -91,7 +105,8 @@ DEFAULT_ROLES = {
             "users:create", "users:read", "users:update", "users:delete",
             "audit:read",
             "backup:create", "backup:read", "backup:update", "backup:delete", "backup:test",
-            "isms:read", "isms:write", "isms:approve"
+            "isms:read", "isms:write", "isms:approve",
+            "risk:create", "risk:read", "risk:update", "risk:delete", "risk:assess", "risk:manage"
         ]
     },
     "Compliance Officer": {
@@ -100,7 +115,8 @@ DEFAULT_ROLES = {
         "permissions": [
             "controls:create", "controls:read", "controls:update", "controls:delete",
             "evidence:create", "evidence:read", "evidence:update", "evidence:delete",
-            "reports:read"
+            "reports:read",
+            "risk:create", "risk:read", "risk:update", "risk:assess"
         ]
     },
     "Auditor": {
@@ -110,7 +126,8 @@ DEFAULT_ROLES = {
             "controls:read",
             "evidence:create", "evidence:read", "evidence:update",
             "reports:read",
-            "audit:read"
+            "audit:read",
+            "risk:read", "risk:assess"
         ]
     },
     "Analyst": {
@@ -119,7 +136,8 @@ DEFAULT_ROLES = {
         "permissions": [
             "controls:read",
             "evidence:read",
-            "reports:read"
+            "reports:read",
+            "risk:read"
         ]
     },
     "Viewer": {
@@ -127,7 +145,8 @@ DEFAULT_ROLES = {
         "desc_ar": "الوصول للقراءة فقط للمعلومات العامة",
         "permissions": [
             "controls:read",
-            "reports:read"
+            "reports:read",
+            "risk:read"
         ]
     }
 }

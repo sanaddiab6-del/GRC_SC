@@ -34,6 +34,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
+import { useWorkflowConfig } from "@/lib/dynamic-config";
 
 interface RiskItem {
   risk_id: string;
@@ -88,6 +89,7 @@ export default function RiskManagementPage() {
     `/api/v1/risks?${queryParams.toString()}`,
     fetcher,
   );
+  const { data: workflowConfig } = useWorkflowConfig("risk");
 
   useEffect(() => {
     setPage(1);
@@ -142,6 +144,8 @@ export default function RiskManagementPage() {
   };
 
   const statusLabel = (value: string) => {
+    const workflowLabel = workflowConfig?.states.find((state) => state.state_key === value)?.label;
+    if (workflowLabel) return workflowLabel;
     if (value === "identified") return t("identified");
     if (value === "assessed") return t("assessed");
     if (value === "treated") return t("treated");

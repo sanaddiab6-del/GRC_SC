@@ -59,6 +59,13 @@ class User(Base):
     refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
     # audit_logs relationship available but not actively used
 
+    @property
+    def role(self) -> str:
+        """Get the first role name for backward compatibility with legacy endpoints."""
+        if self.roles and len(self.roles) > 0:
+            return self.roles[0].role_name.lower()
+        return "viewer"
+
 
 class Role(Base):
     """Role model for RBAC implementation."""

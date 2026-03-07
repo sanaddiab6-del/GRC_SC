@@ -13,6 +13,8 @@ import { ComplianceGauge } from '@/components/dashboard/ComplianceGauge';
 import { ComplianceTrendChart } from '@/components/dashboard/ComplianceTrendChart';
 import { ActivityTimeline } from '@/components/dashboard/ActivityTimeline';
 import { TaskWidget } from '@/components/dashboard/TaskWidget';
+import WidgetRenderer from '@/components/dynamic/WidgetRenderer';
+import { useDashboardLayout } from '@/lib/dynamic-config';
 import Link from 'next/link';
 import {
   LineChart,
@@ -32,6 +34,8 @@ export default function ProfessionalDashboard() {
   const params = useParams();
   const locale = (params?.locale as 'ar' | 'en') || 'en';
   const [lastUpdated, setLastUpdated] = useState(new Date());
+  const { data: dashboardLayout } = useDashboardLayout();
+  const hasDynamicLayout = (dashboardLayout?.length || 0) > 0;
 
   // Demo Data - Professional level
   const kpiData = {
@@ -199,6 +203,37 @@ export default function ProfessionalDashboard() {
         </div>
       </div>
 
+      {hasDynamicLayout ? (
+        <div className="grid grid-cols-12 gap-6">
+          {dashboardLayout?.map((layout) => {
+            const colSpan = Math.min(Math.max(layout.size?.w || 6, 1), 12);
+            return (
+              <div
+                key={layout.id}
+                className="col-span-12"
+                style={{ gridColumn: `span ${colSpan} / span ${colSpan}` }}
+              >
+                {layout.widget && (
+                  <WidgetRenderer
+                    widget={layout.widget}
+                    locale={locale}
+                    data={{
+                      kpiData,
+                      complianceFrameworks,
+                      risks,
+                      activities,
+                      tasks,
+                      complianceTrendData,
+                      incidents: [],
+                    }}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <>
       {/* KPI Cards Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
         <StatCard
@@ -458,6 +493,8 @@ export default function ProfessionalDashboard() {
           </Card>
         </Link>
       </div>
+        </>
+      )}
     </div>
   );
 }

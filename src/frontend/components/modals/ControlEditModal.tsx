@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import DynamicFieldRenderer from '@/components/dynamic/DynamicFieldRenderer';
+import { saveCustomFieldValues, useCustomFields } from '@/lib/dynamic-config';
 
 interface ControlEditModalProps {
   isOpen: boolean;
@@ -49,6 +51,8 @@ export default function ControlEditModal({
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { fields: customFields } = useCustomFields('control', controlData?.control_id);
+  const [customValues, setCustomValues] = useState<Record<string, any>>({});
 
   // Load control data when modal opens
   useEffect(() => {
@@ -65,6 +69,18 @@ export default function ControlEditModal({
     }
   }, [isOpen, controlData]);
 
+  useEffect(() => {
+    if (customFields?.length) {
+      const nextValues: Record<string, any> = {};
+      customFields.forEach((field) => {
+        if (field.value !== undefined) {
+          nextValues[field.id] = field.value;
+        }
+      });
+      setCustomValues(nextValues);
+    }
+  }, [customFields]);
+
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
@@ -74,6 +90,10 @@ export default function ControlEditModal({
       [name]: name === 'maturity_level' ? parseInt(value) || 1 : value,
     }));
     if (error) setError('');
+  };
+
+  const handleCustomValueChange = (fieldId: string, value: any) => {
+    setCustomValues((prev) => ({ ...prev, [fieldId]: value }));
   };
 
   const validateForm = (): boolean => {
@@ -170,6 +190,13 @@ export default function ControlEditModal({
       );
 
       if (response.status === 200) {
+        const valueEntries = Object.entries(customValues).map(([fieldId, value]) => ({
+          field_id: fieldId,
+          value,
+        }));
+        if (controlData?.control_id && valueEntries.length) {
+          await saveCustomFieldValues('control', String(controlData.control_id), valueEntries);
+        }
         showSuccessToast(
           isArabic
             ? 'تم تحديث الضابط بنجاح'
@@ -386,6 +413,20 @@ export default function ControlEditModal({
               </select>
             </div>
           </div>
+
+          {customFields.length > 0 && (
+            <div className="bg-gray-50 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                {isArabic ? 'حقول إضافية' : 'Additional Fields'}
+              </h3>
+              <DynamicFieldRenderer
+                fields={customFields}
+                values={customValues}
+                onChange={handleCustomValueChange}
+                locale={isArabic ? 'ar' : 'en'}
+              />
+            </div>
+          )}
 
           {/* Info Box */}
           <div className="bg-blue-50 rounded-lg p-4 text-sm text-gray-700">

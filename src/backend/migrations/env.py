@@ -26,6 +26,7 @@ try:
     from isms.models import ISMSPolicy, AssetInventory
     from training.models import TrainingCourse, TrainingEnrollment
     from audit.models import AuditFinding, AuditEngagement
+    from dynamic_config import models as _dynamic_config_models  # noqa: F401
     import enterprise_models  # Import all enterprise models
     try:
         from regulatory_versions import FrameworkVersion  # noqa: F401

@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from typing import List, Optional
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pydantic import BaseModel
 
 from core.database import get_db
@@ -1004,20 +1004,107 @@ async def create_audit_finding(
         raise HTTPException(status_code=403, detail="Insufficient permissions")
 
     try:
-        await db.execute(text("""
-            INSERT INTO audit_findings (organization_id, finding_id, title_en, title_ar, description_en, severity, control_id, status)
-            VALUES (:org_id, :finding_id, :title_en, :title_ar, :desc_en, :severity, :control_id, 'open')
-        """), {
-            "org_id": current_user.organization_id,
-            "finding_id": finding.finding_id,
-            "title_en": finding.title_en,
-            "title_ar": finding.title_ar,
-            "desc_en": finding.description_en,
-            "severity": finding.severity,
-            "control_id": finding.control_id
-        })
+        columns_result = await db.execute(text("""
+            SELECT column_name, data_type, is_nullable
+            FROM information_schema.columns
+            WHERE table_name = 'audit_findings'
+        """))
+        column_rows = columns_result.fetchall()
+        columns = {row[0]: {"data_type": row[1], "is_nullable": row[2] == "YES"} for row in column_rows}
+
+        def column_exists(name: str) -> bool:
+            return name in columns
+
+        def column_type(name: str) -> Optional[str]:
+            return columns.get(name, {}).get("data_type")
+
+        now = datetime.utcnow()
+        due_date = now + timedelta(days=30)
+
+        insert_columns = []
+        insert_params = {}
+
+        def set_column(name: str, value) -> None:
+            if column_exists(name):
+                insert_columns.append(name)
+                insert_params[name] = value
+
+        if column_exists("organization_id"):
+            org_id = getattr(current_user, "organization_id", None)
+            if org_id is None and getattr(current_user, "organization_name", None):
+                org_result = await db.execute(
+                    text("SELECT id FROM organizations WHERE name_en = :name OR name_ar = :name ORDER BY id LIMIT 1"),
+                    {"name": current_user.organization_name},
+                )
+                org_row = org_result.first()
+                if org_row:
+                    org_id = org_row[0]
+            if org_id is None:
+                raise HTTPException(status_code=400, detail="No organization found for current user")
+            set_column("organization_id", org_id)
+
+        program_id = None
+        if column_exists("program_id"):
+            program_result = await db.execute(
+                text("SELECT program_id FROM audit_programs ORDER BY program_id LIMIT 1")
+            )
+            program_row = program_result.first()
+            if not program_row:
+                raise HTTPException(status_code=400, detail="No audit program found. Please create an audit program first.")
+            program_id = program_row[0]
+            set_column("program_id", program_id)
+
+        finding_identifier = finding.finding_id
+        if column_exists("finding_number"):
+            set_column("finding_number", finding_identifier)
+        elif column_exists("finding_id") and column_type("finding_id") in {"character varying", "text"}:
+            set_column("finding_id", finding_identifier)
+
+        title_ar = finding.title_ar or finding.title_en
+
+        set_column("title_en", finding.title_en)
+        set_column("title_ar", title_ar)
+        set_column("description_en", finding.description_en)
+        set_column("description_ar", finding.description_en)
+        set_column("evidence_reference_en", "TBD")
+        set_column("evidence_reference_ar", "TBD")
+        set_column("severity", finding.severity)
+        set_column("finding_type", "observation")
+
+        control_reference = f"CTRL-{finding.control_id}" if finding.control_id else "CTRL-UNKNOWN"
+        set_column("control_reference", control_reference)
+        set_column("control_requirement_en", "To be determined")
+        set_column("control_requirement_ar", "To be determined")
+        set_column("gap_identified_en", finding.description_en)
+        set_column("gap_identified_ar", finding.description_en)
+
+        set_column("risk_rating", finding.severity)
+        set_column("recommendation_en", "To be determined")
+        set_column("recommendation_ar", "To be determined")
+
+        if column_exists("owner_id"):
+            set_column("owner_id", current_user.user_id)
+
+        set_column("due_date", due_date)
+        set_column("status", "open")
+        set_column("progress_percentage", 0)
+        set_column("escalated", False)
+        set_column("identified_date", now)
+        set_column("created_at", now)
+        set_column("updated_at", now)
+
+        if not insert_columns:
+            raise HTTPException(status_code=500, detail="Audit findings table schema not detected")
+
+        columns_sql = ", ".join(insert_columns)
+        values_sql = ", ".join([f":{col}" for col in insert_columns])
+
+        insert_sql = text(
+            f"INSERT INTO audit_findings ({columns_sql}) VALUES ({values_sql}) RETURNING *"
+        )
+        result = await db.execute(insert_sql, insert_params)
         await db.commit()
-        result = await db.execute(text("SELECT * FROM audit_findings WHERE finding_id = :id"), {"id": finding.finding_id})
+
         row = result.first()
         if not row:
             raise HTTPException(status_code=500, detail="Failed to create audit finding")

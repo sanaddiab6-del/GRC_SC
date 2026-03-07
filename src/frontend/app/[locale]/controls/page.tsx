@@ -27,10 +27,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import apiClient from "@/lib/api-client";
+import DynamicSectionRenderer from "@/components/dynamic/DynamicSectionRenderer";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useUiPageConfig, useWorkflowConfig } from "@/lib/dynamic-config";
 
 export default function ControlsPage() {
   const t = useTranslations("controlsList");
@@ -46,6 +48,8 @@ export default function ControlsPage() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [stats, setStats] = useState({ total: 0, ecc: 0, ccc: 0, pdpl: 0 });
+  const { data: workflowConfig } = useWorkflowConfig("control");
+  const { data: uiConfig } = useUiPageConfig("controls");
 
   // Edit Modal State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -162,6 +166,13 @@ export default function ControlsPage() {
     non_compliant: "destructive",
     not_started: "default",
     active: "success",
+  };
+
+  const statusLabel = (value: string) => {
+    const normalized = value?.toLowerCase();
+    const workflowLabel = workflowConfig?.states.find((state) => state.state_key === normalized)?.label;
+    if (workflowLabel) return workflowLabel;
+    return value?.replace("_", " ");
   };
 
   return (
@@ -332,7 +343,7 @@ export default function ControlsPage() {
                       <Badge
                         variant={statusVariant[control.status] || "default"}
                       >
-                        {control.status?.replace("_", " ")}
+                        {statusLabel(control.status || "")}
                       </Badge>
                     </TableCell>
                     <TableCell>{control.maturity_level ?? "--"}</TableCell>
@@ -370,6 +381,24 @@ export default function ControlsPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {uiConfig && (
+        <div className="mt-6">
+          <DynamicSectionRenderer
+            config={uiConfig}
+            renderSection={(section) => {
+              if (section.section_key !== "custom_fields") {
+                return null;
+              }
+              return (
+                <div className="text-sm text-muted-foreground">
+                  {t("description")} — {t("filters")}
+                </div>
+              );
+            }}
+          />
+        </div>
+      )}
 
       <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
         <div>

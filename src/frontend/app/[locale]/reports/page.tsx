@@ -1,10 +1,12 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import useSWR from 'swr';
 import apiClient from '@/lib/api-client';
 import axios from 'axios';
+import DynamicSectionRenderer from '@/components/dynamic/DynamicSectionRenderer';
+import { useReportTemplates, useUiPageConfig } from '@/lib/dynamic-config';
 
 const fetcher = (url: string) => apiClient.get(url).then((res) => res.data);
 
@@ -22,6 +24,8 @@ export default function ReportsPage() {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const { data: reportTemplates } = useReportTemplates();
+  const { data: uiConfig } = useUiPageConfig('reports');
 
   const { data: dashboardData } = useSWR('/api/v1/dashboard', fetcher);
 
@@ -64,6 +68,26 @@ export default function ReportsPage() {
     },
   ];
 
+  const templateOptions = reportTemplates?.length
+    ? reportTemplates.map((template) => ({
+        id: template.template_key,
+        name: template.name,
+        description: template.query_config?.description || template.entity_type || '',
+        icon: template.template_key.slice(0, 4).toUpperCase(),
+        template,
+      }))
+    : reportTypes;
+
+  const selectedTemplate = reportTemplates?.find(
+    (template) => template.template_key === selectedReport,
+  );
+
+  useEffect(() => {
+    if (selectedTemplate?.export_format) {
+      setExportFormat(selectedTemplate.export_format);
+    }
+  }, [selectedTemplate]);
+
   // Helper function to get auth headers
   const getAuthHeaders = () => {
     const token = sessionStorage.getItem('access_token');
@@ -80,7 +104,8 @@ export default function ReportsPage() {
       
       // Prepare request payload
       const requestData = {
-        report_type: selectedReport,
+        report_type:
+          selectedTemplate?.query_config?.report_type || selectedReport,
         framework_filter: framework ? [framework] : ['ECC', 'CCC', 'PDPL'],
         date_range_start: dateRange.start ? new Date(dateRange.start).toISOString() : null,
         date_range_end: dateRange.end ? new Date(dateRange.end).toISOString() : null,
@@ -153,7 +178,7 @@ export default function ReportsPage() {
             <div className="bg-white rounded-lg shadow-lg p-6">
               <h2 className="text-lg font-semibold mb-4">Report Types</h2>
               <div className="space-y-2">
-                {reportTypes.map((report) => (
+                {templateOptions.map((report) => (
                   <button
                     key={report.id}
                     onClick={() => setSelectedReport(report.id)}
@@ -219,6 +244,24 @@ export default function ReportsPage() {
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                     />
                   </div>
+
+                  {uiConfig && (
+                    <div className="mt-6">
+                      <DynamicSectionRenderer
+                        config={uiConfig}
+                        renderSection={(section) => {
+                          if (section.section_key !== 'templates') {
+                            return null;
+                          }
+                          return (
+                            <div className="text-sm text-gray-600">
+                              {section.title}
+                            </div>
+                          );
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Export Format */}

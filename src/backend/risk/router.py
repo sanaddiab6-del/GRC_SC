@@ -23,12 +23,30 @@ from .schemas import (
 router = APIRouter()
 
 
-def generate_risk_number() -> str:
+async def generate_risk_number(db: AsyncSession) -> str:
     """Generate unique risk number (RISK-YYYY-####)"""
     from datetime import datetime
     year = datetime.utcnow().year
-    # In real implementation, query DB for last number
-    return f"RISK-{year}-001"
+    
+    # Query for the highest risk number for current year
+    result = await db.execute(
+        select(Risk.risk_number)
+        .where(Risk.risk_number.like(f"RISK-{year}-%"))
+        .order_by(Risk.risk_number.desc())
+        .limit(1)
+    )
+    last_risk = result.scalar_one_or_none()
+    
+    if last_risk:
+        # Extract number part and increment
+        # e.g., "RISK-2026-001" -> "001" -> 1 -> 2 -> "002"
+        last_num = int(last_risk.split("-")[-1])
+        next_num = last_num + 1
+    else:
+        # First risk of the year
+        next_num = 1
+    
+    return f"RISK-{year}-{next_num:03d}"
 
 
 def calculate_risk_score(likelihood: int, impact: int) -> tuple[int, str]:
@@ -57,7 +75,7 @@ async def create_risk(
     """Create risk (NCA ECC-RM-1)"""
     try:
         # Generate risk number
-        risk_number = generate_risk_number()
+        risk_number = await generate_risk_number(db)
         
         # Calculate inherent risk
         inherent_score, inherent_level = calculate_risk_score(risk.likelihood, risk.impact)

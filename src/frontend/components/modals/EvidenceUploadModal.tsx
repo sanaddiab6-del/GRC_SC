@@ -2,6 +2,8 @@
 
 import axios from "axios";
 import { useCallback, useEffect, useState } from "react";
+import DynamicFieldRenderer from "@/components/dynamic/DynamicFieldRenderer";
+import { saveCustomFieldValues, useCustomFields } from "@/lib/dynamic-config";
 
 interface Control {
   control_id: string;
@@ -38,6 +40,8 @@ export default function EvidenceUploadModal({
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [loadingControls, setLoadingControls] = useState(false);
+  const { fields: customFields } = useCustomFields("evidence");
+  const [customValues, setCustomValues] = useState<Record<string, any>>({});
 
   const fetchControls = useCallback(async () => {
     setLoadingControls(true);
@@ -76,6 +80,10 @@ export default function EvidenceUploadModal({
     }));
     // Clear error when user starts typing
     if (error) setError("");
+  };
+
+  const handleCustomValueChange = (fieldId: string, value: any) => {
+    setCustomValues((prev) => ({ ...prev, [fieldId]: value }));
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -232,6 +240,14 @@ export default function EvidenceUploadModal({
       );
 
       if (response.status === 201 || response.status === 200) {
+        const entityId = response.data?.evidence_id || evidenceId;
+        const valueEntries = Object.entries(customValues).map(([fieldId, value]) => ({
+          field_id: fieldId,
+          value,
+        }));
+        if (entityId && valueEntries.length) {
+          await saveCustomFieldValues("evidence", String(entityId), valueEntries);
+        }
         showSuccessToast(
           isArabic ? "تم رفع الدليل بنجاح" : "Evidence uploaded successfully",
         );
@@ -504,6 +520,20 @@ export default function EvidenceUploadModal({
               </div>
             )}
           </div>
+
+          {customFields.length > 0 && (
+            <div className="bg-gray-50 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                {isArabic ? "حقول إضافية" : "Additional Fields"}
+              </h3>
+              <DynamicFieldRenderer
+                fields={customFields}
+                values={customValues}
+                onChange={handleCustomValueChange}
+                locale={isArabic ? "ar" : "en"}
+              />
+            </div>
+          )}
 
           {/* Info Box */}
           <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-700">

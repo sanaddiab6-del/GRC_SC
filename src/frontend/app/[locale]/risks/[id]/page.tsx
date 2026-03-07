@@ -6,6 +6,8 @@ import { useState } from 'react';
 import useSWR from 'swr';
 import { useTranslations } from 'next-intl';
 import apiClient from '@/lib/api-client';
+import DynamicSectionRenderer from '@/components/dynamic/DynamicSectionRenderer';
+import { applyWorkflowTransition, useCustomFields, useUiPageConfig, useWorkflowConfig } from '@/lib/dynamic-config';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,6 +27,11 @@ export default function RiskDetailPage() {
     `/api/v1/risks/${riskId}`,
     fetcher
   );
+  const { data: workflowConfig } = useWorkflowConfig('risk');
+  const { fields: customFields } = useCustomFields('risk', riskId);
+  const { data: uiConfig } = useUiPageConfig('risks');
+
+  const [workflowError, setWorkflowError] = useState<string | null>(null);
 
   // Assessment Modal State
   const [isAssessModalOpen, setIsAssessModalOpen] = useState(false);
@@ -87,6 +94,8 @@ export default function RiskDetailPage() {
   };
 
   const statusLabel = (value: string) => {
+    const workflowLabel = workflowConfig?.states.find((state) => state.state_key === value)?.label;
+    if (workflowLabel) return workflowLabel;
     if (value === 'identified') return tList('identified');
     if (value === 'assessed') return tList('assessed');
     if (value === 'treated') return tList('treated');
@@ -99,6 +108,23 @@ export default function RiskDetailPage() {
 
   const riskLevel = risk.residual_risk_level || risk.inherent_risk_level || '';
   const riskScore = risk.residual_risk_score ?? risk.inherent_risk_score;
+
+  const currentWorkflowState = workflowConfig?.states.find(
+    (state) => state.state_key === risk.status,
+  );
+  const workflowTransitions = workflowConfig?.transitions.filter(
+    (transition) => transition.from_state === currentWorkflowState?.id,
+  );
+
+  const handleWorkflowTransition = async (toStateKey: string) => {
+    setWorkflowError(null);
+    try {
+      await applyWorkflowTransition('risk', riskId, toStateKey);
+      await mutate();
+    } catch (err: any) {
+      setWorkflowError(err?.response?.data?.detail || t('loadError'));
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background px-6 py-6">
@@ -156,6 +182,31 @@ export default function RiskDetailPage() {
                 </Badge>
                 <Badge variant="outline">{t('type')}: {risk.category || t('notAvailable')}</Badge>
               </div>
+              {workflowTransitions && workflowTransitions.length > 0 && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {workflowTransitions.map((transition) => {
+                    const targetState = workflowConfig?.states.find(
+                      (state) => state.id === transition.to_state,
+                    );
+                    if (!targetState?.state_key) {
+                      return null;
+                    }
+                    return (
+                      <Button
+                        key={transition.id}
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleWorkflowTransition(targetState.state_key)}
+                      >
+                        {transition.action_label}
+                      </Button>
+                    );
+                  })}
+                </div>
+              )}
+              {workflowError && (
+                <div className="mt-2 text-sm text-destructive">{workflowError}</div>
+              )}
             </div>
             <div className="flex flex-wrap gap-2">
               <Badge variant="outline">{t('owner')}: {risk.risk_owner || t('unassigned')}</Badge>
@@ -223,6 +274,31 @@ export default function RiskDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {uiConfig && customFields.length > 0 && (
+        <DynamicSectionRenderer
+          config={uiConfig}
+          renderSection={(section) => {
+            if (section.section_key !== 'custom_fields') {
+              return null;
+            }
+            return (
+              <div className="grid gap-3 md:grid-cols-2">
+                {customFields.map((field) => (
+                  <div key={field.id} className="rounded-lg border border-border/60 p-3">
+                    <div className="text-xs text-muted-foreground">{field.field_label}</div>
+                    <div className="text-sm font-medium">
+                      {field.value !== undefined && field.value !== null && field.value !== ''
+                        ? String(field.value)
+                        : t('notAvailable')}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          }}
+        />
+      )}
 
       <Tabs defaultValue="summary">
         <TabsList>

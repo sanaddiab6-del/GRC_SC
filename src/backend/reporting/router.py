@@ -14,13 +14,16 @@ from sqlalchemy import select, func
 from core.database import get_db
 from controls.models import Control, ControlStatus, FrameworkType
 from evidence.models import Evidence, EvidenceStatus
-from reporting.models import Report, ReportType, ReportStatus
+from reporting.models import Report, ReportType, ReportStatus, ReportTemplate
 from reporting.schemas import (
     ReportRequest,
     ReportResponse,
     ComplianceSummary,
     ControlPosture,
     DashboardData,
+    ReportTemplateCreate,
+    ReportTemplateUpdate,
+    ReportTemplateResponse,
 )
 
 router = APIRouter()
@@ -29,6 +32,17 @@ router = APIRouter()
 def _str_value(v) -> str:
     """Return the string value of an enum or plain string."""
     return v if isinstance(v, str) else v.value
+
+
+def _template_to_request(template: ReportTemplate) -> ReportRequest:
+    config = template.query_config or {}
+    return ReportRequest(
+        report_type=config.get("report_type", template.template_key),
+        framework_filter=config.get("framework_filter"),
+        date_range_start=config.get("date_range_start"),
+        date_range_end=config.get("date_range_end"),
+        file_format=config.get("file_format", template.export_format or "pdf"),
+    )
 
 
 @router.get("/dashboard", response_model=DashboardData)
@@ -211,6 +225,57 @@ async def generate_report(
     await db.refresh(report)
 
     return report
+
+
+@router.get("/report-templates", response_model=List[ReportTemplateResponse])
+async def list_report_templates(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(ReportTemplate).order_by(ReportTemplate.created_at.asc()))
+    return result.scalars().all()
+
+
+@router.post("/report-templates", response_model=ReportTemplateResponse, status_code=201)
+async def create_report_template(
+    payload: ReportTemplateCreate,
+    db: AsyncSession = Depends(get_db),
+):
+    template = ReportTemplate(**payload.model_dump())
+    db.add(template)
+    await db.commit()
+    await db.refresh(template)
+    return template
+
+
+@router.patch("/report-templates/{template_key}", response_model=ReportTemplateResponse)
+async def update_report_template(
+    template_key: str,
+    payload: ReportTemplateUpdate,
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(ReportTemplate).where(ReportTemplate.template_key == template_key))
+    template = result.scalar_one_or_none()
+    if not template:
+        raise HTTPException(status_code=404, detail="Report template not found")
+
+    for key, value in payload.model_dump(exclude_unset=True).items():
+        setattr(template, key, value)
+
+    await db.commit()
+    await db.refresh(template)
+    return template
+
+
+@router.post("/report-templates/{template_key}/generate", response_model=ReportResponse)
+async def generate_report_from_template(
+    template_key: str,
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(ReportTemplate).where(ReportTemplate.template_key == template_key))
+    template = result.scalar_one_or_none()
+    if not template:
+        raise HTTPException(status_code=404, detail="Report template not found")
+
+    request = _template_to_request(template)
+    return await generate_report(request, db)
 
 
 @router.get("/reports/{report_id}", response_model=ReportResponse)

@@ -2,6 +2,7 @@
 
 import EvidenceApprovalModal from "@/components/modals/EvidenceApprovalModal";
 import EvidenceUploadModal from "@/components/modals/EvidenceUploadModal";
+import DynamicSectionRenderer from "@/components/dynamic/DynamicSectionRenderer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,6 +36,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import useSWR from "swr";
+import { useUiPageConfig, useWorkflowConfig } from "@/lib/dynamic-config";
 
 const fetcher = (url: string) => apiClient.get(url).then((res) => res.data);
 
@@ -99,6 +101,8 @@ export default function EvidenceListPage() {
     isLoading,
     mutate,
   } = useSWR(`/api/v1/evidence?${queryParams.toString()}`, fetcher);
+  const { data: workflowConfig } = useWorkflowConfig("evidence");
+  const { data: uiConfig } = useUiPageConfig("evidence");
 
   const filteredItems = useMemo(() => {
     const items = evidence?.items || [];
@@ -136,6 +140,12 @@ export default function EvidenceListPage() {
     approved: "success",
     pending: "warning",
     rejected: "destructive",
+  };
+
+  const statusLabel = (value: string) => {
+    const workflowLabel = workflowConfig?.states.find((state) => state.state_key === value)?.label;
+    if (workflowLabel) return workflowLabel;
+    return value;
   };
 
   if (isLoading) {
@@ -321,10 +331,14 @@ export default function EvidenceListPage() {
                     <TableCell>
                       <Badge
                         variant={
-                          validationVariant[item.validation_status] || "muted"
+                          validationVariant[item.validation_status || item.status] || "muted"
                         }
                       >
-                        {item.validation_status || t("notSet")}
+                        {item.validation_status
+                          ? statusLabel(item.validation_status)
+                          : item.status
+                            ? statusLabel(item.status)
+                            : t("notSet")}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
@@ -409,6 +423,24 @@ export default function EvidenceListPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {uiConfig && (
+        <div className="mt-6">
+          <DynamicSectionRenderer
+            config={uiConfig}
+            renderSection={(section) => {
+              if (section.section_key !== "custom_fields") {
+                return null;
+              }
+              return (
+                <div className="text-sm text-muted-foreground">
+                  {t("description")}
+                </div>
+              );
+            }}
+          />
+        </div>
+      )}
 
       <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
         <div>{t("results", { count: filteredItems.length, total })}</div>

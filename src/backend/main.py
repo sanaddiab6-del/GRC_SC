@@ -14,6 +14,9 @@ from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
+from typing import List
 
 # Ensure the backend directory is on sys.path
 backend_dir = Path(__file__).parent
@@ -29,6 +32,8 @@ from auth.router import router as auth_router
 from auth.web_router import router as web_router
 from auth.seeder import seed_admin_user
 from auth.rbac_setup import initialize_rbac
+from auth.security import get_current_active_user
+from auth.models import User
 import ai_router
 from privacy import router as privacy_router
 from incident import router as incident_router
@@ -40,6 +45,7 @@ import enterprise_router
 from isms import router as isms_router
 from audit import router as audit_router
 from assessment.router import router as assessment_router
+from dynamic_config.router import router as config_router
 
 # Configure logging
 logging.basicConfig(
@@ -288,6 +294,76 @@ async def security_status():
 
 
 # ============================================================================
+# Common API endpoints (no sub-prefix)
+# ============================================================================
+
+@app.get("/api/v1/users", tags=["Users"])
+async def list_users_simple(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+    limit: int = 100
+):
+    """Get list of active users (any authenticated user can call this)."""
+    result = await db.execute(
+        select(User)
+        .where(User.is_active == True)  # noqa: E712
+        .options(selectinload(User.roles))
+        .limit(limit)
+    )
+    users = result.scalars().all()
+    
+    # Return simple user data for dropdowns
+    return [
+        {
+            "user_id": str(user.user_id),
+            "name": user.full_name_en or user.email.split('@')[0],  # Fallback to email username
+            "email": user.email,
+            "role": user.roles[0].role_name if user.roles else "Viewer",  # Get first role name
+        }
+        for user in users
+    ]
+
+
+@app.get("/api/v1/debug/user-permissions", tags=["Debug"])
+async def debug_user_permissions(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Debug endpoint to show current user's roles and permissions."""
+    result = await db.execute(
+        select(User)
+        .where(User.user_id == current_user.user_id)
+        .options(selectinload(User.roles).selectinload(Role.permissions))
+    )
+    user = result.scalar_one_or_none()
+    
+    roles_data = []
+    for role in user.roles:
+        permissions = [
+            {
+                "name": perm.permission_name,
+                "resource": perm.resource,
+                "action": perm.action
+            }
+            for perm in role.permissions
+        ]
+        roles_data.append({
+            "role_name": role.role_name,
+            "permissions": permissions,
+            "permission_count": len(permissions)
+        })
+    
+    return {
+        "user_id": str(user.user_id),
+        "email": user.email,
+        "roles": roles_data,
+        "total_roles": len(user.roles)
+    }
+
+
+# ============================================================================
+# 
+# ============================================================================
 # Register all routers with versioned prefix
 # ============================================================================
 
@@ -309,6 +385,7 @@ app.include_router(enterprise_router.router, prefix="/api/v1", tags=["Enterprise
 app.include_router(isms_router, prefix="/api/v1", tags=["ISMS & ISO 27001"])
 app.include_router(audit_router, prefix="/api/v1", tags=["Audit Management"])
 app.include_router(assessment_router, prefix="/api/v1", tags=["Assessment Execution"])
+app.include_router(config_router, prefix="/api/v1", tags=["Configuration"])
 
 # Regulatory version register and commercial packs are loaded dynamically
 try:

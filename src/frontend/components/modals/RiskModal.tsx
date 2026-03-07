@@ -1,7 +1,9 @@
 "use client";
 
-import axios from "axios";
 import React, { useCallback, useEffect, useState } from "react";
+import apiClient from "@/lib/api-client";
+import DynamicFieldRenderer from "@/components/dynamic/DynamicFieldRenderer";
+import { saveCustomFieldValues, useCustomFields } from "@/lib/dynamic-config";
 
 interface Control {
   control_id: string;
@@ -79,6 +81,11 @@ export default function RiskModal({
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
   const [error, setError] = useState("");
+  const { fields: customFields } = useCustomFields(
+    "risk",
+    isEdit ? riskData?.risk_id : undefined,
+  );
+  const [customValues, setCustomValues] = useState<Record<string, any>>({});
 
   // Load form data if editing
   useEffect(() => {
@@ -110,57 +117,69 @@ export default function RiskModal({
     }
   }, [isOpen, isEdit, riskData, isArabic]);
 
+  useEffect(() => {
+    if (customFields?.length) {
+      const nextValues: Record<string, any> = {};
+      customFields.forEach((field) => {
+        if (field.value !== undefined) {
+          nextValues[field.id] = field.value;
+        }
+      });
+      setCustomValues(nextValues);
+    }
+  }, [customFields]);
+
   const fetchDropdownData = useCallback(async () => {
     setLoadingData(true);
+    console.log("🔵 fetchDropdownData called");
     try {
       // Fetch controls
-      const controlsResponse = await axios.get(
-        "http://localhost:8000/api/v1/controls",
-        {
-          params: { limit: 1000 },
-        },
-      );
+      console.log("📡 Fetching controls...");
+      const controlsResponse = await apiClient.get("/api/v1/controls", {
+        params: { limit: 1000 },
+      });
       setControls(controlsResponse.data.items || []);
+      console.log("✅ Controls loaded:", controlsResponse.data.items?.length);
 
-      // Fetch users - try from localStorage first
-      const storedUsers = localStorage.getItem("users");
-      if (storedUsers) {
-        try {
-          const parsedUsers = JSON.parse(storedUsers);
-          setUsers(Array.isArray(parsedUsers) ? parsedUsers : [parsedUsers]);
-        } catch {
-          // If parsing fails, create mock users
-          setUsers([
-            {
-              id: "user-1",
-              name: "Admin User",
-              email: "admin@example.com",
-              role: "Admin",
-            },
-            {
-              id: "user-2",
-              name: "Risk Manager",
-              email: "risk@example.com",
-              role: "Analyst",
-            },
-          ]);
+      // Fetch real users from the API
+      try {
+        console.log("📡 Fetching users...");
+        const usersResponse = await apiClient.get("/api/v1/users", {
+          params: { limit: 100 },
+        });
+        
+        console.log("📦 Users response:", usersResponse.data);
+        
+        if (usersResponse.data && Array.isArray(usersResponse.data)) {
+          // Map users to have consistent id field (use user_id)
+          const mappedUsers = usersResponse.data.map((user: any) => ({
+            id: user.user_id || user.id,
+            user_id: user.user_id || user.id,
+            name: user.name || user.email,
+            email: user.email,
+            role: user.role,
+          }));
+          setUsers(mappedUsers);
+          console.log("✅ Fetched users:", mappedUsers.length, mappedUsers);
+        } else {
+          console.error("❌ Invalid users response format:", usersResponse.data);
+          throw new Error("Invalid users response");
         }
-      } else {
-        // Create mock users if none in localStorage
-        setUsers([
-          {
-            id: "user-1",
-            name: "Admin User",
-            email: "admin@example.com",
-            role: "Admin",
-          },
-          {
-            id: "user-2",
-            name: "Risk Manager",
-            email: "risk@example.com",
-            role: "Analyst",
-          },
-        ]);
+      } catch (userErr) {
+        console.error("❌ Failed to fetch users from API:", userErr);
+        // Fallback: try localStorage
+        const storedUsers = localStorage.getItem("users");
+        if (storedUsers) {
+          try {
+            const parsedUsers = JSON.parse(storedUsers);
+            setUsers(Array.isArray(parsedUsers) ? parsedUsers : [parsedUsers]);
+            console.log("⚠️ Using localStorage users:", parsedUsers);
+          } catch {
+            setError(isArabic ? "فشل تحميل قائمة المستخدمين" : "Failed to load users. Please ensure you are logged in.");
+          }
+        } else {
+          setError(isArabic ? "فشل تحميل قائمة المستخدمين" : "Failed to load users. Please ensure you are logged in.");
+        }
       }
     } catch (err) {
       console.error("Failed to fetch dropdown data:", err);
@@ -193,6 +212,10 @@ export default function RiskModal({
           : value,
     }));
     if (error) setError("");
+  };
+
+  const handleCustomValueChange = (fieldId: string, value: any) => {
+    setCustomValues((prev) => ({ ...prev, [fieldId]: value }));
   };
 
   const calculateRiskScore = () => {
@@ -248,8 +271,6 @@ export default function RiskModal({
     setError("");
 
     try {
-      const token = sessionStorage.getItem("access_token");
-
       // Prepare request body
       const requestBody = isEdit
         ? {
@@ -282,19 +303,29 @@ export default function RiskModal({
           };
 
       const url = isEdit
-        ? `http://localhost:8000/api/v1/risks/${riskData?.risk_id}`
-        : "http://localhost:8000/api/v1/risks";
+        ? `/api/v1/risks/${riskData?.risk_id}`
+        : "/api/v1/risks";
 
-      const method = isEdit ? "patch" : "post";
-
-      const response = await axios[method](url, requestBody, {
-        headers: {
-          "Content-Type": "application/json",
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
+      console.log("Submitting risk:", {
+        method: isEdit ? 'PATCH' : 'POST',
+        url,
+        body: requestBody,
       });
 
+      const response = isEdit 
+        ? await apiClient.patch(url, requestBody)
+        : await apiClient.post(url, requestBody);
+
       if (response.status === 200 || response.status === 201) {
+        const entityId = response.data?.risk_id || riskData?.risk_id;
+        const valueEntries = Object.entries(customValues).map(([fieldId, value]) => ({
+          field_id: fieldId,
+          value,
+        }));
+
+        if (entityId && valueEntries.length) {
+          await saveCustomFieldValues("risk", String(entityId), valueEntries);
+        }
         showSuccessToast(
           isEdit
             ? isArabic
@@ -324,15 +355,40 @@ export default function RiskModal({
       }
     } catch (err: any) {
       console.error("Operation failed:", err);
-      const errorMessage =
-        err.response?.data?.detail ||
-        (isArabic
-          ? isEdit
-            ? "فشل تحديث المخاطرة. يرجى المحاولة مرة أخرى."
-            : "فشل إنشاء المخاطرة. يرجى المحاولة مرة أخرى."
-          : isEdit
-            ? "Failed to update risk. Please try again."
-            : "Failed to create risk. Please try again.");
+      console.error("Error details:", {
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        data: err.response?.data,
+        message: err.message
+      });
+      
+      let errorMessage = "";
+      
+      // Handle validation errors from backend
+      if (err.response?.status === 422) {
+        const validationErrors = err.response?.data?.detail;
+        if (Array.isArray(validationErrors)) {
+          errorMessage = validationErrors.map((e: any) => 
+            `${e.loc?.join('.') || 'Field'}: ${e.msg}`
+          ).join(', ');
+        } else {
+          errorMessage = validationErrors || "Validation error";
+        }
+      } else if (err.response?.status === 401 || err.response?.status === 403) {
+        errorMessage = isArabic 
+          ? "غير مصرح. الرجاء تسجيل الدخول أولاً."
+          : "Unauthorized. Please log in first.";
+      } else {
+        errorMessage = err.response?.data?.detail ||
+          (isArabic
+            ? isEdit
+              ? "فشل تحديث المخاطرة. يرجى المحاولة مرة أخرى."
+              : "فشل إنشاء المخاطرة. يرجى المحاولة مرة أخرى."
+            : isEdit
+              ? "Failed to update risk. Please try again."
+              : "Failed to create risk. Please try again.");
+      }
+      
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -661,6 +717,20 @@ export default function RiskModal({
                       {isArabic ? "5 - فعال جداً" : "5 - Highly Effective"}
                     </option>
                   </select>
+                </div>
+              )}
+
+              {customFields.length > 0 && (
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                    {isArabic ? "حقول إضافية" : "Additional Fields"}
+                  </h3>
+                  <DynamicFieldRenderer
+                    fields={customFields}
+                    values={customValues}
+                    onChange={handleCustomValueChange}
+                    locale={isArabic ? "ar" : "en"}
+                  />
                 </div>
               )}
 

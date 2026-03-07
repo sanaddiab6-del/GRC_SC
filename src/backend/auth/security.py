@@ -180,8 +180,11 @@ def require_permission(resource: str, action: Optional[str] = None):
         
         # Check if user has the required permission
         has_permission = False
+        user_permissions = []
         for role in user.roles:
             for perm in role.permissions:
+                perm_key = f"{perm.resource}:{perm.action}"
+                user_permissions.append(perm_key)
                 if perm.resource == resource and perm.action == action:
                     has_permission = True
                     break
@@ -189,9 +192,16 @@ def require_permission(resource: str, action: Optional[str] = None):
                 break
         
         if not has_permission:
+            # Enhanced logging for debugging
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                f"Permission denied for user {user.user_id} ({user.email}): "
+                f"Required '{resource}:{action}', User has: {', '.join(user_permissions) if user_permissions else 'NO PERMISSIONS'}"
+            )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Permission denied: {resource}:{action}"
+                detail=f"Permission denied: {resource}:{action} required"
             )
         
         return user

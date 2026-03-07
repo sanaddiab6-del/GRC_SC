@@ -136,6 +136,7 @@ def _load_models() -> None:
     from isms import models as _isms_models  # noqa: F401
     from training import models as _training_models  # noqa: F401
     from audit import models as _audit_models  # noqa: F401
+    from dynamic_config import models as _dynamic_config_models  # noqa: F401
     try:
         import regulatory_versions as _reg_versions  # noqa: F401
     except Exception:

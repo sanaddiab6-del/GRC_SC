@@ -5,6 +5,13 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AdminGuard } from '@/components/auth/AuthGuard';
 import { get, post, patch } from '@/lib/api-client';
+import {
+  CustomField,
+  WorkflowState,
+  WorkflowTransition,
+  DashboardWidget,
+  ReportTemplate,
+} from '@/lib/dynamic-config';
 import { getErrorMessage } from '@/lib/api-client';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -78,7 +85,7 @@ function AdminPageContent() {
 
   // ── State ───────────────────────────────────────────────────────────────────
 
-  const [selectedTab, setSelectedTab] = useState<'users' | 'requests' | 'system' | 'settings' | 'audit'>('users');
+  const [selectedTab, setSelectedTab] = useState<'users' | 'requests' | 'system' | 'settings' | 'audit' | 'config'>('users');
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [userRequests, setUserRequests] = useState<UserResponse[]>([]);
@@ -97,6 +104,51 @@ function AdminPageContent() {
     securityOk: false,
     databaseSizeBytes: null
   });
+  const [configEntityType, setConfigEntityType] = useState<'control' | 'risk' | 'evidence' | 'assessment' | 'finding'>(
+    'control'
+  );
+  const [customFields, setCustomFields] = useState<CustomField[]>([]);
+  const [workflowStates, setWorkflowStates] = useState<WorkflowState[]>([]);
+  const [workflowTransitions, setWorkflowTransitions] = useState<WorkflowTransition[]>([]);
+  const [dashboardWidgets, setDashboardWidgets] = useState<DashboardWidget[]>([]);
+  const [reportTemplates, setReportTemplates] = useState<ReportTemplate[]>([]);
+  const [configError, setConfigError] = useState<string | null>(null);
+  const [editingCustomFieldId, setEditingCustomFieldId] = useState<string | null>(null);
+  const [editingWorkflowStateId, setEditingWorkflowStateId] = useState<string | null>(null);
+  const [editingWidgetId, setEditingWidgetId] = useState<string | null>(null);
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+  const [customFieldForm, setCustomFieldForm] = useState({
+    field_key: '',
+    field_label: '',
+    field_type: 'text',
+    required: false,
+    options_json: ''
+  });
+  const [workflowStateForm, setWorkflowStateForm] = useState({
+    state_key: '',
+    label: '',
+    order_index: 0
+  });
+  const [workflowTransitionForm, setWorkflowTransitionForm] = useState({
+    from_state: '',
+    to_state: '',
+    action_label: '',
+    allowed_roles: ''
+  });
+  const [widgetForm, setWidgetForm] = useState({
+    widget_key: '',
+    title: '',
+    component_type: '',
+    data_source: '',
+    config_json: ''
+  });
+  const [templateForm, setTemplateForm] = useState({
+    template_key: '',
+    name: '',
+    entity_type: '',
+    export_format: 'pdf',
+    query_config: ''
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [newUser, setNewUser] = useState({
@@ -112,12 +164,25 @@ function AdminPageContent() {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    if (selectedTab === 'config') {
+      fetchConfigData();
+    }
+  }, [selectedTab, configEntityType]);
+
   const formatBytes = (bytes: number | null): string => {
     if (!bytes || bytes <= 0) return isArabic ? 'غير متاح' : 'N/A';
     const units = ['B', 'KB', 'MB', 'GB', 'TB'];
     const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
     const value = bytes / Math.pow(1024, exponent);
     return `${value.toFixed(1)} ${units[exponent]}`;
+  };
+
+  const unwrap = <T,>(payload: T | { data: T }): T => {
+    if (payload && typeof payload === 'object' && 'data' in payload) {
+      return (payload as { data: T }).data;
+    }
+    return payload as T;
   };
 
   const fetchData = async () => {
@@ -140,13 +205,6 @@ function AdminPageContent() {
         get<AuditLogEntry[]>('/api/v1/auth/admin/audit-logs?limit=50').catch(() => []),
         get<SystemStatusApi>('/api/v1/auth/admin/system-status').catch(() => null),
       ]);
-
-      const unwrap = <T,>(payload: T | { data: T }): T => {
-        if (payload && typeof payload === 'object' && 'data' in payload) {
-          return (payload as { data: T }).data;
-        }
-        return payload as T;
-      };
 
       const rawUsers = unwrap<UserResponse[]>(usersData) || [];
       const rawRequests = unwrap<UserResponse[]>(requestsData) || [];
@@ -191,10 +249,104 @@ function AdminPageContent() {
     }
   };
 
+  const parseJsonInput = (value: string, fieldLabel: string) => {
+    if (!value.trim()) {
+      return null;
+    }
+    try {
+      return JSON.parse(value);
+    } catch (err) {
+      throw new Error(`${fieldLabel} must be valid JSON`);
+    }
+  };
+
+  const fetchConfigData = async () => {
+    try {
+      setLoading(true);
+      setConfigError(null);
+
+      const [fieldsData, workflowData, widgetsData, templatesData] = await Promise.all([
+        get<CustomField[]>(`/api/v1/config/custom-fields?entity_type=${configEntityType}`).catch(() => []),
+        get<{ states: WorkflowState[]; transitions: WorkflowTransition[] }>(
+          `/api/v1/config/workflows?entity_type=${configEntityType}`
+        ).catch(() => ({ states: [], transitions: [] })),
+        get<DashboardWidget[]>("/api/v1/config/dashboard/widgets").catch(() => []),
+        get<ReportTemplate[]>("/api/v1/report-templates").catch(() => []),
+      ]);
+
+      const rawFields = unwrap<CustomField[]>(fieldsData) || [];
+      const rawWorkflow = unwrap<{ states: WorkflowState[]; transitions: WorkflowTransition[] }>(workflowData) || {
+        states: [],
+        transitions: [],
+      };
+      const rawWidgets = unwrap<DashboardWidget[]>(widgetsData) || [];
+      const rawTemplates = unwrap<ReportTemplate[]>(templatesData) || [];
+
+      setCustomFields(rawFields);
+      setWorkflowStates(rawWorkflow.states || []);
+      setWorkflowTransitions(rawWorkflow.transitions || []);
+      setDashboardWidgets(rawWidgets);
+      setReportTemplates(rawTemplates);
+    } catch (err) {
+      setConfigError(getErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // ── Event Handlers ──────────────────────────────────────────────────────────
+
+  const generateStrongPassword = () => {
+    const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const lowercase = 'abcdefghijklmnopqrstuvwxyz';
+    const digits = '0123456789';
+    const special = '!@#$%^&*()';
+    
+    // Ensure at least one of each required type
+    let password = '';
+    password += uppercase[Math.floor(Math.random() * uppercase.length)];
+    password += lowercase[Math.floor(Math.random() * lowercase.length)];
+    password += digits[Math.floor(Math.random() * digits.length)];
+    password += special[Math.floor(Math.random() * special.length)];
+    
+    // Fill remaining characters (to reach 16 total)
+    const allChars = uppercase + lowercase + digits + special;
+    for (let i = password.length; i < 16; i++) {
+      password += allChars[Math.floor(Math.random() * allChars.length)];
+    }
+    
+    // Shuffle the password
+    password = password.split('').sort(() => Math.random() - 0.5).join('');
+    
+    setNewUser({ ...newUser, password });
+  };
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate password complexity (match backend requirements)
+    const password = newUser.password;
+    if (password.length < 12) {
+      alert(isArabic ? 'كلمة المرور يجب أن تكون 12 حرف على الأقل' : 'Password must be at least 12 characters long');
+      return;
+    }
+    if (!/[A-Z]/.test(password)) {
+      alert(isArabic ? 'كلمة المرور يجب أن تحتوي على حرف كبير واحد على الأقل' : 'Password must contain at least one uppercase letter');
+      return;
+    }
+    if (!/[a-z]/.test(password)) {
+      alert(isArabic ? 'كلمة المرور يجب أن تحتوي على حرف صغير واحد على الأقل' : 'Password must contain at least one lowercase letter');
+      return;
+    }
+    if (!/[0-9]/.test(password)) {
+      alert(isArabic ? 'كلمة المرور يجب أن تحتوي على رقم واحد على الأقل' : 'Password must contain at least one digit');
+      return;
+    }
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+      alert(isArabic ? 'كلمة المرور يجب أن تحتوي على رمز خاص واحد على الأقل' : 'Password must contain at least one special character (!@#$%^&*(),.?":{}|<>)');
+      return;
+    }
+    
     try {
       setLoading(true);
       await post('/api/v1/auth/users', {
@@ -256,6 +408,148 @@ function AdminPageContent() {
       await fetchData();
     } catch (err) {
       alert(getErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveCustomField = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      setConfigError(null);
+
+      const optionsJson = parseJsonInput(customFieldForm.options_json, 'Options');
+      const payload = {
+        entity_type: configEntityType,
+        field_key: customFieldForm.field_key,
+        field_label: customFieldForm.field_label,
+        field_type: customFieldForm.field_type,
+        required: customFieldForm.required,
+        options_json: optionsJson,
+      };
+
+      if (editingCustomFieldId) {
+        await patch(`/api/v1/config/custom-fields/${editingCustomFieldId}`, payload);
+      } else {
+        await post('/api/v1/config/custom-fields', payload);
+      }
+
+      setCustomFieldForm({ field_key: '', field_label: '', field_type: 'text', required: false, options_json: '' });
+      setEditingCustomFieldId(null);
+      await fetchConfigData();
+    } catch (err) {
+      setConfigError(getErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveWorkflowState = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      setConfigError(null);
+      const payload = {
+        entity_type: configEntityType,
+        state_key: workflowStateForm.state_key,
+        label: workflowStateForm.label,
+        order_index: workflowStateForm.order_index,
+      };
+
+      if (editingWorkflowStateId) {
+        await patch(`/api/v1/config/workflows/states/${editingWorkflowStateId}`, payload);
+      } else {
+        await post('/api/v1/config/workflows/states', payload);
+      }
+
+      setWorkflowStateForm({ state_key: '', label: '', order_index: 0 });
+      setEditingWorkflowStateId(null);
+      await fetchConfigData();
+    } catch (err) {
+      setConfigError(getErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveWorkflowTransition = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      setConfigError(null);
+      const rolesJson = parseJsonInput(workflowTransitionForm.allowed_roles, 'Allowed roles');
+      const payload = {
+        from_state: workflowTransitionForm.from_state,
+        to_state: workflowTransitionForm.to_state,
+        action_label: workflowTransitionForm.action_label,
+        allowed_roles: rolesJson,
+      };
+      await post('/api/v1/config/workflows/transitions', payload);
+      setWorkflowTransitionForm({ from_state: '', to_state: '', action_label: '', allowed_roles: '' });
+      await fetchConfigData();
+    } catch (err) {
+      setConfigError(getErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveWidget = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      setConfigError(null);
+      const configJson = parseJsonInput(widgetForm.config_json, 'Widget config');
+      const payload = {
+        widget_key: widgetForm.widget_key,
+        title: widgetForm.title,
+        component_type: widgetForm.component_type,
+        data_source: widgetForm.data_source || null,
+        config_json: configJson,
+      };
+
+      if (editingWidgetId) {
+        await patch(`/api/v1/config/dashboard/widgets/${editingWidgetId}`, payload);
+      } else {
+        await post('/api/v1/config/dashboard/widgets', payload);
+      }
+
+      setWidgetForm({ widget_key: '', title: '', component_type: '', data_source: '', config_json: '' });
+      setEditingWidgetId(null);
+      await fetchConfigData();
+    } catch (err) {
+      setConfigError(getErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveTemplate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      setConfigError(null);
+      const queryConfig = parseJsonInput(templateForm.query_config, 'Query config');
+      const payload = {
+        template_key: templateForm.template_key,
+        name: templateForm.name,
+        entity_type: templateForm.entity_type || null,
+        export_format: templateForm.export_format,
+        query_config: queryConfig,
+      };
+
+      if (editingTemplateId) {
+        await patch(`/api/v1/report-templates/${editingTemplateId}`, payload);
+      } else {
+        await post('/api/v1/report-templates', payload);
+      }
+
+      setTemplateForm({ template_key: '', name: '', entity_type: '', export_format: 'pdf', query_config: '' });
+      setEditingTemplateId(null);
+      await fetchConfigData();
+    } catch (err) {
+      setConfigError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -374,6 +668,7 @@ function AdminPageContent() {
               { key: 'system', label: isArabic ? 'حالة النظام' : 'System Status', icon: '🖥' },
               { key: 'settings', label: isArabic ? 'الإعدادات' : 'Settings', icon: '⚙️' },
               { key: 'audit', label: isArabic ? 'سجل التدقيق' : 'Audit Log', icon: '📋' },
+              { key: 'config', label: isArabic ? 'التهيئة' : 'Configuration', icon: '🧩' },
             ].map((tab) => (
               <button
                 key={tab.key}
@@ -560,6 +855,385 @@ function AdminPageContent() {
               </div>
             )}
 
+            {/* Configuration Tab */}
+            {selectedTab === 'config' && (
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">
+                  {isArabic ? 'تهيئة النظام' : 'System Configuration'}
+                </h2>
+                {configError && (
+                  <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {configError}
+                  </div>
+                )}
+
+                <div className="bg-gray-50 rounded-lg p-6 border mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {isArabic ? 'نوع الكيان' : 'Entity Type'}
+                  </label>
+                  <select
+                    value={configEntityType}
+                    onChange={(e) => setConfigEntityType(e.target.value as typeof configEntityType)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="control">Control</option>
+                    <option value="risk">Risk</option>
+                    <option value="evidence">Evidence</option>
+                    <option value="assessment">Assessment</option>
+                    <option value="finding">Finding</option>
+                  </select>
+                </div>
+
+                <div className="space-y-8">
+                  <div className="bg-gray-50 rounded-lg p-6 border">
+                    <h3 className="font-semibold text-lg mb-4 text-gray-900">
+                      {isArabic ? 'الحقول المخصصة' : 'Custom Fields'}
+                    </h3>
+                    <form onSubmit={handleSaveCustomField} className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
+                      <input
+                        value={customFieldForm.field_key}
+                        onChange={(e) => setCustomFieldForm({ ...customFieldForm, field_key: e.target.value })}
+                        className="px-3 py-2 border rounded-lg"
+                        placeholder={isArabic ? 'المفتاح' : 'Field Key'}
+                        required
+                      />
+                      <input
+                        value={customFieldForm.field_label}
+                        onChange={(e) => setCustomFieldForm({ ...customFieldForm, field_label: e.target.value })}
+                        className="px-3 py-2 border rounded-lg"
+                        placeholder={isArabic ? 'التسمية' : 'Label'}
+                        required
+                      />
+                      <select
+                        value={customFieldForm.field_type}
+                        onChange={(e) => setCustomFieldForm({ ...customFieldForm, field_type: e.target.value })}
+                        className="px-3 py-2 border rounded-lg"
+                      >
+                        <option value="text">Text</option>
+                        <option value="number">Number</option>
+                        <option value="select">Select</option>
+                        <option value="user">User</option>
+                        <option value="date">Date</option>
+                        <option value="boolean">Boolean</option>
+                      </select>
+                      <input
+                        value={customFieldForm.options_json}
+                        onChange={(e) => setCustomFieldForm({ ...customFieldForm, options_json: e.target.value })}
+                        className="px-3 py-2 border rounded-lg"
+                        placeholder={isArabic ? 'خيارات JSON' : 'Options JSON'}
+                      />
+                      <div className="flex items-center gap-2">
+                        <label className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={customFieldForm.required}
+                            onChange={(e) => setCustomFieldForm({ ...customFieldForm, required: e.target.checked })}
+                          />
+                          {isArabic ? 'إلزامي' : 'Required'}
+                        </label>
+                        <button
+                          type="submit"
+                          className="ml-auto bg-blue-600 text-white px-4 py-2 rounded-lg"
+                        >
+                          {editingCustomFieldId ? (isArabic ? 'تحديث' : 'Update') : (isArabic ? 'إضافة' : 'Add')}
+                        </button>
+                      </div>
+                    </form>
+                    <div className="space-y-2">
+                      {customFields.map((field) => (
+                        <div key={field.id} className="flex items-center justify-between bg-white rounded-lg p-3 border">
+                          <div>
+                            <div className="font-semibold text-gray-900">{field.field_label}</div>
+                            <div className="text-xs text-gray-500">{field.field_key} • {field.field_type}</div>
+                          </div>
+                          <button
+                            className="text-blue-600 text-sm font-semibold"
+                            onClick={() => {
+                              setEditingCustomFieldId(field.id);
+                              setCustomFieldForm({
+                                field_key: field.field_key,
+                                field_label: field.field_label,
+                                field_type: field.field_type,
+                                required: field.required,
+                                options_json: field.options_json ? JSON.stringify(field.options_json) : '',
+                              });
+                            }}
+                          >
+                            {isArabic ? 'تحرير' : 'Edit'}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-50 rounded-lg p-6 border">
+                    <h3 className="font-semibold text-lg mb-4 text-gray-900">
+                      {isArabic ? 'حالات سير العمل' : 'Workflow States'}
+                    </h3>
+                    <form onSubmit={handleSaveWorkflowState} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                      <input
+                        value={workflowStateForm.state_key}
+                        onChange={(e) => setWorkflowStateForm({ ...workflowStateForm, state_key: e.target.value })}
+                        className="px-3 py-2 border rounded-lg"
+                        placeholder={isArabic ? 'المفتاح' : 'State Key'}
+                        required
+                      />
+                      <input
+                        value={workflowStateForm.label}
+                        onChange={(e) => setWorkflowStateForm({ ...workflowStateForm, label: e.target.value })}
+                        className="px-3 py-2 border rounded-lg"
+                        placeholder={isArabic ? 'التسمية' : 'Label'}
+                        required
+                      />
+                      <input
+                        type="number"
+                        value={workflowStateForm.order_index}
+                        onChange={(e) => setWorkflowStateForm({ ...workflowStateForm, order_index: Number(e.target.value) })}
+                        className="px-3 py-2 border rounded-lg"
+                        placeholder={isArabic ? 'الترتيب' : 'Order'}
+                      />
+                      <button
+                        type="submit"
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg"
+                      >
+                        {editingWorkflowStateId ? (isArabic ? 'تحديث' : 'Update') : (isArabic ? 'إضافة' : 'Add')}
+                      </button>
+                    </form>
+                    <div className="space-y-2">
+                      {workflowStates.map((state) => (
+                        <div key={state.id} className="flex items-center justify-between bg-white rounded-lg p-3 border">
+                          <div>
+                            <div className="font-semibold text-gray-900">{state.label}</div>
+                            <div className="text-xs text-gray-500">{state.state_key}</div>
+                          </div>
+                          <button
+                            className="text-blue-600 text-sm font-semibold"
+                            onClick={() => {
+                              setEditingWorkflowStateId(state.id);
+                              setWorkflowStateForm({
+                                state_key: state.state_key,
+                                label: state.label,
+                                order_index: state.order_index,
+                              });
+                            }}
+                          >
+                            {isArabic ? 'تحرير' : 'Edit'}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-50 rounded-lg p-6 border">
+                    <h3 className="font-semibold text-lg mb-4 text-gray-900">
+                      {isArabic ? 'انتقالات سير العمل' : 'Workflow Transitions'}
+                    </h3>
+                    <form onSubmit={handleSaveWorkflowTransition} className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
+                      <select
+                        value={workflowTransitionForm.from_state}
+                        onChange={(e) => setWorkflowTransitionForm({ ...workflowTransitionForm, from_state: e.target.value })}
+                        className="px-3 py-2 border rounded-lg"
+                        required
+                      >
+                        <option value="">{isArabic ? 'الحالة الحالية' : 'From State'}</option>
+                        {workflowStates.map((state) => (
+                          <option key={state.id} value={state.id}>{state.label}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={workflowTransitionForm.to_state}
+                        onChange={(e) => setWorkflowTransitionForm({ ...workflowTransitionForm, to_state: e.target.value })}
+                        className="px-3 py-2 border rounded-lg"
+                        required
+                      >
+                        <option value="">{isArabic ? 'الحالة التالية' : 'To State'}</option>
+                        {workflowStates.map((state) => (
+                          <option key={state.id} value={state.id}>{state.label}</option>
+                        ))}
+                      </select>
+                      <input
+                        value={workflowTransitionForm.action_label}
+                        onChange={(e) => setWorkflowTransitionForm({ ...workflowTransitionForm, action_label: e.target.value })}
+                        className="px-3 py-2 border rounded-lg"
+                        placeholder={isArabic ? 'التسمية' : 'Action Label'}
+                        required
+                      />
+                      <input
+                        value={workflowTransitionForm.allowed_roles}
+                        onChange={(e) => setWorkflowTransitionForm({ ...workflowTransitionForm, allowed_roles: e.target.value })}
+                        className="px-3 py-2 border rounded-lg"
+                        placeholder={isArabic ? 'الأدوار (JSON)' : 'Allowed Roles JSON'}
+                      />
+                      <button
+                        type="submit"
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg"
+                      >
+                        {isArabic ? 'إضافة' : 'Add'}
+                      </button>
+                    </form>
+                    <div className="space-y-2">
+                      {workflowTransitions.map((transition) => {
+                        const fromLabel = workflowStates.find((state) => state.id === transition.from_state)?.label || transition.from_state;
+                        const toLabel = workflowStates.find((state) => state.id === transition.to_state)?.label || transition.to_state;
+                        return (
+                          <div key={transition.id} className="bg-white rounded-lg p-3 border">
+                            <div className="text-sm font-semibold text-gray-900">{transition.action_label}</div>
+                            <div className="text-xs text-gray-500">{fromLabel} → {toLabel}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-50 rounded-lg p-6 border">
+                    <h3 className="font-semibold text-lg mb-4 text-gray-900">
+                      {isArabic ? 'عناصر لوحة التحكم' : 'Dashboard Widgets'}
+                    </h3>
+                    <form onSubmit={handleSaveWidget} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                      <input
+                        value={widgetForm.widget_key}
+                        onChange={(e) => setWidgetForm({ ...widgetForm, widget_key: e.target.value })}
+                        className="px-3 py-2 border rounded-lg"
+                        placeholder={isArabic ? 'المفتاح' : 'Widget Key'}
+                        required
+                      />
+                      <input
+                        value={widgetForm.title}
+                        onChange={(e) => setWidgetForm({ ...widgetForm, title: e.target.value })}
+                        className="px-3 py-2 border rounded-lg"
+                        placeholder={isArabic ? 'العنوان' : 'Title'}
+                        required
+                      />
+                      <input
+                        value={widgetForm.component_type}
+                        onChange={(e) => setWidgetForm({ ...widgetForm, component_type: e.target.value })}
+                        className="px-3 py-2 border rounded-lg"
+                        placeholder={isArabic ? 'المكون' : 'Component Type'}
+                        required
+                      />
+                      <button
+                        type="submit"
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg"
+                      >
+                        {editingWidgetId ? (isArabic ? 'تحديث' : 'Update') : (isArabic ? 'إضافة' : 'Add')}
+                      </button>
+                      <input
+                        value={widgetForm.data_source}
+                        onChange={(e) => setWidgetForm({ ...widgetForm, data_source: e.target.value })}
+                        className="px-3 py-2 border rounded-lg md:col-span-2"
+                        placeholder={isArabic ? 'مصدر البيانات' : 'Data Source'}
+                      />
+                      <input
+                        value={widgetForm.config_json}
+                        onChange={(e) => setWidgetForm({ ...widgetForm, config_json: e.target.value })}
+                        className="px-3 py-2 border rounded-lg md:col-span-2"
+                        placeholder={isArabic ? 'تهيئة JSON' : 'Config JSON'}
+                      />
+                    </form>
+                    <div className="space-y-2">
+                      {dashboardWidgets.map((widget) => (
+                        <div key={widget.id} className="flex items-center justify-between bg-white rounded-lg p-3 border">
+                          <div>
+                            <div className="font-semibold text-gray-900">{widget.title}</div>
+                            <div className="text-xs text-gray-500">{widget.widget_key} • {widget.component_type}</div>
+                          </div>
+                          <button
+                            className="text-blue-600 text-sm font-semibold"
+                            onClick={() => {
+                              setEditingWidgetId(widget.id);
+                              setWidgetForm({
+                                widget_key: widget.widget_key,
+                                title: widget.title,
+                                component_type: widget.component_type,
+                                data_source: widget.data_source || '',
+                                config_json: widget.config_json ? JSON.stringify(widget.config_json) : '',
+                              });
+                            }}
+                          >
+                            {isArabic ? 'تحرير' : 'Edit'}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-50 rounded-lg p-6 border">
+                    <h3 className="font-semibold text-lg mb-4 text-gray-900">
+                      {isArabic ? 'قوالب التقارير' : 'Report Templates'}
+                    </h3>
+                    <form onSubmit={handleSaveTemplate} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                      <input
+                        value={templateForm.template_key}
+                        onChange={(e) => setTemplateForm({ ...templateForm, template_key: e.target.value })}
+                        className="px-3 py-2 border rounded-lg"
+                        placeholder={isArabic ? 'المفتاح' : 'Template Key'}
+                        required
+                      />
+                      <input
+                        value={templateForm.name}
+                        onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })}
+                        className="px-3 py-2 border rounded-lg"
+                        placeholder={isArabic ? 'الاسم' : 'Name'}
+                        required
+                      />
+                      <input
+                        value={templateForm.entity_type}
+                        onChange={(e) => setTemplateForm({ ...templateForm, entity_type: e.target.value })}
+                        className="px-3 py-2 border rounded-lg"
+                        placeholder={isArabic ? 'نوع الكيان' : 'Entity Type'}
+                      />
+                      <select
+                        value={templateForm.export_format}
+                        onChange={(e) => setTemplateForm({ ...templateForm, export_format: e.target.value })}
+                        className="px-3 py-2 border rounded-lg"
+                      >
+                        <option value="pdf">PDF</option>
+                        <option value="xlsx">XLSX</option>
+                        <option value="json">JSON</option>
+                      </select>
+                      <input
+                        value={templateForm.query_config}
+                        onChange={(e) => setTemplateForm({ ...templateForm, query_config: e.target.value })}
+                        className="px-3 py-2 border rounded-lg md:col-span-3"
+                        placeholder={isArabic ? 'تهيئة JSON' : 'Query Config JSON'}
+                      />
+                      <button
+                        type="submit"
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg"
+                      >
+                        {editingTemplateId ? (isArabic ? 'تحديث' : 'Update') : (isArabic ? 'إضافة' : 'Add')}
+                      </button>
+                    </form>
+                    <div className="space-y-2">
+                      {reportTemplates.map((template) => (
+                        <div key={template.id} className="flex items-center justify-between bg-white rounded-lg p-3 border">
+                          <div>
+                            <div className="font-semibold text-gray-900">{template.name}</div>
+                            <div className="text-xs text-gray-500">{template.template_key} • {template.export_format}</div>
+                          </div>
+                          <button
+                            className="text-blue-600 text-sm font-semibold"
+                            onClick={() => {
+                              setEditingTemplateId(template.template_key);
+                              setTemplateForm({
+                                template_key: template.template_key,
+                                name: template.name,
+                                entity_type: template.entity_type || '',
+                                export_format: template.export_format,
+                                query_config: template.query_config ? JSON.stringify(template.query_config) : '',
+                              });
+                            }}
+                          >
+                            {isArabic ? 'تحرير' : 'Edit'}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Settings Tab */}
             {selectedTab === 'settings' && (
               <div>
@@ -715,17 +1389,35 @@ function AdminPageContent() {
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   {isArabic ? 'كلمة المرور المؤقتة *' : 'Temporary Password *'}
                 </label>
-                <input
-                  type="password"
-                  value={newUser.password}
-                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder={isArabic ? '12 حرف على الأقل' : 'At least 12 characters'}
-                  required
-                />
-                <p className="text-sm text-gray-500 mt-1">
-                  {isArabic ? 'سيُطلب من المستخدم تغيير كلمة المرور عند تسجيل الدخول الأول' : 'User will be required to change password on first login'}
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    value={newUser.password}
+                    onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder={isArabic ? '12+ حرف، أحرف كبيرة وصغيرة، أرقام ورموز' : 'Min 12 chars, upper/lower/digit/special'}
+                    minLength={12}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={generateStrongPassword}
+                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-semibold transition whitespace-nowrap"
+                    title={isArabic ? 'توليد كلمة مرور قوية' : 'Generate strong password'}
+                  >
+                    🔑 {isArabic ? 'توليد' : 'Generate'}
+                  </button>
+                </div>
+                <p className="text-sm text-gray-600 mt-2">
+                  <strong>{isArabic ? 'المتطلبات:' : 'Requirements:'}</strong>
                 </p>
+                <ul className="text-xs text-gray-500 mt-1 space-y-1">
+                  <li>• {isArabic ? '12 حرف على الأقل' : 'At least 12 characters'}</li>
+                  <li>• {isArabic ? 'حرف كبير واحد على الأقل (A-Z)' : 'At least 1 uppercase letter (A-Z)'}</li>
+                  <li>• {isArabic ? 'حرف صغير واحد على الأقل (a-z)' : 'At least 1 lowercase letter (a-z)'}</li>
+                  <li>• {isArabic ? 'رقم واحد على الأقل (0-9)' : 'At least 1 digit (0-9)'}</li>
+                  <li>• {isArabic ? 'رمز خاص واحد على الأقل (!@#$%...)' : 'At least 1 special character (!@#$%...)'}</li>
+                </ul>
               </div>
 
               {/* Role */}
