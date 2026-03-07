@@ -1,11 +1,9 @@
 """
 Database connection and session management
-Supports both SQLite (aiosqlite) and PostgreSQL (asyncpg) via DATABASE_URL.
+Supports PostgreSQL (asyncpg) only via DATABASE_URL.
 
 URL normalisation rules
 -----------------------
-  sqlite:///…                  → sqlite+aiosqlite:///…
-  sqlite+aiosqlite:///…        → unchanged
   postgresql://…               → postgresql+asyncpg://…
   postgresql+asyncpg://…       → unchanged
   postgresql+psycopg2://…      → postgresql+asyncpg://…
@@ -31,20 +29,12 @@ def resolve_async_url(raw_url: str) -> str:
 
     Recognised schemes and their resolutions:
 
-      sqlite:///…              → sqlite+aiosqlite:///…
-      sqlite+aiosqlite:///…    → unchanged
       postgresql://…           → postgresql+asyncpg://…
       postgresql+asyncpg://…   → unchanged
       postgresql+psycopg2://…  → postgresql+asyncpg://…
-      postgres://…             → postgresql+asyncpg://…
+      postgres:// →             → postgresql+asyncpg://…
     """
     url = raw_url.strip()
-
-    # --- SQLite ---
-    if url.startswith("sqlite"):
-        if "+aiosqlite" not in url:
-            url = url.replace("sqlite://", "sqlite+aiosqlite://", 1)
-        return url
 
     # --- PostgreSQL (including the heroku-style "postgres://" shorthand) ---
     if url.startswith("postgres"):
@@ -72,11 +62,9 @@ def resolve_sync_url(async_url: str) -> str:
     Used by Alembic migrations and direct-SQL helper scripts that cannot
     accept an async driver specifier.
 
-      sqlite+aiosqlite:///…    → sqlite:///…
       postgresql+asyncpg://…   → postgresql://…
     """
     url = async_url.strip()
-    url = url.replace("sqlite+aiosqlite://", "sqlite://")
     url = url.replace("postgresql+asyncpg://", "postgresql://")
     return url
 

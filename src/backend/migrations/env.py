@@ -72,8 +72,8 @@ import asyncio
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode.
 
-    Both aiosqlite and asyncpg are async-only drivers that Alembic cannot use
-    directly.  We therefore derive the equivalent synchronous URL and build a
+    asyncpg is an async-only driver that Alembic cannot use directly.
+    We therefore derive the equivalent synchronous URL and build a
     regular (sync) engine for migration execution.
     """
     url = resolve_sync_url(settings.DATABASE_URL)

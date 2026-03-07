@@ -11,7 +11,7 @@ from httpx import ASGITransport, AsyncClient
 # Set test environment variables before any imports
 os.environ.setdefault("PYTEST_RUNNING", "1")
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-ci-32-chars-minimum-secure-key-12345")
-os.environ.setdefault("DATABASE_URL", "postgresql://sico:test_password@localhost:5432/sico_test")
+os.environ.setdefault("DATABASE_URL", "postgresql://user:pass@localhost:5432/sico_grc")
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379")
 
 # Add src to path
