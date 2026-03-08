@@ -47,9 +47,11 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 # Override sqlalchemy.url from environment
-# Convert async URLs to synchronous dialect for Alembic's sync engine.
-database_url = os.getenv("DATABASE_URL", settings.DATABASE_URL)
-database_url = resolve_sync_url(database_url)
+# Prefer DATABASE_URL_SYNC (already a sync URL), then fall back to
+# DATABASE_URL after stripping the asyncpg driver prefix.
+database_url = os.getenv("DATABASE_URL_SYNC") or resolve_sync_url(
+    os.getenv("DATABASE_URL", settings.DATABASE_URL)
+)
 config.set_main_option("sqlalchemy.url", database_url)
 
 
@@ -76,7 +78,7 @@ def run_migrations_online() -> None:
     We therefore derive the equivalent synchronous URL and build a
     regular (sync) engine for migration execution.
     """
-    url = resolve_sync_url(settings.DATABASE_URL)
+    url = config.get_main_option("sqlalchemy.url")
 
     from sqlalchemy import create_engine
     connectable = create_engine(url, poolclass=pool.NullPool)

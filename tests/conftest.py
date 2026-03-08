@@ -8,10 +8,18 @@ import pytest_asyncio
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-# Set test environment variables before any imports
+# Set test environment variables before any imports.
+# Use the async driver scheme so core.database doesn't need to rewrite it.
 os.environ.setdefault("PYTEST_RUNNING", "1")
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-ci-32-chars-minimum-secure-key-12345")
-os.environ.setdefault("DATABASE_URL", "postgresql://user:pass@localhost:5432/sico_grc")
+os.environ.setdefault(
+    "DATABASE_URL",
+    "postgresql+asyncpg://postgres:postgres@localhost:5432/sico_grc_test",
+)
+os.environ.setdefault(
+    "DATABASE_URL_SYNC",
+    "postgresql://postgres:postgres@localhost:5432/sico_grc_test",
+)
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379")
 
 # Add src to path
@@ -44,9 +52,14 @@ def apply_migrations() -> None:
 		alembic_cfg = Config(str(backend_dir / "alembic.ini"))
 		alembic_cfg.set_main_option("script_location", str(backend_dir / "migrations"))
 
-		database_url = os.getenv("DATABASE_URL")
-		if database_url:
-			alembic_cfg.set_main_option("sqlalchemy.url", database_url)
+		# Alembic needs the *sync* driver URL (psycopg2, not asyncpg).
+		database_url_sync = os.getenv("DATABASE_URL_SYNC")
+		if not database_url_sync:
+			# Derive from the async URL by stripping the +asyncpg driver.
+			database_url_sync = os.getenv("DATABASE_URL", "")
+			database_url_sync = database_url_sync.replace("+asyncpg", "")
+		if database_url_sync:
+			alembic_cfg.set_main_option("sqlalchemy.url", database_url_sync)
 
 		command.upgrade(alembic_cfg, "head")
 		print("✓ Database migrations applied successfully")

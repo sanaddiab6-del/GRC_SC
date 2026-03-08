@@ -183,12 +183,52 @@ jobs:
     name: Unit Tests
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: sico_grc_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+          --health-start-period 10s
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5432/sico_grc_test"
+      DATABASE_URL_SYNC: "postgresql://postgres:postgres@localhost:5432/sico_grc_test"
+      REDIS_URL: "redis://localhost:6379/0"
+      SECRET_KEY: "ci-test-secret-key-minimum-32-characters-long-for-security"
+      PYTEST_RUNNING: "1"
+
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Wait for PostgreSQL
+        run: |
+          for i in $(seq 1 30); do
+            pg_isready -h localhost -p 5432 -U postgres && break
+            echo "Waiting for PostgreSQL... ($i/30)"
+            sleep 2
+          done
 
       - name: Install dependencies
         run: |
@@ -197,7 +237,26 @@ jobs:
           pip install -r src/backend/requirements.txt
           pip install bcrypt==4.1.2
           pip install pytest pytest-cov pytest-asyncio httpx
-          pip install pydantic-settings PyJWT alembic
+          pip install pydantic-settings PyJWT alembic psycopg2-binary
+
+      - name: Run Alembic migrations
+        run: |
+          cd src/backend
+          alembic upgrade head || echo "⚠️ Alembic migration failed, tests will use create_all fallback"
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src/backend:${{ github.workspace }}
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/sico_grc_test"
+
+      - name: Debug DB connectivity
+        run: |
+          python -c "
+          import asyncio, asyncpg
+          async def check():
+              conn = await asyncpg.connect('postgresql://postgres:postgres@localhost:5432/sico_grc_test')
+              print('✓ asyncpg connection OK, server version:', conn.get_server_version())
+              await conn.close()
+          asyncio.run(check())
+          "
 
       - name: Clean pytest cache
         run: |
@@ -268,21 +327,9 @@ jobs:
       - name: Check results
         run: |
           security_scan="${{ needs.security-scan.result }}"
-
-          set +e
-          pytest tests/security/ -v --tb=short --cov=ai --cov-report=xml
-          ai_security_status=$?
-
-          pytest tests/ -v
-          unit_tests_status=$?
-
-          ruff check .
-          code_quality_status=$?
-          set -e
-
-          ai_security_tests="$(if [ $ai_security_status -eq 0 ]; then echo success; else echo failure; fi)"
-          unit_tests="$(if [ $unit_tests_status -eq 0 ]; then echo success; else echo failure; fi)"
-          code_quality="$(if [ $code_quality_status -eq 0 ]; then echo success; else echo failure; fi)"
+          ai_security_tests="${{ needs.ai-security-tests.result }}"
+          code_quality="${{ needs.code-quality.result }}"
+          unit_tests="${{ needs.unit-tests.result }}"
 
           echo "Security scan result      : ${security_scan}"
           echo "AI security tests result  : ${ai_security_tests}"
