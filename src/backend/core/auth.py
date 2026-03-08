@@ -39,7 +39,7 @@ JWT_ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES
 JWT_REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("JWT_REFRESH_TOKEN_EXPIRE_DAYS", "7"))
 
 # Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["bcrypt_sha256"], deprecated="auto")
 
 # HTTP Bearer token scheme
 security = HTTPBearer()
@@ -86,18 +86,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 def get_password_hash(password: str) -> str:
-    """Hash a password (bcrypt has 72-byte limit, auto-truncate)"""
-    # bcrypt can only hash passwords up to 72 bytes
-    # Truncate at byte level, not character level
-    MAX_BYTES = 72
-    password_bytes = password.encode('utf-8')
-    
-    if len(password_bytes) > MAX_BYTES:
-        # Truncate to 72 bytes
-        password_bytes = password_bytes[:MAX_BYTES]
-        # Decode back to string, handling potential incomplete UTF-8 at the end
-        password = password_bytes.decode('utf-8', errors='ignore')
-    
+    """Hash a password using bcrypt_sha256 to support long secrets."""
     return pwd_context.hash(password)
 
 

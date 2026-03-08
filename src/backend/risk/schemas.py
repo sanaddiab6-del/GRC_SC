@@ -1,7 +1,7 @@
 """
 Risk Management Pydantic schemas.
 """
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from uuid import UUID
@@ -24,7 +24,7 @@ class RiskCreate(BaseModel):
     control_effectiveness: Optional[int] = Field(None, ge=1, le=5)
     risk_owner: UUID
     
-    @validator('likelihood', 'impact')
+    @field_validator("likelihood", "impact")
     def validate_score(cls, v):
         if v < 1 or v > 5:
             raise ValueError('Score must be between 1 and 5')
