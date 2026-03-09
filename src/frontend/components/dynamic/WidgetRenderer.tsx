@@ -1,12 +1,14 @@
 "use client";
 
-import { ComplianceGauge } from "@/components/dashboard/ComplianceGauge";
-import { ComplianceTrendChart } from "@/components/dashboard/ComplianceTrendChart";
-import { ActivityTimeline } from "@/components/dashboard/ActivityTimeline";
-import { RiskHeatMap } from "@/components/dashboard/RiskHeatMap";
-import { TaskWidget } from "@/components/dashboard/TaskWidget";
-import { SecurityIncidentFeed } from "@/components/dashboard/SecurityIncidentFeed";
+import dynamic from "next/dynamic";
 import { DashboardWidget } from "@/lib/dynamic-config";
+
+const ComplianceGauge = dynamic(() => import("@/components/dashboard/ComplianceGauge").then(m => ({ default: m.ComplianceGauge })), { ssr: false });
+const ComplianceTrendChart = dynamic(() => import("@/components/dashboard/ComplianceTrendChart").then(m => ({ default: m.ComplianceTrendChart })), { ssr: false });
+const ActivityTimeline = dynamic(() => import("@/components/dashboard/ActivityTimeline").then(m => ({ default: m.ActivityTimeline })), { ssr: false });
+const RiskHeatMap = dynamic(() => import("@/components/dashboard/RiskHeatMap").then(m => ({ default: m.RiskHeatMap })), { ssr: false });
+const TaskWidget = dynamic(() => import("@/components/dashboard/TaskWidget").then(m => ({ default: m.TaskWidget })), { ssr: false });
+const SecurityIncidentFeed = dynamic(() => import("@/components/dashboard/SecurityIncidentFeed").then(m => ({ default: m.SecurityIncidentFeed })), { ssr: false });
 
 interface WidgetRendererProps {
   widget: DashboardWidget;

@@ -6,14 +6,9 @@
  */
 
 import React, { useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useParams } from 'next/navigation';
 import { StatCard, ChartCard, Card, TableCard } from '@/components/ui/Cards';
-import { RiskHeatMap } from '@/components/dashboard/RiskHeatMap';
-import { ComplianceGauge } from '@/components/dashboard/ComplianceGauge';
-import { ComplianceTrendChart } from '@/components/dashboard/ComplianceTrendChart';
-import { ActivityTimeline } from '@/components/dashboard/ActivityTimeline';
-import { TaskWidget } from '@/components/dashboard/TaskWidget';
-import WidgetRenderer from '@/components/dynamic/WidgetRenderer';
 import { useDashboardLayout } from '@/lib/dynamic-config';
 import Link from 'next/link';
 import {
@@ -29,6 +24,13 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
+
+const RiskHeatMap = dynamic(() => import('@/components/dashboard/RiskHeatMap').then(m => ({ default: m.RiskHeatMap })), { ssr: false });
+const ComplianceGauge = dynamic(() => import('@/components/dashboard/ComplianceGauge').then(m => ({ default: m.ComplianceGauge })), { ssr: false });
+const ComplianceTrendChart = dynamic(() => import('@/components/dashboard/ComplianceTrendChart').then(m => ({ default: m.ComplianceTrendChart })), { ssr: false });
+const ActivityTimeline = dynamic(() => import('@/components/dashboard/ActivityTimeline').then(m => ({ default: m.ActivityTimeline })), { ssr: false });
+const TaskWidget = dynamic(() => import('@/components/dashboard/TaskWidget').then(m => ({ default: m.TaskWidget })), { ssr: false });
+const WidgetRenderer = dynamic(() => import('@/components/dynamic/WidgetRenderer'), { ssr: false });
 
 export default function ProfessionalDashboard() {
   const params = useParams();

@@ -10,6 +10,11 @@ const nextConfig = {
   // Enable standalone output for Docker (minimal production build)
   output: "standalone",
 
+  // Tree-shake large packages in dev mode
+  experimental: {
+    optimizePackageImports: ['recharts', 'date-fns', 'lucide-react'],
+  },
+
   webpack: (config, { isServer }) => {
     // Explicitly set the @ alias to resolve to the frontend directory
     config.resolve.alias["@"] = path.resolve(__dirname);

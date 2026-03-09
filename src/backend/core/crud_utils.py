@@ -86,7 +86,7 @@ async def check_exists(
     
     if existing:
         raise HTTPException(
-            status_code=400,
+            status_code=409,
             detail={
                 "message_en": error_message_en,
                 "message_ar": error_message_ar,

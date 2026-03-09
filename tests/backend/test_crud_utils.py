@@ -13,6 +13,7 @@ from fastapi import HTTPException
 @pytest.mark.asyncio
 async def test_get_by_id_found():
     from core.crud_utils import get_by_id
+    from unittest.mock import patch
 
     mock_item = MagicMock()
     mock_item.control_id = "ECC-1"
@@ -22,24 +23,29 @@ async def test_get_by_id_found():
     result.scalar_one_or_none.return_value = mock_item
     session.execute = AsyncMock(return_value=result)
 
-    # We need a mock model with a real attribute-like field
     model = MagicMock()
     model.control_id = MagicMock()  # column descriptor
 
-    item = await get_by_id(
-        db=session,
-        model=model,
-        id_field_name="control_id",
-        id_value="ECC-1",
-        error_message_en="Not found",
-        error_message_ar="غير موجود",
-    )
+    with patch("core.crud_utils.select") as mock_select:
+        mock_query = MagicMock()
+        mock_query.where.return_value = mock_query
+        mock_select.return_value = mock_query
+
+        item = await get_by_id(
+            db=session,
+            model=model,
+            id_field_name="control_id",
+            id_value="ECC-1",
+            error_message_en="Not found",
+            error_message_ar="غير موجود",
+        )
     assert item is mock_item
 
 
 @pytest.mark.asyncio
 async def test_get_by_id_not_found():
     from core.crud_utils import get_by_id
+    from unittest.mock import patch
 
     session = AsyncMock()
     result = MagicMock()
@@ -49,15 +55,20 @@ async def test_get_by_id_not_found():
     model = MagicMock()
     model.control_id = MagicMock()
 
-    with pytest.raises(HTTPException) as exc_info:
-        await get_by_id(
-            db=session,
-            model=model,
-            id_field_name="control_id",
-            id_value="NOPE",
-            error_message_en="Not found",
-            error_message_ar="غير موجود",
-        )
+    with patch("core.crud_utils.select") as mock_select:
+        mock_query = MagicMock()
+        mock_query.where.return_value = mock_query
+        mock_select.return_value = mock_query
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_by_id(
+                db=session,
+                model=model,
+                id_field_name="control_id",
+                id_value="NOPE",
+                error_message_en="Not found",
+                error_message_ar="غير موجود",
+            )
     assert exc_info.value.status_code == 404
 
 
@@ -66,6 +77,7 @@ async def test_get_by_id_not_found():
 @pytest.mark.asyncio
 async def test_check_exists_no_conflict():
     from core.crud_utils import check_exists
+    from unittest.mock import patch
 
     session = AsyncMock()
     result = MagicMock()
@@ -75,20 +87,26 @@ async def test_check_exists_no_conflict():
     model = MagicMock()
     model.control_id = MagicMock()
 
-    # Should not raise
-    await check_exists(
-        db=session,
-        model=model,
-        id_field_name="control_id",
-        id_value="NEW-ID",
-        error_message_en="Already exists",
-        error_message_ar="موجود بالفعل",
-    )
+    with patch("core.crud_utils.select") as mock_select:
+        mock_query = MagicMock()
+        mock_query.where.return_value = mock_query
+        mock_select.return_value = mock_query
+
+        # Should not raise
+        await check_exists(
+            db=session,
+            model=model,
+            id_field_name="control_id",
+            id_value="NEW-ID",
+            error_message_en="Already exists",
+            error_message_ar="موجود بالفعل",
+        )
 
 
 @pytest.mark.asyncio
 async def test_check_exists_conflict():
     from core.crud_utils import check_exists
+    from unittest.mock import patch
 
     existing = MagicMock()
     session = AsyncMock()
@@ -99,16 +117,21 @@ async def test_check_exists_conflict():
     model = MagicMock()
     model.control_id = MagicMock()
 
-    with pytest.raises(HTTPException) as exc_info:
-        await check_exists(
-            db=session,
-            model=model,
-            id_field_name="control_id",
-            id_value="DUP",
-            error_message_en="Already exists",
-            error_message_ar="موجود بالفعل",
-        )
-    assert exc_info.value.status_code == 400
+    with patch("core.crud_utils.select") as mock_select:
+        mock_query = MagicMock()
+        mock_query.where.return_value = mock_query
+        mock_select.return_value = mock_query
+
+        with pytest.raises(HTTPException) as exc_info:
+            await check_exists(
+                db=session,
+                model=model,
+                id_field_name="control_id",
+                id_value="DUP",
+                error_message_en="Already exists",
+                error_message_ar="موجود بالفعل",
+            )
+    assert exc_info.value.status_code == 409
 
 
 # ─── update_model ─────────────────────────────────────────────────────────────
@@ -145,6 +168,7 @@ async def test_update_model():
 @pytest.mark.asyncio
 async def test_delete_by_id_found():
     from core.crud_utils import delete_by_id
+    from unittest.mock import patch
 
     mock_item = MagicMock()
     session = AsyncMock()
@@ -157,14 +181,19 @@ async def test_delete_by_id_found():
     model = MagicMock()
     model.control_id = MagicMock()
 
-    await delete_by_id(
-        db=session,
-        model=model,
-        id_field_name="control_id",
-        id_value="ECC-1",
-        error_message_en="Not found",
-        error_message_ar="غير موجود",
-    )
+    with patch("core.crud_utils.select") as mock_select:
+        mock_query = MagicMock()
+        mock_query.where.return_value = mock_query
+        mock_select.return_value = mock_query
+
+        await delete_by_id(
+            db=session,
+            model=model,
+            id_field_name="control_id",
+            id_value="ECC-1",
+            error_message_en="Not found",
+            error_message_ar="غير موجود",
+        )
     session.delete.assert_awaited_once_with(mock_item)
     session.commit.assert_awaited_once()
 
@@ -172,6 +201,7 @@ async def test_delete_by_id_found():
 @pytest.mark.asyncio
 async def test_delete_by_id_not_found():
     from core.crud_utils import delete_by_id
+    from unittest.mock import patch
 
     session = AsyncMock()
     result = MagicMock()
@@ -181,15 +211,20 @@ async def test_delete_by_id_not_found():
     model = MagicMock()
     model.control_id = MagicMock()
 
-    with pytest.raises(HTTPException) as exc_info:
-        await delete_by_id(
-            db=session,
-            model=model,
-            id_field_name="control_id",
-            id_value="NOPE",
-            error_message_en="Not found",
-            error_message_ar="غير موجود",
-        )
+    with patch("core.crud_utils.select") as mock_select:
+        mock_query = MagicMock()
+        mock_query.where.return_value = mock_query
+        mock_select.return_value = mock_query
+
+        with pytest.raises(HTTPException) as exc_info:
+            await delete_by_id(
+                db=session,
+                model=model,
+                id_field_name="control_id",
+                id_value="NOPE",
+                error_message_en="Not found",
+                error_message_ar="غير موجود",
+            )
     assert exc_info.value.status_code == 404
 
 

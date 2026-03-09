@@ -109,12 +109,17 @@ async def test_require_role_unauthorized():
     role = MagicMock()
     role.role_name = "Viewer"
     user.roles = [role]
+    user.user_id = "test-user-id"
 
-    # The dependency generator needs a user; we simulate by calling it
-    # require_role returns an async function that takes current_user
-    # but it's a Depends wrapper — we test the logic
+    # Provide a mock DB session that returns the user when queried
+    from unittest.mock import AsyncMock as _AsyncMock
+    session = _AsyncMock()
+    db_result = MagicMock()
+    db_result.scalar_one_or_none.return_value = user
+    session.execute = _AsyncMock(return_value=db_result)
+
     with pytest.raises(HTTPException) as exc_info:
-        await dep(current_user=user)
+        await dep(current_user=user, db=session)
     assert exc_info.value.status_code == 403
 
 

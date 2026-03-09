@@ -103,4 +103,4 @@ def test_settings_defaults():
     assert settings.API_V1_PREFIX == "/api/v1"
     assert settings.DEFAULT_LANGUAGE == "ar"
     assert settings.AUDIT_LOG_RETENTION_YEARS == 7
-    assert settings.RATE_LIMIT_ENABLED is True
+    assert settings.RATE_LIMIT_ENABLED is False

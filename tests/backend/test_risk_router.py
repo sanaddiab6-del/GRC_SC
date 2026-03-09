@@ -15,22 +15,37 @@ from httpx import AsyncClient, ASGITransport
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 def _make_user(role="Analyst"):
-    from auth.models import User, Role
+    from auth.models import User
 
     user = MagicMock(spec=User)
     user.user_id = str(uuid4())
     user.username = "tester"
     user.email = "tester@example.com"
     user.is_active = True
-    user.roles = [MagicMock(spec=Role, name=role)]
+
+    # Build a role with full risk/vendor permissions so permission_checker passes
+    role_mock = MagicMock()
+    role_mock.role_name = role
+    perms = []
+    for resource in ["risk", "vendor"]:
+        for action in ["read", "create", "update", "delete", "manage"]:
+            perm = MagicMock()
+            perm.resource = resource
+            perm.action = action
+            perms.append(perm)
+    role_mock.permissions = perms
+    user.roles = [role_mock]
     return user
 
 
 def _make_risk(override: dict | None = None):
     from risk.models import Risk, RiskCategory, RiskStatus, TreatmentStatus
 
+    uid = uuid4()
+    owner_id = uuid4()
     m = MagicMock(spec=Risk)
-    m.id = str(uuid4())
+    m.risk_id = uid
+    m.id = str(uid)
     m.risk_number = "RISK-2024-001"
     m.title_en = "Test Risk"
     m.title_ar = "خطر تجريبي"
@@ -40,12 +55,16 @@ def _make_risk(override: dict | None = None):
     m.status = RiskStatus.IDENTIFIED
     m.likelihood = 3
     m.impact = 4
-    m.inherent_score = 12
-    m.inherent_level = "medium"
-    m.residual_score = None
-    m.residual_level = None
-    m.treatment_status = TreatmentStatus.OPEN
-    m.owner_id = str(uuid4())
+    m.inherent_risk_score = 12
+    m.inherent_risk_level = "medium"
+    m.residual_risk_score = None
+    m.residual_risk_level = None
+    m.treatment_status = TreatmentStatus.PLANNED
+    m.risk_owner = owner_id
+    m.identified_by = owner_id
+    m.identified_at = datetime(2024, 1, 1)
+    m.last_assessed_at = None
+    m.next_review_date = None
     m.control_id = None
     m.created_at = datetime(2024, 1, 1)
     m.updated_at = datetime(2024, 1, 1)
@@ -174,8 +193,21 @@ async def test_list_vendors(app_with_overrides):
     from risk.models import ThirdPartyRisk
 
     vendor = MagicMock(spec=ThirdPartyRisk)
-    vendor.id = str(uuid4())
+    vendor.vendor_id = uuid4()
     vendor.vendor_name = "Vendor Co"
+    vendor.vendor_type = "cloud_provider"
+    vendor.risk_rating = "medium"
+    vendor.services_provided_en = "Cloud hosting services"
+    vendor.services_provided_ar = "خدمات الاستضافة السحابية"
+    vendor.data_access_level = "limited"
+    vendor.has_nca_compliance = False
+    vendor.has_iso27001 = False
+    vendor.has_soc2 = False
+    vendor.contract_start_date = None
+    vendor.contract_end_date = None
+    vendor.last_review_date = None
+    vendor.next_review_date = None
+    vendor.is_active = True
     vendor.created_at = datetime(2024, 1, 1)
 
     result = MagicMock()

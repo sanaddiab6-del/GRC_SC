@@ -171,6 +171,7 @@ async def get_executive_dashboard(
     ]
 
     return DashboardData(
+        total_controls=total_controls,
         compliance_summary=compliance_summary,
         control_posture=control_posture,
         recent_evidence=total_evidence,

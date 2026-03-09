@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { format } from 'date-fns';
-import { ar } from 'date-fns/locale';
+import { ar } from 'date-fns/locale/ar';
 
 interface Incident {
   id: string;

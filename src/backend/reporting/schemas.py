@@ -58,6 +58,7 @@ class ControlPosture(BaseModel):
 
 class DashboardData(BaseModel):
     """Executive dashboard data"""
+    total_controls: int = 0
     compliance_summary: ComplianceSummary
     control_posture: List[ControlPosture]
     recent_evidence: int

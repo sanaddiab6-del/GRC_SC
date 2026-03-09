@@ -14,11 +14,11 @@ os.environ.setdefault("PYTEST_RUNNING", "1")
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-ci-32-chars-minimum-secure-key-12345")
 os.environ.setdefault(
     "DATABASE_URL",
-    "postgresql+asyncpg://postgres:postgres@localhost:5432/sico_grc_test",
+    "postgresql+asyncpg://postgres:root@localhost:5432/sico_grc_test",
 )
 os.environ.setdefault(
     "DATABASE_URL_SYNC",
-    "postgresql://postgres:postgres@localhost:5432/sico_grc_test",
+    "postgresql://postgres:root@localhost:5432/sico_grc_test",
 )
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379")
 
@@ -62,9 +62,9 @@ def apply_migrations() -> None:
 			alembic_cfg.set_main_option("sqlalchemy.url", database_url_sync)
 
 		command.upgrade(alembic_cfg, "head")
-		print("✓ Database migrations applied successfully")
+		print("[OK] Database migrations applied successfully")
 	except Exception as e:
-		print(f"⚠️  Database migration failed: {e}")
+		print(f"[WARN] Database migration failed: {e}")
 		print("   Falling back to SQLAlchemy create_all for test schema")
 		# Fallback: drop and recreate all tables from current models (safe for test env)
 		try:
@@ -85,7 +85,7 @@ def apply_migrations() -> None:
 				await engine.dispose()
 
 			asyncio.run(_recreate_db())
-			print("✓ Database schema created via SQLAlchemy models")
+			print("[OK] Database schema created via SQLAlchemy models")
 		except Exception as e2:
-			print(f"⚠️  Fallback schema creation also failed: {e2}")
+			print(f"[WARN] Fallback schema creation also failed: {e2}")
 			print("   Tests will run with limited functionality")

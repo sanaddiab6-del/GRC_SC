@@ -12,7 +12,7 @@ def test_code_changes_exist():
     
     try:
         # Check privacy router optimization
-        with open("src/backend/privacy/router.py") as f:
+        with open("src/backend/privacy/router.py", encoding="utf-8") as f:
             content = f.read()
             if "func.count()" in content and "select_from" in content:
                 print("  ✅ Privacy router uses func.count() optimization")
@@ -24,7 +24,7 @@ def test_code_changes_exist():
     
     try:
         # Check controls router optimization
-        with open("src/backend/controls/router.py") as f:
+        with open("src/backend/controls/router.py", encoding="utf-8") as f:
             content = f.read()
             if ".offset(offset).limit(limit)" in content:
                 print("  ✅ Controls router uses database pagination")
@@ -35,7 +35,7 @@ def test_code_changes_exist():
     
     try:
         # Check reporting router optimization
-        with open("src/backend/reporting/router.py") as f:
+        with open("src/backend/reporting/router.py", encoding="utf-8") as f:
             content = f.read()
             if "group_by(Control.status)" in content:
                 print("  ✅ Reporting router uses SQL aggregations")
@@ -46,7 +46,7 @@ def test_code_changes_exist():
     
     try:
         # Check evidence router optimization
-        with open("src/backend/evidence/router.py") as f:
+        with open("src/backend/evidence/router.py", encoding="utf-8") as f:
             content = f.read()
             if "group_by(Evidence.status)" in content:
                 print("  ✅ Evidence router uses SQL aggregations")
@@ -60,7 +60,7 @@ def test_model_indexes():
     
     try:
         # Check controls model
-        with open("src/backend/controls/models.py") as f:
+        with open("src/backend/controls/models.py", encoding="utf-8") as f:
             content = f.read()
             if 'domain = Column(String(100), nullable=False, index=True)' in content:
                 print("  ✅ Controls.domain index added")
@@ -71,7 +71,7 @@ def test_model_indexes():
     
     try:
         # Check evidence model
-        with open("src/backend/evidence/models.py") as f:
+        with open("src/backend/evidence/models.py", encoding="utf-8") as f:
             content = f.read()
             if 'control_id = Column(String(50), ForeignKey("controls.control_id"), nullable=False, index=True)' in content:
                 print("  ✅ Evidence.control_id index added")
@@ -86,7 +86,7 @@ def test_rag_caching():
     print("\nTesting RAG query caching...")
     
     try:
-        with open("ai/rag/bilingual_retriever.py") as f:
+        with open("ai/rag/bilingual_retriever.py", encoding="utf-8") as f:
             content = f.read()
             if "_query_cache" in content:
                 print("  ✅ Query cache implemented")
@@ -107,7 +107,7 @@ def test_chunker_optimization():
     print("\nTesting chunker optimizations...")
     
     try:
-        with open("ai/rag/chunker.py") as f:
+        with open("ai/rag/chunker.py", encoding="utf-8") as f:
             content = f.read()
             if "max_chunk_size" in content:
                 print("  ✅ Max chunk size enforcement added")
@@ -127,7 +127,7 @@ def test_frontend_hooks():
     try:
         if os.path.exists(hooks_file):
             print(f"  ✅ {hooks_file} exists")
-            with open(hooks_file) as f:
+            with open(hooks_file, encoding="utf-8") as f:
                 content = f.read()
                 if "useDebounce" in content:
                     print("  ✅ useDebounce hook implemented")
@@ -140,7 +140,7 @@ def test_frontend_hooks():
     
     try:
         # Check React.memo usage
-        with open("src/frontend/components/ui/index.tsx") as f:
+        with open("src/frontend/components/ui/index.tsx", encoding="utf-8") as f:
             content = f.read()
             memo_count = content.count("React.memo")
             if memo_count >= 5:
@@ -152,7 +152,7 @@ def test_frontend_hooks():
     
     try:
         # Check useMemo in controls page
-        with open("src/frontend/app/[locale]/grc/controls/page.tsx") as f:
+        with open("src/frontend/app/[locale]/grc/controls/page.tsx", encoding="utf-8") as f:
             content = f.read()
             if "useMemo" in content:
                 print("  ✅ useMemo optimization added")

@@ -114,6 +114,8 @@ async def test_list_report_templates():
 
 @pytest.mark.asyncio
 async def test_create_report_template():
+    import uuid as _uuid
+    from datetime import datetime as _dt
     from main import app
 
     session = AsyncMock()
@@ -124,24 +126,21 @@ async def test_create_report_template():
     session.add = MagicMock()
     session.commit = AsyncMock()
 
+    # Set attributes that match ReportTemplateBase/ReportTemplateResponse schema
     template_mock = MagicMock()
-    template_mock.template_id = 1
+    template_mock.id = _uuid.uuid4()
     template_mock.template_key = "monthly_compliance"
-    template_mock.name_en = "Monthly Report"
-    template_mock.name_ar = "تقرير شهري"
-    template_mock.description_en = "Desc"
-    template_mock.description_ar = "وصف"
-    template_mock.export_format = "pdf"
+    template_mock.name = "Monthly Report"
+    template_mock.entity_type = None
     template_mock.query_config = {}
-    template_mock.is_active = True
+    template_mock.export_format = "pdf"
+    template_mock.created_at = _dt(2024, 1, 1)
 
     async def fake_refresh(obj):
-        for attr in dir(template_mock):
-            if not attr.startswith("_"):
-                try:
-                    setattr(obj, attr, getattr(template_mock, attr))
-                except (AttributeError, TypeError):
-                    pass
+        # Copy only the schema-relevant attributes to avoid MagicMock noise
+        for attr in ["id", "template_key", "name", "entity_type", "query_config",
+                     "export_format", "created_at"]:
+            setattr(obj, attr, getattr(template_mock, attr))
 
     session.refresh = fake_refresh
 
@@ -150,10 +149,7 @@ async def test_create_report_template():
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
             r = await c.post("/api/v1/report-templates", json={
                 "template_key": "monthly_compliance",
-                "name_en": "Monthly Report",
-                "name_ar": "تقرير شهري",
-                "description_en": "Desc",
-                "description_ar": "وصف",
+                "name": "Monthly Report",
                 "export_format": "pdf",
             })
         # May be 201 or 200 depending on implementation

@@ -199,7 +199,7 @@ async def test_create_evidence_duplicate():
                 "title_en": "Dup",
                 "title_ar": "مكرر",
             })
-        assert r.status_code == 400
+        assert r.status_code == 409
     finally:
         _clear(app)
 
