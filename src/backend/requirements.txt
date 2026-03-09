@@ -1,31 +1,36 @@
-# Python dependencies for SICO GRC Backend (runtime)
+# Python dependencies for SICO GRC Backend (Python 3.11)
 
-# API server
+--index-url https://pypi.org/simple
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# API
 fastapi==0.129.0
 uvicorn[standard]==0.34.0
-python-multipart==0.0.9
+python-multipart==0.0.22
 
-# Database (PostgreSQL + async SQLAlchemy)
+# Database
 sqlalchemy[asyncio]==2.0.36
 asyncpg==0.30.0
-psycopg2-binary==2.9.10
-passlib[bcrypt]
-# Redis
+
+# Cache
 redis==5.2.1
 
 # Validation
 pydantic==2.10.5
 pydantic-settings==2.7.1
-email-validator==2.1.0
 
-# Authentication & security
+# Auth / Security
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 bcrypt==4.1.2
-cryptography==44.0.0
 
 # AI / RAG
-langchain==0.1.4
-chromadb==0.4.22
-transformers==4.48.0
-torch==2.5.1
+transformers==4.53.0
+langchain>=0.3.14,<0.4.0
+langchain-community>=0.3.14,<0.4.0
+langchain-core>=0.3.27,<0.4.0
+chromadb==0.5.23
+
+# PyTorch (CPU)
+torch==2.5.1+cpu ; platform_system == "Windows"
+torch==2.5.1 ; platform_system != "Windows"
