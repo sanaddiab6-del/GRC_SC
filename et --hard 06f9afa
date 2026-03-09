@@ -1,0 +1,122 @@
+[33m4ea0cfd[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m fixing CI/CD
+[33m7ce8425[m fixing CI errors
+[33m273384b[m fixing Backend Tests.7
+[33mb5ff594[m Merge branch 'main' of https://github.com/sonaiso/sanadcom
+[33m06f9afa[m fixing Backend Tests.7
+[33mfed5045[m Merge pull request #62 from sonaiso/copilot/update-application-url
+[33m0b9d3ff[m[33m ([m[1;31morigin/copilot/update-application-url[m[33m)[m Update application URL: port 5000 for frontend, fix hardcoded API URLs, add Codespace auto-config
+[33mbefe2d5[m Initial plan
+[33md17c812[m Merge pull request #58 from sonaiso/copilot/identify-slow-code-issues
+[33md98ab8d[m Merge pull request #60 from sonaiso/dependabot/pip/ai/pip-f555cbc803
+[33m54b6b29[m chore(deps): bump the pip group across 2 directories with 3 updates
+[33m801754e[m Merge pull request #55 from sonaiso/dependabot/npm_and_yarn/src/frontend/npm_and_yarn-00f1c93969
+[33md79bfbf[m Merge pull request #56 from sonaiso/dependabot/pip/ai/pip-290fe54528
+[33mdc30114[m Merge branch 'main' into dependabot/pip/ai/pip-290fe54528
+[33mfd92154[m Merge pull request #57 from sonaiso/copilot/fix-dependency-conflict
+[33m9a13155[m Merge pull request #52 from sonaiso/copilot/fix-cicd-pipeline-failures
+[33ma6c9d56[m[33m ([m[1;31morigin/copilot/identify-slow-code-issues[m[33m)[m perf: eliminate redundant queries, add pagination, fix duplicate methods, memoize React components
+[33m6d20b50[m Initial plan
+[33m732504b[m Merge pull request #45
+[33m324c49b[m[33m ([m[1;31morigin/copilot/fix-dependency-conflict[m[33m)[m Update AI/RAG Python Dependencies
+[33md6958b0[m Fix langchain/langchain-community version conflict with compatible 0.3.x versions
+[33m1ca666e[m Initial plan
+[33m786ed81[m fixing test_evidence
+[33ma2b627d[m[33m ([m[1;31morigin/dependabot/pip/ai/pip-290fe54528[m[33m)[m chore(deps): bump the pip group across 2 directories with 5 updates
+[33m292797f[m fixing test_evidence
+[33m9264c4f[m fixing AI security tests
+[33m124f59b[m loads of upgrades
+[33m936480d[m loads of upgrades
+[33m34eb60d[m loads of upgrades
+[33mde34f6a[m loads of upgrades
+[33m189a381[m loads of upgrades
+[33m8987cf4[m Fixing backend Error
+[33m14c5aba[m Fixing backend Error
+[33m2ae2b62[m JIRA model and Saas comp
+[33m9175690[m testing
+[33me79ff5a[m fixing Backend Tests.7
+[33m4e440ef[m fixing Backend Tests.7
+[33m81e3cd6[m fixing Backend Tests.6
+[33m432749c[m fixing Backend Tests.6
+[33mb440d2f[m fixing Backend Tests.5
+[33mb5cfd40[m fixing Backend Tests.5
+[33mfc49f11[m fixing Backend Tests.4
+[33m7322268[m fixing Backend Tests.3
+[33mb4b9d31[m fixing Backend Tests.3
+[33m2e349f0[m fixing security-quality.yml
+[33m50cf8d2[m fix Backend Tests.2
+[33mf01e703[m fix Backend Tests
+[33m064a52c[m fix axios.dt.ts
+[33mb4354ba[m JWT activated and backend functioning 100%
+[33m52746cf[m Editing libraries fix frontend Errors
+[33m6ae54ea[m[33m ([m[1;31morigin/dependabot/npm_and_yarn/src/frontend/npm_and_yarn-00f1c93969[m[33m)[m chore(deps): bump the npm_and_yarn group across 1 directory with 2 updates
+[33m4f94936[m filtering the platform
+[33mae91122[m fix backend Errors
+[33mb574a2a[m convert from sqlite to postgresql and setting up the backend
+[33mf800aa4[m committed docker back end files
+[33m31b9f85[m fixing security-scanning.yml file
+[33mcf875b2[m refactor(ci): fail only on fixable CRITICAL CVEs
+[33m99b004e[m fixing security-scanning.yml file
+[33m6a00163[m fix(security): upgrade frontend base image to Node 22 LTS, filter unfixable CVEs
+[33m9d64b55[m fixing Docker file
+[33m2aa243d[m Fix assessment migration user FK
+[33mc2ad610[m fixing the control library
+[33m8ac7748[m Fix Alembic multiple heads issue and add migration helper scripts
+[33mba57b8b[m fix all errors
+[33m45a3102[m fix all errors
+[33mb9eb767[m fix all errors
+[33m519c292[m Merge branch 'main' of https://github.com/sonaiso/sanadcom
+[33mae3912a[m fix all errors
+[33me4a6373[m Add CodeQL analysis workflow configuration
+[33m77abbb3[m undo command Bandit SARIF Upload
+[33mc83a2e7[m command Bandit SARIF Upload
+[33m0857f46[m command Bandit SARIF Upload
+[33m9cb7c49[m fix(ci): disable Code Scanning to skip SARIF upload requirements
+[33m3b048a4[m fix(ci): resolve timeout and disk space issues in security scanning
+[33m41340ca[m ✅ fix ENABLE_CODE_SCANNING.md code Scanning
+[33m9f33575[m fix CodeQL Upload security-scanning.yml:154:
+[33m644494d[m Fix CI/CD pipeline: add frontend-tests job, fix asyncio_mode, add workflow permissions
+[33m5e2fed2[m fix: enable CodeQL results upload for GitHub Code Scanning + add database docs
+[33md09d37f[m Initial plan
+[33mcba63c9[m Added missing Pydantic schema attributes to WorkflowCaseCreate
+[33mfb3c282[m fix(build): resolve Next.js build error and backend type issues
+[33m66996a7[m All errors in enterprise_router.py are now resolved!
+[33md1be7b8[m Fixed Pydantic v2 dependency conflict: safety 3.0.1 → 3.2.11
+[33mc19180f[m /ai-governance/page.tsx
+[33m8fc5679[m bashmohndes salem
+[33m4ffed41[m CancelToken
+[33ma53a796[m[33m ([m[1;31morigin/dependabot/npm_and_yarn/src/frontend/npm_and_yarn-f1bf2b0a19[m[33m)[m chore(deps-dev): bump ajv
+[33m91aa436[m fix(ci): correct workflow paths for security scanning jobs
+[33m2874afe[m fix(frontend): repair malformed package.json causing npm EJSONPARSE
+[33m36e6f88[m Installed alembic
+[33mad98fb4[m fix errors of backend
+[33ma961739[m Fix backend parse errors for coverage and stabilize routers
+[33m91055dc[m Fix malformed api package __init__ for coverage parsing
+[33m4394a9a[m Fix automation parser error and sync backend/frontend updates
+[33m4b71d50[m fix: use devcontainers-extra/features/poetry instead of discontinued reference
+[33mba153fe[m Restore platform to working state, fix backend dependency issues, and clean up environment (stage all changes)
+[33mb636d8f[m Restore platform to working state, fix backend dependency issues, and clean up environment
+[33mc8613c5[m Merge pull request #37 from sonaiso/copilot/fix-cicd-build-issues
+[33m5c0ccda[m[33m ([m[1;31morigin/copilot/fix-cicd-build-issues[m[33m)[m Fix CI failures: backend SQLAlchemy reserved metadata attribute and frontend missing imports
+[33me8f25a6[m Initial plan
+[33md416187[m Merge pull request #36 from sonaiso/copilot/fix-lifecycle-control-issues
+[33m7bd3ce2[m[33m ([m[1;31morigin/copilot/fix-lifecycle-control-issues[m[33m)[m Fix review comments: extract ternary expressions, address readability
+[33mea27ed2[m Fix syntax errors, add lifecycle/tamper/versions/packs, fix CI gates
+[33me833266[m Initial plan
+[33m44d980b[m fix(frontend): add missing useDebounce hook to resolve build error
+[33m0834b9a[m fix: resolve all config and workflow errors
+[33m2c01bad[m ci: upgrade Node.js to 20.11.1 for Next.js 15+ compatibility (frontend workflows)
+[33m16e5104[m chore: disable duplicate security workflows to restore full matrix checks via security-scanning.yml only
+[33m45e4423[m fix: update CodeQL upload-sarif to v4 and add SARIF existence checks for Bandit/Trivy reports
+[33m9e12b9a[m Fixed merge corruption/syntax error in database.py
+[33mea19417[m Merge pull request #27 from sonaiso/copilot/merge-branches-into-main
+[33mdf3434c[m[33m ([m[1;31morigin/copilot/merge-branches-into-main[m[33m)[m fix: update frontend/package-lock.json to resolve next@15.2.9 (remove pinned 15.1.6)
+[33m87ae34f[m fix: upgrade next to 15.2.9 and transformers to 4.48.0 to patch security vulnerabilities
+[33m89a2781[m Merge branch 'copilot/update-readme-documentation'
+[33ma8e70de[m Merge branch 'copilot/refactor-duplicate-code'
+[33ma49a551[m Merge branch 'copilot/organize-and-launch-platform'
+[33m424a553[m Merge branch 'copilot/manage-project-till-completion'
+[33m42549e8[m Merge branch 'copilot/improve-slow-code-efficiency'
+[33m040c613[m Merge branch 'copilot/improve-code-quality'
+[33m129c206[m Merge branch 'copilot/gather-project-materials'
+[33mfa21102[m Merge branch 'copilot/fixmerge-security-pipeline'
+[33m84519ce[

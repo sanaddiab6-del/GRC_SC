@@ -9,7 +9,7 @@ python-multipart==0.0.9
 sqlalchemy[asyncio]==2.0.36
 asyncpg==0.30.0
 psycopg2-binary==2.9.10
-
+passlib[bcrypt]
 # Redis
 redis==5.2.1
 
