@@ -14,7 +14,7 @@ export default async function HomePage({
       <div className="bg-gradient-to-br from-primary-600 to-primary-800 text-white py-20">
         <div className="container mx-auto px-4 text-center">
           <h1 className="text-5xl font-bold mb-6">
-            {isArabic ? 'منصة سيكو للحوكمة' : 'SICO GRC Platform'}
+            {'SICO GRC Platform'}
           </h1>
           <p className="text-xl mb-8 max-w-3xl mx-auto">
             {isArabic 

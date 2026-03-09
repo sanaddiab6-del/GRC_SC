@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "SICO GRC Platform | منصة سيكو للحوكمة",
+  title: "SICO GRC Platform",
   description: "Saudi Regulatory Compliance Engine - ECC, CCC, PDPL",
 };
 
