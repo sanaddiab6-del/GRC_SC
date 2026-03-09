@@ -4,7 +4,7 @@ External audit planning, finding tracking, and certification management.
 """
 from datetime import datetime
 from typing import Any, List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from audit.models import AuditType, AuditStatus, FindingSeverity, FindingStatus
 
@@ -59,8 +59,7 @@ class AuditProgramResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ===== AUDIT FINDING SCHEMAS =====
@@ -127,8 +126,7 @@ class AuditFindingResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ===== CERTIFICATION SCHEMAS =====
@@ -158,6 +156,5 @@ class CertificationResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 

@@ -7,7 +7,7 @@ from datetime import datetime, date
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy import Column, String, Integer, DateTime, Boolean, Text, Date
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -69,8 +69,7 @@ class FrameworkVersionResponse(FrameworkVersionCreate):
     id: int
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ---------------------------------------------------------------------------

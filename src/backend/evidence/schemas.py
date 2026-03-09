@@ -2,7 +2,7 @@
 Evidence schemas for API validation
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, Dict, Any
 from datetime import datetime
 
@@ -54,8 +54,7 @@ class EvidenceResponse(EvidenceBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class EvidenceIntegrityResponse(BaseModel):

@@ -1,7 +1,7 @@
 """
 Risk Management Pydantic schemas.
 """
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from uuid import UUID
@@ -67,8 +67,7 @@ class RiskResponse(BaseModel):
     last_assessed_at: Optional[datetime] = None
     next_review_date: Optional[datetime] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Risk assessment schemas
@@ -96,8 +95,7 @@ class AssessmentResponse(BaseModel):
     notes_en: Optional[str] = None
     notes_ar: Optional[str] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Third-party risk schemas
@@ -154,5 +152,4 @@ class VendorResponse(BaseModel):
     is_active: bool
     created_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

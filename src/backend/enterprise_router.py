@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import date, datetime, timedelta
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from core.database import get_db
 from auth.security import get_current_active_user, require_role
@@ -92,8 +92,7 @@ class OrganizationResponse(BaseModel):
     license_type: Optional[str]
     is_active: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserResponse(BaseModel):
@@ -105,8 +104,7 @@ class UserResponse(BaseModel):
     role: str
     is_active: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AssetResponse(BaseModel):
@@ -120,8 +118,7 @@ class AssetResponse(BaseModel):
     environment: Optional[str]
     is_active: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RiskResponse(BaseModel):
@@ -140,8 +137,7 @@ class RiskResponse(BaseModel):
     risk_level_residual: Optional[str]
     status: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AuditFindingResponse(BaseModel):
@@ -155,8 +151,7 @@ class AuditFindingResponse(BaseModel):
     target_closure_date: Optional[date]
     is_overdue: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AuditFindingListResponse(BaseModel):
@@ -172,8 +167,7 @@ class RoPAResponse(BaseModel):
     legal_basis: str
     status: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DSARResponse(BaseModel):
@@ -186,8 +180,7 @@ class DSARResponse(BaseModel):
     is_overdue: bool
     status: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DataBreachResponse(BaseModel):
@@ -200,8 +193,7 @@ class DataBreachResponse(BaseModel):
     sdaia_notified: bool
     status: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class WorkflowCaseResponse(BaseModel):
@@ -214,8 +206,7 @@ class WorkflowCaseResponse(BaseModel):
     status: str
     is_overdue: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class VendorResponse(BaseModel):
@@ -229,8 +220,7 @@ class VendorResponse(BaseModel):
     is_data_processor: bool
     status: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ComplianceMetricsResponse(BaseModel):
@@ -244,8 +234,7 @@ class ComplianceMetricsResponse(BaseModel):
     critical_risks: Optional[int]
     open_findings: Optional[int]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ============================================================================

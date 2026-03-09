@@ -5,7 +5,6 @@ Implements PDPL-compliant password hashing and JWT token management.
 from datetime import datetime, timedelta
 from typing import Optional, List, cast
 from jose import JWTError, ExpiredSignatureError, jwt
-from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,25 +15,7 @@ import hashlib
 from core.database import get_db
 from core.config import settings
 from auth.models import User, Role, Permission, AuditLog
-
-
-# ---------------------------------------------------------------------------
-# Password hashing – passlib bcrypt_sha256 for long secrets
-# ---------------------------------------------------------------------------
-pwd_context = CryptContext(schemes=["bcrypt_sha256"], deprecated="auto")
-
-
-def get_password_hash(password: str) -> str:
-    """Hash a plain-text password using bcrypt_sha256."""
-    return pwd_context.hash(password)
-
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a plain-text password against a bcrypt_sha256 hash."""
-    try:
-        return pwd_context.verify(plain_password, hashed_password)
-    except Exception:
-        return False
+from auth.password_utils import get_password_hash, verify_password  # noqa: F401
 
 
 # OAuth2 scheme

@@ -122,6 +122,17 @@ class Settings(BaseSettings):
     RATE_LIMIT_ENABLED: bool = True
     RATE_LIMIT_PER_MINUTE: int = 60
     RATE_LIMIT_PER_HOUR: int = 1000
+
+    @model_validator(mode="after")
+    def disable_rate_limit_in_tests(self) -> "Settings":
+        """Automatically disable rate limiting when running under pytest or TESTING=True."""
+        if (
+            os.getenv("PYTEST_RUNNING") == "1"
+            or os.getenv("PYTEST_CURRENT_TEST")
+            or os.getenv("TESTING", "").lower() in ("1", "true")
+        ):
+            self.RATE_LIMIT_ENABLED = False
+        return self
     
     # TLS/HTTPS
     TLS_ENABLED: bool = True

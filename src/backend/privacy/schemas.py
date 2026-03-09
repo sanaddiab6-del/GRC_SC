@@ -1,7 +1,7 @@
 """
 Privacy management schemas for PDPL compliance.
 """
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 from uuid import UUID
@@ -33,8 +33,7 @@ class ConsentResponse(BaseModel):
     withdrawn_at: Optional[datetime]
     expires_at: Optional[datetime]
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DSARCreate(BaseModel):
@@ -68,8 +67,7 @@ class DSARResponse(BaseModel):
     response_en: Optional[str]
     response_ar: Optional[str]
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DataClassificationCreate(BaseModel):
@@ -90,8 +88,7 @@ class DataClassificationResponse(BaseModel):
     classified_by: UUID
     classified_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DataBreachCreate(BaseModel):
@@ -119,8 +116,7 @@ class DataBreachResponse(BaseModel):
     sdaia_notified_at: Optional[datetime]
     users_notified_at: Optional[datetime]
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RetentionPolicyCreate(BaseModel):
@@ -142,8 +138,7 @@ class RetentionPolicyResponse(BaseModel):
     auto_delete_enabled: bool
     created_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PIACreate(BaseModel):
@@ -173,5 +168,4 @@ class PIAResponse(BaseModel):
     conducted_at: datetime
     approved_at: Optional[datetime]
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

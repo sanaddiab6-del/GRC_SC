@@ -1,7 +1,7 @@
 """
 AI Governance Pydantic schemas.
 """
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, ConfigDict
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from uuid import UUID
@@ -70,8 +70,7 @@ class AIModelResponse(BaseModel):
     created_at: datetime
     deployed_at: Optional[datetime] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Bias test schemas
@@ -114,8 +113,7 @@ class BiasTestResponse(BaseModel):
     tested_at: datetime
     tested_by: UUID
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Ethics review schemas
@@ -155,5 +153,4 @@ class EthicsReviewResponse(BaseModel):
     approved: bool
     next_review_date: Optional[datetime] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

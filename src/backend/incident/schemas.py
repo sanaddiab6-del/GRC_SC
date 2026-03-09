@@ -1,7 +1,7 @@
 """
 Incident Response Pydantic schemas.
 """
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, ConfigDict
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from uuid import UUID
@@ -70,8 +70,7 @@ class IncidentResponse(BaseModel):
     nca_reported: bool
     nca_reported_at: Optional[datetime] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class IncidentReport(BaseModel):
@@ -116,5 +115,4 @@ class PlaybookResponse(BaseModel):
     created_at: datetime
     is_active: bool
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

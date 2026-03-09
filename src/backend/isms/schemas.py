@@ -4,7 +4,7 @@ ISO 27001 policy management, asset inventory, and document control.
 """
 from datetime import datetime
 from typing import Optional, List, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from isms.models import PolicyStatus, PolicyType, DocumentClassification
 
@@ -91,8 +91,7 @@ class ISMSPolicyResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ===== ASSET INVENTORY SCHEMAS =====
@@ -163,5 +162,4 @@ class AssetResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

@@ -13,14 +13,14 @@ from collections import OrderedDict
 _LANGCHAIN_AVAILABLE = False
 
 if TYPE_CHECKING:
-    from langchain.embeddings import HuggingFaceEmbeddings  # type: ignore[import-not-found]
-    from langchain.vectorstores import Chroma  # type: ignore[import-not-found]
-    from langchain.schema import Document  # type: ignore[import-not-found]
+    from langchain_community.embeddings import HuggingFaceEmbeddings  # type: ignore[import-not-found]
+    from langchain_community.vectorstores import Chroma  # type: ignore[import-not-found]
+    from langchain_core.documents import Document  # type: ignore[import-not-found]
 else:
     try:
-        from langchain.embeddings import HuggingFaceEmbeddings  # type: ignore[import-not-found]
-        from langchain.vectorstores import Chroma  # type: ignore[import-not-found]
-        from langchain.schema import Document  # type: ignore[import-not-found]
+        from langchain_community.embeddings import HuggingFaceEmbeddings  # type: ignore[import-not-found]
+        from langchain_community.vectorstores import Chroma  # type: ignore[import-not-found]
+        from langchain_core.documents import Document  # type: ignore[import-not-found]
         _LANGCHAIN_AVAILABLE = True
     except ImportError:
         HuggingFaceEmbeddings = None
