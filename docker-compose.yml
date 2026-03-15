@@ -78,6 +78,9 @@ services:
       - PROTOCOL_HEADER=x-forwarded-proto
       - HOST_HEADER=x-forwarded-host
     image: ghcr.io/intuitem/ciso-assistant-community/frontend:latest
+    volumes:
+      - ./frontend/static/favicon.svg:/app/build/client/favicon.svg:ro
+      - ./frontend/static/favicon.ico:/app/build/client/favicon.ico:ro
     pull_policy: always
     restart: always
     depends_on:
