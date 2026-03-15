@@ -1,0 +1,514 @@
+urn: urn:intuitem:risk:library:nca-ccc-1
+locale: en
+ref_id: nca-cloud-cybersecurity-controls
+name: NCA Cloud Cybersecurity Controls (CCC)
+description: "The Saudi National Cybersecurity Authority (NCA) Cloud Cybersecurity Controls\
+  \ (CCC \u2013 1:2020) provide cybersecurity requirements for Cloud Service Providers\
+  \ (CSPs) and Cloud Service Tenants (CSTs) in Saudi Arabia.\nReference: https://nca.gov.sa/en/legislation?item=193&slug=controls-list"
+copyright: "\xA9 NCA"
+version: 1
+publication_date: 2024-04-19
+provider: NCA
+packager: intuitem
+objects:
+  framework:
+    urn: urn:intuitem:risk:framework:nca-ccc-1
+    ref_id: nca-cloud-cybersecurity-controls
+    name: NCA Cloud Cybersecurity Controls (CCC)
+    description: Saudi National Cybersecurity Authority framework for Cloud Cybersecurity
+      Controls (CCC) applicable to Cloud Service Providers and Cloud Service Tenants
+    requirement_nodes:
+    # ===== Domain 1: Cybersecurity Governance =====
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:1
+      assessable: false
+      depth: 1
+      ref_id: '1'
+      name: Cybersecurity Governance
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:1-1
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:1
+      ref_id: 1-1
+      name: Cloud Cybersecurity Strategy
+      description: To ensure that cloud cybersecurity plans, goals, initiatives and
+        projects are contributing to compliance with related laws and regulations.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:1-1-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:1-1
+      ref_id: 1-1-1
+      description: A cloud cybersecurity strategy must be defined, documented and
+        approved, consistent with the organization's cybersecurity strategy. It must
+        be supported by the Authorizing Official.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:1-1-2
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:1-1
+      ref_id: 1-1-2
+      description: The cloud cybersecurity strategy must be reviewed periodically
+        and updated upon changes to related laws and regulations or cloud computing
+        environment.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:1-2
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:1
+      ref_id: 1-2
+      name: Cloud Cybersecurity Management
+      description: To ensure Authorizing Official's support in implementing and managing
+        cloud cybersecurity programs within the organization.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:1-2-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:1-2
+      ref_id: 1-2-1
+      description: Cloud cybersecurity requirements must be included in the organization's
+        cybersecurity policies and procedures.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:1-2-2
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:1-2
+      ref_id: 1-2-2
+      description: Roles, responsibilities and authorities for cloud cybersecurity
+        must be clearly defined, documented and assigned.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:1-2-3
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:1-2
+      ref_id: 1-2-3
+      description: Cloud cybersecurity requirements must be addressed in project management
+        for all cloud computing related projects.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:1-3
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:1
+      ref_id: 1-3
+      name: Cloud Cybersecurity Policies and Procedures
+      description: To ensure cybersecurity policies and procedures for cloud computing
+        services are defined, approved, implemented and communicated.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:1-3-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:1-3
+      ref_id: 1-3-1
+      description: Cloud cybersecurity policies and procedures must be defined, documented,
+        approved and communicated to relevant stakeholders.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:1-3-2
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:1-3
+      ref_id: 1-3-2
+      description: Cloud cybersecurity policies and procedures must be reviewed periodically
+        and updated upon changes.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:1-4
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:1
+      ref_id: 1-4
+      name: Cloud Cybersecurity Risk Management
+      description: To ensure that cloud cybersecurity risks are managed effectively
+        within the organization.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:1-4-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:1-4
+      ref_id: 1-4-1
+      description: Cloud cybersecurity risks must be identified, assessed, treated
+        and monitored as part of the organization's cybersecurity risk management
+        methodology.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:1-4-2
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:1-4
+      ref_id: 1-4-2
+      description: The organization must ensure that a risk assessment is conducted
+        before adopting cloud computing services.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:1-5
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:1
+      ref_id: 1-5
+      name: Cloud Cybersecurity in Human Resources
+      description: To ensure human resources cybersecurity requirements are addressed
+        for cloud computing services.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:1-5-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:1-5
+      ref_id: 1-5-1
+      description: Background checks must be conducted on cloud computing personnel
+        before granting access to the organization's cloud assets and information.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:1-5-2
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:1-5
+      ref_id: 1-5-2
+      description: Cloud cybersecurity awareness and training programs must be established
+        and maintained for cloud computing personnel.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:1-6
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:1
+      ref_id: 1-6
+      name: Cloud Cybersecurity Compliance
+      description: To ensure compliance with cloud cybersecurity regulatory requirements
+        and cloud service agreements.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:1-6-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:1-6
+      ref_id: 1-6-1
+      description: Compliance with cloud cybersecurity requirements related to applicable
+        laws, regulations and policies must be ensured.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:1-6-2
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:1-6
+      ref_id: 1-6-2
+      description: The cloud service provider (CSP) must comply with national cybersecurity
+        regulations and controls issued by NCA.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:1-6-3
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:1-6
+      ref_id: 1-6-3
+      description: Cloud cybersecurity periodic review and audit requirements must
+        be defined and implemented.
+    # ===== Domain 2: Cybersecurity Defense =====
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:2
+      assessable: false
+      depth: 1
+      ref_id: '2'
+      name: Cybersecurity Defense
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:2-1
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:2
+      ref_id: 2-1
+      name: Cloud Asset Management
+      description: To ensure that cloud computing assets are identified, classified
+        and managed.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:2-1-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:2-1
+      ref_id: 2-1-1
+      description: An inventory of cloud computing assets must be defined, documented
+        and maintained. This must include assets related to information, software,
+        hardware, services, personnel and cloud service configurations.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:2-1-2
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:2-1
+      ref_id: 2-1-2
+      description: Cloud computing assets must be classified based on the organization's
+        information classification scheme.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:2-2
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:2
+      ref_id: 2-2
+      name: Cloud Identity and Access Management
+      description: To ensure that only authorized individuals can access the organization's
+        cloud computing resources.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:2-2-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:2-2
+      ref_id: 2-2-1
+      description: Cloud identity and access management requirements must be defined,
+        documented and implemented. Multi-factor authentication must be enforced for
+        all cloud administration access.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:2-2-2
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:2-2
+      ref_id: 2-2-2
+      description: Privileged access to cloud computing environments must be managed,
+        monitored and controlled using the principle of least privilege.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:2-2-3
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:2-2
+      ref_id: 2-2-3
+      description: Cloud service access must be reviewed periodically to ensure it
+        remains appropriate, and revoked when no longer required.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:2-3
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:2
+      ref_id: 2-3
+      name: Cloud Data and Information Protection
+      description: To ensure the protection of data and information stored, processed
+        or transmitted through cloud computing services.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:2-3-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:2-3
+      ref_id: 2-3-1
+      description: Data classification and handling requirements for cloud computing
+        must be defined and implemented in accordance with the organization's data
+        classification scheme.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:2-3-2
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:2-3
+      ref_id: 2-3-2
+      description: Data stored in cloud computing environments must be encrypted at
+        rest and in transit using approved cryptographic algorithms with encryption
+        keys managed by the organization.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:2-3-3
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:2-3
+      ref_id: 2-3-3
+      description: Data localization requirements must be defined and implemented,
+        ensuring that sensitive and classified data is stored and processed within
+        the Kingdom of Saudi Arabia.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:2-3-4
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:2-3
+      ref_id: 2-3-4
+      description: Data backup and recovery requirements for cloud computing services
+        must be defined, documented and tested regularly.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:2-3-5
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:2-3
+      ref_id: 2-3-5
+      description: Secure data deletion procedures must be defined and implemented
+        for cloud computing environments including data sanitization upon service
+        termination.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:2-4
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:2
+      ref_id: 2-4
+      name: Cloud Cryptography
+      description: To ensure proper use of cryptography to protect the confidentiality,
+        integrity and availability of cloud assets.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:2-4-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:2-4
+      ref_id: 2-4-1
+      description: Cryptographic controls for cloud computing must be defined, documented
+        and implemented. Nationally approved cryptographic algorithms and key lengths
+        must be used.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:2-4-2
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:2-4
+      ref_id: 2-4-2
+      description: Encryption key management requirements for cloud computing must
+        be defined and implemented. The organization must retain control of encryption
+        keys, and hardware security modules (HSMs) must be used for key management.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:2-5
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:2
+      ref_id: 2-5
+      name: Cloud Network Security
+      description: To ensure the security of cloud network infrastructure and connections.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:2-5-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:2-5
+      ref_id: 2-5-1
+      description: Cloud network security requirements must be defined, documented
+        and implemented. Network segmentation must be applied to isolate the organization's
+        cloud workloads.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:2-5-2
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:2-5
+      ref_id: 2-5-2
+      description: Virtual private networks (VPNs) or dedicated connectivity must
+        be used to securely connect to cloud computing environments.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:2-5-3
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:2-5
+      ref_id: 2-5-3
+      description: Cloud security monitoring, logging and threat detection requirements
+        must be defined and implemented for network traffic.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:2-6
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:2
+      ref_id: 2-6
+      name: Cloud Virtualization Security
+      description: To ensure the security of virtualization technologies used in cloud
+        computing.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:2-6-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:2-6
+      ref_id: 2-6-1
+      description: Cloud virtualization security requirements must be defined, documented
+        and implemented. Hypervisor hardening and secure configuration must be enforced.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:2-6-2
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:2-6
+      ref_id: 2-6-2
+      description: Container and microservices security requirements must be defined
+        and implemented for cloud computing environments.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:2-7
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:2
+      ref_id: 2-7
+      name: Cloud Vulnerability Management
+      description: To ensure cloud computing vulnerabilities are identified, assessed
+        and remediated in a timely manner.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:2-7-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:2-7
+      ref_id: 2-7-1
+      description: Cloud vulnerability management requirements must be defined, documented
+        and implemented. Regular vulnerability assessments and penetration testing
+        of cloud environments must be conducted.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:2-7-2
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:2-7
+      ref_id: 2-7-2
+      description: Cloud configuration management and security hardening requirements
+        must be defined and implemented using cloud security benchmarks (e.g., CIS Benchmarks).
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:2-8
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:2
+      ref_id: 2-8
+      name: Cloud Security Event and Incident Management
+      description: To ensure timely detection, response and recovery from cloud cybersecurity
+        events and incidents.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:2-8-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:2-8
+      ref_id: 2-8-1
+      description: Cloud security event logging, monitoring and analysis requirements
+        must be defined, documented and implemented. Logs must be stored and protected
+        for a period determined by applicable laws and regulations.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:2-8-2
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:2-8
+      ref_id: 2-8-2
+      description: Cloud cybersecurity incident response procedures must be defined,
+        documented and tested. The CSP must notify the organization of security incidents
+        affecting the cloud environment.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:2-8-3
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:2-8
+      ref_id: 2-8-3
+      description: Security information and event management (SIEM) or equivalent
+        capability must be implemented for cloud computing environments.
+    # ===== Domain 3: Cybersecurity Resilience =====
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:3
+      assessable: false
+      depth: 1
+      ref_id: '3'
+      name: Cybersecurity Resilience
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:3-1
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:3
+      ref_id: 3-1
+      name: Cloud Business Continuity and Disaster Recovery
+      description: To ensure cloud computing business continuity and disaster recovery
+        plans are defined, implemented and tested.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:3-1-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:3-1
+      ref_id: 3-1-1
+      description: Cloud business continuity and disaster recovery plans must be defined,
+        documented and maintained. Recovery time objectives (RTO) and recovery point
+        objectives (RPO) must be defined.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:3-1-2
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:3-1
+      ref_id: 3-1-2
+      description: Cloud business continuity and disaster recovery plans must be tested
+        periodically and updated upon changes.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:3-1-3
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:3-1
+      ref_id: 3-1-3
+      description: Cloud service portability and exit strategy requirements must be
+        defined to ensure the organization can migrate services, applications and
+        data from one CSP to another or back to on-premise.
+    # ===== Domain 4: Third-Party and Cloud Service Provider Security =====
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:4
+      assessable: false
+      depth: 1
+      ref_id: '4'
+      name: Third-Party and Cloud Service Provider Security
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:4-1
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:4
+      ref_id: 4-1
+      name: Cloud Service Provider Cybersecurity
+      description: To ensure that cloud service providers meet the organization's
+        cybersecurity requirements.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:4-1-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:4-1
+      ref_id: 4-1-1
+      description: Cloud service provider cybersecurity requirements must be defined,
+        documented and included in contracts and service level agreements (SLAs).
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:4-1-2
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:4-1
+      ref_id: 4-1-2
+      description: The CSP must be classified and registered by the Communications,
+        Space and Technology Commission (CST) and comply with the Cloud Computing
+        Regulatory Framework (CCRF).
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:4-1-3
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:4-1
+      ref_id: 4-1-3
+      description: Cloud service provider cybersecurity posture must be assessed and
+        monitored periodically, including independent third-party assessments or certifications.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:4-1-4
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:4-1
+      ref_id: 4-1-4
+      description: The CSP must notify the organization of material changes to cloud
+        services, subcontractors, or data processing locations that may affect the
+        security posture.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:4-2
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:4
+      ref_id: 4-2
+      name: Cloud Service Agreements and SLA Management
+      description: To ensure that cloud service agreements include adequate cybersecurity
+        requirements and responsibilities.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:4-2-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:4-2
+      ref_id: 4-2-1
+      description: Cloud service agreements must clearly define the shared responsibility
+        model, specifying security responsibilities between the CSP and CST.
+    - urn: urn:intuitem:risk:req_node:nca-ccc-1:4-2-2
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-ccc-1:4-2
+      ref_id: 4-2-2
+      description: Service level agreements (SLAs) must include cybersecurity requirements,
+        service availability, data protection, incident notification and compliance
+        obligations.

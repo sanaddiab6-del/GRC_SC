@@ -1,0 +1,508 @@
+urn: urn:intuitem:risk:library:nca-pdpl-1
+locale: en
+ref_id: nca-pdpl
+name: Saudi Personal Data Protection Law (PDPL)
+description: "The Saudi Personal Data Protection Law (PDPL), issued by Royal Decree\
+  \ M/19 dated 9/2/1443H (September 2021), regulates the collection, processing,\
+  \ disclosure and retention of personal data in the Kingdom of Saudi Arabia. Overseen\
+  \ by the Saudi Data and Artificial Intelligence Authority (SDAIA).\nReference: https://sdaia.gov.sa"
+copyright: "\xA9 Kingdom of Saudi Arabia"
+version: 1
+publication_date: 2024-04-19
+provider: NCA
+packager: intuitem
+objects:
+  framework:
+    urn: urn:intuitem:risk:framework:nca-pdpl-1
+    ref_id: nca-pdpl
+    name: Saudi Personal Data Protection Law (PDPL)
+    description: Saudi Arabia's Personal Data Protection Law (PDPL) framework covering
+      data protection principles, rights of data subjects, obligations of data controllers,
+      and data transfer requirements
+    requirement_nodes:
+    # ===== Chapter 1: General Provisions =====
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:1
+      assessable: false
+      depth: 1
+      ref_id: '1'
+      name: General Provisions
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:1-1
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:1
+      ref_id: 1-1
+      name: Scope and Applicability
+      description: Defines the scope and applicability of the Personal Data Protection
+        Law.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:1-1-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:1-1
+      ref_id: 1-1-1
+      description: The law applies to any processing of personal data related to
+        individuals in the Kingdom of Saudi Arabia by any means, including processing
+        by entities located outside the Kingdom if the processing relates to individuals
+        residing in the Kingdom.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:1-1-2
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:1-1
+      ref_id: 1-1-2
+      description: The controller must determine the purpose and means of personal
+        data processing, and must comply with the provisions of this law and its
+        implementing regulations.
+    # ===== Chapter 2: Personal Data Collection and Processing =====
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:2
+      assessable: false
+      depth: 1
+      ref_id: '2'
+      name: Personal Data Collection and Processing
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:2-1
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:2
+      ref_id: 2-1
+      name: Lawful Basis for Processing
+      description: Establishes the lawful bases for collecting and processing personal data.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:2-1-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:2-1
+      ref_id: 2-1-1
+      description: Personal data must not be collected except directly from the data
+        subject. Collection from other sources is permitted only with the consent
+        of the data subject or where the data is publicly available.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:2-1-2
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:2-1
+      ref_id: 2-1-2
+      description: Personal data must be collected for clear, specific and legitimate
+        purposes, and must not be processed in a manner incompatible with those purposes.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:2-1-3
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:2-1
+      ref_id: 2-1-3
+      description: The collection of personal data must be limited to the minimum
+        necessary to achieve the purpose for which it is collected (data minimization).
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:2-2
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:2
+      ref_id: 2-2
+      name: Consent Requirements
+      description: Requirements for obtaining valid consent from data subjects.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:2-2-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:2-2
+      ref_id: 2-2-1
+      description: The consent of the data subject must be obtained before collecting,
+        processing or disclosing their personal data, unless a legal exception applies.
+        Consent must be explicit, informed, freely given and specific.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:2-2-2
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:2-2
+      ref_id: 2-2-2
+      description: The data subject must have the right to withdraw consent at any
+        time. Withdrawal of consent does not affect the lawfulness of processing
+        carried out prior to the withdrawal.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:2-2-3
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:2-2
+      ref_id: 2-2-3
+      description: Processing of personal data without consent is permitted when
+        necessary for compliance with another law, fulfillment of a contract,
+        protection of vital interests, or legitimate interests of the controller
+        that do not override the rights of the data subject.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:2-3
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:2
+      ref_id: 2-3
+      name: Sensitive Personal Data
+      description: Special requirements for processing sensitive personal data.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:2-3-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:2-3
+      ref_id: 2-3-1
+      description: Sensitive personal data (including health data, genetic data, credit/financial
+        data, criminal records, biometric data, ethnic/racial origin, and data revealing
+        religious or political beliefs) must not be processed without explicit consent
+        or an applicable legal exception.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:2-3-2
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:2-3
+      ref_id: 2-3-2
+      description: Additional safeguards must be implemented when processing sensitive
+        personal data, including enhanced security measures, access controls and
+        impact assessments.
+    # ===== Chapter 3: Rights of Data Subjects =====
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:3
+      assessable: false
+      depth: 1
+      ref_id: '3'
+      name: Rights of Data Subjects
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:3-1
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:3
+      ref_id: 3-1
+      name: Right to Be Informed
+      description: Data subjects' right to be informed about data processing activities.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:3-1-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:3-1
+      ref_id: 3-1-1
+      description: The data subject must be informed of the legal justification for
+        collecting their data, the purpose of collection, the identity of the entity
+        collecting the data, and any entities to whom the data may be disclosed.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:3-1-2
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:3-1
+      ref_id: 3-1-2
+      description: A clear and comprehensive privacy notice must be provided to the
+        data subject before or at the time of data collection, written in clear and
+        easy-to-understand language.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:3-2
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:3
+      ref_id: 3-2
+      name: Right of Access
+      description: Data subjects' right to access their personal data.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:3-2-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:3-2
+      ref_id: 3-2-1
+      description: The data subject has the right to request access to their personal
+        data held by the controller, including the purpose of processing, categories
+        of data processed, and entities to whom data has been disclosed.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:3-3
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:3
+      ref_id: 3-3
+      name: Right to Rectification and Erasure
+      description: Data subjects' right to correct or delete their personal data.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:3-3-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:3-3
+      ref_id: 3-3-1
+      description: The data subject has the right to request correction, completion
+        or updating of their personal data where it is inaccurate, incomplete or
+        outdated.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:3-3-2
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:3-3
+      ref_id: 3-3-2
+      description: The data subject has the right to request destruction or erasure
+        of their personal data when it is no longer necessary for the purpose for
+        which it was collected, when consent is withdrawn, or when processed unlawfully.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:3-4
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:3
+      ref_id: 3-4
+      name: Right to Object and Restrict Processing
+      description: Data subjects' right to object to or restrict processing.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:3-4-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:3-4
+      ref_id: 3-4-1
+      description: The data subject has the right to object to the processing of
+        their personal data or to request restriction of processing in certain
+        circumstances as defined by the law.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:3-4-2
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:3-4
+      ref_id: 3-4-2
+      description: The data subject has the right not to be subject to decisions based
+        solely on automated processing, including profiling, that produce legal effects
+        or significantly affect them.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:3-5
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:3
+      ref_id: 3-5
+      name: Right to Data Portability
+      description: Data subjects' right to receive and transfer their data.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:3-5-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:3-5
+      ref_id: 3-5-1
+      description: The data subject has the right to obtain their personal data in
+        a structured, commonly used and machine-readable format, and to transfer
+        that data to another controller where technically feasible.
+    # ===== Chapter 4: Obligations of the Controller =====
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:4
+      assessable: false
+      depth: 1
+      ref_id: '4'
+      name: Obligations of the Controller
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:4-1
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:4
+      ref_id: 4-1
+      name: Data Protection Measures
+      description: Security and organizational measures required of data controllers.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:4-1-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:4-1
+      ref_id: 4-1-1
+      description: The controller must implement appropriate technical and organizational
+        measures to protect personal data from loss, damage, disclosure, alteration,
+        unauthorized access or any form of illegal processing.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:4-1-2
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:4-1
+      ref_id: 4-1-2
+      description: The controller must ensure that personal data is accurate and up
+        to date, and must take reasonable steps to correct or delete inaccurate data
+        without delay.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:4-1-3
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:4-1
+      ref_id: 4-1-3
+      description: The controller must implement privacy by design and by default,
+        ensuring that data protection measures are integrated into processing operations
+        from the outset.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:4-2
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:4
+      ref_id: 4-2
+      name: Data Protection Impact Assessment
+      description: Requirements for conducting data protection impact assessments.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:4-2-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:4-2
+      ref_id: 4-2-1
+      description: A data protection impact assessment must be conducted before
+        processing that is likely to result in a high risk to the rights and freedoms
+        of data subjects, including large-scale processing of sensitive data, systematic
+        monitoring, and automated decision-making.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:4-2-2
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:4-2
+      ref_id: 4-2-2
+      description: The impact assessment must include a description of the processing
+        operations, the purpose, necessity, risks to data subjects, and the measures
+        to address those risks.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:4-3
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:4
+      ref_id: 4-3
+      name: Record Keeping and Documentation
+      description: Requirements for maintaining records of processing activities.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:4-3-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:4-3
+      ref_id: 4-3-1
+      description: The controller must maintain a record of processing activities,
+        including the categories of data processed, purposes, recipients, data transfers,
+        retention periods and security measures.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:4-3-2
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:4-3
+      ref_id: 4-3-2
+      description: Records of processing activities must be made available to the
+        competent authority upon request.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:4-4
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:4
+      ref_id: 4-4
+      name: Data Breach Notification
+      description: Requirements for notifying breaches involving personal data.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:4-4-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:4-4
+      ref_id: 4-4-1
+      description: The controller must notify the competent authority without undue
+        delay and within the timeframe specified by the implementing regulations
+        in the event of a personal data breach that is likely to cause harm to data
+        subjects.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:4-4-2
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:4-4
+      ref_id: 4-4-2
+      description: Where the data breach is likely to result in a high risk to the
+        rights and freedoms of data subjects, the controller must also notify the
+        affected data subjects without undue delay.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:4-5
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:4
+      ref_id: 4-5
+      name: Data Retention and Destruction
+      description: Requirements for retaining and destroying personal data.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:4-5-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:4-5
+      ref_id: 4-5-1
+      description: Personal data must be destroyed when the purpose for which it
+        was collected has been achieved, the retention period has expired, or upon
+        request of the data subject, unless retention is required by another law.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:4-5-2
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:4-5
+      ref_id: 4-5-2
+      description: Data retention periods must be defined and documented, and personal
+        data must not be retained longer than necessary for the purpose of processing.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:4-6
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:4
+      ref_id: 4-6
+      name: Processor Requirements
+      description: Requirements related to data processors and sub-processors.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:4-6-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:4-6
+      ref_id: 4-6-1
+      description: The controller must ensure that data processors provide sufficient
+        guarantees regarding technical and organizational measures to protect personal
+        data, and the processing must be governed by a written contract.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:4-6-2
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:4-6
+      ref_id: 4-6-2
+      description: The processor must not engage another processor (sub-processor)
+        without prior written authorization of the controller.
+    # ===== Chapter 5: Cross-Border Data Transfer =====
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:5
+      assessable: false
+      depth: 1
+      ref_id: '5'
+      name: Cross-Border Data Transfer
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:5-1
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:5
+      ref_id: 5-1
+      name: Data Transfer Conditions
+      description: Conditions and requirements for transferring personal data outside
+        the Kingdom of Saudi Arabia.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:5-1-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:5-1
+      ref_id: 5-1-1
+      description: Personal data must not be transferred outside the Kingdom of Saudi
+        Arabia except in accordance with the conditions specified in the law and
+        implementing regulations, including ensuring an adequate level of data protection
+        in the receiving country.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:5-1-2
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:5-1
+      ref_id: 5-1-2
+      description: Cross-border data transfer may be permitted when it is necessary
+        for the fulfillment of an obligation under an international agreement, for
+        serving the interests of the Kingdom, or with the approval of the competent
+        authority.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:5-1-3
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:5-1
+      ref_id: 5-1-3
+      description: A risk assessment must be conducted before transferring personal
+        data outside the Kingdom to evaluate the level of data protection in the
+        receiving country or organization.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:5-1-4
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:5-1
+      ref_id: 5-1-4
+      description: Appropriate safeguards must be in place for cross-border transfers,
+        including binding corporate rules, standard contractual clauses, or certification
+        mechanisms as approved by the competent authority.
+    # ===== Chapter 6: Penalties and Enforcement =====
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:6
+      assessable: false
+      depth: 1
+      ref_id: '6'
+      name: Penalties and Enforcement
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:6-1
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:6
+      ref_id: 6-1
+      name: Violations and Penalties
+      description: Penalties for violations of the Personal Data Protection Law.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:6-1-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:6-1
+      ref_id: 6-1-1
+      description: Any person who violates the provisions of this law relating to
+        the disclosure or publication of sensitive personal data shall be subject
+        to imprisonment for a period not exceeding two years and/or a fine not exceeding
+        SAR 3,000,000.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:6-1-2
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:6-1
+      ref_id: 6-1-2
+      description: Any person who violates other provisions of the law relating to
+        the transfer of personal data outside the Kingdom in violation of the requirements
+        shall be subject to a fine not exceeding SAR 5,000,000.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:6-1-3
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:6-1
+      ref_id: 6-1-3
+      description: The competent authority has the power to issue warnings, order
+        corrective measures, impose administrative fines, and in cases of repeated
+        violations, the fine may be doubled.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:6-2
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:6
+      ref_id: 6-2
+      name: Complaints and Recourse
+      description: Mechanisms for data subjects to file complaints and seek recourse.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:6-2-1
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:6-2
+      ref_id: 6-2-1
+      description: Data subjects have the right to file complaints with the competent
+        authority regarding any violation of the provisions of this law.
+    - urn: urn:intuitem:risk:req_node:nca-pdpl-1:6-2-2
+      assessable: true
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-pdpl-1:6-2
+      ref_id: 6-2-2
+      description: The controller must have an internal process for receiving and
+        handling data subject complaints and requests, and must respond within the
+        timeframes specified in the implementing regulations.
