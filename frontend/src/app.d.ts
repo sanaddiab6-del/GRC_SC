@@ -1,0 +1,29 @@
+// See https://kit.svelte.dev/docs/types#app
+// for information about these interfaces
+// and what to do when importing types
+
+import type { User, GlobalSettings } from '$lib/utils/types';
+import type { FeatureFlags } from '$lib/feature-flags';
+
+declare global {
+	namespace App {
+		// interface Error {}
+		interface Locals {
+			user: User;
+			featureFlags: FeatureFlags;
+			globalSettings: GlobalSettings;
+			generalSettings: Record<string, any>;
+		}
+		interface PageData {
+			flash?: {
+				type: 'success' | 'error' | 'warning' | 'info';
+				message: string;
+				timeout?: number;
+				autohide?: boolean;
+			};
+		}
+		// interface Platform {}
+	}
+}
+
+export {};

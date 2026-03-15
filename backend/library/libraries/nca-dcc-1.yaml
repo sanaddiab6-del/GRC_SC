@@ -1,0 +1,329 @@
+urn: urn:intuitem:risk:library:nca-dcc-1
+locale: en
+ref_id: DCC-1
+name: Data Cybersecurity Controls
+description: "The NCA publishes the Data Cybersecurity Controls (DCC-1:2021).\n\
+  These controls define the minimum cybersecurity requirements to protect data\
+  \ assets within organizations.\n\nReference: https://nca.gov.sa/en/legislation?item=195"
+copyright: "© NCA"
+version: 1
+publication_date: 2024-06-19
+provider: NCA
+packager: intuitem
+objects:
+  framework:
+    urn: urn:intuitem:risk:framework:nca-dcc-1
+    ref_id: DCC-1
+    name: Data Cybersecurity Controls
+    description: Saudi National Cybersecurity Authority framework for Data Cybersecurity Controls (DCC-1:2021)
+    requirement_nodes:
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:1
+      assessable: false
+      depth: 1
+      ref_id: '1'
+      name: Data Cybersecurity Governance
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:1-1
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:1
+      ref_id: 1-1
+      name: Data Cybersecurity Policies and Procedures
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:1-1-controls
+      assessable: false
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:1-1
+      name: Controls
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:1-1-1
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:1-1-controls
+      ref_id: 1-1-1
+      description: The organization must define, document, approve, and implement data cybersecurity policies and procedures covering all data assets and lifecycles.
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:1-1-2
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:1-1-controls
+      ref_id: 1-1-2
+      description: Data handling procedures must cover all phases of the data lifecycle including collection, processing, storage, transfer, archiving, and disposal.
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:1-1-3
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:1-1-controls
+      ref_id: 1-1-3
+      description: Data cybersecurity policies must be reviewed at least annually and updated to reflect regulatory, organizational, and threat landscape changes.
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:1-1-4
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:1-1-controls
+      ref_id: 1-1-4
+      description: Data cybersecurity policies must be communicated to all relevant staff, and awareness training must be provided on data handling requirements.
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:1-2
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:1
+      ref_id: 1-2
+      name: Data Cybersecurity Roles and Responsibilities
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:1-2-controls
+      assessable: false
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:1-2
+      name: Controls
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:1-2-1
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:1-2-controls
+      ref_id: 1-2-1
+      description: A Data Protection Officer (DPO) or equivalent role must be designated with defined responsibilities for data cybersecurity governance and compliance.
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:1-2-2
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:1-2-controls
+      ref_id: 1-2-2
+      description: Data owners must be assigned for all data assets, with responsibility for classification, access control decisions, and ensuring appropriate security controls.
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:1-2-3
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:1-2-controls
+      ref_id: 1-2-3
+      description: Data custodians must be defined with operational responsibilities for implementing data security controls as directed by data owners.
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:1-3
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:1
+      ref_id: 1-3
+      name: Data Management Compliance
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:1-3-controls
+      assessable: false
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:1-3
+      name: Controls
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:1-3-1
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:1-3-controls
+      ref_id: 1-3-1
+      description: The organization must comply with all applicable data protection laws and regulations, including the Personal Data Protection Law (PDPL) and relevant NCA regulations.
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:1-3-2
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:1-3-controls
+      ref_id: 1-3-2
+      description: Data Protection Impact Assessments (DPIA) must be conducted for high-risk data processing activities before initiation.
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:2
+      assessable: false
+      depth: 1
+      ref_id: '2'
+      name: Data Classification
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:2-1
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:2
+      ref_id: 2-1
+      name: Data Classification Controls
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:2-1-controls
+      assessable: false
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:2-1
+      name: Controls
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:2-1-1
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:2-1-controls
+      ref_id: 2-1-1
+      description: A data classification scheme must be established with defined sensitivity levels (e.g., Top Secret, Secret, Confidential, Public) aligned with national classification standards and business requirements.
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:2-1-2
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:2-1-controls
+      ref_id: 2-1-2
+      description: All organizational data assets must be classified according to the defined classification scheme, with data owners responsible for classification decisions.
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:2-1-3
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:2-1-controls
+      ref_id: 2-1-3
+      description: Data must be labeled (physically and digitally) according to its classification level to enable appropriate handling throughout its lifecycle.
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:2-1-4
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:2-1-controls
+      ref_id: 2-1-4
+      description: Data classification must be reviewed periodically and updated when the sensitivity or criticality of data changes.
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:3
+      assessable: false
+      depth: 1
+      ref_id: '3'
+      name: Data Handling Controls
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:3-1
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:3
+      ref_id: 3-1
+      name: Data at Rest
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:3-1-controls
+      assessable: false
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:3-1
+      name: Controls
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:3-1-1
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:3-1-controls
+      ref_id: 3-1-1
+      description: Sensitive and classified data stored on any media must be encrypted using approved encryption algorithms (e.g., AES-256 or equivalent).
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:3-1-2
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:3-1-controls
+      ref_id: 3-1-2
+      description: Access controls must be implemented to restrict access to stored data based on the need-to-know principle and user roles.
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:3-1-3
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:3-1-controls
+      ref_id: 3-1-3
+      description: Physical storage media containing sensitive data must be protected with appropriate physical security controls and tracked throughout their lifecycle.
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:3-2
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:3
+      ref_id: 3-2
+      name: Data in Transit
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:3-2-controls
+      assessable: false
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:3-2
+      name: Controls
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:3-2-1
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:3-2-controls
+      ref_id: 3-2-1
+      description: Sensitive data transmitted over networks must be encrypted using approved secure protocols (e.g., TLS 1.2 or higher, IPSec).
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:3-2-2
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:3-2-controls
+      ref_id: 3-2-2
+      description: Secure, approved channels must be used for all data transfers, and unauthorized data transfer methods must be blocked.
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:3-3
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:3
+      ref_id: 3-3
+      name: Data Usage
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:3-3-controls
+      assessable: false
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:3-3
+      name: Controls
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:3-3-1
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:3-3-controls
+      ref_id: 3-3-1
+      description: Data Loss Prevention (DLP) solutions or equivalent controls must be implemented to prevent unauthorized copying, forwarding, printing, or exfiltration of sensitive data.
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:3-3-2
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:3-3-controls
+      ref_id: 3-3-2
+      description: User access to data must be logged and monitored, with alerts generated for unusual or unauthorized data access patterns.
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:3-3-3
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:3-3-controls
+      ref_id: 3-3-3
+      description: Restrictions must be in place to prevent unauthorized copying of data to removable media, personal devices, or unapproved cloud storage services.
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:3-4
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:3
+      ref_id: 3-4
+      name: Data Retention and Destruction
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:3-4-controls
+      assessable: false
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:3-4
+      name: Controls
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:3-4-1
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:3-4-controls
+      ref_id: 3-4-1
+      description: Retention periods must be defined for all data types, based on legal, regulatory, and business requirements, and documented in a data retention schedule.
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:3-4-2
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:3-4-controls
+      ref_id: 3-4-2
+      description: Data that has reached its retention period must be securely deleted or destroyed using approved methods (e.g., cryptographic erasure, physical destruction) that prevent recovery.
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:3-4-3
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:3-4-controls
+      ref_id: 3-4-3
+      description: Records of data deletion and destruction must be maintained, including the date, method, and authorization for destruction.
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:4
+      assessable: false
+      depth: 1
+      ref_id: '4'
+      name: Data Audit and Monitoring
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:4-1
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:4
+      ref_id: 4-1
+      name: Data Audit Logs
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:4-1-controls
+      assessable: false
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:4-1
+      name: Controls
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:4-1-1
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:4-1-controls
+      ref_id: 4-1-1
+      description: Audit logging must be enabled for all access to sensitive and classified data, capturing who accessed what data, when, from where, and what action was performed.
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:4-1-2
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:4-1-controls
+      ref_id: 4-1-2
+      description: Audit logs must be stored securely with controls to prevent unauthorized modification, deletion, or tampering.
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:4-1-3
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:4-1-controls
+      ref_id: 4-1-3
+      description: Audit logs must be retained for a period consistent with regulatory requirements and the organization's log retention policy.
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:4-2
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:4
+      ref_id: 4-2
+      name: Data Access Monitoring
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:4-2-controls
+      assessable: false
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:4-2
+      name: Controls
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:4-2-1
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:4-2-controls
+      ref_id: 4-2-1
+      description: Continuous monitoring must be implemented to detect and alert on unauthorized, excessive, or anomalous access to sensitive data assets.
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:4-2-2
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:4-2-controls
+      ref_id: 4-2-2
+      description: Alerts generated by data access monitoring tools must be investigated promptly, with a defined escalation path for confirmed data security incidents.
+    - urn: urn:intuitem:risk:req_node:nca-dcc-1:4-2-3
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-dcc-1:4-2-controls
+      ref_id: 4-2-3
+      description: Data access logs must be reviewed periodically by data owners or security personnel to ensure access patterns are appropriate and authorized.

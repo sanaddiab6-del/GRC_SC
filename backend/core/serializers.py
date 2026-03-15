@@ -1,0 +1,3944 @@
+import importlib
+from typing import Any
+
+import structlog
+from django.db import models, transaction
+from django.db.models import F
+from django.utils import timezone
+
+from ciso_assistant.settings import EMAIL_HOST, EMAIL_HOST_RESCUE
+from core.models import *
+from core.serializer_fields import (
+    FieldsRelatedField,
+    HashSlugRelatedField,
+    PathField,
+)
+from core.utils import time_state
+from ebios_rm.models import EbiosRMStudy, Stakeholder
+from tprm.models import Contract, Solution
+from global_settings.utils import ff_is_enabled
+from iam.models import *
+from django.contrib.auth.models import Permission
+
+from rest_framework import serializers
+from rest_framework.exceptions import PermissionDenied
+
+from integrations.models import IntegrationConfiguration, SyncMapping
+
+logger = structlog.get_logger(__name__)
+
+
+class SerializerFactory:
+    """Factory to get a serializer class from a list of modules.
+
+    Attributes:
+    modules (list): List of module names to search for the serializer.
+    """
+
+    def __init__(self, *modules: str):
+        # Reverse to prioritize later modules
+        self.modules = list(reversed(modules))
+
+    def get_serializer(self, base_name: str, action: str):
+        if action in ["list", "retrieve"]:
+            serializer_name = f"{base_name}ReadSerializer"
+        elif action in ["create", "update", "partial_update", "destroy"]:
+            serializer_name = f"{base_name}WriteSerializer"
+        else:
+            return None
+
+        return self._get_serializer_class(serializer_name)
+
+    def _get_serializer_class(self, serializer_name: str):
+        for module_name in self.modules:
+            try:
+                serializer_module = importlib.import_module(module_name)
+                serializer_class = getattr(serializer_module, serializer_name)
+                return serializer_class
+            except (ModuleNotFoundError, AttributeError):
+                continue
+
+        raise ValueError(
+            f"Serializer {serializer_name} not found in any provided modules"
+        )
+
+
+class BaseModelSerializer(serializers.ModelSerializer):
+    FLAGGED_FIELDS: dict[str, str] = {}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        for field_name, flag_name in self.FLAGGED_FIELDS.items():
+            if not ff_is_enabled(flag_name):
+                self.fields.pop(field_name)
+
+    def _check_object_perm(
+        self, instance_or_data, action: str, *, folder: Folder | None = None
+    ) -> None:
+        """Check that the requesting user has *action* permission on the resolved folder."""
+        if folder is None:
+            folder = Folder.get_folder(instance_or_data)
+        if folder is None:
+            return
+        request = self.context.get("request")
+        if request is None:
+            return
+        if not RoleAssignment.is_access_allowed(
+            user=request.user,
+            perm=Permission.objects.get(
+                codename=f"{action}_{self.Meta.model._meta.model_name}",
+            ),
+            folder=folder,
+        ):
+            raise PermissionDenied(
+                {
+                    "folder": f"You do not have permission to {action} objects in this folder"
+                }
+            )
+
+    def _ensure_immutable(self, field_name: str, value) -> None:
+        """Raise PermissionDenied if a field's value is changing on update."""
+        if self.instance is None:
+            return
+        current_id = getattr(self.instance, f"{field_name}_id", None)
+        if current_id and str(value.id) != str(current_id):
+            raise PermissionDenied({field_name: "This field is immutable"})
+
+    def validate_folder(self, folder: Folder) -> Folder:
+        """Enforce permission when an object is moved to a different folder."""
+        if (
+            self.instance is not None
+            and hasattr(self.instance, "folder_id")
+            and str(folder.id) != str(self.instance.folder_id)
+        ):
+            if getattr(self.instance, "builtin", False):
+                raise PermissionDenied(
+                    {"folder": "Builtin objects cannot change folder"}
+                )
+            self._check_object_perm(self.instance, "add", folder=folder)
+        return folder
+
+    def update(self, instance: models.Model, validated_data: Any) -> models.Model:
+        self._check_object_perm(instance, "change")
+        if hasattr(instance, "urn") and getattr(instance, "urn"):
+            raise PermissionDenied({"urn": "Imported objects cannot be modified"})
+        try:
+            object_updated = super().update(instance, validated_data)
+            return object_updated
+        except Exception as e:
+            logger.error(e)
+            raise serializers.ValidationError(e.args[0])
+
+    def _check_m2m_visibility(self, validated_data: dict) -> None:
+        """Verify that all M2M linked objects are visible to the requesting user."""
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return
+        user = request.user
+        root_folder = Folder.get_root_folder()
+        accessible_cache: dict = {}
+        for field_name, value in validated_data.items():
+            if not isinstance(value, list) or not value:
+                continue
+            if not all(isinstance(item, models.Model) for item in value):
+                continue
+            related_model = type(value[0])
+            if related_model not in accessible_cache:
+                try:
+                    ids = RoleAssignment.get_accessible_object_ids(
+                        root_folder, user, related_model
+                    )[0]
+                    accessible_cache[related_model] = {str(i) for i in ids}
+                except (NotImplementedError, Permission.DoesNotExist):
+                    accessible_cache[related_model] = None
+            accessible_ids = accessible_cache[related_model]
+            if accessible_ids is None:
+                continue
+            for item in value:
+                if str(item.id) not in accessible_ids:
+                    raise PermissionDenied(
+                        {
+                            field_name: f"You do not have permission to link to this {related_model._meta.model_name}"
+                        }
+                    )
+
+    def validate(self, data):
+        data = super().validate(data)
+        self._check_m2m_visibility(data)
+        return data
+
+    def delete(self, instance: models.Model) -> None:
+        """Enforce delete permission before removing *instance*."""
+        self._check_object_perm(instance, "delete")
+        instance.delete()
+
+    def create(self, validated_data: Any):
+        logger.debug("validated data", **validated_data)
+        folder = Folder.get_folder(validated_data)
+        folder = folder if folder else Folder.get_root_folder()
+        self._check_object_perm(validated_data, "add", folder=folder)
+        try:
+            object_created = super().create(validated_data)
+            return object_created
+        except ValidationError as e:
+            logger.error(e)
+            raise serializers.ValidationError(e.args[0])
+
+    def get_path(self, obj):
+        """
+        Gets the pre-calculated folder path for list views, with a fallback.
+        """
+        optimized_data = self.context.get("optimized_data")
+        if optimized_data:
+            # Use the pre-calculated path data if available
+            return optimized_data.get("paths", {}).get(obj.id, [])
+
+        # Fallback for single object serialization (e.g., retrieve endpoint)
+        # We manually serialize the folder objects to match the new optimized output
+        folders = obj.get_folder_full_path()
+        return [{"id": f.id, "name": f.name} for f in folders]
+
+    class Meta:
+        model: models.Model
+
+
+class ReferentialSerializer(BaseModelSerializer):
+    name = serializers.CharField(source="get_name_translated")
+    description = serializers.CharField(
+        source="get_description_translated", allow_blank=True, allow_null=True
+    )
+    annotation = serializers.CharField(
+        source="get_annotation_translated", allow_blank=True, allow_null=True
+    )
+
+    class Meta:
+        model: ReferentialObjectMixin
+        exclude = ["translations"]
+
+
+class AssessmentReadSerializer(BaseModelSerializer):
+    path = PathField(read_only=True)
+    perimeter = FieldsRelatedField(["id", "folder"])
+    authors = FieldsRelatedField(many=True)
+    reviewers = FieldsRelatedField(many=True)
+    folder = FieldsRelatedField()
+
+
+# Risk Assessment
+
+
+class RiskMatrixReadSerializer(ReferentialSerializer):
+    folder = FieldsRelatedField()
+    json_definition = serializers.JSONField(source="get_json_translated")
+    library = FieldsRelatedField(["name", "id"])
+
+    class Meta:
+        model = RiskMatrix
+        exclude = ["translations"]
+
+
+class RiskMatrixWriteSerializer(RiskMatrixReadSerializer):
+    pass
+
+
+class RiskMatrixImportExportSerializer(BaseModelSerializer):
+    library = serializers.SlugRelatedField(slug_field="urn", read_only=True)
+
+    class Meta:
+        model = RiskMatrix
+        fields = [
+            "created_at",
+            "updated_at",
+            "urn",
+            "name",
+            "description",
+            "ref_id",
+            "annotation",
+            "translations",
+            "locale",
+            "default_locale",
+            "library",
+            "is_enabled",
+            "provider",
+            "json_definition",
+        ]
+
+
+class VulnerabilityReadSerializer(BaseModelSerializer):
+    path = PathField(read_only=True)
+    folder = FieldsRelatedField()
+    applied_controls = FieldsRelatedField(many=True)
+    assets = FieldsRelatedField(many=True)
+    filtering_labels = FieldsRelatedField(["id", "folder"], many=True)
+    security_exceptions = FieldsRelatedField(many=True)
+    severity = serializers.CharField(source="get_severity_display")
+
+    class Meta:
+        model = Vulnerability
+        exclude = ["created_at", "updated_at", "is_published"]
+
+
+class VulnerabilityWriteSerializer(BaseModelSerializer):
+    class Meta:
+        model = Vulnerability
+        exclude = ["created_at", "updated_at", "is_published"]
+
+
+class VulnerabilityImportExportSerializer(BaseModelSerializer):
+    folder = HashSlugRelatedField(slug_field="pk", read_only=True)
+    applied_controls = HashSlugRelatedField(slug_field="pk", read_only=True, many=True)
+
+    class Meta:
+        model = Vulnerability
+        fields = [
+            "ref_id",
+            "name",
+            "description",
+            "folder",
+            "status",
+            "severity",
+            "applied_controls",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class RiskAcceptanceWriteSerializer(BaseModelSerializer):
+    class Meta:
+        model = RiskAcceptance
+        exclude = ["accepted_at", "rejected_at", "revoked_at", "state"]
+
+
+class RiskAcceptanceReadSerializer(BaseModelSerializer):
+    path = PathField(read_only=True)
+    folder = FieldsRelatedField()
+    risk_scenarios = FieldsRelatedField(many=True)
+    approver = FieldsRelatedField(["id", "first_name", "last_name"])
+    state = serializers.CharField(source="get_state_display")
+
+    class Meta:
+        model = RiskAcceptance
+        fields = "__all__"
+
+
+class PerimeterWriteSerializer(BaseModelSerializer):
+    def validate_name(self, value):
+        """
+        Check that the folder perimeter name does not contain the character "/"
+        """
+        if "/" in value:
+            raise serializers.ValidationError(
+                "The name cannot contain '/' for a Perimeter."
+            )
+        return value
+
+    def update(self, instance, validated_data):
+        new_folder = validated_data.get("folder", None)
+        if new_folder is not None:
+            new_folder_id = (
+                new_folder.id if isinstance(new_folder, models.Model) else new_folder
+            )
+            if new_folder_id and str(new_folder_id) != str(instance.folder_id):
+                raise PermissionDenied({"folder": "Perimeter domain cannot be changed"})
+        return super().update(instance, validated_data)
+
+    class Meta:
+        model = Perimeter
+        exclude = ["created_at"]
+
+
+class PerimeterReadSerializer(BaseModelSerializer):
+    path = PathField(read_only=True)
+    folder = FieldsRelatedField()
+    lc_status = serializers.CharField(source="get_lc_status_display")
+    default_assignee = FieldsRelatedField(many=True)
+
+    class Meta:
+        model = Perimeter
+        fields = "__all__"
+
+
+class PerimeterImportExportSerializer(BaseModelSerializer):
+    folder = HashSlugRelatedField(slug_field="pk", read_only=True)
+
+    class Meta:
+        model = Perimeter
+        fields = [
+            "ref_id",
+            "name",
+            "description",
+            "folder",
+            "lc_status",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class RiskAssessmentWriteSerializer(BaseModelSerializer):
+    def validate(self, attrs):
+        if hasattr(self, "instance") and self.instance and self.instance.is_locked:
+            # If we're unlocking (setting is_locked to False), allow the operation
+            if "is_locked" in attrs and attrs["is_locked"] is False:
+                return super().validate(attrs)
+
+            # Otherwise, only allow modifying the is_locked field
+            locked_fields = [field for field in attrs.keys() if field != "is_locked"]
+            if locked_fields:
+                raise serializers.ValidationError(
+                    f"⚠️ Cannot modify the risk assessment attributes when it is locked. Only the 'Locked' field can be modified."
+                )
+        return super().validate(attrs)
+
+    def update(self, instance, validated_data):
+        # Check if status is changing to deprecated
+        old_status = instance.status
+        new_status = validated_data.get("status", old_status)
+
+        # Auto-lock when status changes to deprecated
+        if old_status != "deprecated" and new_status == "deprecated":
+            validated_data["is_locked"] = True
+
+        # If perimeter is being changed, update folder to match the new perimeter's folder
+        if "perimeter" in validated_data:
+            new_perimeter = validated_data["perimeter"]
+            if new_perimeter and new_perimeter.folder:
+                validated_data["folder"] = new_perimeter.folder
+
+        # Check if folder is being changed (either directly or via perimeter)
+        new_folder = validated_data.get("folder")
+        if new_folder and new_folder != instance.folder:
+            # Cascade folder change to all child RiskScenarios
+            instance.risk_scenarios.update(folder=new_folder)
+
+        return super().update(instance, validated_data)
+
+    class Meta:
+        model = RiskAssessment
+        exclude = ["created_at", "updated_at"]
+
+
+class RiskAssessmentDuplicateSerializer(BaseModelSerializer):
+    class Meta:
+        model = RiskAssessment
+        fields = ["name", "version", "perimeter", "description"]
+
+
+class RiskAssessmentReadSerializer(AssessmentReadSerializer):
+    path = PathField(read_only=True)
+    str = serializers.CharField(source="__str__")
+    perimeter = FieldsRelatedField(["id", "folder"])
+    folder = FieldsRelatedField()
+    risk_scenarios = FieldsRelatedField(many=True, fields=["id", "name", "ref_id"])
+    risk_scenarios_count = serializers.IntegerField(source="risk_scenarios.count")
+    risk_matrix = FieldsRelatedField()
+    ebios_rm_study = FieldsRelatedField(["id", "name"])
+    validation_flows = FieldsRelatedField(
+        many=True,
+        fields=[
+            "id",
+            "ref_id",
+            "status",
+            {"approver": ["id", "email", "first_name", "last_name"]},
+        ],
+        source="validationflow_set",
+    )
+
+    class Meta:
+        model = RiskAssessment
+        exclude = []
+
+
+class RiskAssessmentImportExportSerializer(BaseModelSerializer):
+    risk_matrix = serializers.SlugRelatedField(slug_field="urn", read_only=True)
+
+    folder = HashSlugRelatedField(slug_field="pk", read_only=True)
+    perimeter = HashSlugRelatedField(slug_field="pk", read_only=True)
+    ebios_rm_study = HashSlugRelatedField(slug_field="pk", read_only=True)
+
+    class Meta:
+        model = RiskAssessment
+        fields = [
+            "ref_id",
+            "name",
+            "version",
+            "description",
+            "folder",
+            "perimeter",
+            "eta",
+            "due_date",
+            "status",
+            "observation",
+            "risk_matrix",
+            "ebios_rm_study",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class AssetCapabilityReadSerializer(ReferentialSerializer):
+    class Meta:
+        model = AssetCapability
+        exclude = ["translations"]
+
+
+class AssetCapabilityWriteSerializer(AssetCapabilityReadSerializer):
+    pass
+
+
+class AssetWriteSerializer(BaseModelSerializer):
+    ebios_rm_studies = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=EbiosRMStudy.objects.all(),
+        required=False,
+        allow_null=True,
+        write_only=True,
+    )
+    parent_assets = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=Asset.objects.all(),
+        required=False,
+    )
+    support_assets = serializers.PrimaryKeyRelatedField(
+        source="child_assets",
+        many=True,
+        queryset=Asset.objects.all(),
+        required=False,
+    )
+    solutions = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=Solution.objects.all(),
+        required=False,
+    )
+    security_exceptions = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=SecurityException.objects.all(),
+        required=False,
+    )
+    applied_controls = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=AppliedControl.objects.all(),
+        required=False,
+    )
+    vulnerabilities = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=Vulnerability.objects.all(),
+        required=False,
+    )
+    incidents = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=Incident.objects.all(),
+        required=False,
+    )
+    organisation_objectives = serializers.PrimaryKeyRelatedField(
+        queryset=OrganisationObjective.objects.all(),
+        many=True,
+        required=False,
+    )
+
+    class Meta:
+        model = Asset
+        exclude = ["business_value"]
+
+    def validate(self, data):
+        parent_assets = data.get("parent_assets", [])
+        support_assets = data.get("child_assets", [])
+        """
+        Check that the assets graph will not contain cycles
+        """
+        myset = set()
+        if self.instance:
+            myset = set([self.instance])
+        if parent_assets:
+            myset = myset | set(support_assets)
+
+            for asset in parent_assets:
+                if myset & set(asset.ancestors_plus_self()):
+                    raise serializers.ValidationError(
+                        "errorAssetGraphMustNotContainCycles"
+                    )
+        return super().validate(data)
+
+    def create(self, validated_data):
+        parent_assets = validated_data.pop("parent_assets", None)
+        child_assets = validated_data.pop("child_assets", None)
+        applied_controls = validated_data.pop("applied_controls", None)
+        vulnerabilities = validated_data.pop("vulnerabilities", None)
+        incidents = validated_data.pop("incidents", None)
+        asset = super().create(validated_data)
+
+        if parent_assets is not None:
+            asset.parent_assets.set(parent_assets)
+        if child_assets is not None:
+            asset.child_assets.set(child_assets)
+        if applied_controls is not None:
+            asset.applied_controls.set(applied_controls)
+        if vulnerabilities is not None:
+            asset.vulnerabilities.set(vulnerabilities)
+        if incidents is not None:
+            asset.incidents.set(incidents)
+
+        return asset
+
+    def update(self, instance, validated_data):
+        parent_assets = validated_data.pop("parent_assets", None)
+        child_assets = validated_data.pop("child_assets", None)
+        applied_controls = validated_data.pop("applied_controls", None)
+        vulnerabilities = validated_data.pop("vulnerabilities", None)
+        incidents = validated_data.pop("incidents", None)
+
+        instance = super().update(instance, validated_data)
+
+        # Set parent_assets and support_assets (child_assets) if provided
+        if parent_assets is not None:
+            instance.parent_assets.set(parent_assets)
+        if child_assets is not None:
+            instance.child_assets.set(child_assets)
+        if applied_controls is not None:
+            instance.applied_controls.set(applied_controls)
+        if vulnerabilities is not None:
+            instance.vulnerabilities.set(vulnerabilities)
+        if incidents is not None:
+            instance.incidents.set(incidents)
+
+        return instance
+
+
+class AssetReadSerializer(AssetWriteSerializer):
+    path = PathField(read_only=True)
+    folder = FieldsRelatedField()
+    parent_assets = FieldsRelatedField(many=True)
+    support_assets = FieldsRelatedField(source="child_assets", many=True)
+    owner = FieldsRelatedField(many=True)
+    filtering_labels = FieldsRelatedField(["id", "folder"], many=True)
+    type = serializers.CharField(source="get_type_display")
+    security_exceptions = FieldsRelatedField(many=True)
+    personal_data = FieldsRelatedField(many=True)
+    asset_class = FieldsRelatedField(["id", "name"])
+    overridden_children_capabilities = FieldsRelatedField(["id", "name"], many=True)
+    solutions = FieldsRelatedField(many=True)
+    applied_controls = FieldsRelatedField(many=True)
+
+    children_assets = serializers.SerializerMethodField()
+    security_objectives = serializers.SerializerMethodField()
+    disaster_recovery_objectives = serializers.SerializerMethodField()
+    security_capabilities = serializers.SerializerMethodField()
+    recovery_capabilities = serializers.SerializerMethodField()
+    security_objectives_comparison = serializers.SerializerMethodField()
+    recovery_objectives_comparison = serializers.SerializerMethodField()
+
+    def get_children_assets(self, obj):
+        """
+        Gets pre-calculated descendant IDs for list views, with a fallback for detail views.
+        """
+        optimized_data = self.context.get("optimized_data")
+        if optimized_data:
+            # Use pre-calculated data if available
+            return optimized_data.get("descendants", {}).get(obj.id, [])
+
+        # Fallback for single object serialization
+        return obj.children_assets.annotate(str=F("name")).values("id", "str")
+
+    def get_security_objectives(self, obj):
+        """
+        Gets pre-calculated security objectives for list views, with a fallback.
+        """
+        optimized_data = self.context.get("optimized_data")
+        if optimized_data:
+            return optimized_data.get("security_objectives", {}).get(obj.id, [])
+
+        # Fallback for single object serialization
+        return obj.get_security_objectives_display()
+
+    def get_disaster_recovery_objectives(self, obj):
+        """
+        Gets pre-calculated disaster recovery objectives for list views, with a fallback.
+        """
+        optimized_data = self.context.get("optimized_data")
+        if optimized_data:
+            return optimized_data.get("disaster_recovery_objectives", {}).get(
+                obj.id, []
+            )
+
+        # Fallback for single object serialization
+        return obj.get_disaster_recovery_objectives_display()
+
+    def get_security_capabilities(self, obj):
+        """
+        Gets pre-calculated security capabilities for list views, with a fallback.
+        """
+        optimized_data = self.context.get("optimized_data")
+        if optimized_data:
+            return optimized_data.get("security_capabilities", {}).get(obj.id, [])
+
+        # Fallback for single object serialization
+        return obj.get_security_capabilities_display()
+
+    def get_recovery_capabilities(self, obj):
+        """
+        Gets pre-calculated recovery capabilities for list views, with a fallback.
+        """
+        optimized_data = self.context.get("optimized_data")
+        if optimized_data:
+            return optimized_data.get("recovery_capabilities", {}).get(obj.id, [])
+
+        # Fallback for single object serialization
+        return obj.get_recovery_capabilities_display()
+
+    def get_security_objectives_comparison(self, obj):
+        """
+        Gets comparison of security objectives vs capabilities with verdict.
+        """
+        return obj.get_security_objectives_comparison()
+
+    def get_recovery_objectives_comparison(self, obj):
+        """
+        Gets comparison of recovery objectives vs capabilities with verdict.
+        """
+        return obj.get_recovery_objectives_comparison()
+
+
+class AssetAutocompleteSerializer(BaseModelSerializer):
+    folder = FieldsRelatedField()
+    type = serializers.CharField(source="get_type_display")
+
+    class Meta:
+        model = Asset
+        fields = ["id", "name", "ref_id", "type", "folder"]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["str"] = str(instance)
+        return data
+
+
+class AssetImportExportSerializer(BaseModelSerializer):
+    folder = HashSlugRelatedField(slug_field="pk", read_only=True)
+    parent_assets = HashSlugRelatedField(slug_field="pk", read_only=True, many=True)
+
+    class Meta:
+        model = Asset
+        fields = [
+            "type",
+            "name",
+            "description",
+            "reference_link",
+            "security_objectives",
+            "disaster_recovery_objectives",
+            "parent_assets",
+            "folder",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class AssetClassReadSerializer(BaseModelSerializer):
+    path = PathField(read_only=True)
+    parent = FieldsRelatedField()
+    full_path = serializers.CharField()
+
+    class Meta:
+        model = AssetClass
+        exclude = ["created_at", "updated_at", "folder", "is_published"]
+
+
+class AssetClassWriteSerializer(BaseModelSerializer):
+    class Meta:
+        model = AssetClass
+        exclude = ["created_at", "updated_at", "folder", "is_published"]
+
+
+class ReferenceControlWriteSerializer(BaseModelSerializer):
+    class Meta:
+        model = ReferenceControl
+        exclude = ["translations"]
+
+
+class ReferenceControlReadSerializer(ReferentialSerializer):
+    path = PathField(read_only=True)
+    folder = FieldsRelatedField()
+    library = FieldsRelatedField(["name", "id"])
+    filtering_labels = FieldsRelatedField(["id", "folder"], many=True)
+
+    class Meta:
+        model = ReferenceControl
+        exclude = ["translations"]
+
+
+class ReferenceControlImportExportSerializer(BaseModelSerializer):
+    library = serializers.SlugRelatedField(slug_field="urn", read_only=True)
+
+    folder = HashSlugRelatedField(slug_field="pk", read_only=True)
+
+    class Meta:
+        model = ReferenceControl
+        fields = [
+            "ref_id",
+            "name",
+            "description",
+            "urn",
+            "provider",
+            "category",
+            "csf_function",
+            "typical_evidence",
+            "annotation",
+            "translations",
+            "locale",
+            "default_locale",
+            "folder",
+            "library",
+            "created_at",
+            "updated_at",
+        ]
+
+
+"""class LibraryReadSerializer(BaseModelSerializer):
+    class Meta:
+        model = LoadedLibrary
+        fields = "__all__"
+
+
+class LibraryWriteSerializer(BaseModelSerializer):
+    class Meta:
+        model = LoadedLibrary
+        fields = "__all__"
+"""
+
+
+class ThreatWriteSerializer(BaseModelSerializer):
+    class Meta:
+        model = Threat
+        exclude = ["translations"]
+
+
+class ThreatReadSerializer(ReferentialSerializer):
+    path = PathField(read_only=True)
+    folder = FieldsRelatedField()
+    library = FieldsRelatedField(["name", "id"])
+    filtering_labels = FieldsRelatedField(["id", "folder"], many=True)
+
+    class Meta:
+        model = Threat
+        exclude = ["translations"]
+
+
+class ThreatImportExportSerializer(BaseModelSerializer):
+    library = serializers.SlugRelatedField(slug_field="urn", read_only=True)
+
+    folder = HashSlugRelatedField(slug_field="pk", read_only=True)
+
+    class Meta:
+        model = Threat
+        fields = [
+            "created_at",
+            "updated_at",
+            "folder",
+            "urn",
+            "ref_id",
+            "provider",
+            "name",
+            "description",
+            "annotation",
+            "translations",
+            "locale",
+            "default_locale",
+            "library",
+        ]
+
+
+class RiskScenarioWriteSerializer(BaseModelSerializer):
+    # Note: Inherent risk fields are always accepted for writing,
+    # but only displayed when inherent_risk feature flag is enabled
+    FLAGGED_FIELDS = {}
+
+    risk_matrix = serializers.PrimaryKeyRelatedField(
+        read_only=True, source="risk_assessment.risk_matrix"
+    )
+
+    def validate_risk_assessment(self, value):
+        self._ensure_immutable("risk_assessment", value)
+        return value
+
+    def validate(self, attrs):
+        if (
+            hasattr(self, "instance")
+            and self.instance
+            and self.instance.risk_assessment.is_locked
+        ):
+            raise serializers.ValidationError(
+                "⚠️ Cannot modify the risk scenario when the risk assessment is locked."
+            )
+
+        antecedent_scenarios = attrs.get("antecedent_scenarios", [])
+        consequent_scenarios = attrs.get("consequent_scenarios", [])
+
+        # Check that the scenario graph will not contain cycles
+        myset = set()
+        if self.instance:
+            myset = set([self.instance])
+
+        if antecedent_scenarios:
+            # Add all consequent scenarios to the set
+            if self.instance:
+                myset = myset | set(self.instance.consequent_scenarios.all())
+
+            for scenario in antecedent_scenarios:
+                if myset & set(scenario.ancestors_plus_self()):
+                    raise serializers.ValidationError(
+                        {
+                            "antecedent_scenarios": "errorRiskScenarioGraphMustNotContainCycles"
+                        }
+                    )
+
+        return super().validate(attrs)
+
+    def create(self, validated_data):
+        # Set folder from risk_assessment before the permission check in parent class
+        if "risk_assessment" in validated_data and validated_data["risk_assessment"]:
+            validated_data["folder"] = validated_data["risk_assessment"].folder
+
+        owner_data = validated_data.get("owner", [])
+        risk_scenario = super().create(validated_data)
+
+        # Send notification to newly assigned owners
+        if owner_data:
+            self._send_assignment_notifications(
+                risk_scenario, [actor.id for actor in owner_data]
+            )
+
+        return risk_scenario
+
+    def update(self, instance, validated_data):
+        # Track old owners before update
+        old_owner_ids = set(instance.owner.values_list("id", flat=True))
+
+        updated_instance = super().update(instance, validated_data)
+
+        # Get new owners after update
+        new_owner_ids = set(updated_instance.owner.values_list("id", flat=True))
+
+        # Send notifications only to newly assigned owners
+        newly_assigned_ids = new_owner_ids - old_owner_ids
+        if newly_assigned_ids:
+            self._send_assignment_notifications(
+                updated_instance, list(newly_assigned_ids)
+            )
+
+        return updated_instance
+
+    def _send_assignment_notifications(self, risk_scenario, owner_ids):
+        """Send assignment notifications to the specified owners"""
+        if not owner_ids:
+            return
+
+        try:
+            from core.models import Actor
+            from .tasks import send_risk_scenario_assignment_notification
+
+            assigned_actors = Actor.objects.filter(id__in=owner_ids)
+            assigned_emails = []
+            for actor in assigned_actors:
+                assigned_emails.extend(actor.get_emails())
+
+            if assigned_emails:
+                # Queue the task for async execution
+                send_risk_scenario_assignment_notification(
+                    risk_scenario.id, assigned_emails
+                )
+        except Exception as e:
+            logger.error(
+                f"Failed to send RiskScenario assignment notification: {str(e)}"
+            )
+
+    class Meta:
+        model = RiskScenario
+        exclude = ["folder"]
+
+
+class RiskScenarioReadSerializer(RiskScenarioWriteSerializer):
+    str = serializers.CharField(source="__str__", read_only=True)
+    risk_assessment = FieldsRelatedField(["id", "name", "is_locked"])
+    risk_matrix = FieldsRelatedField(source="risk_assessment.risk_matrix")
+    folder = FieldsRelatedField()
+    version = serializers.StringRelatedField(source="risk_assessment.version")
+    operational_scenario = FieldsRelatedField(["id", "name", "ebios_rm_study"])
+    threats = FieldsRelatedField(many=True)
+    assets = FieldsRelatedField(many=True)
+    qualifications = FieldsRelatedField(many=True)
+    risk_origin = FieldsRelatedField(["id", "name", "description"])
+    antecedent_scenarios = FieldsRelatedField(
+        many=True, fields=["id", "ref_id", "name"]
+    )
+
+    treatment = serializers.CharField()
+
+    inherent_proba = serializers.JSONField(source="get_inherent_proba")
+    inherent_impact = serializers.JSONField(source="get_inherent_impact")
+    inherent_level = serializers.JSONField(source="get_inherent_risk")
+    current_proba = serializers.JSONField(source="get_current_proba")
+    current_impact = serializers.JSONField(source="get_current_impact")
+    current_level = serializers.JSONField(source="get_current_risk")
+    residual_proba = serializers.JSONField(source="get_residual_proba")
+    residual_impact = serializers.JSONField(source="get_residual_impact")
+    residual_level = serializers.JSONField(source="get_residual_risk")
+
+    strength_of_knowledge = serializers.JSONField(source="get_strength_of_knowledge")
+
+    applied_controls = FieldsRelatedField(many=True)
+    existing_applied_controls = FieldsRelatedField(many=True)
+
+    owner = FieldsRelatedField(many=True)
+    security_exceptions = FieldsRelatedField(many=True)
+    filtering_labels = FieldsRelatedField(many=True)
+
+    within_tolerance = serializers.CharField()
+
+    class Meta:
+        model = RiskScenario
+        fields = "__all__"
+
+
+class RiskScenarioImportExportSerializer(BaseModelSerializer):
+    threats = HashSlugRelatedField(slug_field="pk", many=True, read_only=True)
+    risk_assessment = HashSlugRelatedField(slug_field="pk", read_only=True)
+    vulnerabilities = HashSlugRelatedField(slug_field="pk", read_only=True, many=True)
+    assets = HashSlugRelatedField(slug_field="pk", read_only=True, many=True)
+    existing_applied_controls = HashSlugRelatedField(
+        slug_field="pk", read_only=True, many=True
+    )
+    applied_controls = HashSlugRelatedField(slug_field="pk", read_only=True, many=True)
+    qualifications = serializers.SlugRelatedField(
+        slug_field="name", read_only=True, many=True
+    )
+    risk_origin = serializers.SlugRelatedField(
+        slug_field="name", read_only=True, many=False
+    )
+
+    class Meta:
+        model = RiskScenario
+        fields = [
+            "ref_id",
+            "name",
+            "description",
+            "risk_assessment",
+            "treatment",
+            "threats",
+            "vulnerabilities",
+            "assets",
+            "existing_applied_controls",
+            "applied_controls",
+            "current_proba",
+            "current_impact",
+            "residual_proba",
+            "residual_impact",
+            "strength_of_knowledge",
+            "justification",
+            "created_at",
+            "updated_at",
+            "qualifications",
+            "risk_origin",
+        ]
+
+
+class AppliedControlWriteSerializer(BaseModelSerializer):
+    findings = serializers.PrimaryKeyRelatedField(
+        many=True, required=False, queryset=Finding.objects.all()
+    )
+    requirement_assessments = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=RequirementAssessment.objects.all(), required=False
+    )
+    stakeholders = serializers.PrimaryKeyRelatedField(
+        many=True, required=False, queryset=Stakeholder.objects.all()
+    )
+    task_templates = serializers.PrimaryKeyRelatedField(
+        many=True, required=False, queryset=TaskTemplate.objects.all()
+    )
+    cost = serializers.JSONField(required=False, allow_null=True)
+    integration_config = serializers.PrimaryKeyRelatedField(
+        required=False,
+        allow_null=True,
+        queryset=IntegrationConfiguration.objects.all(),
+        write_only=True,
+    )
+    remote_object_id = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True, write_only=True
+    )
+    create_remote_object = serializers.BooleanField(
+        required=False, default=False, write_only=True
+    )
+
+    def create(self, validated_data: Any):
+        validated_data.pop("create_remote_object", None)
+        validated_data.pop("remote_object_id", None)
+        validated_data.pop("integration_config", None)
+
+        owner_data = validated_data.get("owner", [])
+        findings = validated_data.pop("findings", [])
+        task_templates = validated_data.pop("task_templates", [])
+        applied_control = super().create(validated_data)
+        if findings:
+            applied_control.findings.set(findings)
+        if task_templates:
+            applied_control.task_templates.set(task_templates)
+
+        # Send notification to newly assigned owners
+        if owner_data:
+            self._send_assignment_notifications(
+                applied_control, [user.id for user in owner_data]
+            )
+
+        return applied_control
+
+    def update(self, instance, validated_data):
+        # Track old owners before update
+        old_owner_ids = set(instance.owner.values_list("id", flat=True))
+
+        findings = validated_data.pop("findings", None)
+        task_templates = validated_data.pop("task_templates", None)
+
+        updated_instance = super().update(instance, validated_data)
+
+        if findings is not None:
+            updated_instance.findings.set(findings)
+        if task_templates is not None:
+            updated_instance.task_templates.set(task_templates)
+
+        # Get new owners after update
+        new_owner_ids = set(updated_instance.owner.values_list("id", flat=True))
+
+        # Send notifications only to newly assigned owners
+        newly_assigned_ids = new_owner_ids - old_owner_ids
+        if newly_assigned_ids:
+            self._send_assignment_notifications(
+                updated_instance, list(newly_assigned_ids)
+            )
+
+        return updated_instance
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        sync_mappings = [
+            {
+                "id": mapping.id,
+                "remote_id": mapping.remote_id,
+                "sync_status": mapping.sync_status,
+                "last_synced_at": mapping.last_synced_at,
+                "last_sync_direction": mapping.last_sync_direction,
+                "error_message": mapping.error_message,
+                "provider": mapping.configuration.provider.name,
+            }
+            for mapping in SyncMapping.objects.filter(local_object_id=instance.id).only(
+                "id",
+                "remote_id",
+                "sync_status",
+                "last_synced_at",
+                "last_sync_direction",
+                "error_message",
+                "configuration__provider__name",
+            )
+        ]
+        if sync_mappings:
+            ret["sync_mappings"] = sync_mappings
+        return ret
+
+    def _send_assignment_notifications(self, applied_control, owner_ids):
+        """Send assignment notifications to the specified owners"""
+        if not owner_ids:
+            return
+
+        try:
+            from core.models import Actor
+            from .tasks import send_applied_control_assignment_notification
+
+            assigned_actors = Actor.objects.filter(id__in=owner_ids)
+            assigned_emails = []
+            for actor in assigned_actors:
+                assigned_emails.extend(actor.get_emails())
+
+            if assigned_emails:
+                # Queue the task for async execution
+                send_applied_control_assignment_notification(
+                    applied_control.id, assigned_emails
+                )
+        except Exception as e:
+            logger.error(
+                f"Failed to send AppliedControl assignment notification: {str(e)}"
+            )
+
+    class Meta:
+        model = AppliedControl
+        fields = "__all__"
+
+
+class AppliedControlReadSerializer(AppliedControlWriteSerializer):
+    path = PathField(read_only=True)
+    folder = FieldsRelatedField()
+    reference_control = FieldsRelatedField()
+    priority = serializers.CharField(source="get_priority_display")
+    category = serializers.CharField(
+        source="get_category_display"
+    )  # type : get_type_display
+    csf_function = serializers.CharField(
+        source="get_csf_function_display"
+    )  # type : get_type_display
+    evidences = FieldsRelatedField(many=True)
+    objectives = FieldsRelatedField(many=True)
+    effort = serializers.CharField(source="get_effort_display")
+    control_impact = serializers.CharField(source="get_control_impact_display")
+    cost = serializers.JSONField()
+    annual_cost = serializers.DecimalField(
+        max_digits=12, decimal_places=2, read_only=True
+    )
+    currency = serializers.SerializerMethodField()
+    annual_cost_display = serializers.SerializerMethodField()
+    filtering_labels = FieldsRelatedField(["id", "folder"], many=True)
+    assets = FieldsRelatedField(many=True)
+
+    ranking_score = serializers.IntegerField(source="get_ranking_score")
+    owner = FieldsRelatedField(many=True)
+    security_exceptions = FieldsRelatedField(many=True)
+    state = serializers.SerializerMethodField()
+    findings_count = serializers.IntegerField(source="findings.count")
+    is_assigned = serializers.BooleanField(read_only=True)
+
+    def get_state(self, obj):
+        if not obj.eta:
+            return None
+        return time_state(obj.eta.isoformat())
+
+    def get_currency(self, obj):
+        if not obj.cost:
+            return "€"  # Default currency
+        return obj.cost.get("currency", "€")
+
+    def get_annual_cost_display(self, obj):
+        annual_cost = obj.annual_cost
+        if annual_cost == 0:
+            return ""
+        currency = self.get_currency(obj)
+        return f"{annual_cost:,.2f} {currency}"
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        if self.context.get("action") == "retrieve":
+            sync_mappings = [
+                {
+                    "id": mapping.id,
+                    "remote_id": mapping.remote_id,
+                    "sync_status": mapping.sync_status,
+                    "last_synced_at": mapping.last_synced_at,
+                    "last_sync_direction": mapping.last_sync_direction,
+                    "error_message": mapping.error_message,
+                    "provider": mapping.configuration.provider.name,
+                }
+                for mapping in SyncMapping.objects.filter(local_object_id=instance.id)
+                .select_related("configuration__provider")
+                .only(
+                    "id",
+                    "remote_id",
+                    "sync_status",
+                    "last_synced_at",
+                    "last_sync_direction",
+                    "error_message",
+                    "configuration__provider__name",
+                )
+            ]
+            if sync_mappings:
+                ret["sync_mappings"] = sync_mappings
+        return ret
+
+
+class ActionPlanSerializer(BaseModelSerializer):
+    folder = FieldsRelatedField()
+    reference_control = FieldsRelatedField()
+    priority = serializers.CharField(source="get_priority_display")
+    category = serializers.CharField(
+        source="get_category_display"
+    )  # type : get_type_display
+    csf_function = serializers.CharField(
+        source="get_csf_function_display"
+    )  # type : get_type_display
+    evidences = FieldsRelatedField(many=True)
+    effort = serializers.CharField(source="get_effort_display")
+    control_impact = serializers.CharField(source="get_control_impact_display")
+    status = serializers.CharField(source="get_status_display")
+    cost = serializers.JSONField()
+    annual_cost = serializers.DecimalField(
+        max_digits=12, decimal_places=2, read_only=True
+    )
+
+    ranking_score = serializers.IntegerField(source="get_ranking_score")
+    owner = FieldsRelatedField(many=True)
+
+    class Meta:
+        model = AppliedControl
+        fields = "__all__"
+
+
+class ComplianceAssessmentActionPlanSerializer(ActionPlanSerializer):
+    requirement_assessments = serializers.SerializerMethodField(
+        method_name="get_requirement_assessments"
+    )
+
+    def get_requirement_assessments(self, obj):
+        pk = self.context.get("pk")
+        if pk is None:
+            return None
+        requirement_assessments = RequirementAssessment.objects.filter(
+            compliance_assessment=pk, applied_controls=obj
+        )
+        return [
+            {
+                "str": str(req.requirement.safe_display_str),
+                "id": str(req.id),
+            }
+            for req in requirement_assessments
+        ]
+
+    class Meta:
+        model = AppliedControl
+        fields = [
+            "id",
+            "ref_id",
+            "name",
+            "description",
+            "folder",
+            "status",
+            "eta",
+            "expiry_date",
+            "priority",
+            "category",
+            "csf_function",
+            "effort",
+            "control_impact",
+            "cost",
+            "annual_cost",
+            "ranking_score",
+            "requirement_assessments",
+            "reference_control",
+            "evidences",
+            "owner",
+        ]
+
+
+class RiskAssessmentActionPlanSerializer(ActionPlanSerializer):
+    risk_scenarios = serializers.SerializerMethodField(method_name="get_risk_scenarios")
+
+    def get_risk_scenarios(self, obj):
+        pk = self.context.get("pk")
+        if pk is None:
+            return None
+        risk_scenarios = (
+            RiskScenario.objects.filter(risk_assessment=pk)
+            .filter(Q(applied_controls=obj) | Q(existing_applied_controls=obj))
+            .distinct()
+        )
+        return [
+            {
+                "str": str(req.ref_id + " - " + req.name),
+                "id": str(req.id),
+            }
+            for req in risk_scenarios
+        ]
+
+    class Meta:
+        model = AppliedControl
+        fields = [
+            "id",
+            "ref_id",
+            "name",
+            "description",
+            "folder",
+            "status",
+            "eta",
+            "expiry_date",
+            "priority",
+            "category",
+            "csf_function",
+            "effort",
+            "control_impact",
+            "cost",
+            "annual_cost",
+            "ranking_score",
+            "risk_scenarios",
+            "reference_control",
+            "evidences",
+            "owner",
+        ]
+
+
+class AppliedControlDuplicateSerializer(BaseModelSerializer):
+    class Meta:
+        model = AppliedControl
+        fields = ["name", "description", "folder"]
+
+
+class AppliedControlImportExportSerializer(BaseModelSerializer):
+    reference_control = HashSlugRelatedField(slug_field="pk", read_only=True)
+    folder = HashSlugRelatedField(slug_field="pk", read_only=True)
+    evidences = HashSlugRelatedField(slug_field="pk", read_only=True, many=True)
+    objectives = HashSlugRelatedField(slug_field="pk", read_only=True, many=True)
+
+    class Meta:
+        model = AppliedControl
+        fields = [
+            "folder",
+            "ref_id",
+            "name",
+            "description",
+            "priority",
+            "reference_control",
+            "created_at",
+            "updated_at",
+            "category",
+            "csf_function",
+            "status",
+            "start_date",
+            "eta",
+            "expiry_date",
+            "link",
+            "effort",
+            "control_impact",
+            "cost",
+            "evidences",
+            "objectives",
+        ]
+
+
+class PolicyWriteSerializer(AppliedControlWriteSerializer):
+    class Meta:
+        model = Policy
+        fields = "__all__"
+
+
+class PolicyReadSerializer(AppliedControlReadSerializer):
+    path = PathField(read_only=True)
+    validation_flows = FieldsRelatedField(
+        many=True,
+        fields=[
+            "id",
+            "ref_id",
+            "status",
+            {"approver": ["id", "email", "first_name", "last_name"]},
+        ],
+        source="validationflow_set",
+    )
+
+    class Meta:
+        model = Policy
+        fields = "__all__"
+
+
+class ActorReadSerializer(BaseModelSerializer):
+    specific = FieldsRelatedField()
+    str = serializers.CharField(source="__str__")
+
+    class Meta:
+        model = Actor
+        fields = ["id", "str", "type", "specific"]
+
+
+class TeamWriteSerializer(BaseModelSerializer):
+    class Meta:
+        model = Team
+        fields = [
+            "id",
+            "name",
+            "description",
+            "folder",
+            "team_email",
+            "leader",
+            "deputies",
+            "members",
+        ]
+
+
+class TeamReadSerializer(BaseModelSerializer):
+    folder = FieldsRelatedField()
+    leader = FieldsRelatedField()
+    deputies = FieldsRelatedField(many=True)
+    members = FieldsRelatedField(many=True)
+
+    class Meta:
+        model = Team
+        fields = [
+            "id",
+            "name",
+            "description",
+            "folder",
+            "team_email",
+            "leader",
+            "deputies",
+            "members",
+        ]
+
+
+class UserReadSerializer(BaseModelSerializer):
+    user_groups = FieldsRelatedField(fields=["builtin", "id"], many=True)
+    has_mfa_enabled = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "email",
+            "first_name",
+            "last_name",
+            "is_active",
+            "date_joined",
+            "user_groups",
+            "keep_local_login",
+            "is_third_party",
+            "observation",
+            "has_mfa_enabled",
+            "expiry_date",
+            "is_superuser",
+        ]
+
+
+class UserRolesOnFolderSerializer(BaseModelSerializer):
+    roles = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ["id", "email", "first_name", "last_name", "is_active", "roles"]
+
+    def get_roles(self, obj):
+        return [
+            {"str": str(role)}
+            for role in self.context["user_roles_map"].get(obj.id, [])
+        ]
+
+
+class UserWriteSerializer(BaseModelSerializer):
+    is_local = serializers.BooleanField(required=False)
+
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "email",
+            "first_name",
+            "last_name",
+            "is_active",
+            "date_joined",
+            "user_groups",
+            "keep_local_login",
+            "is_third_party",
+            "is_local",
+            "observation",
+            "expiry_date",
+            "is_superuser",
+        ]
+
+    def validate_email(self, email):
+        validate_email(email)
+        return email
+
+    def create(self, validated_data):
+        send_mail = EMAIL_HOST or EMAIL_HOST_RESCUE
+        if not RoleAssignment.is_access_allowed(
+            user=self.context["request"].user,
+            perm=Permission.objects.get(
+                codename="add_user",
+                content_type__app_label=User._meta.app_label,
+                content_type__model=User._meta.model_name,
+            ),
+            folder=Folder.get_root_folder(),
+        ):
+            raise PermissionDenied(
+                {"error": ["You do not have permission to create users"]}
+            )
+        try:
+            user = User.objects.create_user(**validated_data)
+        except Exception as e:
+            logger.error(e)
+            if (
+                User.objects.filter(email=validated_data["email"]).exists()
+                and send_mail
+            ):
+                logger.warning("mailing failed")
+                raise serializers.ValidationError(
+                    {
+                        "warning": [
+                            "User created successfully but an error occurred while sending the email"
+                        ]
+                    }
+                )
+            else:
+                raise serializers.ValidationError(
+                    {"error": ["An error occurred while creating the user"]}
+                )
+        return user
+
+    def update(self, instance: User, validated_data: Any) -> User:
+        user_groups_data = validated_data.get("user_groups")
+        if user_groups_data is not None:
+            initial_groups = set(instance.user_groups.all())
+            new_groups = set(group for group in user_groups_data)
+
+            if initial_groups != new_groups:
+                logger.info(
+                    "user groups updated",
+                    user=instance,
+                    initial_user_groups=initial_groups,
+                    new_user_groups=new_groups,
+                )
+                # instance.user_groups.set(user_groups_data)
+        return super().update(instance, validated_data)
+
+
+class UserGroupReadSerializer(BaseModelSerializer):
+    path = PathField(source="get_folder_full_path", read_only=True)
+    name = serializers.CharField(source="__str__")
+    localization_dict = serializers.JSONField(source="get_localization_dict")
+    folder = FieldsRelatedField()
+
+    class Meta:
+        model = UserGroup
+        fields = "__all__"
+
+
+class UserGroupWriteSerializer(BaseModelSerializer):
+    class Meta:
+        model = UserGroup
+        fields = "__all__"
+
+
+class PermissionReadSerializer(BaseModelSerializer):
+    content_type = FieldsRelatedField(fields=["id", "app_label", "model"])
+    normalized_model = serializers.SerializerMethodField()
+    normalized_codename = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Permission
+        fields = "__all__"
+
+    def get_normalized_model(self, obj):
+        model_class = obj.content_type.model_class()
+        return (
+            model_class.__name__ if model_class else obj.content_type.model.capitalize()
+        )
+
+    def get_normalized_codename(self, obj):
+        model_class = obj.content_type.model_class()
+        model_name = (
+            model_class.__name__ if model_class else obj.content_type.model.capitalize()
+        )
+        return f"{obj.codename.split('_')[0]}{model_name}"
+
+
+class PermissionWriteSerializer(BaseModelSerializer):
+    class Meta:
+        model = Permission
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.read_only = True
+
+
+class RoleAssignmentReadSerializer(BaseModelSerializer):
+    class Meta:
+        model = RoleAssignment
+        fields = "__all__"
+
+
+class RoleAssignmentWriteSerializer(BaseModelSerializer):
+    class Meta:
+        model = RoleAssignment
+        fields = "__all__"
+
+
+class FolderWriteSerializer(BaseModelSerializer):
+    class Meta:
+        model = Folder
+        exclude = [
+            "builtin",
+            "content_type",
+        ]
+
+    def update(self, instance, validated_data):
+        if (
+            instance.content_type == Folder.ContentType.ROOT
+            and "create_iam_groups" in validated_data
+            and validated_data["create_iam_groups"] != instance.create_iam_groups
+        ):
+            raise serializers.ValidationError(
+                {"create_iam_groups": "globalFolderMustKeepIamGroupsEnabled"}
+            )
+
+        create_flag_changed = (
+            instance.content_type == Folder.ContentType.DOMAIN
+            and "create_iam_groups" in validated_data
+            and validated_data["create_iam_groups"] != instance.create_iam_groups
+        )
+        if create_flag_changed:
+            new_value = validated_data["create_iam_groups"]
+            if new_value:
+                with transaction.atomic():
+                    updated_instance = super().update(instance, validated_data)
+                    Folder.create_default_ug_and_ra(updated_instance)
+                return updated_instance
+
+            auto_groups = UserGroup.objects.filter(folder=instance, builtin=True)
+            auto_groups_exist = auto_groups.exists()
+            if (
+                auto_groups_exist
+                and User.objects.filter(user_groups__in=auto_groups).exists()
+            ):
+                raise serializers.ValidationError(
+                    {"create_iam_groups": "cannotDisableIamGroupsAssignedUsers"}
+                )
+            with transaction.atomic():
+                updated_instance = super().update(instance, validated_data)
+                if auto_groups_exist:
+                    RoleAssignment.objects.filter(user_group__in=auto_groups).delete()
+                    auto_groups.delete()
+            return updated_instance
+
+        return super().update(instance, validated_data)
+
+    def validate_name(self, value):
+        """
+        Check that the folder name does not contain the character "/"
+        """
+        if "/" in value:
+            raise serializers.ValidationError(
+                "The name cannot contain '/' for a Folder."
+            )
+        return value
+
+    def validate_parent_folder(self, value):
+        """
+        If parent_folder is empty or None, default to the root folder.
+        On update, check add permission on the target parent folder.
+        """
+        if not value:
+            return Folder.get_root_folder()
+        if (
+            self.instance is not None
+            and self.instance.parent_folder_id
+            and str(value.id) != str(self.instance.parent_folder_id)
+        ):
+            self._check_object_perm(self.instance, "add", folder=value)
+        return value
+
+
+class FolderReadSerializer(BaseModelSerializer):
+    path = PathField(read_only=True)
+    parent_folder = FieldsRelatedField()
+    filtering_labels = FieldsRelatedField(many=True)
+
+    content_type = serializers.CharField(source="get_content_type_display")
+
+    class Meta:
+        model = Folder
+        fields = "__all__"
+
+
+class FolderImportExportSerializer(BaseModelSerializer):
+    parent_folder = HashSlugRelatedField(slug_field="pk", read_only=True)
+
+    class Meta:
+        model = Folder
+        fields = [
+            "parent_folder",
+            "name",
+            "description",
+            "content_type",
+            "create_iam_groups",
+            "created_at",
+            "updated_at",
+        ]
+
+
+# Compliance Assessment
+
+
+class FrameworkReadSerializer(ReferentialSerializer):
+    folder = FieldsRelatedField()
+    library = FieldsRelatedField(["name", "id"])
+    reference_controls = FieldsRelatedField(many=True)
+    is_dynamic = serializers.BooleanField(read_only=True)
+    has_update = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = Framework
+        exclude = ["translations"]
+
+
+class FrameworkWriteSerializer(FrameworkReadSerializer):
+    pass
+
+
+class FrameworkImportExportSerializer(BaseModelSerializer):
+    library = serializers.SlugRelatedField(slug_field="urn", read_only=True)
+
+    class Meta:
+        model = Framework
+        fields = [
+            "urn",
+            "ref_id",
+            "name",
+            "library",
+            "min_score",
+            "max_score",
+            "implementation_groups_definition",
+            "provider",
+            "annotation",
+            "translations",
+            "locale",
+            "default_locale",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class RequirementNodeReadSerializer(ReferentialSerializer):
+    reference_controls = FieldsRelatedField(many=True)
+    threats = FieldsRelatedField(many=True)
+    display_short = serializers.CharField()
+    display_long = serializers.CharField()
+    questions = serializers.JSONField(source="get_questions_translated")
+    typical_evidence = serializers.CharField(
+        source="get_typical_evidence_translated", allow_blank=True, allow_null=True
+    )
+
+    class Meta:
+        model = RequirementNode
+        exclude = ["translations"]
+
+
+class RequirementNodeWriteSerializer(RequirementNodeReadSerializer):
+    pass
+
+
+class EvidenceReadSerializer(BaseModelSerializer):
+    path = PathField(read_only=True)
+    attachment = serializers.SerializerMethodField()
+    size = serializers.CharField(source="get_size")
+    folder = FieldsRelatedField()
+    applied_controls = FieldsRelatedField(many=True)
+    requirement_assessments = FieldsRelatedField(many=True)
+    contracts = FieldsRelatedField(many=True)
+    filtering_labels = FieldsRelatedField(["id", "folder"], many=True)
+    owner = FieldsRelatedField(many=True)
+    status = serializers.CharField(source="get_status_display")
+    link = serializers.SerializerMethodField()
+
+    def get_attachment(self, obj):
+        last_revision = obj.last_revision
+        if last_revision and last_revision.attachment:
+            return last_revision.attachment.url
+        return None
+
+    def get_link(self, obj):
+        last_revision = obj.last_revision
+        return last_revision.link if last_revision else None
+
+    class Meta:
+        model = Evidence
+        fields = "__all__"
+
+
+class EvidenceWriteSerializer(BaseModelSerializer):
+    applied_controls = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=AppliedControl.objects.all(), required=False
+    )
+    requirement_assessments = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=RequirementAssessment.objects.all(), required=False
+    )
+    findings = serializers.PrimaryKeyRelatedField(
+        many=True, required=False, queryset=Finding.objects.all()
+    )
+    findings_assessments = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=FindingsAssessment.objects.all(), required=False
+    )
+    timeline_entries = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=TimelineEntry.objects.all(), required=False
+    )
+    contracts = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=Contract.objects.all(), required=False
+    )
+    owner = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=Actor.objects.all(), required=False
+    )
+    attachment = serializers.FileField(required=False)
+    link = serializers.URLField(required=False)
+
+    class Meta:
+        model = Evidence
+        exclude = ["is_published"]
+
+    def create(self, validated_data):
+        attachment = validated_data.pop("attachment", None)
+        link = validated_data.pop("link", None)
+
+        evidence = super().create(validated_data)
+
+        EvidenceRevision.objects.get_or_create(
+            evidence=evidence, defaults={"link": link, "attachment": attachment}
+        )
+
+        return evidence
+
+    def update(self, instance, validated_data):
+        # Track old folder before update
+        old_folder_id = instance.folder_id
+
+        # Handle properly owner field cleaning
+        owners = validated_data.get("owner", None)
+        with transaction.atomic():
+            instance = super().update(instance, validated_data)
+            if not owners:
+                instance.owner.set([])
+
+            # Update all EvidenceRevisions' folder if the Evidence's folder changed
+            if old_folder_id != instance.folder_id:
+                EvidenceRevision.objects.filter(evidence=instance).update(
+                    folder=instance.folder
+                )
+
+        return instance
+
+    def to_representation(self, instance):
+        """Include link and attachment from the latest revision in the response"""
+        data = super().to_representation(instance)
+
+        # Add revision fields to the response
+        latest_revision = instance.last_revision
+        if latest_revision:
+            data["link"] = latest_revision.link
+            data["attachment"] = (
+                latest_revision.attachment.url if latest_revision.attachment else None
+            )
+        else:
+            data["link"] = None
+            data["attachment"] = None
+
+        return data
+
+
+class EvidenceImportExportSerializer(BaseModelSerializer):
+    folder = HashSlugRelatedField(slug_field="pk", read_only=True)
+
+    class Meta:
+        model = Evidence
+        fields = [
+            "folder",
+            "name",
+            "description",
+            "created_at",
+            "updated_at",
+            "status",
+            "expiry_date",
+        ]
+
+
+class EvidenceRevisionReadSerializer(BaseModelSerializer):
+    attachment = serializers.CharField(source="filename")
+    size = serializers.CharField(source="get_size")
+    evidence = FieldsRelatedField()
+    folder = FieldsRelatedField()
+    str = serializers.CharField(source="__str__")
+    task_node = FieldsRelatedField()
+
+    class Meta:
+        model = EvidenceRevision
+        fields = "__all__"
+
+
+class EvidenceRevisionWriteSerializer(BaseModelSerializer):
+    class Meta:
+        model = EvidenceRevision
+        fields = "__all__"
+
+    def create(self, validated_data):
+        evidence = validated_data["evidence"]
+        max_version = EvidenceRevision.objects.filter(evidence=evidence).aggregate(
+            models.Max("version")
+        )["version__max"]
+        validated_data["version"] = (max_version or 0) + 1
+        # Update evidence status to in_review when a new revision is submitted
+        evidence.status = Evidence.Status.IN_REVIEW
+        evidence.save()
+        return super().create(validated_data)
+
+
+class EvidenceRevisionImportExportSerializer(BaseModelSerializer):
+    folder = HashSlugRelatedField(slug_field="pk", read_only=True)
+    evidence = HashSlugRelatedField(slug_field="pk", read_only=True)
+    attachment = serializers.CharField(allow_blank=True)
+    size = serializers.CharField(source="get_size", read_only=True)
+    attachment_hash = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = EvidenceRevision
+        fields = [
+            "folder",
+            "evidence",
+            "observation",
+            "version",
+            "attachment",
+            "link",
+            "created_at",
+            "updated_at",
+            "size",
+            "attachment_hash",
+        ]
+
+
+class AttachmentUploadSerializer(serializers.Serializer):
+    attachment = serializers.FileField(required=True)
+
+    class Meta:
+        model = Evidence
+        fields = ["attachment"]
+
+
+class OrganisationObjectiveReadSerializer(BaseModelSerializer):
+    folder = FieldsRelatedField()
+    assets = FieldsRelatedField(many=True)
+    issues = FieldsRelatedField(many=True)
+    tasks = FieldsRelatedField(many=True)
+    metrics = FieldsRelatedField(many=True)
+    status = serializers.CharField(source="get_status_display")
+    health = serializers.CharField(source="get_health_display")
+    assigned_to = FieldsRelatedField(many=True)
+
+    class Meta:
+        model = OrganisationObjective
+        fields = "__all__"
+
+
+class OrganisationObjectiveWriteSerializer(BaseModelSerializer):
+    applied_controls = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=AppliedControl.objects.all(),
+        required=False,
+    )
+
+    class Meta:
+        model = OrganisationObjective
+        fields = "__all__"
+
+    def create(self, validated_data: Any):
+        applied_controls = validated_data.pop("applied_controls", [])
+        instance = super().create(validated_data)
+        if applied_controls:
+            instance.applied_controls.set(applied_controls)
+        return instance
+
+    def update(self, instance, validated_data):
+        applied_controls = validated_data.pop("applied_controls", None)
+        instance = super().update(instance, validated_data)
+        if applied_controls is not None:
+            instance.applied_controls.set(applied_controls)
+        return instance
+
+
+class OrganisationObjectiveDuplicateSerializer(BaseModelSerializer):
+    class Meta:
+        model = OrganisationObjective
+        fields = ["name", "description", "folder"]
+
+
+class OrganisationIssueReadSerializer(BaseModelSerializer):
+    folder = FieldsRelatedField()
+    assets = FieldsRelatedField(many=True)
+    category = serializers.CharField(source="get_category_display")
+    origin = serializers.CharField(source="get_origin_display")
+
+    class Meta:
+        model = OrganisationIssue
+        fields = "__all__"
+
+
+class OrganisationIssueWriteSerializer(BaseModelSerializer):
+    objectives = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=OrganisationObjective.objects.all(),
+        required=False,
+    )
+
+    class Meta:
+        model = OrganisationIssue
+        fields = "__all__"
+
+    def validate(self, attrs):
+        start_date = attrs.get(
+            "start_date",
+            getattr(getattr(self, "instance", None), "start_date", None),
+        )
+        expiration_date = attrs.get(
+            "expiration_date",
+            getattr(getattr(self, "instance", None), "expiration_date", None),
+        )
+        if start_date and expiration_date and start_date > expiration_date:
+            raise serializers.ValidationError(
+                {"expiration_date": "Expiration date must be on or after start date"}
+            )
+        return super().validate(attrs)
+
+    def create(self, validated_data: Any):
+        objectives = validated_data.pop("objectives", [])
+        instance = super().create(validated_data)
+        if objectives:
+            instance.objectives.set(objectives)
+        return instance
+
+    def update(self, instance, validated_data):
+        objectives = validated_data.pop("objectives", None)
+        instance = super().update(instance, validated_data)
+        if objectives is not None:
+            instance.objectives.set(objectives)
+        return instance
+
+
+class CampaignReadSerializer(BaseModelSerializer):
+    folder = FieldsRelatedField()
+    compliance_assessments = FieldsRelatedField(many=True)
+    perimeters = FieldsRelatedField(many=True)
+    frameworks = FieldsRelatedField(many=True)
+    status = serializers.CharField(source="get_status_display")
+    framework = FieldsRelatedField(
+        [
+            "id",
+            "min_score",
+            "max_score",
+            "implementation_groups_definition",
+            "ref_id",
+            "reference_controls",
+        ]
+    )
+
+    class Meta:
+        model = Campaign
+        fields = "__all__"
+
+
+class CampaignWriteSerializer(BaseModelSerializer):
+    class Meta:
+        model = Campaign
+        fields = "__all__"
+
+    def create(self, validated_data: Any):
+        return super().create(validated_data)
+
+
+class ComplianceAssessmentReadSerializer(AssessmentReadSerializer):
+    path = PathField(read_only=True)
+    perimeter = FieldsRelatedField(["id", "folder"])
+    folder = FieldsRelatedField()
+    campaign = FieldsRelatedField()
+    framework = FieldsRelatedField(
+        [
+            "id",
+            "min_score",
+            "max_score",
+            "implementation_groups_definition",
+            "ref_id",
+            "reference_controls",
+            "has_update",
+        ]
+    )
+    selected_implementation_groups = serializers.ReadOnlyField(
+        source="get_selected_implementation_groups"
+    )
+    progress = serializers.ReadOnlyField()
+    assets = FieldsRelatedField(many=True)
+    evidences = FieldsRelatedField(many=True)
+    validation_flows = FieldsRelatedField(
+        many=True,
+        fields=[
+            "id",
+            "ref_id",
+            "status",
+            {"approver": ["id", "email", "first_name", "last_name"]},
+        ],
+        source="validationflow_set",
+    )
+
+    class Meta:
+        model = ComplianceAssessment
+        fields = "__all__"
+
+
+class ComplianceAssessmentListSerializer(BaseModelSerializer):
+    """Optimized serializer for list views - only includes fields needed by the table."""
+
+    path = PathField(read_only=True)
+    folder = FieldsRelatedField()
+    framework = FieldsRelatedField()
+    perimeter = FieldsRelatedField()
+    progress = serializers.SerializerMethodField()
+
+    def get_progress(self, obj):
+        if not obj.selected_implementation_groups:
+            # Fast path: use SQL annotations (no implementation group filtering needed)
+            total = getattr(obj, "total_requirements", 0)
+            assessed = getattr(obj, "assessed_requirements", 0)
+        else:
+            # Use prefetched requirement_assessments filtered by implementation groups
+            selected_groups = set(obj.selected_implementation_groups)
+            ras = [
+                ra
+                for ra in obj.requirement_assessments.all()
+                if selected_groups & set(ra.requirement.implementation_groups or [])
+            ]
+            total = len(ras)
+            assessed = len(
+                [
+                    ra
+                    for ra in ras
+                    if ra.result != RequirementAssessment.Result.NOT_ASSESSED
+                    or ra.score is not None
+                ]
+            )
+        return int((assessed / total) * 100) if total else 0
+
+    class Meta:
+        model = ComplianceAssessment
+        fields = [
+            "id",
+            "ref_id",
+            "name",
+            "description",
+            "version",
+            "framework",
+            "folder",
+            "perimeter",
+            "progress",
+            "status",
+            "is_locked",
+            "created_at",
+            "updated_at",
+            "path",
+        ]
+
+
+class ComplianceAssessmentWriteSerializer(BaseModelSerializer):
+    baseline = serializers.PrimaryKeyRelatedField(
+        write_only=True,
+        queryset=ComplianceAssessment.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+    ebios_rm_studies = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=EbiosRMStudy.objects.all(),
+        required=False,
+        allow_null=True,
+        write_only=True,
+    )
+    create_applied_controls_from_suggestions = serializers.BooleanField(
+        write_only=True, required=False, default=False
+    )
+
+    def validate(self, attrs):
+        if hasattr(self, "instance") and self.instance and self.instance.is_locked:
+            # If we're unlocking (setting is_locked to False), allow the operation
+            if "is_locked" in attrs and attrs["is_locked"] is False:
+                return super().validate(attrs)
+
+            # Otherwise, only allow modifying the is_locked field
+            locked_fields = [field for field in attrs.keys() if field != "is_locked"]
+            if locked_fields:
+                raise serializers.ValidationError(
+                    f"⚠️ Cannot modify the audit attributes when it is locked. Only the 'Locked' field can be modified."
+                )
+        return super().validate(attrs)
+
+    def create(self, validated_data: Any):
+        validated_data.pop("create_applied_controls_from_suggestions", None)
+        authors_data = validated_data.get("authors", [])
+        assessment = super().create(validated_data)
+
+        # Send notification to newly assigned authors
+        if authors_data:
+            self._send_assignment_notifications(
+                assessment, [user.id for user in authors_data]
+            )
+
+        # Only apply default implementation groups if none were provided by the user
+        if (
+            assessment.framework.implementation_groups_definition
+            and not assessment.selected_implementation_groups
+        ):
+            default_implementation_groups = []
+            for ig in assessment.framework.implementation_groups_definition:
+                if ig.get("default_selected", False):
+                    default_implementation_groups += [ig["ref_id"]]
+            assessment.selected_implementation_groups = default_implementation_groups
+            assessment.save()
+
+        return assessment
+
+    def update(self, instance, validated_data):
+        # Track old authors, folder, and perimeter before update
+        old_author_ids = set(instance.authors.values_list("id", flat=True))
+        old_folder_id = instance.folder_id
+
+        # Auto-lock when status changes to deprecated
+        old_status = instance.status
+        new_status = validated_data.get("status", old_status)
+        if old_status != "deprecated" and new_status == "deprecated":
+            validated_data["is_locked"] = True
+
+        # If perimeter is being changed, update folder to match the new perimeter's folder
+        if "perimeter" in validated_data:
+            new_perimeter = validated_data["perimeter"]
+            if new_perimeter and new_perimeter.folder:
+                validated_data["folder"] = new_perimeter.folder
+
+        with transaction.atomic():
+            # Perform the main update (fields + M2M)
+            updated_instance = super().update(instance, validated_data)
+
+            # Cascade folder change to requirement assessments
+            if old_folder_id != updated_instance.folder_id:
+                RequirementAssessment.objects.filter(
+                    compliance_assessment=updated_instance
+                ).update(folder=updated_instance.folder)
+
+            # Determine newly assigned authors
+            new_author_ids = set(updated_instance.authors.values_list("id", flat=True))
+            newly_assigned_ids = new_author_ids - old_author_ids
+
+            # Schedule notifications to run **after transaction commits**
+            if newly_assigned_ids:
+                transaction.on_commit(
+                    lambda: self._send_assignment_notifications(
+                        updated_instance, list(newly_assigned_ids)
+                    )
+                )
+
+        return updated_instance
+
+    def _send_assignment_notifications(self, assessment, author_ids):
+        """Send assignment notifications to the specified authors"""
+        if not author_ids:
+            return
+
+        try:
+            from core.models import Actor
+            from .tasks import send_compliance_assessment_assignment_notification
+
+            assigned_actors = Actor.objects.filter(id__in=author_ids)
+            assigned_emails = []
+            for actor in assigned_actors:
+                assigned_emails.extend(actor.get_emails())
+
+            if assigned_emails:
+                send_compliance_assessment_assignment_notification(
+                    assessment.id, assigned_emails
+                )
+        except Exception as e:
+            logger.error(
+                f"Failed to send ComplianceAssessment assignment notification: {str(e)}"
+            )
+
+    class Meta:
+        model = ComplianceAssessment
+        fields = "__all__"
+
+
+class ComplianceAssessmentImportExportSerializer(BaseModelSerializer):
+    framework = serializers.SlugRelatedField(slug_field="urn", read_only=True)
+
+    folder = HashSlugRelatedField(slug_field="pk", read_only=True)
+    perimeter = HashSlugRelatedField(slug_field="pk", read_only=True)
+
+    class Meta:
+        model = ComplianceAssessment
+        fields = [
+            "ref_id",
+            "name",
+            "version",
+            "description",
+            "folder",
+            "perimeter",
+            "eta",
+            "due_date",
+            "status",
+            "observation",
+            "framework",
+            "selected_implementation_groups",
+            "min_score",
+            "max_score",
+            "scores_definition",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class RequirementAssessmentReadSerializer(BaseModelSerializer):
+    class FilteredNodeSerializer(RequirementNodeReadSerializer):
+        class Meta:
+            model = RequirementNode
+            fields = [
+                "id",
+                "urn",
+                "annotation",
+                "name",
+                "description",
+                "typical_evidence",
+                "ref_id",
+                "associated_reference_controls",
+                "associated_threats",
+                "parent_requirement",
+                "questions",
+                "implementation_groups",
+            ]
+
+    name = serializers.CharField(source="__str__")
+    description = serializers.CharField(source="get_requirement_description")
+    evidences = FieldsRelatedField(many=True)
+    compliance_assessment = FieldsRelatedField(
+        [
+            "id",
+            "name",
+            "is_locked",
+            "min_score",
+            "max_score",
+            "progress_status_enabled",
+            "extended_result_enabled",
+            {"framework": ["implementation_groups_definition"]},
+        ]
+    )
+    folder = FieldsRelatedField()
+    perimeter = FieldsRelatedField(source="compliance_assessment.perimeter")
+    assessable = serializers.BooleanField(source="requirement.assessable")
+    requirement = FilteredNodeSerializer()
+    security_exceptions = FieldsRelatedField(many=True)
+    is_locked = serializers.BooleanField()
+    applied_controls = FieldsRelatedField(many=True)
+
+    class Meta:
+        model = RequirementAssessment
+        fields = "__all__"
+
+
+class RequirementAssessmentWriteSerializer(BaseModelSerializer):
+    requirement = serializers.PrimaryKeyRelatedField(read_only=True)
+
+    def validate(self, attrs):
+        compliance_assessment = self.get_compliance_assessment()
+
+        if compliance_assessment and compliance_assessment.is_locked:
+            raise serializers.ValidationError(
+                "⚠️ Cannot modify the requirement when the audit is locked."
+            )
+
+        if (
+            compliance_assessment
+            and compliance_assessment.status == Assessment.Status.IN_REVIEW
+        ):
+            raise serializers.ValidationError(
+                "⚠️ Cannot modify the requirement when the audit is in review."
+            )
+
+        # Assignment-level locking for auditee users
+        request = self.context.get("request")
+        if request and self.instance and compliance_assessment:
+            from core.utils import get_auditee_filtered_folder_ids
+
+            auditee_folders = get_auditee_filtered_folder_ids(request.user)
+            if auditee_folders and compliance_assessment.folder_id in auditee_folders:
+                locked_assignment = self.instance.assignments.filter(
+                    status__in=["submitted", "closed"]
+                ).first()
+                if locked_assignment:
+                    raise serializers.ValidationError(
+                        "Cannot modify: this requirement's assignment has been submitted or closed."
+                    )
+
+        # Validate extended_result against result
+        extended_result = attrs.get("extended_result")
+        if extended_result is None and self.instance:
+            extended_result = self.instance.extended_result
+
+        result = attrs.get("result")
+        if result is None and self.instance:
+            result = self.instance.result
+
+        if compliance_assessment.extended_result_enabled and extended_result:
+            nonconformity_values = [
+                RequirementAssessment.ExtendedResult.MAJOR_NONCONFORMITY,
+                RequirementAssessment.ExtendedResult.MINOR_NONCONFORMITY,
+            ]
+            applicable_results_for_nonconformity = [
+                RequirementAssessment.Result.NON_COMPLIANT,
+                RequirementAssessment.Result.PARTIALLY_COMPLIANT,
+            ]
+
+            if extended_result in nonconformity_values:
+                if result not in applicable_results_for_nonconformity:
+                    raise serializers.ValidationError(
+                        {
+                            "extended_result": "Major and minor nonconformities are only applicable when result is non-compliant or partially compliant."
+                        }
+                    )
+
+            if extended_result == RequirementAssessment.ExtendedResult.GOOD_PRACTICE:
+                if result != RequirementAssessment.Result.COMPLIANT:
+                    raise serializers.ValidationError(
+                        {
+                            "extended_result": "Good practice is only applicable when result is compliant."
+                        }
+                    )
+
+        return super().validate(attrs)
+
+    def validate_score(self, value):
+        compliance_assessment = self.get_compliance_assessment()
+
+        if value is not None:
+            value = max(
+                (
+                    compliance_assessment.min_score,
+                    min(value, compliance_assessment.max_score),
+                )
+            )
+        return value
+
+    def get_compliance_assessment(self):
+        if hasattr(self, "instance") and self.instance:
+            return self.instance.compliance_assessment
+        try:
+            compliance_assessment_id = self.context.get("request", {}).data.get(
+                "compliance_assessment", {}
+            )
+            compliance_assessment = ComplianceAssessment.objects.get(
+                id=compliance_assessment_id
+            )
+            return compliance_assessment
+        except ComplianceAssessment.DoesNotExist:
+            raise serializers.ValidationError(
+                "The specified Compliance Assessment does not exist."
+            )
+
+    def update(self, instance, validated_data):
+        instance = super().update(instance, validated_data)
+
+        requirement = instance.requirement
+
+        # Safely get all choices across all questions
+        choices = []
+        for _, question in (
+            requirement.questions.items() if requirement.questions else []
+        ):
+            for choice in question.get("choices", []):
+                choices.append(choice)
+
+        # Check if any choice has scoring or result logic
+        has_score_or_result = any(
+            choice.get("add_score") is not None
+            or choice.get("compute_result") is not None
+            for choice in choices
+        )
+
+        if has_score_or_result:
+            instance.compute_score_and_result()
+
+        return instance
+
+    class Meta:
+        model = RequirementAssessment
+        exclude = ["created_at", "updated_at"]
+
+
+class RequirementMappingSetReadSerializer(BaseModelSerializer):
+    # library = FieldsRelatedField(["name", "id"])
+    folder = FieldsRelatedField()
+    source_framework = serializers.SerializerMethodField()
+    target_framework = serializers.SerializerMethodField()
+    urn = serializers.SerializerMethodField()
+    frameworks_available = serializers.SerializerMethodField()
+
+    class Meta:
+        model = StoredLibrary
+        fields = [
+            "source_framework",
+            "target_framework",
+            "folder",
+            "id",
+            "name",
+            "description",
+            "ref_id",
+            "urn",
+            "provider",
+            "builtin",
+            "locale",
+            "default_locale",
+            "is_published",
+            "translations",
+            "frameworks_available",
+        ]
+
+    def get_source_framework(self, obj):
+        mapping_set = obj.content.get(
+            "requirement_mapping_sets", [obj.content.get("requirement_mapping_set", {})]
+        )[0]
+        source_urn = mapping_set.get("source_framework_urn", "")
+        framework_lib = StoredLibrary.objects.filter(
+            content__framework__urn=source_urn,
+            content__framework__isnull=False,
+            content__requirement_mapping_set__isnull=True,
+            content__requirement_mapping_sets__isnull=True,
+        ).first()
+        if framework_lib is None:
+            return {
+                "str": source_urn,
+                "urn": source_urn,
+            }
+        framework = framework_lib.content.get("framework")
+        return {
+            "str": framework.get("name", framework.get("urn")),
+            "urn": framework.get("urn"),
+        }
+
+    def get_target_framework(self, obj):
+        mapping_set = obj.content.get(
+            "requirement_mapping_sets", [obj.content.get("requirement_mapping_set", {})]
+        )[0]
+        target_urn = mapping_set.get("target_framework_urn", "")
+        framework_lib = StoredLibrary.objects.filter(
+            content__framework__urn=target_urn,
+            content__framework__isnull=False,
+            content__requirement_mapping_set__isnull=True,
+            content__requirement_mapping_sets__isnull=True,
+        ).first()
+        if framework_lib is None:
+            return {
+                "str": target_urn,
+                "urn": target_urn,
+            }
+        framework = framework_lib.content.get("framework")
+        return {
+            "str": framework.get("name", framework.get("urn")),
+            "urn": framework.get("urn"),
+        }
+
+    def get_urn(self, obj):
+        rms = obj.content.get(
+            "requirement_mapping_sets", [obj.content.get("requirement_mapping_set", {})]
+        )
+        return rms[0].get("urn") if rms else None
+
+    def get_frameworks_available(self, obj):
+        source = self.get_source_framework(obj)
+        target = self.get_target_framework(obj)
+        # When framework is not found, str equals urn
+        return source["str"] != source["urn"] and target["str"] != target["urn"]
+
+
+class RequirementAssessmentImportExportSerializer(BaseModelSerializer):
+    requirement = serializers.SlugRelatedField(slug_field="urn", read_only=True)
+
+    folder = HashSlugRelatedField(slug_field="pk", read_only=True)
+    compliance_assessment = HashSlugRelatedField(slug_field="pk", read_only=True)
+    evidences = HashSlugRelatedField(slug_field="pk", read_only=True, many=True)
+    applied_controls = HashSlugRelatedField(slug_field="pk", read_only=True, many=True)
+
+    class Meta:
+        model = RequirementAssessment
+        fields = [
+            "created_at",
+            "updated_at",
+            "eta",
+            "due_date",
+            "folder",
+            "status",
+            "result",
+            "score",
+            "is_scored",
+            "observation",
+            "compliance_assessment",
+            "requirement",
+            "selected",
+            "mapping_inference",
+            "answers",
+            "evidences",
+            "applied_controls",
+        ]
+
+
+class RequirementAssignmentEventSerializer(BaseModelSerializer):
+    event_actor = FieldsRelatedField(["id", "email", "first_name", "last_name"])
+
+    class Meta:
+        model = RequirementAssignmentEvent
+        fields = ["id", "event_type", "event_actor", "event_notes", "created_at"]
+
+
+class RequirementAssignmentReadSerializer(BaseModelSerializer):
+    folder = FieldsRelatedField()
+    compliance_assessment = FieldsRelatedField()
+    actor = FieldsRelatedField(many=True)
+    requirement_assessments = FieldsRelatedField(many=True)
+    events = RequirementAssignmentEventSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = RequirementAssignment
+        fields = "__all__"
+
+
+class RequirementAssignmentWriteSerializer(BaseModelSerializer):
+    class Meta:
+        model = RequirementAssignment
+        fields = "__all__"
+        read_only_fields = ["status"]
+
+    def validate(self, attrs):
+        """
+        Validate that requirement assessments belong to the specified compliance assessment
+        and are not already assigned to another assignment.
+        """
+        compliance_assessment = attrs.get(
+            "compliance_assessment",
+            getattr(self.instance, "compliance_assessment", None),
+        )
+        requirement_assessments = attrs.get("requirement_assessments", [])
+
+        if compliance_assessment and requirement_assessments:
+            # Check that all requirement assessments belong to the compliance assessment
+            for ra in requirement_assessments:
+                if ra.compliance_assessment_id != compliance_assessment.id:
+                    raise serializers.ValidationError(
+                        {
+                            "requirement_assessments": f"Requirement assessment '{ra}' does not belong to the specified compliance assessment."
+                        }
+                    )
+
+            # Check that requirement assessments are not already assigned to another assignment
+            existing_assignment_ids = (
+                RequirementAssignment.objects.filter(
+                    compliance_assessment=compliance_assessment,
+                    requirement_assessments__in=requirement_assessments,
+                )
+                .exclude(id=self.instance.id if self.instance else None)
+                .values_list("id", flat=True)
+                .distinct()
+            )
+
+            if existing_assignment_ids:
+                raise serializers.ValidationError(
+                    {
+                        "requirement_assessments": "Some requirement assessments are already assigned to another assignment."
+                    }
+                )
+
+        return super().validate(attrs)
+
+
+class RequirementMappingSetWriteSerializer(RequirementMappingSetReadSerializer):
+    pass
+
+
+class ComputeMappingSerializer(serializers.Serializer):
+    mapping_set = serializers.PrimaryKeyRelatedField(
+        queryset=RequirementMappingSet.objects.all()
+    )
+    source_assessment = serializers.PrimaryKeyRelatedField(
+        queryset=ComplianceAssessment.objects.all()
+    )
+
+
+class FilteringLabelReadSerializer(BaseModelSerializer):
+    path = PathField(read_only=True)
+    folder = FieldsRelatedField()
+
+    class Meta:
+        model = FilteringLabel
+        fields = "__all__"
+
+
+class FilteringLabelWriteSerializer(BaseModelSerializer):
+    class Meta:
+        model = FilteringLabel
+        exclude = ["folder", "is_published"]
+
+
+class LibraryFilteringLabelReadSerializer(BaseModelSerializer):
+    path = PathField(read_only=True)
+    folder = FieldsRelatedField()
+
+    class Meta:
+        model = LibraryFilteringLabel
+        fields = "__all__"
+
+
+class LibraryFilteringLabelWriteSerializer(BaseModelSerializer):
+    class Meta:
+        model = LibraryFilteringLabel
+        exclude = ["folder", "is_published"]
+
+
+class SecurityExceptionWriteSerializer(BaseModelSerializer):
+    requirement_assessments = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=RequirementAssessment.objects.all(), required=False
+    )
+    applied_controls = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=AppliedControl.objects.all(), required=False
+    )
+    assets = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=Asset.objects.all(), required=False
+    )
+
+    class Meta:
+        model = SecurityException
+        fields = "__all__"
+
+
+class SecurityExceptionReadSerializer(BaseModelSerializer):
+    path = PathField(read_only=True)
+    folder = FieldsRelatedField()
+    owners = FieldsRelatedField(many=True)
+    approver = FieldsRelatedField()
+    severity = serializers.CharField(source="get_severity_display")
+    associated_objects_count = serializers.SerializerMethodField()
+    assets = FieldsRelatedField(many=True)
+    validation_flows = FieldsRelatedField(
+        many=True,
+        fields=[
+            "id",
+            "ref_id",
+            "status",
+            {"approver": ["id", "email", "first_name", "last_name"]},
+        ],
+        source="validationflow_set",
+    )
+
+    def get_associated_objects_count(self, obj):
+        """Prefer annotated or prefetched counts to avoid extra DB queries."""
+        annotated = getattr(obj, "associated_objects_count", None)
+        if annotated is not None:
+            return annotated
+        try:
+            # Uses prefetch cache when available (no extra queries)
+            return (
+                len(obj.assets.all())
+                + len(obj.applied_controls.all())
+                + len(obj.vulnerabilities.all())
+                + len(obj.risk_scenarios.all())
+                + len(obj.requirement_assessments.all())
+            )
+        except Exception:
+            # Fallback: perform DB counts
+            return (
+                obj.assets.count()
+                + obj.applied_controls.count()
+                + obj.vulnerabilities.count()
+                + obj.risk_scenarios.count()
+                + obj.requirement_assessments.count()
+            )
+
+    class Meta:
+        model = SecurityException
+        fields = "__all__"
+
+
+class FindingsAssessmentWriteSerializer(BaseModelSerializer):
+    def validate(self, attrs):
+        if hasattr(self, "instance") and self.instance and self.instance.is_locked:
+            # If we're unlocking (setting is_locked to False), allow the operation
+            if "is_locked" in attrs and attrs["is_locked"] is False:
+                return super().validate(attrs)
+
+            # Otherwise, only allow modifying the is_locked field
+            locked_fields = [field for field in attrs.keys() if field != "is_locked"]
+            if locked_fields:
+                raise serializers.ValidationError(
+                    f"⚠️ Cannot modify the findings assessment attributes when it is locked. Only the 'Locked' field can be modified."
+                )
+        return super().validate(attrs)
+
+    def update(self, instance, validated_data):
+        # Track old folder before update
+        old_folder_id = instance.folder_id
+        # Check if status is changing to deprecated
+        old_status = instance.status
+        new_status = validated_data.get("status", old_status)
+
+        # Auto-lock when status changes to deprecated
+        if old_status != "deprecated" and new_status == "deprecated":
+            validated_data["is_locked"] = True
+
+        # If perimeter is being changed, update folder to match the new perimeter's folder
+        if "perimeter" in validated_data:
+            new_perimeter = validated_data["perimeter"]
+            if new_perimeter and new_perimeter.folder:
+                validated_data["folder"] = new_perimeter.folder
+
+        with transaction.atomic():
+            updated_instance = super().update(instance, validated_data)
+
+            # Cascade folder change to findings
+            if old_folder_id != updated_instance.folder_id:
+                Finding.objects.filter(findings_assessment=updated_instance).update(
+                    folder=updated_instance.folder
+                )
+
+        return updated_instance
+
+    class Meta:
+        model = FindingsAssessment
+        exclude = ["created_at", "updated_at"]
+
+
+class FindingsAssessmentReadSerializer(AssessmentReadSerializer):
+    path = PathField(read_only=True)
+    folder = FieldsRelatedField()
+    findings_count = serializers.IntegerField(source="findings.count")
+    treatment_progress = serializers.IntegerField(read_only=True, default=0)
+    evidences = FieldsRelatedField(many=True)
+    validation_flows = FieldsRelatedField(
+        many=True,
+        fields=[
+            "id",
+            "ref_id",
+            "status",
+            {"approver": ["id", "email", "first_name", "last_name"]},
+        ],
+        source="validationflow_set",
+    )
+
+    class Meta:
+        model = FindingsAssessment
+        fields = "__all__"
+
+
+class FindingWriteSerializer(BaseModelSerializer):
+    def validate(self, attrs):
+        if (
+            hasattr(self, "instance")
+            and self.instance
+            and self.instance.findings_assessment.is_locked
+        ):
+            raise serializers.ValidationError(
+                "⚠️ Cannot modify the finding when the findings assessment is locked."
+            )
+        return super().validate(attrs)
+
+    class Meta:
+        model = Finding
+        exclude = ["created_at", "updated_at", "folder"]
+
+    def create(self, validated_data):
+        findings_assessment = validated_data.get("findings_assessment")
+        if not findings_assessment:
+            raise serializers.ValidationError({"findings_assessment": "mandatory"})
+        validated_data["folder"] = findings_assessment.folder
+
+        return super().create(validated_data)
+
+
+class FindingReadSerializer(FindingWriteSerializer):
+    path = PathField(read_only=True)
+    owner = FieldsRelatedField(many=True)
+    findings_assessment = FieldsRelatedField(["id", "name", "is_locked"])
+    threats = FieldsRelatedField(many=True)
+    vulnerabilities = FieldsRelatedField(many=True)
+    reference_controls = FieldsRelatedField(many=True)
+    applied_controls = FieldsRelatedField(many=True)
+    filtering_labels = FieldsRelatedField(many=True)
+    evidences = FieldsRelatedField(many=True)
+    perimeter = FieldsRelatedField(
+        source="findings_assessment.perimeter", fields=["id", "name", "folder"]
+    )
+    folder = FieldsRelatedField()
+    severity = serializers.CharField(source="get_severity_display")
+    priority = serializers.CharField(source="get_priority_display")
+
+    class Meta:
+        model = Finding
+        fields = "__all__"
+
+
+class PresetJourneyStepReadSerializer(BaseModelSerializer):
+    title = serializers.CharField(source="get_title_translated")
+    description = serializers.CharField(
+        source="get_description_translated", allow_blank=True
+    )
+
+    class Meta:
+        model = PresetJourneyStep
+        exclude = ["translations"]
+
+
+class PresetJourneyStepWriteSerializer(BaseModelSerializer):
+    class Meta:
+        model = PresetJourneyStep
+        fields = ["status", "notes", "target_ref"]
+
+    def update(self, instance, validated_data):
+        if "status" in validated_data:
+            new_status = validated_data["status"]
+            if new_status in (
+                PresetJourneyStep.Status.DONE,
+                PresetJourneyStep.Status.SKIPPED,
+            ):
+                validated_data["completed_at"] = timezone.now()
+                validated_data["completed_by"] = self.context["request"].user
+            elif new_status == PresetJourneyStep.Status.NOT_STARTED:
+                validated_data["completed_at"] = None
+                validated_data["completed_by"] = None
+
+        with transaction.atomic():
+            # Sync target_ref change to parent journey's object_refs
+            if "target_ref" in validated_data:
+                new_ref = validated_data["target_ref"]
+                journey = instance.journey
+                object_refs = dict(journey.object_refs or {})
+                if new_ref:
+                    object_refs[instance.key] = new_ref
+                else:
+                    object_refs.pop(instance.key, None)
+                journey.object_refs = object_refs
+                journey.save(update_fields=["object_refs"])
+
+            return super().update(instance, validated_data)
+
+
+class PresetJourneyReadSerializer(BaseModelSerializer):
+    steps = PresetJourneyStepReadSerializer(many=True, read_only=True)
+    folder = FieldsRelatedField()
+    latest_version = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PresetJourney
+        fields = "__all__"
+
+    def get_latest_version(self, obj):
+        return (
+            StoredLibrary.objects.filter(urn=obj.urn)
+            .order_by("-version")
+            .values_list("version", flat=True)
+            .first()
+        )
+
+
+class PresetJourneyWriteSerializer(BaseModelSerializer):
+    class Meta:
+        model = PresetJourney
+        fields = ["name", "description"]
+
+
+class QuickStartSerializer(serializers.Serializer):
+    folder = serializers.UUIDField(required=False)
+    audit_name = serializers.CharField()
+    framework = serializers.CharField()
+    create_risk_assessment = serializers.BooleanField()
+    risk_assessment_name = serializers.CharField(required=False)
+    risk_matrix = serializers.CharField(required=False)
+
+    def save(self, **kwargs):
+        return self.create(self.validated_data)
+
+    def create(self, validated_data):
+        folder = Folder.objects.filter(
+            content_type=Folder.ContentType.DOMAIN,
+            name="Starter",
+        ).first()
+        if not folder:
+            folder_data = {
+                "content_type": Folder.ContentType.DOMAIN,
+                "name": "Starter",
+                "create_iam_groups": True,
+            }
+            folder_serializer = FolderWriteSerializer(
+                data=folder_data, context=self.context
+            )
+            if not folder_serializer.is_valid(raise_exception=True):
+                return None
+            folder = folder_serializer.save()
+            Folder.create_default_ug_and_ra(folder)
+
+        perimeter_data = {
+            "folder": folder.id,
+            "name": "Starter",
+        }
+        perimeter = Perimeter.objects.filter(**perimeter_data).first()
+        if not perimeter:
+            perimeter_serializer = PerimeterWriteSerializer(
+                data=perimeter_data, context=self.context
+            )
+            if not perimeter_serializer.is_valid(raise_exception=True):
+                return None
+            perimeter = perimeter_serializer.save()
+
+        framework_lib_urn = validated_data["framework"]
+        if not LoadedLibrary.objects.filter(urn=framework_lib_urn).exists():
+            framework_stored_lib = StoredLibrary.objects.get(urn=framework_lib_urn)
+            try:
+                framework_stored_lib.load()
+            except Exception as e:
+                logger.error(e)
+                raise serializers.ValidationError(
+                    {"error": "Could not load the selected framework library"}
+                )
+        framework_lib = LoadedLibrary.objects.get(urn=framework_lib_urn)
+        framework = Framework.objects.get(library=framework_lib)
+        compliance_assessment_data = {
+            "folder": folder.id,
+            "perimeter": perimeter.id,
+            "framework": framework.id,
+            "name": validated_data["audit_name"],
+        }
+        compliance_asssessment_serializer = ComplianceAssessmentWriteSerializer(
+            data=compliance_assessment_data, context=self.context
+        )
+        if not compliance_asssessment_serializer.is_valid(raise_exception=True):
+            return None
+        audit = compliance_asssessment_serializer.save()
+        audit.create_requirement_assessments()
+
+        created_objects = {
+            "folder": FolderReadSerializer(folder).data,
+            "perimeter": PerimeterReadSerializer(perimeter).data,
+            "complianceassessment": ComplianceAssessmentReadSerializer(audit).data,
+        }
+
+        if not validated_data["create_risk_assessment"]:
+            return created_objects
+
+        matrix_lib_urn = validated_data["risk_matrix"]
+        if not LoadedLibrary.objects.filter(urn=matrix_lib_urn).exists():
+            matrix_stored_lib = StoredLibrary.objects.get(urn=matrix_lib_urn)
+            try:
+                matrix_stored_lib.load()
+            except Exception as e:
+                logger.error(e)
+                raise serializers.ValidationError(
+                    {"error": "Could not load the selected risk matrix library"}
+                )
+        matrix_lib = LoadedLibrary.objects.get(urn=matrix_lib_urn)
+        matrix = RiskMatrix.objects.get(library=matrix_lib)
+
+        risk_assessment_data = {
+            "folder": folder.id,
+            "perimeter": perimeter.id,
+            "risk_matrix": matrix.id,
+            "name": validated_data["risk_assessment_name"],
+        }
+        risk_asssessment_serializer = RiskAssessmentWriteSerializer(
+            data=risk_assessment_data, context=self.context
+        )
+        if not risk_asssessment_serializer.is_valid(raise_exception=True):
+            return created_objects
+        risk_assessment = risk_asssessment_serializer.save()
+        created_objects["riskassessment"] = RiskAssessmentReadSerializer(
+            risk_assessment
+        ).data
+
+        return created_objects
+
+
+class TimelineEntryWriteSerializer(BaseModelSerializer):
+    class Meta:
+        model = TimelineEntry
+        exclude = ["created_at", "updated_at"]
+
+
+class TimelineEntryReadSerializer(TimelineEntryWriteSerializer):
+    path = PathField(read_only=True)
+    str = serializers.CharField(source="__str__", read_only=True)
+    author = FieldsRelatedField()
+    folder = FieldsRelatedField()
+    incident = FieldsRelatedField()
+    evidences = FieldsRelatedField(many=True)
+
+    class Meta:
+        model = TimelineEntry
+        exclude = []
+
+
+class CommentWriteSerializer(BaseModelSerializer):
+    PARENT_FIELDS = [
+        "requirement_assessment",
+        "risk_scenario",
+        "applied_control",
+        "finding",
+    ]
+
+    def validate(self, data):
+        # Only enforce the one-parent constraint on creation, not partial updates
+        if self.instance is None:
+            parent_count = sum(1 for f in self.PARENT_FIELDS if data.get(f) is not None)
+            if parent_count != 1:
+                raise serializers.ValidationError(
+                    "Exactly one parent (requirement_assessment, risk_scenario, "
+                    "applied_control, or finding) must be set."
+                )
+        return data
+
+    def create(self, validated_data):
+        # Resolve folder from the parent object so the RBAC check in
+        # BaseModelSerializer.create() uses the correct folder instead
+        # of falling back to root (which auditees cannot access).
+        for field_name in self.PARENT_FIELDS:
+            parent_obj = validated_data.get(field_name)
+            if parent_obj is not None:
+                validated_data["folder"] = parent_obj.folder
+                break
+        return super().create(validated_data)
+
+    class Meta:
+        model = Comment
+        exclude = ["created_at", "updated_at", "is_tainted", "author", "folder"]
+
+
+class CommentReadSerializer(CommentWriteSerializer):
+    str = serializers.CharField(source="__str__", read_only=True)
+    author = FieldsRelatedField(["id", "email", "first_name", "last_name"])
+    folder = FieldsRelatedField()
+    requirement_assessment = FieldsRelatedField()
+    risk_scenario = FieldsRelatedField()
+    applied_control = FieldsRelatedField()
+    finding = FieldsRelatedField()
+
+    class Meta:
+        model = Comment
+        fields = "__all__"
+
+
+class IncidentWriteSerializer(BaseModelSerializer):
+    class Meta:
+        model = Incident
+        exclude = ["created_at", "updated_at"]
+
+    def update(self, instance, validated_data):
+        old_folder_id = instance.folder_id
+        with transaction.atomic():
+            updated_instance = super().update(instance, validated_data)
+            if old_folder_id != updated_instance.folder_id:
+                TimelineEntry.objects.filter(incident=updated_instance).update(
+                    folder=updated_instance.folder
+                )
+        return updated_instance
+
+
+class IncidentReadSerializer(IncidentWriteSerializer):
+    path = PathField(read_only=True)
+    threats = FieldsRelatedField(many=True)
+    owners = FieldsRelatedField(many=True)
+    assets = FieldsRelatedField(many=True)
+    qualifications = FieldsRelatedField(many=True)
+    entities = FieldsRelatedField(many=True)
+    severity = serializers.CharField(source="get_severity_display", read_only=True)
+    status = serializers.CharField(source="get_status_display", read_only=True)
+    detection = serializers.CharField(source="get_detection_display", read_only=True)
+    folder = FieldsRelatedField()
+    filtering_labels = FieldsRelatedField(many=True)
+
+    class Meta:
+        model = Incident
+        fields = "__all__"
+
+    def get_timeline_entries(self, obj):
+        """Returns a serialized list of timeline entries related to the incident."""
+        return TimelineEntryReadSerializer(obj.timeline_entries.all(), many=True).data
+
+
+class TaskTemplateReadSerializer(BaseModelSerializer):
+    path = PathField(read_only=True)
+    folder = FieldsRelatedField()
+    evidences = FieldsRelatedField(many=True)
+    assets = FieldsRelatedField(many=True)
+    applied_controls = FieldsRelatedField(many=True)
+    compliance_assessments = FieldsRelatedField(many=True)
+    risk_assessments = FieldsRelatedField(many=True)
+    assigned_to = FieldsRelatedField(many=True)
+    findings_assessment = FieldsRelatedField(many=True)
+
+    next_occurrence = serializers.ReadOnlyField(source="get_next_occurrence")
+    last_occurrence_status = serializers.ReadOnlyField(
+        source="get_last_occurrence_status"
+    )
+    next_occurrence_status = serializers.ReadOnlyField(
+        source="get_next_occurrence_status"
+    )
+
+    # Expose task_node fields directly
+    status = serializers.SerializerMethodField()
+    observation = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TaskTemplate
+        exclude = ["schedule"]
+
+    def get_task_node(self, obj):
+        """
+        Helper to fetch the related TaskNode for non-recurrent templates.
+        """
+        if obj.is_recurrent:
+            return None
+        return TaskNode.objects.filter(task_template=obj).order_by("due_date").first()
+
+    def get_status(self, obj):
+        task_node = self.get_task_node(obj)
+        return task_node.status if task_node else None
+
+    def get_observation(self, obj):
+        task_node = self.get_task_node(obj)
+        return task_node.observation if task_node else ""
+
+
+class TaskTemplateWriteSerializer(BaseModelSerializer):
+    status = serializers.CharField(required=False)
+    observation = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True
+    )
+    objectives = serializers.PrimaryKeyRelatedField(
+        queryset=OrganisationObjective.objects.all(),
+        many=True,
+        required=False,
+    )
+
+    class Meta:
+        model = TaskTemplate
+        fields = "__all__"
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if not instance.is_recurrent:
+            task_node = (
+                TaskNode.objects.filter(task_template=instance)
+                .order_by("due_date")
+                .first()
+            )
+            if task_node:
+                data["status"] = task_node.status
+                data["observation"] = task_node.observation
+            else:
+                data["status"] = None
+                data["observation"] = ""
+        return data
+
+    def create(self, validated_data):
+        assigned_to_data = validated_data.get("assigned_to", [])
+        tasknode_data = self._extract_tasknode_fields(validated_data)
+        with transaction.atomic():
+            instance = super().create(validated_data)
+            self._sync_task_node(instance, tasknode_data, False, instance.is_recurrent)
+
+        # Send notification to newly assigned users
+        if assigned_to_data:
+            self._send_assignment_notifications(
+                instance, [actor.id for actor in assigned_to_data]
+            )
+
+        return instance
+
+    def update(self, instance, validated_data):
+        # Track old assigned users before update
+        old_assigned_ids = set(instance.assigned_to.values_list("id", flat=True))
+
+        # Track old folder before update
+        old_folder_id = instance.folder_id
+
+        was_recurrent = instance.is_recurrent  # Store the previous state
+        tasknode_data = self._extract_tasknode_fields(validated_data)
+
+        with transaction.atomic():
+            instance = super().update(instance, validated_data)
+            now_recurrent = instance.is_recurrent
+            self._sync_task_node(instance, tasknode_data, was_recurrent, now_recurrent)
+
+            # Update all TaskNodes' folder if the TaskTemplate's folder changed
+            if old_folder_id != instance.folder_id:
+                TaskNode.objects.filter(task_template=instance).update(
+                    folder=instance.folder
+                )
+
+        # Get new assigned users after update
+        new_assigned_ids = set(instance.assigned_to.values_list("id", flat=True))
+
+        # Send notifications only to newly assigned users
+        newly_assigned_ids = new_assigned_ids - old_assigned_ids
+        if newly_assigned_ids:
+            self._send_assignment_notifications(instance, list(newly_assigned_ids))
+
+        return instance
+
+    def _send_assignment_notifications(self, task_template, actor_ids):
+        """Send assignment notifications to the specified actors"""
+        if not actor_ids:
+            return
+
+        try:
+            from core.models import Actor
+            from .tasks import send_task_template_assignment_notification
+
+            assigned_actors = Actor.objects.filter(id__in=actor_ids)
+            assigned_emails = []
+            for actor in assigned_actors:
+                assigned_emails.extend(actor.get_emails())
+
+            if assigned_emails:
+                send_task_template_assignment_notification(
+                    task_template.id, assigned_emails
+                )
+        except Exception as e:
+            logger.error(
+                f"Failed to send TaskTemplate assignment notification: {str(e)}"
+            )
+
+    def _extract_tasknode_fields(self, validated_data):
+        """
+        Separate the TaskNode-specific fields from validated_data.
+        """
+        return {
+            "status": validated_data.pop("status", None),
+            "observation": validated_data.pop("observation", None),
+        }
+
+    def _sync_task_node(
+        self, task_template, tasknode_data, was_recurrent, now_recurrent
+    ):
+        """
+        Synchronize or create the TaskNode linked to a non-recurrent TaskTemplate.
+        """
+        if now_recurrent:
+            return  # Only sync for non-recurrent templates
+
+        task_nodes = TaskNode.objects.filter(task_template=task_template)
+        if was_recurrent:
+            # Was recurrent, now non-recurrent: must clean
+            task_nodes.delete()
+            task_node = TaskNode.objects.create(
+                task_template=task_template,
+                due_date=task_template.task_date,
+                scheduled_date=task_template.task_date,
+                folder=task_template.folder,
+            )
+        else:
+            # Was already non-recurrent: reuse if possible
+            if task_nodes.count() == 1:
+                task_node = task_nodes.first()
+            else:
+                task_nodes.delete()
+                task_node = TaskNode.objects.create(
+                    task_template=task_template,
+                    due_date=task_template.task_date,
+                    scheduled_date=task_template.task_date,
+                    folder=task_template.folder,
+                )
+
+        task_node.to_delete = False
+        task_node.due_date = task_template.task_date
+        task_node.scheduled_date = task_template.task_date
+        if tasknode_data.get("status") is not None:
+            task_node.status = tasknode_data["status"]
+        if tasknode_data.get("observation") is not None:
+            task_node.observation = tasknode_data["observation"]
+        task_node.save()
+
+
+class TaskNodeReadSerializer(BaseModelSerializer):
+    path = PathField(read_only=True)
+    task_template = FieldsRelatedField(["folder", "id"])
+    folder = FieldsRelatedField()
+    name = serializers.SerializerMethodField()
+    assigned_to = FieldsRelatedField(many=True)
+    evidences = FieldsRelatedField(["folder", "id"], many=True)
+    is_recurrent = serializers.BooleanField(source="task_template.is_recurrent")
+    expected_evidence = FieldsRelatedField(["folder", "id"], many=True)
+    evidence_reviewed = serializers.SerializerMethodField()
+    evidence_revisions_map = serializers.SerializerMethodField()
+    applied_controls = FieldsRelatedField(["folder", "id"], many=True)
+    compliance_assessments = FieldsRelatedField(["folder", "id"], many=True)
+    assets = FieldsRelatedField(["folder", "id"], many=True)
+    risk_assessments = FieldsRelatedField(["folder", "id"], many=True)
+    findings_assessment = FieldsRelatedField(["folder", "id"], many=True)
+
+    def get_name(self, obj):
+        return obj.task_template.name if obj.task_template else ""
+
+    def get_evidence_reviewed(self, obj):
+        evidence_reviewed = []
+        for evidence in obj.expected_evidence:
+            last_revision = evidence.last_revision
+            if last_revision and last_revision.task_node == obj:
+                evidence_reviewed.append(evidence.id)
+        return evidence_reviewed
+
+    def get_evidence_revisions_map(self, obj):
+        """Returns a mapping of evidence ID to revision ID for this task node"""
+        from core.models import EvidenceRevision
+
+        evidence_revisions = {}
+        for evidence in obj.expected_evidence:
+            # Find revisions for this evidence that belong to this task node
+            revision = EvidenceRevision.objects.filter(
+                evidence=evidence, task_node=obj
+            ).first()
+            if revision:
+                evidence_revisions[str(evidence.id)] = str(revision.id)
+        return evidence_revisions
+
+    class Meta:
+        model = TaskNode
+        exclude = ["to_delete"]
+
+
+class TaskNodeWriteSerializer(BaseModelSerializer):
+    class Meta:
+        model = TaskNode
+        exclude = ["task_template", "evidences", "scheduled_date"]
+
+    def validate_due_date(self, value):
+        if self.instance and value:
+            exists = (
+                TaskNode.objects.filter(
+                    task_template=self.instance.task_template,
+                    due_date=value,
+                )
+                .exclude(pk=self.instance.pk)
+                .exists()
+            )
+            if exists:
+                raise serializers.ValidationError("taskNodeDuplicateDueDate")
+        return value
+
+
+class TerminologyReadSerializer(BaseModelSerializer):
+    field_path = serializers.CharField(source="get_field_path_display", read_only=True)
+    translated_name = serializers.CharField(source="get_name_translated")
+
+    class Meta:
+        model = Terminology
+        exclude = ["folder"]
+
+
+class TerminologyWriteSerializer(BaseModelSerializer):
+    builtin = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = Terminology
+        exclude = ["folder", "is_published"]
+
+
+class ValidationFlowWriteSerializer(BaseModelSerializer):
+    ref_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    event_notes = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True, write_only=True
+    )
+
+    def create(self, validated_data: dict) -> ValidationFlow:
+        """
+        Override create to automatically set the requester to the current user
+        and create initial submission event.
+        """
+        from core.models import FlowEvent
+
+        request_user = self.context["request"].user
+        validated_data["requester"] = request_user
+
+        # Extract event_notes (if provided) or use request_notes for initial event
+        event_notes = validated_data.pop("event_notes", None)
+        if not event_notes:
+            event_notes = validated_data.get("request_notes", None)
+
+        # Create the validation flow
+        instance = super().create(validated_data)
+
+        # Create initial submission event
+        FlowEvent.objects.create(
+            validation_flow=instance,
+            event_type=instance.status,
+            event_actor=request_user,
+            event_notes=event_notes,
+            folder=instance.folder,
+        )
+
+        # Send notification to approver (best-effort only, don't break creation)
+        try:
+            from core.tasks import send_validation_flow_created_notification
+
+            send_validation_flow_created_notification(instance)
+        except Exception as e:
+            logger.error(
+                "Failed to send validation flow creation notification",
+                validation_flow_id=instance.id,
+                ref_id=instance.ref_id,
+            )
+
+        return instance
+
+    def update(self, instance: ValidationFlow, validated_data: dict) -> ValidationFlow:
+        """
+        Override update to ensure proper permissions for status transitions:
+        - Approver can modify status when status is 'submitted' or 'accepted'
+        - Requester can modify status when status is 'change_requested'
+        - Creates FlowEvent for each status transition
+        """
+        from core.models import FlowEvent
+
+        request_user = self.context["request"].user
+        old_folder_id = instance.folder_id
+
+        # Check if status is being modified
+        if "status" in validated_data:
+            new_status = validated_data["status"]
+            current_status = instance.status
+
+            # Define who can modify based on current status
+            if current_status in ["submitted", "accepted"]:
+                # For submitted status: approver can do any action, requester can only drop
+                if current_status == "submitted" and new_status == "dropped":
+                    # Allow requester to drop their own request
+                    if (
+                        instance.requester != request_user
+                        and instance.approver != request_user
+                    ):
+                        raise PermissionDenied(
+                            {
+                                "error": "Only the requester or approver can drop this validation"
+                            }
+                        )
+                else:
+                    # Only approver can change status from submitted or accepted (for other actions)
+                    if instance.approver != request_user:
+                        raise PermissionDenied(
+                            {
+                                "error": "Only the assigned approver can modify this validation"
+                            }
+                        )
+            elif current_status == "change_requested":
+                # Only requester can change status from change_requested
+                if instance.requester != request_user:
+                    raise PermissionDenied(
+                        {
+                            "error": "Only the requester can resubmit or drop this validation"
+                        }
+                    )
+            else:
+                # Terminal states (rejected, revoked, dropped, expired) cannot be modified
+                raise PermissionDenied(
+                    {
+                        "error": "This validation is in a terminal state and cannot be modified"
+                    }
+                )
+
+            # Extract event notes from validated_data (passed from actions)
+            event_notes = validated_data.pop("event_notes", None)
+
+            with transaction.atomic():
+                # Update the instance
+                updated_instance = super().update(instance, validated_data)
+
+                # Create FlowEvent after successful status transition
+                FlowEvent.objects.create(
+                    validation_flow=updated_instance,
+                    event_type=updated_instance.status,
+                    event_actor=request_user,
+                    event_notes=event_notes,
+                    folder=updated_instance.folder,
+                )
+
+                # Auto-lock/unlock associated objects based on status transitions
+                self._manage_associated_objects_lock(
+                    updated_instance, current_status, new_status
+                )
+
+                # Cascade folder changes to events if needed
+                if old_folder_id != updated_instance.folder_id:
+                    FlowEvent.objects.filter(validation_flow=updated_instance).update(
+                        folder=updated_instance.folder
+                    )
+
+            # Notify the other party about the status change (after commit)
+            def _send_update_notification():
+                try:
+                    from core.tasks import send_validation_flow_updated_notification
+
+                    actor_name = (
+                        f"{request_user.first_name} {request_user.last_name}".strip()
+                        or request_user.email
+                    )
+
+                    # Approver acted → notify requester
+                    if (
+                        request_user == updated_instance.approver
+                        and updated_instance.requester
+                        and updated_instance.requester.email
+                    ):
+                        send_validation_flow_updated_notification(
+                            updated_instance.id,
+                            updated_instance.requester.email,
+                            updated_instance.get_status_display(),
+                            actor_name,
+                            event_notes,
+                        )
+                    # Requester acted → notify approver
+                    elif (
+                        request_user == updated_instance.requester
+                        and updated_instance.approver
+                        and updated_instance.approver.email
+                    ):
+                        send_validation_flow_updated_notification(
+                            updated_instance.id,
+                            updated_instance.approver.email,
+                            updated_instance.get_status_display(),
+                            actor_name,
+                            event_notes,
+                        )
+                except Exception as e:
+                    logger.error(
+                        "Failed to send validation flow update notification",
+                        validation_flow_id=updated_instance.id,
+                        error=str(e),
+                    )
+
+            transaction.on_commit(_send_update_notification)
+
+            return updated_instance
+
+        with transaction.atomic():
+            updated_instance = super().update(instance, validated_data)
+
+            if old_folder_id != updated_instance.folder_id:
+                FlowEvent.objects.filter(validation_flow=updated_instance).update(
+                    folder=updated_instance.folder
+                )
+
+        return updated_instance
+
+    def _manage_associated_objects_lock(
+        self, validation_flow, old_status: str, new_status: str
+    ):
+        """
+        Automatically lock/unlock associated objects based on validation status.
+        - Lock when status becomes 'accepted'
+        """
+        # Only act on specific transitions
+        should_lock = new_status == "accepted"
+        # should_unlock = old_status == "accepted" and new_status == "revoked"
+        #
+        # if not (should_lock or should_unlock):
+        #     return
+
+        if not should_lock:
+            return
+        lock_value = should_lock
+
+        # Get all assessment model fields
+        assessment_fields = [
+            "compliance_assessments",
+            "risk_assessments",
+            "business_impact_analysis",
+            "findings_assessments",
+        ]
+
+        for field_name in assessment_fields:
+            related_manager = getattr(validation_flow, field_name)
+            if related_manager.exists():
+                related_manager.update(is_locked=lock_value)
+                logger.info(
+                    f"{'Locked' if lock_value else 'Unlocked'} {related_manager.count()} "
+                    f"{field_name} for validation flow {validation_flow.ref_id}"
+                )
+
+    class Meta:
+        model = ValidationFlow
+        fields = "__all__"
+        read_only_fields = ["requester"]
+
+
+class FlowEventSerializer(BaseModelSerializer):
+    event_actor = FieldsRelatedField(["id", "email", "first_name", "last_name"])
+
+    class Meta:
+        model = FlowEvent
+        fields = ["id", "event_type", "event_actor", "event_notes", "created_at"]
+
+
+class ValidationFlowReadSerializer(BaseModelSerializer):
+    str = serializers.CharField(source="__str__", read_only=True)
+    path = PathField(read_only=True)
+    folder = FieldsRelatedField()
+    compliance_assessments = FieldsRelatedField(
+        many=True,
+        fields=[
+            "id",
+            "status",
+            "updated_at",
+            {"perimeter": ["id", {"folder": ["id"]}]},
+        ],
+    )
+    risk_assessments = FieldsRelatedField(
+        many=True,
+        fields=[
+            "id",
+            "status",
+            "updated_at",
+            {"perimeter": ["id", {"folder": ["id"]}]},
+        ],
+    )
+    business_impact_analysis = FieldsRelatedField(
+        many=True,
+        fields=[
+            "id",
+            "status",
+            "updated_at",
+            {"perimeter": ["id", {"folder": ["id"]}]},
+        ],
+    )
+    crq_studies = FieldsRelatedField(many=True)
+    ebios_studies = FieldsRelatedField(many=True)
+    entity_assessments = FieldsRelatedField(
+        many=True,
+        fields=[
+            "id",
+            "status",
+            "updated_at",
+            {"perimeter": ["id", {"folder": ["id"]}]},
+        ],
+    )
+    findings_assessments = FieldsRelatedField(
+        many=True,
+        fields=[
+            "id",
+            "status",
+            "updated_at",
+            {"perimeter": ["id", {"folder": ["id"]}]},
+        ],
+    )
+    evidences = FieldsRelatedField(many=True)
+    security_exceptions = FieldsRelatedField(many=True)
+    policies = FieldsRelatedField(many=True)
+    processings = FieldsRelatedField(many=True)
+    accreditations = FieldsRelatedField(many=True)
+    contracts = FieldsRelatedField(many=True)
+    filtering_labels = FieldsRelatedField(many=True)
+    requester = FieldsRelatedField(["id", "email", "first_name", "last_name"])
+    approver = FieldsRelatedField(["id", "email", "first_name", "last_name"])
+    linked_models = serializers.SerializerMethodField()
+    events = FlowEventSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = ValidationFlow
+        fields = "__all__"
+
+    def get_linked_models(self, obj):
+        linked = []
+        field_map = [
+            ("compliance_assessments", "has_compliance_assessments"),
+            ("risk_assessments", "has_risk_assessments"),
+            ("business_impact_analysis", "has_business_impact_analysis"),
+            ("crq_studies", "has_crq_studies"),
+            ("ebios_studies", "has_ebios_studies"),
+            ("entity_assessments", "has_entity_assessments"),
+            ("findings_assessments", "has_findings_assessments"),
+            ("evidences", "has_evidences"),
+            ("security_exceptions", "has_security_exceptions"),
+            ("policies", "has_policies"),
+            ("processings", "has_processings"),
+            ("accreditations", "has_accreditations"),
+            ("contracts", "has_contracts"),
+        ]
+        prefetched = getattr(obj, "_prefetched_objects_cache", {})
+        for field_name, flag_name in field_map:
+            annotated_value = getattr(obj, flag_name, None)
+            if annotated_value is not None:
+                has_items = annotated_value
+            elif field_name in prefetched:
+                has_items = bool(prefetched[field_name])
+            else:
+                manager = getattr(obj, field_name, None)
+                has_items = bool(manager and manager.exists())
+            if has_items:
+                linked.append(field_name)
+        return linked
+
+
+class ComplianceAssessmentEvidenceSerializer(BaseModelSerializer):
+    """Serializer for evidences in the context of compliance assessments"""
+
+    folder = FieldsRelatedField()
+    status = serializers.CharField(source="get_status_display")
+    owner = FieldsRelatedField(many=True)
+    size = serializers.CharField(source="get_size")
+    last_update = serializers.DateTimeField(source="updated_at")
+    requirement_assessments = serializers.SerializerMethodField()
+
+    def get_requirement_assessments(self, obj):
+        pk = self.context.get("pk")
+        if pk is None:
+            return {"direct_links": [], "indirect_links": []}
+
+        # Get requirement assessments for this compliance assessment
+        requirement_assessments = RequirementAssessment.objects.filter(
+            compliance_assessment=pk
+        ).prefetch_related("applied_controls")
+
+        direct_links = []
+        indirect_links = []
+
+        # Direct links - evidence is directly linked to requirement assessment
+        for req_assessment in requirement_assessments:
+            if obj in req_assessment.evidences.all():
+                direct_links.append(
+                    {
+                        "requirement_assessment_id": str(req_assessment.id),
+                        "requirement_assessment_name": str(
+                            req_assessment.requirement.safe_display_str
+                        ),
+                    }
+                )
+
+        # Indirect links - evidence is linked through applied controls
+        for req_assessment in requirement_assessments:
+            for applied_control in req_assessment.applied_controls.all():
+                if obj in applied_control.evidences.all():
+                    indirect_links.append(
+                        {
+                            "requirement_assessment_id": str(req_assessment.id),
+                            "requirement_assessment_name": str(
+                                req_assessment.requirement.safe_display_str
+                            ),
+                            "applied_control_id": str(applied_control.id),
+                            "applied_control_name": applied_control.name,
+                        }
+                    )
+
+        # Return a simplified format similar to action-plan
+        all_links = []
+
+        # Add direct links
+        for link in direct_links:
+            all_links.append(
+                {
+                    "str": link["requirement_assessment_name"],
+                    "id": link["requirement_assessment_id"],
+                }
+            )
+
+        # Add indirect links
+        for link in indirect_links:
+            all_links.append(
+                {
+                    "str": f"{link['requirement_assessment_name']} (via {link['applied_control_name'][:15]}...)",
+                    "id": link["requirement_assessment_id"],
+                }
+            )
+
+        return all_links
+
+    class Meta:
+        model = Evidence
+        fields = [
+            "id",
+            "name",
+            "status",
+            "last_update",
+            "expiry_date",
+            "owner",
+            "folder",
+            "size",
+            "requirement_assessments",
+        ]

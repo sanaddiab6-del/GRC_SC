@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <defs>
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0d9488;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#06b6d4;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="innerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#14b8a6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#22d3ee;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Shield shape -->
+  <path d="M100 15 L175 45 L175 100 Q175 160 100 185 Q25 160 25 100 L25 45 Z" 
+        fill="url(#shieldGrad)" />
+  
+  <!-- Inner shield highlight -->
+  <path d="M100 30 L160 55 L160 100 Q160 145 100 167 Q40 145 40 100 L40 55 Z" 
+        fill="url(#innerGrad)" opacity="0.3" />
+  
+  <!-- Checkmark / Security symbol -->
+  <path d="M75 100 L95 120 L130 75" 
+        stroke="white" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+  
+  <!-- Three horizontal lines (governance layers) -->
+  <rect x="60" y="135" width="80" height="6" rx="3" fill="white" opacity="0.9"/>
+  <rect x="70" y="147" width="60" height="5" rx="2.5" fill="white" opacity="0.7"/>
+  <rect x="80" y="157" width="40" height="4" rx="2" fill="white" opacity="0.5"/>
+</svg>

@@ -1,0 +1,88 @@
+from django.core.exceptions import ValidationError
+from django.conf import settings
+from django.core.validators import BaseValidator
+from django.utils.text import get_valid_filename, slugify
+import jsonschema
+
+
+class JSONSchemaInstanceValidator(BaseValidator):
+    """
+    Validate a JSON schema instance
+    """
+
+    def __init__(self, schema):
+        self.schema = schema
+
+    def __call__(self, value):
+        try:
+            jsonschema.validate(value, self.schema)
+        except jsonschema.exceptions.ValidationError as e:
+            raise ValidationError(e.message)
+
+
+def validate_file_size(value):
+    """
+    Check that file size doesn't exceed maximum authorized
+    """
+    filesize = value.size
+
+    if filesize > int(settings.ATTACHMENT_MAX_SIZE_MB) * 1000000:
+        raise ValidationError(
+            f"The maximum file size that can be uploaded is {settings.ATTACHMENT_MAX_SIZE_MB} MB"
+        )
+    else:
+        return value
+
+
+def validate_file_name(value):
+    """
+    Check file extension and sanitize its name
+    """
+    allowed_extensions = [
+        "jpg",
+        "jpeg",
+        "png",
+        "doc",
+        "docx",
+        "odt",
+        "ppt",
+        "pptx",
+        "txt",
+        "xls",
+        "xlsx",
+        "ods",
+        "csv",
+        "pdf",
+        "json",
+        "yaml",
+        "yml",
+        "toml",
+        "xml",
+        "msg",
+        "eml",
+        "zip",
+        "7z",
+        "tar",
+        "gz",
+        "log",
+        "svg",
+        "mp4",
+        "mov",
+        "gif",
+    ]
+    parts = value.name.split(".")
+    extension = parts[-1].lower()
+
+    if extension in allowed_extensions:
+        if len(value.name) > 256:
+            raise ValidationError("File name is too long")
+        value.name = (
+            slugify(get_valid_filename(value.name.replace(extension, "")))
+            + "."
+            + extension
+        )
+        return value
+    else:
+        raise ValidationError(
+            f"Unsupported file extension '.{extension}'. Allowed extensions: {', '.join(allowed_extensions)}"
+        )

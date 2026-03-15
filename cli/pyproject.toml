@@ -1,0 +1,21 @@
+[project]
+name = "ciso-assistant-cli"
+version = "0.1.0"
+description = "CISO Assistant CLI tools"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.28.1",
+    "mcp[cli]>=1.6.0",
+    "pyyaml>=6.0.2",
+    "requests>=2.32.3",
+    "python-dotenv>=1.0.0",
+    "rich>=13.0.0",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["ca_mcp", "clica"]

@@ -1,0 +1,495 @@
+urn: urn:intuitem:risk:library:nca-cscc-1
+locale: en
+ref_id: CSCC-1
+name: Cloud Cybersecurity Controls
+description: "The NCA publishes the Cloud Cybersecurity Controls (CSCC-1:2021).\
+  \ These controls aim to protect cloud computing environments and services.\n\n\
+  Reference: https://nca.gov.sa/en/legislation?item=193"
+copyright: "© NCA"
+version: 1
+publication_date: 2024-06-19
+provider: NCA
+packager: intuitem
+objects:
+  framework:
+    urn: urn:intuitem:risk:framework:nca-cscc-1
+    ref_id: CSCC-1
+    name: Cloud Cybersecurity Controls
+    description: Saudi National Cybersecurity Authority framework for Cloud Cybersecurity Controls (CSCC-1:2021)
+    requirement_nodes:
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:1
+      assessable: false
+      depth: 1
+      ref_id: '1'
+      name: Cybersecurity Governance for Cloud Computing
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:1-1
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:1
+      ref_id: 1-1
+      name: Cybersecurity Policies and Procedures for Cloud Computing
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:1-1-objective
+      assessable: false
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:1-1
+      name: Objective
+      description: To ensure cloud cybersecurity requirements are documented, communicated, and complied with.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:1-1-controls
+      assessable: false
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:1-1
+      name: Controls
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:1-1-1
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:1-1-controls
+      ref_id: 1-1-1
+      description: The organization must document, approve, and implement cybersecurity policies and procedures specific to cloud computing services.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:1-1-2
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:1-1-controls
+      ref_id: 1-1-2
+      description: Cloud cybersecurity policies and procedures must cover all cloud service models (IaaS, PaaS, SaaS) and deployment models used by the organization.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:1-1-3
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:1-1-controls
+      ref_id: 1-1-3
+      description: The organization must review and approve the Cloud Service Provider's (CSP) cybersecurity policies relevant to the contracted services.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:1-1-4
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:1-1-controls
+      ref_id: 1-1-4
+      description: The organization must enforce its cybersecurity requirements on the CSP through contractual agreements and regular compliance checks.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:1-2
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:1
+      ref_id: 1-2
+      name: Cybersecurity Roles and Responsibilities for Cloud Computing
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:1-2-controls
+      assessable: false
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:1-2
+      name: Controls
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:1-2-1
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:1-2-controls
+      ref_id: 1-2-1
+      description: The organization must define and assign clear cybersecurity roles and responsibilities for cloud computing services.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:1-2-2
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:1-2-controls
+      ref_id: 1-2-2
+      description: A designated owner must be assigned for each cloud service to oversee its security posture.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:1-2-3
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:1-2-controls
+      ref_id: 1-2-3
+      description: A shared responsibility matrix must be defined between the organization and the CSP, clarifying cybersecurity responsibilities for each service model.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:1-2-4
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:1-2-controls
+      ref_id: 1-2-4
+      description: Personnel assigned with cloud security roles must receive appropriate training on cloud security principles and the organization's cloud policies.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:1-3
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:1
+      ref_id: 1-3
+      name: Cybersecurity Risk Management for Cloud Computing
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:1-3-controls
+      assessable: false
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:1-3
+      name: Controls
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:1-3-1
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:1-3-controls
+      ref_id: 1-3-1
+      description: The organization must conduct specific risk assessments for cloud computing services, considering cloud-specific threats and vulnerabilities.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:1-3-2
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:1-3-controls
+      ref_id: 1-3-2
+      description: Cloud cybersecurity risks must be documented in the organizational risk register, and accepted risks must be formally acknowledged by management.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2
+      assessable: false
+      depth: 1
+      ref_id: '2'
+      name: Cybersecurity Resilience for Cloud Computing
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-1
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2
+      ref_id: 2-1
+      name: Asset Management for Cloud Computing
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-1-controls
+      assessable: false
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-1
+      name: Controls
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-1-1
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-1-controls
+      ref_id: 2-1-1
+      description: The organization must maintain an up-to-date inventory of all cloud assets, including virtual machines, storage, databases, applications, and services.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-1-2
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-1-controls
+      ref_id: 2-1-2
+      description: Cloud assets must be classified according to the organization's data classification policy, and appropriate security controls applied based on classification.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-2
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2
+      ref_id: 2-2
+      name: Identity and Access Management for Cloud Computing
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-2-controls
+      assessable: false
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-2
+      name: Controls
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-2-1
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-2-controls
+      ref_id: 2-2-1
+      description: The organization must implement strong authentication mechanisms for access to cloud resources, using approved identity providers.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-2-2
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-2-controls
+      ref_id: 2-2-2
+      description: The principle of least privilege must be applied to all cloud resource access, limiting user and service permissions to those strictly required.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-2-3
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-2-controls
+      ref_id: 2-2-3
+      description: Default accounts and unnecessary accounts in cloud environments must be disabled or removed immediately.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-2-4
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-2-controls
+      ref_id: 2-2-4
+      description: Multi-Factor Authentication (MFA) must be enforced for all privileged and administrative access to cloud management consoles and sensitive cloud resources.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-2-5
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-2-controls
+      ref_id: 2-2-5
+      description: Privileged access to cloud resources must be monitored and all administrative actions logged.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-2-6
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-2-controls
+      ref_id: 2-2-6
+      description: Access rights to cloud resources must be reviewed periodically (at least annually) and revoked when no longer needed.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-2-7
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-2-controls
+      ref_id: 2-2-7
+      description: API keys, service account credentials, and access tokens for cloud services must be managed securely, rotated regularly, and stored in approved secrets management solutions.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-3
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2
+      ref_id: 2-3
+      name: Cloud Data and Information Protection
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-3-controls
+      assessable: false
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-3
+      name: Controls
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-3-1
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-3-controls
+      ref_id: 2-3-1
+      description: All sensitive data stored in cloud environments must be encrypted at rest using approved encryption algorithms and key lengths.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-3-2
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-3-controls
+      ref_id: 2-3-2
+      description: All data in transit to and from cloud services must be encrypted using approved secure communication protocols (e.g., TLS 1.2 or higher).
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-3-3
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-3-controls
+      ref_id: 2-3-3
+      description: Cryptographic keys used for cloud data encryption must be managed securely, with the organization maintaining control over keys for sensitive data.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-3-4
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-3-controls
+      ref_id: 2-3-4
+      description: Data Loss Prevention (DLP) mechanisms must be implemented to prevent unauthorized data exfiltration from cloud environments.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-3-5
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-3-controls
+      ref_id: 2-3-5
+      description: Data residency requirements must be defined and enforced to ensure organizational data is stored and processed within approved geographic boundaries as required by regulations.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-3-6
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-3-controls
+      ref_id: 2-3-6
+      description: Cloud data must be securely deleted or sanitized when no longer needed, ensuring data cannot be recovered from decommissioned cloud resources.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-3-7
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-3-controls
+      ref_id: 2-3-7
+      description: Regular backups of critical cloud data must be performed, stored securely (separate from production), and tested for restorability.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-3-8
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-3-controls
+      ref_id: 2-3-8
+      description: Backup data must be protected with the same or equivalent security controls as production cloud data, including encryption and access controls.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-3-9
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-3-controls
+      ref_id: 2-3-9
+      description: Data restoration from backups must be tested periodically to confirm backup integrity and recovery procedures are effective.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-4
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2
+      ref_id: 2-4
+      name: Security Configuration for Cloud Computing
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-4-controls
+      assessable: false
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-4
+      name: Controls
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-4-1
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-4-controls
+      ref_id: 2-4-1
+      description: Cloud infrastructure and services must be hardened according to approved security configuration baselines (e.g., CIS Benchmarks for cloud platforms).
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-4-2
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-4-controls
+      ref_id: 2-4-2
+      description: Unused cloud services, ports, protocols, and features must be disabled to minimize the attack surface.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-4-3
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-4-controls
+      ref_id: 2-4-3
+      description: Changes to cloud security configurations must follow a change management process including review, approval, testing, and documentation.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-5
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2
+      ref_id: 2-5
+      name: Vulnerability Management for Cloud Computing
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-5-controls
+      assessable: false
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-5
+      name: Controls
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-5-1
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-5-controls
+      ref_id: 2-5-1
+      description: Regular vulnerability assessments must be performed on cloud workloads, applications, and infrastructure components.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-5-2
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-5-controls
+      ref_id: 2-5-2
+      description: Security patches and updates for cloud components must be applied promptly, following a defined patch management schedule.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-5-3
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-5-controls
+      ref_id: 2-5-3
+      description: Penetration testing must be conducted on cloud environments at least annually, with findings tracked and remediated.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-6
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2
+      ref_id: 2-6
+      name: Cybersecurity Event Logs and Monitoring for Cloud Computing
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-6-controls
+      assessable: false
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-6
+      name: Controls
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-6-1
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-6-controls
+      ref_id: 2-6-1
+      description: Comprehensive logging must be enabled for all cloud resources, including management activities, authentication events, and data access.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-6-2
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-6-controls
+      ref_id: 2-6-2
+      description: Cloud logs must be centralized, protected from tampering, and stored in a separate secure environment from the systems they monitor.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-6-3
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-6-controls
+      ref_id: 2-6-3
+      description: Continuous monitoring of cloud environments must be implemented for detection of security events, anomalies, and policy violations.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-6-4
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-6-controls
+      ref_id: 2-6-4
+      description: Cloud event logs must be retained for a minimum period as defined by regulatory requirements and the organization's log retention policy.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-7
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2
+      ref_id: 2-7
+      name: Cybersecurity Incident and Threat Management for Cloud Computing
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-7-controls
+      assessable: false
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-7
+      name: Controls
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-7-1
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-7-controls
+      ref_id: 2-7-1
+      description: Cloud-specific incident response procedures must be defined, including escalation paths, coordination with CSPs, and communication protocols.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-7-2
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-7-controls
+      ref_id: 2-7-2
+      description: The organization must establish incident reporting and notification procedures with the CSP, including defined SLAs for incident reporting.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-7-3
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-7-controls
+      ref_id: 2-7-3
+      description: Post-incident reviews (lessons learned) must be conducted after significant cloud security incidents to prevent recurrence.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-8
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2
+      ref_id: 2-8
+      name: Physical Security for Cloud Computing
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-8-controls
+      assessable: false
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-8
+      name: Controls
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-8-1
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-8-controls
+      ref_id: 2-8-1
+      description: The organization must verify that the CSP implements appropriate physical security controls for data center facilities hosting organizational data.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-8-2
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-8-controls
+      ref_id: 2-8-2
+      description: Evidence of CSP data center physical security certifications (e.g., ISO 27001, SOC 2) must be reviewed during due diligence and contract renewal.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-9
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2
+      ref_id: 2-9
+      name: Cybersecurity Resilience for Cloud Computing
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-9-controls
+      assessable: false
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-9
+      name: Controls
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-9-1
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-9-controls
+      ref_id: 2-9-1
+      description: Service Level Agreements (SLAs) with CSPs must include minimum availability, recovery time objectives (RTO), and recovery point objectives (RPO) aligned with business continuity requirements.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-9-2
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-9-controls
+      ref_id: 2-9-2
+      description: Disaster recovery plans must be implemented for critical cloud services, with clearly defined recovery procedures and responsibilities.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:2-9-3
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:2-9-controls
+      ref_id: 2-9-3
+      description: Business continuity and disaster recovery plans for cloud services must be tested at least annually, with results documented and remediation actions tracked.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:3
+      assessable: false
+      depth: 1
+      ref_id: '3'
+      name: Third-Party and Cloud Computing Cybersecurity
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:3-1
+      assessable: false
+      depth: 2
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:3
+      ref_id: 3-1
+      name: Third-Party Cybersecurity Management for Cloud Computing
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:3-1-controls
+      assessable: false
+      depth: 3
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:3-1
+      name: Controls
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:3-1-1
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:3-1-controls
+      ref_id: 3-1-1
+      description: A cybersecurity due diligence assessment must be conducted on prospective CSPs before contracting, evaluating their security certifications, controls, and compliance posture.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:3-1-2
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:3-1-controls
+      ref_id: 3-1-2
+      description: Cybersecurity requirements, including data protection, incident reporting, audit rights, and compliance with NCA regulations, must be incorporated into cloud service contracts.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:3-1-3
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:3-1-controls
+      ref_id: 3-1-3
+      description: Periodic assessments of CSP compliance with contractual cybersecurity requirements must be conducted, using audit reports, certifications, or direct assessments.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:3-1-4
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:3-1-controls
+      ref_id: 3-1-4
+      description: Exit and migration procedures must be defined in cloud contracts, including provisions for data return, deletion confirmation, and transition support.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:3-1-5
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:3-1-controls
+      ref_id: 3-1-5
+      description: Dependencies on multiple CSPs and subcontractors (supply chain) must be identified and managed to prevent concentration risk.
+    - urn: urn:intuitem:risk:req_node:nca-cscc-1:3-1-6
+      assessable: true
+      depth: 4
+      parent_urn: urn:intuitem:risk:req_node:nca-cscc-1:3-1-controls
+      ref_id: 3-1-6
+      description: Regular security review meetings must be held with CSPs to discuss security posture, incidents, upcoming changes, and compliance status.

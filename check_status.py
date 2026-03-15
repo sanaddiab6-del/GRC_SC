@@ -1,0 +1,10 @@
+from core.models import RequirementNode, ReferenceControl, Threat
+rn_total = RequirementNode.objects.count()
+rn_ar = RequirementNode.objects.filter(translations__has_key='ar').count()
+rc_total = ReferenceControl.objects.count()
+rc_ar = ReferenceControl.objects.filter(translations__has_key='ar').count()
+t_total = Threat.objects.count()
+t_ar = Threat.objects.filter(translations__has_key='ar').count()
+print(f'RequirementNodes: {rn_ar}/{rn_total} translated')
+print(f'ReferenceControls: {rc_ar}/{rc_total} translated')
+print(f'Threats: {t_ar}/{t_total} translated')
