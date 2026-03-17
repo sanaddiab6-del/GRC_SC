@@ -255,6 +255,7 @@ INSTALLED_APPS = [
     "serdes",
     "integrations",
     "webhooks",
+    "notifications",
     "rest_framework",
     "knox",
     "rest_framework_simplejwt",

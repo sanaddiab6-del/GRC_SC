@@ -1,5 +1,5 @@
 <p align="center">
-Star the project 🌟 to get releases notification and help growing the community! <!-- sanadcom -->
+Star the project 🌟 to get releases notification and help growing the community!
 </p>
 
 <p align="center">
