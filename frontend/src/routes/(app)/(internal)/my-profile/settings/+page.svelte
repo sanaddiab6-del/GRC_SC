@@ -21,6 +21,61 @@
 	} from '$lib/components/Modals/stores';
 	import CreatePatModal from './pat/components/CreatePATModal.svelte';
 
+	// ---- Notification preferences ----
+	type NotifPrefs = {
+		in_app_enabled: boolean;
+		email_enabled: boolean;
+		slack_enabled: boolean;
+		slack_webhook_url: string;
+		teams_enabled: boolean;
+		teams_webhook_url: string;
+	};
+
+	let notifPrefs = $state<NotifPrefs>(
+		(data as any).notificationPreferences ?? {
+			in_app_enabled: true,
+			email_enabled: false,
+			slack_enabled: false,
+			slack_webhook_url: '',
+			teams_enabled: false,
+			teams_webhook_url: ''
+		}
+	);
+	let notifSaving = $state(false);
+	let notifSaved = $state(false);
+	let notifError = $state('');
+
+	async function saveNotifPrefs() {
+		notifSaving = true;
+		notifSaved = false;
+		notifError = '';
+		try {
+			const res = await fetch('/fe-api/notifications/preferences', {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					in_app_enabled: notifPrefs.in_app_enabled,
+					email_enabled: notifPrefs.email_enabled,
+					slack_enabled: notifPrefs.slack_enabled,
+					slack_webhook_url: notifPrefs.slack_webhook_url || '',
+					teams_enabled: notifPrefs.teams_enabled,
+					teams_webhook_url: notifPrefs.teams_webhook_url || ''
+				})
+			});
+			if (res.ok) {
+				notifSaved = true;
+				setTimeout(() => (notifSaved = false), 3000);
+			} else {
+				const err = await res.json().catch(() => ({}));
+				notifError = Object.values(err).flat().join(' ');
+			}
+		} catch (e: any) {
+			notifError = e?.message ?? 'Network error';
+		} finally {
+			notifSaving = false;
+		}
+	}
+
 	interface Props {
 		data: PageData;
 		form: ActionData;
@@ -136,6 +191,9 @@
 		<Tabs.Trigger value="security"
 			><i class="fa-solid fa-shield-halved mr-2"></i>{m.securitySettings()}</Tabs.Trigger
 		>
+		<Tabs.Trigger value="notifications"
+			><i class="fa-solid fa-bell mr-2"></i>Notifications</Tabs.Trigger
+		>
 		<Tabs.Indicator />
 	</Tabs.List>
 	<Tabs.Content value="security">
@@ -246,6 +304,125 @@
 						</dd>
 					</div>
 				</dl>
+			</div>
+		</div>
+	</Tabs.Content>
+
+	<!-- ======================================================= -->
+	<!-- Notifications tab                                       -->
+	<!-- ======================================================= -->
+	<Tabs.Content value="notifications">
+		<div class="p-4 flex flex-col space-y-6">
+			<div class="flex flex-col">
+				<h3 class="h3 font-medium">Notification Settings</h3>
+				<p class="text-sm text-surface-800">Control how and where you receive notifications.</p>
+			</div>
+			<hr />
+
+			<!-- Channels -->
+			<div class="flex flex-col space-y-4">
+				<h4 class="font-semibold text-sm text-surface-700 uppercase tracking-wide">Delivery channels</h4>
+
+				<!-- In-app -->
+				<label class="flex items-center justify-between gap-4 p-4 card bg-surface-50 rounded-lg cursor-pointer">
+					<div class="flex items-center gap-3">
+						<span class="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-600">
+							<i class="fa-solid fa-bell text-sm"></i>
+						</span>
+						<div>
+							<p class="font-medium text-sm">In-app notifications</p>
+							<p class="text-xs text-surface-600">Bell icon in the top bar</p>
+						</div>
+					</div>
+					<input type="checkbox" class="checkbox" bind:checked={notifPrefs.in_app_enabled} />
+				</label>
+
+				<!-- Email -->
+				<label class="flex items-center justify-between gap-4 p-4 card bg-surface-50 rounded-lg cursor-pointer">
+					<div class="flex items-center gap-3">
+						<span class="flex items-center justify-center w-8 h-8 rounded-full bg-green-100 text-green-600">
+							<i class="fa-solid fa-envelope text-sm"></i>
+						</span>
+						<div>
+							<p class="font-medium text-sm">Email notifications</p>
+							<p class="text-xs text-surface-600">Sent to your account email address</p>
+						</div>
+					</div>
+					<input type="checkbox" class="checkbox" bind:checked={notifPrefs.email_enabled} />
+				</label>
+
+				<!-- Slack -->
+				<div class="flex flex-col gap-2 p-4 card bg-surface-50 rounded-lg">
+					<label class="flex items-center justify-between gap-4 cursor-pointer">
+						<div class="flex items-center gap-3">
+							<span class="flex items-center justify-center w-8 h-8 rounded-full bg-purple-100 text-purple-600">
+								<i class="fa-brands fa-slack text-sm"></i>
+							</span>
+							<div>
+								<p class="font-medium text-sm">Slack notifications</p>
+								<p class="text-xs text-surface-600">Send to a Slack webhook</p>
+							</div>
+						</div>
+						<input type="checkbox" class="checkbox" bind:checked={notifPrefs.slack_enabled} />
+					</label>
+					{#if notifPrefs.slack_enabled}
+						<input
+							type="url"
+							class="input w-full text-sm"
+							placeholder="https://hooks.slack.com/services/..."
+							bind:value={notifPrefs.slack_webhook_url}
+						/>
+					{/if}
+				</div>
+
+				<!-- Teams -->
+				<div class="flex flex-col gap-2 p-4 card bg-surface-50 rounded-lg">
+					<label class="flex items-center justify-between gap-4 cursor-pointer">
+						<div class="flex items-center gap-3">
+							<span class="flex items-center justify-center w-8 h-8 rounded-full bg-sky-100 text-sky-600">
+								<i class="fa-brands fa-microsoft text-sm"></i>
+							</span>
+							<div>
+								<p class="font-medium text-sm">Microsoft Teams notifications</p>
+								<p class="text-xs text-surface-600">Send to a Teams incoming webhook</p>
+							</div>
+						</div>
+						<input type="checkbox" class="checkbox" bind:checked={notifPrefs.teams_enabled} />
+					</label>
+					{#if notifPrefs.teams_enabled}
+						<input
+							type="url"
+							class="input w-full text-sm"
+							placeholder="https://outlook.office.com/webhook/..."
+							bind:value={notifPrefs.teams_webhook_url}
+						/>
+					{/if}
+				</div>
+			</div>
+
+			<!-- Save button -->
+			<div class="flex items-center gap-3">
+				<button
+					class="btn preset-filled-primary-500 w-fit"
+					onclick={saveNotifPrefs}
+					disabled={notifSaving}
+				>
+					{#if notifSaving}
+						<i class="fa-solid fa-spinner fa-spin mr-2"></i>Saving...
+					{:else}
+						<i class="fa-solid fa-floppy-disk mr-2"></i>Save preferences
+					{/if}
+				</button>
+				{#if notifSaved}
+					<span class="text-sm text-success-600">
+						<i class="fa-solid fa-circle-check mr-1"></i>Saved
+					</span>
+				{/if}
+				{#if notifError}
+					<span class="text-sm text-error-600">
+						<i class="fa-solid fa-circle-exclamation mr-1"></i>{notifError}
+					</span>
+				{/if}
 			</div>
 		</div>
 	</Tabs.Content>

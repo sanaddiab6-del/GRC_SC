@@ -26,6 +26,7 @@
 	import { getModalStore, type ModalStore } from '$lib/components/Modals/stores';
 
 	import CommandPalette from '$lib/components/CommandPalette/CommandPalette.svelte';
+	import NotificationBell from '$lib/components/Notifications/NotificationBell.svelte';
 	import {
 		interceptExternalLinks,
 		setGlobalModalStore,
@@ -168,6 +169,7 @@
 				</div>
 			</div>
 			<div class="flex items-center gap-3">
+				<NotificationBell />
 				{#if data?.user?.is_admin}
 					<button
 						onclick={() => getStartedTrigger.set(true)}

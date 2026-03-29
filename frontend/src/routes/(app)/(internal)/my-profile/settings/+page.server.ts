@@ -53,6 +53,13 @@ export const load: PageServerLoad = async (event) => {
 	const personalAccessTokenCreateForm = await superValidate(zod(AuthTokenCreateSchema));
 	const personalAccessTokenDeleteForm = await superValidate(zod(z.object({ id: z.string() })));
 
+	const notificationPreferencesResponse = await event
+		.fetch(`${BASE_API_URL}/notifications/preferences/`)
+		.catch(() => null);
+	const notificationPreferences = notificationPreferencesResponse?.ok
+		? await notificationPreferencesResponse.json()
+		: null;
+
 	return {
 		authenticators,
 		totp,
@@ -61,6 +68,7 @@ export const load: PageServerLoad = async (event) => {
 		personalAccessTokens,
 		personalAccessTokenCreateForm,
 		personalAccessTokenDeleteForm,
+		notificationPreferences,
 		title: m.settings()
 	};
 };
