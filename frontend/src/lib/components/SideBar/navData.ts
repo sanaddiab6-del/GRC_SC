@@ -97,6 +97,12 @@ export const navData = {
 					name: 'roleAssignments',
 					fa_icon: 'fa-solid fa-user-tag',
 					href: '/role-assignments'
+				},
+				{
+					name: 'registrationRequests',
+					fa_icon: 'fa-solid fa-user-clock',
+					href: '/registration-requests',
+					permissions: ['add_user']
 				}
 			]
 		},

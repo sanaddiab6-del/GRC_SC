@@ -49,6 +49,41 @@ export const loginSchema = z
 	})
 	.required();
 
+export const registrationSchema = z
+	.object({
+		email: z.string({ required_error: 'Email is required' }).email(),
+		first_name: z
+			.string({ required_error: 'First name is required' })
+			.min(1, 'First name is required')
+			.max(150),
+		last_name: z
+			.string({ required_error: 'Last name is required' })
+			.min(1, 'Last name is required')
+			.max(150),
+		company: z
+			.string({ required_error: 'Company is required' })
+			.min(1, 'Company is required')
+			.max(200),
+		job_title: z
+			.string({ required_error: 'Job title is required' })
+			.min(1, 'Job title is required')
+			.max(150),
+		phone: z.string().max(30).optional().default(''),
+		department: z.string().max(150).optional().default(''),
+		reason: z
+			.string({ required_error: 'Reason is required' })
+			.min(1, 'Reason is required')
+			.max(2000),
+		password: z
+			.string({ required_error: 'Password is required' })
+			.min(8, 'Password must be at least 8 characters'),
+		confirm_password: z.string({ required_error: 'Confirm password is required' })
+	})
+	.refine((data) => data.password === data.confirm_password, {
+		message: 'Passwords do not match',
+		path: ['confirm_password']
+	});
+
 export const emailSchema = z
 	.object({
 		email: z.string({

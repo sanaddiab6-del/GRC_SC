@@ -47,7 +47,7 @@ export const getOptions = ({
 	self?: Record<string, any>;
 	selfSelect?: boolean;
 }[] => {
-	const append = (x, y) => (!y ? x : !x || x == '' ? y : x + ' - ' + y);
+	const append = (x: string, y: string) => (!y ? x : !x || x == '' ? y : x + ' - ' + y);
 	const options = objects
 		.map((object) => {
 			const my_label =
@@ -102,11 +102,12 @@ export interface ForeignKeyField {
 	endpointUrl?: string;
 	urlParams?: string;
 	tableFields?: string[];
+	detail?: boolean;
 }
 
 export interface ReverseForeignKeyField extends ForeignKeyField {
-	detail?: boolean;
-	detailUrlParams?: string[]; // To prepare possible fetch for foreign keys with detail in generic views
+	detailUrlParams?: string[];
+	fieldForInitialData?: string[]; // To prepare possible fetch for foreign keys with detail in generic views
 	disableCreate?: boolean;
 	disableDelete?: boolean;
 	disableEdit?: boolean;
@@ -131,6 +132,7 @@ interface Field {
 	field: string;
 	type?: 'date' | 'datetime';
 	tooltip?: string;
+	urlModel?: urlModel;
 }
 
 interface SelectField {
@@ -2558,10 +2560,10 @@ const FIELD_COMPONENT_MAP = {
 };
 
 export function getFieldComponentMap(URLModel: string) {
-	const fieldComponentMap = FIELD_COMPONENT_MAP[URLModel] ?? {};
-	const listViewConfig = listViewFields[URLModel] ?? { body: [] };
+	const fieldComponentMap = (FIELD_COMPONENT_MAP as Record<string, any>)[URLModel] ?? {};
+	const listViewConfig = (listViewFields as Record<string, any>)[URLModel] ?? { body: [] };
 
-	if (listViewConfig.body.findIndex((field) => field === 'description') >= 0) {
+	if (listViewConfig.body.findIndex((field: string) => field === 'description') >= 0) {
 		fieldComponentMap.description = MarkdownDescription;
 	}
 	return fieldComponentMap;
@@ -2701,7 +2703,7 @@ export const getModelInfo = (model: urlModel | string): ModelMapEntry => {
 	const baseModel = model.split('_')[0];
 	const map = URL_MODEL_MAP[model] || URL_MODEL_MAP[baseModel] || {};
 	// The urlmodel of {model}_duplicate must be {model}
-	map['urlModel'] = baseModel;
+	map['urlModel'] = baseModel as urlModel;
 	return map;
 };
 

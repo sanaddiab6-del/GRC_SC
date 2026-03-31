@@ -106,5 +106,17 @@
 				>{m.loginSSO()}</button
 			>
 		{/if}
+		<div class="border-t border-gray-200 w-full pt-3">
+			<p class="text-center text-sm text-gray-600">
+				{m.dontHaveAccount()}
+				<a
+					href="/register"
+					class="text-primary-800 hover:text-primary-600 font-semibold"
+					data-testid="register-link"
+				>
+					{m.requestAccess()}
+				</a>
+			</p>
+		</div>
 	</div>
 </div>

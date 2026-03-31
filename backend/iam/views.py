@@ -30,11 +30,14 @@ from ciso_assistant.settings import EMAIL_HOST, EMAIL_HOST_RESCUE
 
 from global_settings.models import GlobalSettings
 from core.models import Actor
-from .models import Folder, PersonalAccessToken, Role, RoleAssignment
+from .models import Folder, PersonalAccessToken, RegistrationRequest, Role, RoleAssignment, UserGroup
 from .serializers import (
     ChangePasswordSerializer,
     LoginSerializer,
     PersonalAccessTokenReadSerializer,
+    RegistrationRequestCreateSerializer,
+    RegistrationRequestReadSerializer,
+    RegistrationRequestReviewSerializer,
     ResetPasswordConfirmSerializer,
     SetPasswordSerializer,
 )
@@ -483,3 +486,175 @@ class RevokeOtherSessionsView(views.APIView):
             {"revoked_sessions": deleted_count},
             status=status.HTTP_200_OK,
         )
+
+
+# ── Registration request views ───────────────────────────────────────────
+
+
+class RegistrationRequestCreateView(views.APIView):
+    """
+    Public endpoint: submit a self-service registration request.
+    No authentication required (AllowAny).
+    """
+
+    authentication_classes = []
+    permission_classes = (permissions.AllowAny,)
+    throttle_scope = "registration"
+
+    def post(self, request):
+        serializer = RegistrationRequestCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        logger.info("registration_request_created", email=serializer.validated_data["email"])
+        return Response(
+            {
+                "message": "Registration request submitted successfully. "
+                "An administrator will review your request."
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class RegistrationRequestListView(views.APIView):
+    """
+    Admin-only endpoint: list registration requests with optional filtering.
+    """
+
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get(self, request):
+        if not _is_admin(request.user):
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        status_filter = request.query_params.get("status")
+        qs = RegistrationRequest.objects.all().order_by("-created_at")
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+
+        serializer = RegistrationRequestReadSerializer(qs, many=True)
+        return Response(serializer.data, status=HTTP_200_OK)
+
+
+class RegistrationRequestDetailView(views.APIView):
+    """
+    Admin-only endpoint: retrieve a single registration request.
+    """
+
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get(self, request, pk):
+        if not _is_admin(request.user):
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            reg = RegistrationRequest.objects.get(pk=pk)
+        except RegistrationRequest.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        serializer = RegistrationRequestReadSerializer(reg)
+        return Response(serializer.data, status=HTTP_200_OK)
+
+
+class RegistrationRequestReviewView(views.APIView):
+    """
+    Admin-only endpoint: approve or reject a registration request.
+    """
+
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def post(self, request, pk):
+        if not _is_admin(request.user):
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            reg = RegistrationRequest.objects.get(pk=pk)
+        except RegistrationRequest.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        serializer = RegistrationRequestReviewSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        action = serializer.validated_data["action"]
+        review_notes = serializer.validated_data.get("review_notes", "")
+
+        if action == "approve":
+            # Resolve user groups from UUIDs
+            group_ids = serializer.validated_data.get("user_groups", [])
+            user_groups = None
+            if group_ids:
+                user_groups = UserGroup.objects.filter(id__in=group_ids)
+                if user_groups.count() != len(group_ids):
+                    return Response(
+                        {"error": "One or more specified user groups do not exist."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+            folder = None
+            folder_id = serializer.validated_data.get("folder")
+            if folder_id:
+                try:
+                    folder = Folder.objects.get(pk=folder_id)
+                except Folder.DoesNotExist:
+                    return Response(
+                        {"error": "Specified folder does not exist."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+            try:
+                user = reg.approve(
+                    reviewer=request.user,
+                    user_groups=user_groups,
+                    folder=folder,
+                    review_notes=review_notes,
+                )
+            except ValueError as e:
+                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            except Exception:
+                logger.exception("registration_approval_failed", email=reg.email)
+                return Response(
+                    {"error": "An error occurred while approving the request."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+            return Response(
+                {"message": f"User {user.email} approved and created.", "user_id": str(user.id)},
+                status=HTTP_200_OK,
+            )
+
+        elif action == "reject":
+            try:
+                reg.reject(reviewer=request.user, review_notes=review_notes)
+            except ValueError as e:
+                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"message": f"Registration request for {reg.email} rejected."},
+                status=HTTP_200_OK,
+            )
+
+        return Response({"error": "Invalid action."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class RegistrationRequestCountView(views.APIView):
+    """
+    Admin-only endpoint: return count of pending requests (for badge display).
+    """
+
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get(self, request):
+        if not _is_admin(request.user):
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        count = RegistrationRequest.objects.filter(
+            status=RegistrationRequest.Status.PENDING
+        ).count()
+        return Response({"pending_count": count}, status=HTTP_200_OK)
+
+
+def _is_admin(user) -> bool:
+    """Check if user has system administrator role."""
+    try:
+        admin_role = Role.objects.get(name="BI-RL-ADM")
+        return RoleAssignment.has_role(user, admin_role)
+    except Role.DoesNotExist:
+        return user.is_superuser

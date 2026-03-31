@@ -343,6 +343,12 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": PAGINATE_BY,
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "EXCEPTION_HANDLER": "core.helpers.handle",
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.ScopedRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "registration": "5/hour",
+    },
 }
 
 REST_KNOX = {

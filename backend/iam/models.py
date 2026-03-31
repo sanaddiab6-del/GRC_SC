@@ -1464,6 +1464,203 @@ class PersonalAccessToken(models.Model):
         return f"{self.auth_token.user.email} : {self.name} : {self.auth_token.digest}"
 
 
+class RegistrationRequest(models.Model):
+    """
+    Stores self-service registration requests that require admin approval
+    before a User account is activated.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = "pending", _("Pending")
+        APPROVED = "approved", _("Approved")
+        REJECTED = "rejected", _("Rejected")
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    email = models.EmailField(max_length=100)
+    first_name = models.CharField(max_length=150)
+    last_name = models.CharField(max_length=150)
+    company = models.CharField(max_length=200, verbose_name=_("Company / Organization"))
+    job_title = models.CharField(max_length=150, verbose_name=_("Job title"))
+    phone = models.CharField(max_length=30, blank=True, verbose_name=_("Phone number"))
+    department = models.CharField(
+        max_length=150, blank=True, verbose_name=_("Department / Domain")
+    )
+    reason = models.TextField(verbose_name=_("Reason for requesting access"))
+    password_hash = models.CharField(max_length=256)
+
+    status = models.CharField(
+        max_length=10,
+        choices=Status.choices,
+        default=Status.PENDING,
+        db_index=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    reviewed_by = models.ForeignKey(
+        "iam.User",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="reviewed_registrations",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    review_notes = models.TextField(blank=True)
+    assigned_user_groups = models.ManyToManyField(
+        UserGroup,
+        blank=True,
+        help_text=_("User groups to assign upon approval."),
+    )
+    assigned_folder = models.ForeignKey(
+        Folder,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        help_text=_("Domain folder to assign upon approval."),
+    )
+
+    class Meta:
+        verbose_name = _("registration request")
+        verbose_name_plural = _("registration requests")
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["email"],
+                condition=models.Q(status="pending"),
+                name="unique_pending_email",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.email} ({self.get_status_display()})"
+
+    def approve(self, reviewer, user_groups=None, folder=None, review_notes=""):
+        """
+        Create an active User from this registration request.
+        The user is assigned to the Global Reader group by default.
+        All database operations are wrapped in an atomic transaction.
+        """
+        from django.db import transaction
+
+        if self.status != self.Status.PENDING:
+            raise ValueError("Only pending requests can be approved.")
+
+        global_reader_group = UserGroup.objects.filter(
+            name=str(UserGroupCodename.GLOBAL_READER)
+        ).first()
+        if not global_reader_group:
+            raise ValueError(
+                f"Default user group '{UserGroupCodename.GLOBAL_READER}' not found. "
+                "Cannot approve registration without a default group."
+            )
+
+        root_folder = Folder.get_root_folder()
+
+        with transaction.atomic():
+            # Create the user with the stored password hash
+            user = User(
+                email=self.email,
+                first_name=self.first_name,
+                last_name=self.last_name,
+                is_active=True,
+                is_superuser=False,
+                folder=root_folder,
+                password=self.password_hash,
+                is_published=True,
+            )
+            user.save()
+
+            # Create allauth EmailAddress
+            EmailAddress.objects.create(
+                user=user,
+                email=user.email,
+                verified=True,
+                primary=True,
+            )
+
+            # Assign to Global Reader group by default (least privilege)
+            user.user_groups.add(global_reader_group)
+
+            # Assign additional groups if specified by admin
+            if user_groups:
+                user.user_groups.add(*user_groups)
+
+            self.status = self.Status.APPROVED
+            self.reviewed_by = reviewer
+            self.reviewed_at = timezone.now()
+            self.review_notes = review_notes
+            if folder:
+                self.assigned_folder = folder
+            self.save()
+
+        logger.info(
+            "registration_request_approved",
+            email=self.email,
+            reviewer=reviewer.email,
+            user_id=str(user.id),
+        )
+
+        # Send approval notification email (best-effort, don't block on failure)
+        if EMAIL_HOST or EMAIL_HOST_RESCUE:
+            try:
+                send_mail(
+                    subject=_("Your access request has been approved"),
+                    message=_(
+                        "Your registration request for %(url)s has been approved. "
+                        "You can now log in with your email address."
+                    )
+                    % {"url": CISO_ASSISTANT_URL},
+                    from_email=None,
+                    recipient_list=[self.email],
+                    fail_silently=False,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "registration_approval_email_failed",
+                    email=self.email,
+                    error=str(exc),
+                )
+
+        return user
+
+    def reject(self, reviewer, review_notes=""):
+        if self.status != self.Status.PENDING:
+            raise ValueError("Only pending requests can be rejected.")
+
+        self.status = self.Status.REJECTED
+        self.reviewed_by = reviewer
+        self.reviewed_at = timezone.now()
+        self.review_notes = review_notes
+        self.save()
+
+        logger.info(
+            "registration_request_rejected",
+            email=self.email,
+            reviewer=reviewer.email,
+        )
+
+        # Send rejection notification email (best-effort, don't block on failure)
+        if EMAIL_HOST or EMAIL_HOST_RESCUE:
+            try:
+                send_mail(
+                    subject=_("Your access request update"),
+                    message=_(
+                        "Your registration request for %(url)s has been reviewed. "
+                        "Unfortunately, your request was not approved at this time. "
+                        "Please contact your administrator for more information."
+                    )
+                    % {"url": CISO_ASSISTANT_URL},
+                    from_email=None,
+                    recipient_list=[self.email],
+                    fail_silently=False,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "registration_rejection_email_failed",
+                    email=self.email,
+                    error=str(exc),
+                )
+
+
 common_exclude = ["created_at", "updated_at"]
 auditlog.register(
     User,
@@ -1473,4 +1670,8 @@ auditlog.register(
 auditlog.register(
     Folder,
     exclude_fields=common_exclude,
+)
+auditlog.register(
+    RegistrationRequest,
+    exclude_fields=["password_hash"],
 )

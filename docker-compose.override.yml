@@ -1,4 +1,14 @@
 services:
+  backend:
+    volumes:
+      - ./db:/code/db
+      - ./backend/iam:/code/iam
+      - ./backend/ciso_assistant/settings.py:/code/ciso_assistant/settings.py
+  huey:
+    volumes:
+      - ./db:/code/db
+      - ./backend/iam:/code/iam
+      - ./backend/ciso_assistant/settings.py:/code/ciso_assistant/settings.py
   frontend:
     image: ciso-assistant-community-frontend:latest
     build:

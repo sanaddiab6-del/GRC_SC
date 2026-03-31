@@ -8,6 +8,11 @@ from .views import (
     CurrentUserView,
     LoginView,
     PasswordResetView,
+    RegistrationRequestCountView,
+    RegistrationRequestCreateView,
+    RegistrationRequestDetailView,
+    RegistrationRequestListView,
+    RegistrationRequestReviewView,
     ResetPasswordConfirmView,
     SessionTokenView,
     SetPasswordView,
@@ -54,4 +59,30 @@ urlpatterns = [
     path("jwt/logout/", JWTLogoutView.as_view(), name="jwt-logout"),
     path("jwt/info/", JWTTokenInfoView.as_view(), name="jwt-token-info"),
     path("jwt/roles/", JWTRoleHierarchyView.as_view(), name="jwt-role-hierarchy"),
+    # ── Registration / onboarding ────────────────────────────────────────────
+    path(
+        "registration-requests/",
+        RegistrationRequestCreateView.as_view(),
+        name="registration-request-create",
+    ),
+    path(
+        "registration-requests/list/",
+        RegistrationRequestListView.as_view(),
+        name="registration-request-list",
+    ),
+    path(
+        "registration-requests/<uuid:pk>/",
+        RegistrationRequestDetailView.as_view(),
+        name="registration-request-detail",
+    ),
+    path(
+        "registration-requests/<uuid:pk>/review/",
+        RegistrationRequestReviewView.as_view(),
+        name="registration-request-review",
+    ),
+    path(
+        "registration-requests/count/",
+        RegistrationRequestCountView.as_view(),
+        name="registration-request-count",
+    ),
 ]
