@@ -1,14 +1,4 @@
 services:
-  backend:
-    volumes:
-      - ./backend/core/views.py:/code/core/views.py:ro
-      - ./backend/core/serializers.py:/code/core/serializers.py:ro
-
-  huey:
-    volumes:
-      - ./backend/core/views.py:/code/core/views.py:ro
-      - ./backend/core/serializers.py:/code/core/serializers.py:ro
-
   frontend:
     image: ciso-assistant-community-frontend:latest
     build:
