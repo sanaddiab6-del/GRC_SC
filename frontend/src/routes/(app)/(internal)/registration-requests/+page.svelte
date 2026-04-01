@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import { m } from '$paraglide/messages';
-	import { BASE_API_URL } from '$lib/utils/constants';
+	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 
 	interface Props {
@@ -59,58 +59,6 @@
 		selectedUserGroups = [];
 		selectedFolder = '';
 		errorMessage = '';
-	}
-
-	async function submitReview() {
-		if (!reviewingRequest || !reviewAction) return;
-		submitting = true;
-		errorMessage = '';
-
-		try {
-			const token = document.cookie
-				.split('; ')
-				.find((row) => row.startsWith('csrftoken='))
-				?.split('=')[1];
-
-			const body: Record<string, any> = {
-				action: reviewAction,
-				review_notes: reviewNotes
-			};
-			if (reviewAction === 'approve') {
-				if (selectedUserGroups.length > 0) {
-					body.user_groups = selectedUserGroups;
-				}
-				if (selectedFolder) {
-					body.folder = selectedFolder;
-				}
-			}
-
-			const res = await fetch(
-				`${BASE_API_URL}/iam/registration-requests/${reviewingRequest.id}/review/`,
-				{
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json',
-						'X-CSRFToken': token || ''
-					},
-					body: JSON.stringify(body),
-					credentials: 'include'
-				}
-			);
-
-			if (!res.ok) {
-				const err = await res.json();
-				errorMessage = err.error || 'An error occurred';
-				return;
-			}
-
-			cancelReview();
-			await invalidateAll();
-		} catch (e) {
-			errorMessage = 'Network error. Please try again.';
-		} finally {
-			submitting = false;
-		}
 	}
 
 	let displayedRequests = $derived(
@@ -304,92 +252,120 @@
 												{/if}
 											</h4>
 
-											{#if reviewAction === 'approve'}
-												<div class="space-y-3">
-													<div>
-														<label
-															class="text-sm font-semibold block mb-1"
-															for="review-user-groups"
-														>
-															{m.userGroups()}
-														</label>
-														<select
-															id="review-user-groups"
-															class="select w-full"
-															multiple
-															bind:value={selectedUserGroups}
-														>
-															{#each data.userGroups as group}
-																<option value={group.id}>
-																	{group.str || group.name}
-																</option>
-															{/each}
-														</select>
-														<p class="text-xs text-gray-500 mt-1">
-															{m.userGroupsApprovalHint()}
-														</p>
-													</div>
+											<form
+												method="POST"
+												action="?/review"
+												use:enhance={() => {
+													submitting = true;
+													errorMessage = '';
+													return async ({ result, update }) => {
+														submitting = false;
+														if (result.type === 'failure') {
+															errorMessage = result.data?.error || 'An error occurred';
+														} else {
+															cancelReview();
+															await update();
+														}
+													};
+												}}
+											>
+												<input type="hidden" name="id" value={reviewingRequest.id} />
+												<input type="hidden" name="action" value={reviewAction} />
 
-													<div>
-														<label
-															class="text-sm font-semibold block mb-1"
-															for="review-folder"
-														>
-															{m.domain()}
-														</label>
-														<select
-															id="review-folder"
-															class="select w-full"
-															bind:value={selectedFolder}
-														>
-															<option value="">— {m.none()} —</option>
-															{#each data.folders as folder}
-																<option value={folder.id}>
-																	{folder.str || folder.name}
-																</option>
-															{/each}
-														</select>
+												{#if reviewAction === 'approve'}
+													<div class="space-y-3">
+														<div>
+															<label
+																class="text-sm font-semibold block mb-1"
+																for="review-user-groups"
+															>
+																{m.userGroups()}
+															</label>
+															<select
+																id="review-user-groups"
+																name="user_groups"
+																class="select w-full"
+																multiple
+																bind:value={selectedUserGroups}
+															>
+																{#each data.userGroups as group}
+																	<option value={group.id}>
+																		{group.str || group.name}
+																	</option>
+																{/each}
+															</select>
+															<p class="text-xs text-gray-500 mt-1">
+																{m.userGroupsApprovalHint()}
+															</p>
+														</div>
+
+														<div>
+															<label
+																class="text-sm font-semibold block mb-1"
+																for="review-folder"
+															>
+																{m.domain()}
+															</label>
+															<select
+																id="review-folder"
+																name="folder"
+																class="select w-full"
+																bind:value={selectedFolder}
+															>
+																<option value="">— {m.none()} —</option>
+																{#each data.folders as folder}
+																	<option value={folder.id}>
+																		{folder.str || folder.name}
+																	</option>
+																{/each}
+															</select>
+														</div>
 													</div>
+												{/if}
+
+												<div class="mt-3">
+													<label class="text-sm font-semibold block mb-1" for="review-notes">
+														{m.reviewNotes()}
+													</label>
+													<textarea
+														id="review-notes"
+														name="review_notes"
+														class="input min-h-[60px]"
+														rows="2"
+														bind:value={reviewNotes}
+														placeholder={m.reviewNotesPlaceholder()}
+													></textarea>
 												</div>
-											{/if}
 
-											<div class="mt-3">
-												<label class="text-sm font-semibold block mb-1" for="review-notes">
-													{m.reviewNotes()}
-												</label>
-												<textarea
-													id="review-notes"
-													class="input min-h-[60px]"
-													rows="2"
-													bind:value={reviewNotes}
-													placeholder={m.reviewNotesPlaceholder()}
-												></textarea>
-											</div>
+												{#if errorMessage}
+													<p class="text-error-500 text-sm mt-2">
+														<i class="fa-solid fa-exclamation-triangle mr-1"></i>
+														{errorMessage}
+													</p>
+												{/if}
 
-											{#if errorMessage}
-												<p class="text-error-500 text-sm mt-2">
-													<i class="fa-solid fa-exclamation-triangle mr-1"></i>
-													{errorMessage}
-												</p>
-											{/if}
-
-											<div class="flex gap-2 mt-4">
-												<button
-													class="btn btn-sm {reviewAction === 'approve'
-														? 'preset-filled-success-500'
-														: 'preset-filled-error-500'}"
-													onclick={submitReview}
-													disabled={submitting}
-												>
-													{#if submitting}
-														<i class="fa-solid fa-spinner fa-spin mr-1"></i>
-													{/if}
-													{reviewAction === 'approve' ? m.approve() : m.reject()}
-												</button>
-												<button class="btn btn-sm preset-tonal" onclick={cancelReview}>
-													{m.cancel()}
-												</button>
-											</div>
+												<div class="flex gap-2 mt-4">
+													<button
+														type="submit"
+														class="btn btn-sm {reviewAction === 'approve'
+															? 'preset-filled-success-500'
+															: 'preset-filled-error-500'}"
+														disabled={submitting}
+													>
+														{#if submitting}
+															<i class="fa-solid fa-spinner fa-spin mr-1"></i>
+														{/if}
+														{reviewAction === 'approve' ? m.approve() : m.reject()}
+													</button>
+													<button
+														type="button"
+														class="btn btn-sm preset-tonal"
+														onclick={cancelReview}
+													>
+														{m.cancel()}
+													</button>
+												</div>
+											</form>
 										</div>
 									</div>
 								</td>

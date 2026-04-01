@@ -1,54 +1,61 @@
-import { BASE_API_URL } from '$lib/utils/constants';
-import { registrationSchema } from '$lib/utils/schemas';
+﻿import { BASE_API_URL } from '$lib/utils/constants';
+import { registrationBaseSchema } from '$lib/utils/schemas';
 import { fail, redirect, type Actions } from '@sveltejs/kit';
-import { setError, superValidate } from 'sveltekit-superforms';
+import { setError, superValidate, type SuperValidated } from 'sveltekit-superforms';
 import { zod } from 'sveltekit-superforms/adapters';
+import type { z } from 'zod';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ request, locals }) => {
-	// redirect user if already logged in
-	if (locals.user) {
-		redirect(302, '/analytics');
-	}
+type RegistrationData = z.infer<typeof registrationBaseSchema>;
+// Cast required: superforms' ZodObjectType constraint is too narrow for schemas with .default() fields
+const schema = zod(registrationBaseSchema as any);
 
-	const form = await superValidate(request, zod(registrationSchema));
-	return { form };
+export const load: PageServerLoad = async ({ request, locals }) => {
+if (locals.user) {
+redirect(302, '/analytics');
+}
+
+const form = (await superValidate(request, schema)) as SuperValidated<RegistrationData>;
+return { form };
 };
 
 export const actions: Actions = {
-	register: async ({ request, fetch }) => {
-		const form = await superValidate(request, zod(registrationSchema));
-		if (!form.valid) {
-			return fail(400, { form });
-		}
+register: async ({ request, fetch }) => {
+const form = (await superValidate(request, schema)) as SuperValidated<RegistrationData>;
+if (!form.valid) {
+return fail(400, { form });
+}
 
-		const endpoint = `${BASE_API_URL}/iam/registration-requests/`;
+if (form.data.password !== form.data.confirm_password) {
+return setError(form, 'confirm_password', 'Passwords do not match');
+}
 
-		const requestInitOptions: RequestInit = {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(form.data)
-		};
+const endpoint = `${BASE_API_URL}/iam/registration-requests/`;
 
-		const res = await fetch(endpoint, requestInitOptions);
-		const body = await res.json();
+const requestInitOptions: RequestInit = {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify(form.data)
+};
 
-		if (!res.ok) {
-			// Map backend validation errors to form fields
-			if (body && typeof body === 'object') {
-				for (const [field, errors] of Object.entries(body)) {
-					if (Array.isArray(errors)) {
-						for (const error of errors) {
-							setError(form, field as any, String(error));
-						}
-					} else if (typeof errors === 'string') {
-						setError(form, field as any, errors);
-					}
-				}
-			}
-			return fail(res.status, { form });
-		}
+const res = await fetch(endpoint, requestInitOptions);
+const body = await res.json();
 
-		return { form, success: true };
-	}
+if (!res.ok) {
+if (body && typeof body === 'object') {
+for (const [field, errors] of Object.entries(body)) {
+if (Array.isArray(errors)) {
+for (const error of errors) {
+setError(form as any, field as any, String(error));
+}
+} else if (typeof errors === 'string') {
+setError(form as any, field as any, errors);
+}
+}
+}
+return fail(res.status, { form });
+}
+
+return { form, success: true };
+}
 };

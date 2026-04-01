@@ -1,6 +1,6 @@
 import { BASE_API_URL } from '$lib/utils/constants';
-import { redirect } from '@sveltejs/kit';
-import type { PageServerLoad } from './$types';
+import { fail, redirect } from '@sveltejs/kit';
+import type { PageServerLoad, Actions } from './$types';
 
 export const load: PageServerLoad = async ({ fetch, locals }) => {
 	if (!locals.user) {
@@ -30,4 +30,37 @@ export const load: PageServerLoad = async ({ fetch, locals }) => {
 		userGroups: userGroupsData.results || userGroupsData,
 		folders: foldersData.results || foldersData
 	};
+};
+
+export const actions: Actions = {
+	review: async ({ request, fetch }) => {
+		const formData = await request.formData();
+		const id = formData.get('id') as string;
+		const action = formData.get('action') as string;
+		const review_notes = formData.get('review_notes') as string || '';
+		const user_groups = formData.getAll('user_groups') as string[];
+		const folder = formData.get('folder') as string || '';
+
+		const body: Record<string, any> = { action, review_notes };
+		if (action === 'approve') {
+			if (user_groups.length > 0) body.user_groups = user_groups;
+			if (folder) body.folder = folder;
+		}
+
+		const res = await fetch(
+			`${BASE_API_URL}/iam/registration-requests/${id}/review/`,
+			{
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(body)
+			}
+		);
+
+		if (!res.ok) {
+			const err = await res.json().catch(() => ({ error: 'Request failed' }));
+			return fail(res.status, { error: err.error || 'An error occurred' });
+		}
+
+		return { success: true };
+	}
 };

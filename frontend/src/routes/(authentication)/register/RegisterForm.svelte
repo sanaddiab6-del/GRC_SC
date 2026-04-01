@@ -1,5 +1,6 @@
 <script lang="ts">
 	import SuperForm from '$lib/components/Forms/Form.svelte';
+	import TextArea from '$lib/components/Forms/TextArea.svelte';
 	import TextField from '$lib/components/Forms/TextField.svelte';
 	import { registrationSchema } from '$lib/utils/schemas';
 	import { zod } from 'sveltekit-superforms/adapters';
@@ -79,25 +80,12 @@
 
 						<TextField {form} field="department" label={m.departmentDomain()} />
 
-						<div>
-							<label class="text-sm font-semibold" for="reason"
-								>{m.reasonForAccess()} <span class="text-red-500">*</span></label
-							>
-							{#if errors?.reason}
-								{#each errors.reason as error}
-									<p class="text-error-500 text-xs font-medium">{error}</p>
-								{/each}
-							{/if}
-							<textarea
-								class="input min-h-[80px]"
-								name="reason"
-								id="form-input-reason"
-								data-testid="form-input-reason"
-								placeholder={m.reasonForAccessPlaceholder()}
-								rows="3"
-								required
-							></textarea>
-						</div>
+						<TextArea
+							{form}
+							field="reason"
+							label={m.reasonForAccess()}
+							rows={3}
+						/>
 
 						<!-- Password fields -->
 						<div class="border-t border-gray-200 pt-3 mt-1">

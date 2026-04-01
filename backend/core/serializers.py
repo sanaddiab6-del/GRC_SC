@@ -1805,8 +1805,11 @@ class FrameworkReadSerializer(ReferentialSerializer):
     folder = FieldsRelatedField()
     library = FieldsRelatedField(["name", "id"])
     reference_controls = FieldsRelatedField(many=True)
-    is_dynamic = serializers.BooleanField(read_only=True)
+    is_dynamic = serializers.SerializerMethodField()
     has_update = serializers.BooleanField(read_only=True)
+
+    def get_is_dynamic(self, obj):
+        return bool(obj.implementation_groups_definition)
 
     class Meta:
         model = Framework

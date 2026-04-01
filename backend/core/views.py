@@ -8406,19 +8406,7 @@ class FrameworkViewSet(BaseModelViewSet):
     search_fields = ["name", "description"]
 
     def get_queryset(self):
-        qs = super().get_queryset().prefetch_related("requirement_nodes")
-
-        # Annotate if the framework is dynamic (any question choice uses implementation groups)
-        qs = qs.annotate(
-            is_dynamic=Exists(
-                QuestionChoice.objects.filter(
-                    question__requirement_node__framework=OuterRef("pk"),
-                    select_implementation_groups__isnull=False,
-                ).exclude(select_implementation_groups=[])
-            )
-        )
-
-        return qs
+        return super().get_queryset()
 
     @method_decorator(cache_page(60 * LONG_CACHE_TTL))
     @method_decorator(vary_on_cookie)

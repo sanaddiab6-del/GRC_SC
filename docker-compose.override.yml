@@ -1,16 +1,20 @@
 services:
   backend:
+    image: sanadcom-backend:latest
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     volumes:
       - ./db:/code/db
-      - ./backend/iam:/code/iam
-      - ./backend/ciso_assistant/settings.py:/code/ciso_assistant/settings.py
   huey:
+    image: sanadcom-backend:latest
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     volumes:
       - ./db:/code/db
-      - ./backend/iam:/code/iam
-      - ./backend/ciso_assistant/settings.py:/code/ciso_assistant/settings.py
   frontend:
-    image: ciso-assistant-community-frontend:latest
+    image: sanadcom-frontend:latest
     build:
       context: ./frontend
       dockerfile: Dockerfile
