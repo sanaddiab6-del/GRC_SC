@@ -236,11 +236,12 @@ class RiskMatrixReadSerializer(ReferentialSerializer):
     editing_languages = serializers.SerializerMethodField()
 
     def get_has_editing_draft(self, obj):
-        return obj.editing_draft is not None
+        return getattr(obj, "editing_draft", None) is not None
 
     def get_editing_languages(self, obj):
         """Return list of language codes available in the draft or published translations."""
         langs = set()
+        draft = getattr(obj, "editing_draft", None)
         # Base locale
         if obj.locale:
             langs.add(obj.locale)
@@ -248,12 +249,12 @@ class RiskMatrixReadSerializer(ReferentialSerializer):
         if obj.translations and isinstance(obj.translations, dict):
             langs.update(obj.translations.keys())
         # From editing_draft level translations + _meta
-        if obj.editing_draft and isinstance(obj.editing_draft, dict):
-            meta = obj.editing_draft.get("_meta", {})
+        if draft and isinstance(draft, dict):
+            meta = draft.get("_meta", {})
             if isinstance(meta.get("translations"), dict):
                 langs.update(meta["translations"].keys())
             for category in ("probability", "impact", "risk"):
-                levels = obj.editing_draft.get(category, [])
+                levels = draft.get(category, [])
                 if isinstance(levels, list):
                     for level in levels:
                         if isinstance(level, dict) and isinstance(
@@ -264,7 +265,7 @@ class RiskMatrixReadSerializer(ReferentialSerializer):
 
     class Meta:
         model = RiskMatrix
-        exclude = ["translations", "editing_draft", "editing_history"]
+        exclude = ["translations"]
 
 
 class RiskMatrixWriteSerializer(RiskMatrixReadSerializer):

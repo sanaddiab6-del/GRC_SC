@@ -772,7 +772,13 @@ export const URL_MODEL_MAP: ModelMap = {
 		localNamePlural: 'roleAssignments',
 		verboseName: 'Role assignment',
 		verboseNamePlural: 'Role assignments',
-		foreignKeyFields: [],
+		foreignKeyFields: [
+			{ field: 'folder', urlModel: 'folders', urlParams: 'content_type=DO&content_type=GL' },
+			{ field: 'perimeter_folders', urlModel: 'folders', urlParams: 'content_type=DO&content_type=GL' },
+			{ field: 'user', urlModel: 'users' },
+			{ field: 'user_group', urlModel: 'user-groups' },
+			{ field: 'role', urlModel: 'roles' }
+		],
 		filters: []
 	},
 	frameworks: {

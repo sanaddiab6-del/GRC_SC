@@ -385,7 +385,9 @@
 	let fieldComponentMap = $derived(getFieldComponentMap(URLModel));
 	let canCreateObject = $derived(
 		model
-			? page.params.id
+			? user.is_admin && model.name === 'roleassignment'
+				? true
+				: page.params.id
 				? canPerformAction({
 						user,
 						action: 'add',

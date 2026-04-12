@@ -1385,6 +1385,21 @@ export const RoleSchema = z.object({
 	permissions: z.array(z.number()).optional()
 });
 
+export const RoleAssignmentSchema = z
+	.object({
+		...NameDescriptionMixin,
+		folder: z.string(),
+		perimeter_folders: z.array(z.string().uuid().optional()).optional(),
+		user: z.string().uuid().optional().nullable(),
+		user_group: z.string().uuid().optional().nullable(),
+		role: z.string().uuid(),
+		is_recursive: z.boolean().default(false)
+	})
+	.refine((data) => Boolean(data.user || data.user_group), {
+		message: 'Select a user or a user group',
+		path: ['user']
+	});
+
 // PMBOK
 export const GenericCollectionSchema = z.object({
 	...NameDescriptionMixin,
@@ -1565,6 +1580,7 @@ const SCHEMA_MAP: Record<string, AnyZodObject> = {
 	'quantitative-risk-hypotheses': quantitativeRiskHypothesisSchema,
 	terminologies: TerminologySchema,
 	roles: RoleSchema,
+	'role-assignments': RoleAssignmentSchema,
 	'generic-collections': GenericCollectionSchema,
 	accreditations: AccreditationSchema,
 	'metric-definitions': MetricDefinitionSchema,
