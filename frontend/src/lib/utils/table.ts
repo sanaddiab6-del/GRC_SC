@@ -1425,6 +1425,31 @@ export const listViewFields = {
 			filtering_labels: LABELS_FILTER
 		}
 	},
+	'workflow-cases': {
+		head: [
+			'ref_id',
+			'name',
+			'workflowType',
+			'classification',
+			'status',
+			'approvalState',
+			'remediationCompletion',
+			'domain'
+		],
+		body: [
+			'ref_id',
+			'name',
+			'workflow_type',
+			'classification',
+			'status',
+			'approval_state',
+			'remediation_completion',
+			'folder'
+		],
+		filters: {
+			folder: DOMAIN_FILTER
+		}
+	},
 	'applied-controls': {
 		head: [
 			'ref_id',

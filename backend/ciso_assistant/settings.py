@@ -11,6 +11,7 @@ else it is sqlite, and no env variable is required
 
 from pathlib import Path
 import os
+import sys
 from dotenv import load_dotenv
 from datetime import timedelta
 import logging.config
@@ -613,7 +614,16 @@ if MAIL_DEBUG:
 
 
 ## Huey settings
-HUEY_FILE_PATH = os.environ.get("HUEY_FILE_PATH", BASE_DIR / "db" / "huey.db")
+IS_PYTEST_RUN = "PYTEST_CURRENT_TEST" in os.environ or any(
+    "pytest" in str(arg).lower() for arg in sys.argv
+)
+
+default_huey_path = BASE_DIR / "db" / "huey.db"
+if IS_PYTEST_RUN:
+    default_huey_path = BASE_DIR / ".test-tmp" / "huey.db"
+
+HUEY_FILE_PATH = Path(os.environ.get("HUEY_FILE_PATH", default_huey_path))
+HUEY_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 HUEY = {
     "huey_class": "huey.SqliteHuey",
@@ -621,7 +631,7 @@ HUEY = {
     "utc": True,
     "filename": HUEY_FILE_PATH,
     "results": True,  # would be interesting for debug
-    "immediate": False,  # set to False to run in "live" mode regardless of DEBUG, otherwise it will follow
+    "immediate": IS_PYTEST_RUN,
 }
 
 AUDITLOG_RETENTION_DAYS = int(os.environ.get("AUDITLOG_RETENTION_DAYS", 90))

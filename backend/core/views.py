@@ -6560,6 +6560,267 @@ class ValidationFlowViewSet(BaseModelViewSet):
             )
 
 
+class WorkflowCaseViewSet(BaseModelViewSet):
+    model = WorkflowCase
+    filterset_fields = [
+        "folder",
+        "workflow_type",
+        "classification",
+        "status",
+        "treatment_decision",
+        "severity",
+        "owners",
+        "reviewers",
+        "affected_assets",
+        "requirement_assessments",
+        "findings",
+        "findings_assessments",
+        "risk_scenarios",
+        "incidents",
+        "applied_controls",
+        "task_templates",
+        "evidences",
+        "validation_flows",
+    ]
+    search_fields = ["ref_id", "name", "description", "domain"]
+
+    def get_queryset(self):
+        return (
+            super()
+            .get_queryset()
+            .select_related("folder", "residual_risk_reassessed_by")
+            .prefetch_related(
+                "owners",
+                "reviewers",
+                "affected_assets",
+                "requirement_assessments",
+                "findings",
+                "findings_assessments",
+                "risk_scenarios",
+                "incidents",
+                "applied_controls",
+                "task_templates",
+                "evidences",
+                "validation_flows",
+                "security_exceptions",
+                Prefetch(
+                    "approval_steps",
+                    queryset=WorkflowCaseApprovalStep.objects.select_related("approver"),
+                ),
+                Prefetch(
+                    "events",
+                    queryset=WorkflowCaseEvent.objects.select_related("event_actor"),
+                ),
+            )
+        )
+
+    @method_decorator(cache_page(60 * LONG_CACHE_TTL))
+    @action(detail=False, name="Get workflow type choices")
+    def workflow_type(self, request):
+        return Response(dict(WorkflowCase.WorkflowType.choices))
+
+    @method_decorator(cache_page(60 * LONG_CACHE_TTL))
+    @action(detail=False, name="Get classification choices")
+    def classification(self, request):
+        return Response(dict(WorkflowCase.Classification.choices))
+
+    @method_decorator(cache_page(60 * LONG_CACHE_TTL))
+    @action(detail=False, name="Get treatment decisions")
+    def treatment_decision(self, request):
+        return Response(dict(WorkflowCase.TreatmentDecision.choices))
+
+    @action(detail=True, methods=["get"], name="Get closure readiness")
+    def closure_readiness(self, request, pk=None):
+        workflow_case = self.get_object()
+        can_close, missing = workflow_case.can_close()
+        return Response(
+            {
+                "can_close": can_close,
+                "missing": missing,
+                "approval_state": workflow_case.approval_state,
+                "remediation_completion": workflow_case.remediation_completion,
+            }
+        )
+
+    @action(detail=True, methods=["post"], name="Submit for review")
+    def submit_for_review(self, request, pk=None):
+        workflow_case = self.get_object()
+        if not workflow_case.approval_steps.exists() and workflow_case.require_approval_for_closure:
+            return Response(
+                {"error": "Approval steps are required before review submission."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        workflow_case.status = WorkflowCase.Status.IN_REVIEW
+        workflow_case.save(update_fields=["status", "closed_at"])
+        WorkflowCaseEvent.objects.create(
+            workflow_case=workflow_case,
+            event_type="submitted_for_review",
+            event_actor=request.user,
+            folder=workflow_case.folder,
+        )
+        return Response(WorkflowCaseReadSerializer(workflow_case).data)
+
+    @action(detail=True, methods=["post"], name="Mark residual risk reassessed")
+    def reassess_residual_risk(self, request, pk=None):
+        workflow_case = self.get_object()
+        workflow_case.residual_risk_summary = request.data.get("summary", "")
+        workflow_case.residual_risk_reassessed_at = timezone.now()
+        workflow_case.residual_risk_reassessed_by = request.user
+        workflow_case.save(
+            update_fields=[
+                "residual_risk_summary",
+                "residual_risk_reassessed_at",
+                "residual_risk_reassessed_by",
+            ]
+        )
+        WorkflowCaseEvent.objects.create(
+            workflow_case=workflow_case,
+            event_type="residual_risk_reassessed",
+            event_actor=request.user,
+            event_notes=workflow_case.residual_risk_summary,
+            folder=workflow_case.folder,
+        )
+        return Response(WorkflowCaseReadSerializer(workflow_case).data)
+
+    @action(detail=True, methods=["get"], name="Get workflow traceability")
+    def traceability(self, request, pk=None):
+        workflow_case = self.get_object()
+        return Response(
+            {
+                "workflow_case": WorkflowCaseReadSerializer(workflow_case).data,
+                "requirements": RequirementAssessmentReadSerializer(
+                    workflow_case.requirement_assessments.all(), many=True
+                ).data,
+                "findings": FindingReadSerializer(
+                    workflow_case.findings.all(), many=True
+                ).data,
+                "applied_controls": AppliedControlReadSerializer(
+                    workflow_case.applied_controls.all(), many=True
+                ).data,
+                "tasks": TaskTemplateReadSerializer(
+                    workflow_case.task_templates.all(), many=True
+                ).data,
+                "evidences": EvidenceReadSerializer(
+                    workflow_case.evidences.all(), many=True
+                ).data,
+                "risk_scenarios": RiskScenarioReadSerializer(
+                    workflow_case.risk_scenarios.all(), many=True
+                ).data,
+                "validation_flows": ValidationFlowReadSerializer(
+                    workflow_case.validation_flows.all(), many=True
+                ).data,
+            }
+        )
+
+    @action(detail=True, methods=["get"], name="Get case action plan")
+    def action_plan(self, request, pk=None):
+        workflow_case = self.get_object()
+        return Response(
+            {
+                "applied_controls": AppliedControlReadSerializer(
+                    workflow_case.applied_controls.all(), many=True
+                ).data,
+                "task_templates": TaskTemplateReadSerializer(
+                    workflow_case.task_templates.all(), many=True
+                ).data,
+                "remediation_completion": workflow_case.remediation_completion,
+            }
+        )
+
+
+class WorkflowCaseApprovalStepViewSet(BaseModelViewSet):
+    model = WorkflowCaseApprovalStep
+    filterset_fields = ["workflow_case", "approver", "status", "folder"]
+    search_fields = ["notes"]
+
+    def get_queryset(self):
+        return (
+            super()
+            .get_queryset()
+            .select_related("folder", "workflow_case", "approver")
+        )
+
+    def _ensure_can_act(self, step: WorkflowCaseApprovalStep, user: User) -> Response | None:
+        if step.approver != user:
+            return Response(
+                {"error": "Only the assigned approver can act on this approval step."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        previous_unapproved = step.workflow_case.approval_steps.filter(
+            sequence__lt=step.sequence,
+            is_required=True,
+        ).exclude(status=WorkflowCaseApprovalStep.Status.APPROVED)
+        if previous_unapproved.exists():
+            return Response(
+                {"error": "Previous approval steps must be completed first."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return None
+
+    def _record_case_event(self, step: WorkflowCaseApprovalStep, actor: User, action_name: str, notes: str | None = None):
+        WorkflowCaseEvent.objects.create(
+            workflow_case=step.workflow_case,
+            event_type=f"approval_{action_name}",
+            event_actor=actor,
+            event_notes=notes,
+            folder=step.workflow_case.folder,
+        )
+
+    @action(detail=True, methods=["post"], name="Approve step")
+    def approve(self, request, pk=None):
+        step = self.get_object()
+        denial = self._ensure_can_act(step, request.user)
+        if denial:
+            return denial
+        step.status = WorkflowCaseApprovalStep.Status.APPROVED
+        step.notes = request.data.get("notes")
+        step.save(update_fields=["status", "notes", "acted_at", "folder"])
+        if step.workflow_case.approval_state == "approved":
+            self._record_case_event(step, request.user, "completed", step.notes)
+        else:
+            self._record_case_event(step, request.user, "approved", step.notes)
+        return Response(WorkflowCaseApprovalStepReadSerializer(step).data)
+
+    @action(detail=True, methods=["post"], name="Reject step")
+    def reject(self, request, pk=None):
+        step = self.get_object()
+        denial = self._ensure_can_act(step, request.user)
+        if denial:
+            return denial
+        step.status = WorkflowCaseApprovalStep.Status.REJECTED
+        step.notes = request.data.get("notes")
+        step.save(update_fields=["status", "notes", "acted_at", "folder"])
+        step.workflow_case.status = WorkflowCase.Status.IN_PROGRESS
+        step.workflow_case.save(update_fields=["status", "closed_at"])
+        self._record_case_event(step, request.user, "rejected", step.notes)
+        return Response(WorkflowCaseApprovalStepReadSerializer(step).data)
+
+    @action(detail=True, methods=["post"], name="Request changes")
+    def request_changes(self, request, pk=None):
+        step = self.get_object()
+        denial = self._ensure_can_act(step, request.user)
+        if denial:
+            return denial
+        step.status = WorkflowCaseApprovalStep.Status.CHANGES_REQUESTED
+        step.notes = request.data.get("notes")
+        step.save(update_fields=["status", "notes", "acted_at", "folder"])
+        step.workflow_case.status = WorkflowCase.Status.IN_PROGRESS
+        step.workflow_case.save(update_fields=["status", "closed_at"])
+        self._record_case_event(step, request.user, "changes_requested", step.notes)
+        return Response(WorkflowCaseApprovalStepReadSerializer(step).data)
+
+
+class WorkflowCaseEventViewSet(BaseModelViewSet):
+    model = WorkflowCaseEvent
+    filterset_fields = ["workflow_case", "event_type", "folder"]
+    search_fields = ["event_type", "event_notes"]
+
+    def get_queryset(self):
+        return super().get_queryset().select_related(
+            "folder", "workflow_case", "event_actor"
+        )
+
+
 class ActorViewSet(BaseModelViewSet):
     http_method_names = ["get", "head", "options"]
 
@@ -14806,6 +15067,7 @@ SEARCHABLE_MODELS = [
     _search_entry(Incident, "incidents", ref_id=True),
     _search_entry(Finding, "findings", ref_id=True),
     _search_entry(SecurityException, "security-exceptions", ref_id=True),
+    _search_entry(WorkflowCase, "workflow-cases", ref_id=True),
     _search_entry(TaskTemplate, "task-templates", ref_id=True, limit=100),
     _search_entry(Evidence, "evidences"),
     # --- Governance ---

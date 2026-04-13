@@ -17,8 +17,10 @@ services:
 
   backend:
     container_name: backend
-    image: ghcr.io/intuitem/ciso-assistant-community/backend:latest
-    pull_policy: always
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: sanadcom-backend:local
     restart: always
     depends_on:
       postgres:
@@ -44,8 +46,10 @@ services:
 
   huey:
     container_name: huey
-    image: ghcr.io/intuitem/ciso-assistant-community/backend:latest
-    pull_policy: always
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: sanadcom-huey:local
     depends_on:
       postgres:
         condition: service_healthy
@@ -77,11 +81,13 @@ services:
       - PUBLIC_BACKEND_API_EXPOSED_URL=https://localhost:8443/api
       - PROTOCOL_HEADER=x-forwarded-proto
       - HOST_HEADER=x-forwarded-host
-    image: ghcr.io/intuitem/ciso-assistant-community/frontend:latest
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: sanadcom-frontend:local
     volumes:
       - ./frontend/static/favicon.svg:/app/build/client/favicon.svg:ro
       - ./frontend/static/favicon.ico:/app/build/client/favicon.ico:ro
-    pull_policy: always
     restart: always
     depends_on:
       backend:

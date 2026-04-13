@@ -50,6 +50,7 @@ export const URL_MODEL = [
 	'policies',
 	'risk-acceptances',
 	'validation-flows',
+	'workflow-cases',
 	'reference-controls',
 	'assets',
 	'actors',

@@ -3899,6 +3899,159 @@ class ValidationFlowReadSerializer(BaseModelSerializer):
         return linked
 
 
+class WorkflowCaseEventWriteSerializer(BaseModelSerializer):
+    class Meta:
+        model = WorkflowCaseEvent
+        fields = "__all__"
+
+
+class WorkflowCaseEventReadSerializer(WorkflowCaseEventWriteSerializer):
+    event_actor = FieldsRelatedField(["id", "email", "first_name", "last_name"])
+
+    class Meta:
+        model = WorkflowCaseEvent
+        fields = ["id", "event_type", "event_actor", "event_notes", "created_at"]
+
+
+class WorkflowCaseApprovalStepWriteSerializer(BaseModelSerializer):
+    class Meta:
+        model = WorkflowCaseApprovalStep
+        fields = "__all__"
+
+
+class WorkflowCaseApprovalStepReadSerializer(BaseModelSerializer):
+    approver = FieldsRelatedField(["id", "email", "first_name", "last_name"])
+    folder = FieldsRelatedField()
+
+    class Meta:
+        model = WorkflowCaseApprovalStep
+        fields = "__all__"
+
+
+class WorkflowCaseWriteSerializer(BaseModelSerializer):
+    @staticmethod
+    def _apply_scalar_attrs(instance, attrs):
+        for field_name, value in attrs.items():
+            try:
+                field = instance._meta.get_field(field_name)
+            except Exception:
+                continue
+            if field.many_to_many or field.one_to_many:
+                continue
+            setattr(instance, field_name, value)
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        target_status = attrs.get("status")
+        if self.instance:
+            target_status = attrs.get("status", self.instance.status)
+
+        if target_status in (
+            WorkflowCase.Status.CLOSED,
+            WorkflowCase.Status.CLOSED_WITH_MONITORING,
+        ):
+            instance = self.instance or WorkflowCase(
+                folder=attrs.get("folder", Folder.get_root_folder())
+            )
+            self._apply_scalar_attrs(instance, attrs)
+            can_close, missing = instance.can_close()
+            if not can_close:
+                raise serializers.ValidationError(
+                    {
+                        "status": "Closure criteria are not satisfied.",
+                        "missing_closure_requirements": missing,
+                    }
+                )
+        return attrs
+
+    def create(self, validated_data):
+        request_user = self.context["request"].user
+        instance = super().create(validated_data)
+        WorkflowCaseEvent.objects.create(
+            workflow_case=instance,
+            event_type="created",
+            event_actor=request_user,
+            event_notes=instance.description,
+            folder=instance.folder,
+        )
+        return instance
+
+    def update(self, instance, validated_data):
+        request_user = self.context["request"].user
+        old_status = instance.status
+        old_reassessment_at = instance.residual_risk_reassessed_at
+        if (
+            validated_data.get("residual_risk_summary")
+            and not validated_data.get("residual_risk_reassessed_at")
+            and not instance.residual_risk_reassessed_at
+        ):
+            validated_data["residual_risk_reassessed_at"] = timezone.now()
+            validated_data["residual_risk_reassessed_by"] = request_user
+
+        updated = super().update(instance, validated_data)
+
+        if old_status != updated.status:
+            WorkflowCaseEvent.objects.create(
+                workflow_case=updated,
+                event_type="status_changed",
+                event_actor=request_user,
+                event_notes=f"{old_status}->{updated.status}",
+                folder=updated.folder,
+            )
+        if (
+            old_reassessment_at != updated.residual_risk_reassessed_at
+            and updated.residual_risk_reassessed_at
+        ):
+            WorkflowCaseEvent.objects.create(
+                workflow_case=updated,
+                event_type="residual_risk_reassessed",
+                event_actor=request_user,
+                event_notes=updated.residual_risk_summary,
+                folder=updated.folder,
+            )
+        return updated
+
+    class Meta:
+        model = WorkflowCase
+        fields = "__all__"
+
+
+class WorkflowCaseReadSerializer(BaseModelSerializer):
+    path = PathField(read_only=True)
+    folder = FieldsRelatedField()
+    owners = FieldsRelatedField(many=True)
+    reviewers = FieldsRelatedField(many=True)
+    affected_assets = FieldsRelatedField(many=True)
+    requirement_assessments = FieldsRelatedField(many=True)
+    findings = FieldsRelatedField(many=True)
+    findings_assessments = FieldsRelatedField(many=True)
+    risk_scenarios = FieldsRelatedField(many=True)
+    incidents = FieldsRelatedField(many=True)
+    applied_controls = FieldsRelatedField(many=True)
+    task_templates = FieldsRelatedField(many=True)
+    evidences = FieldsRelatedField(many=True)
+    validation_flows = FieldsRelatedField(many=True)
+    security_exceptions = FieldsRelatedField(many=True)
+    filtering_labels = FieldsRelatedField(many=True)
+    severity = serializers.CharField(source="get_severity_display")
+    workflow_type = serializers.CharField(source="get_workflow_type_display")
+    classification = serializers.CharField(source="get_classification_display")
+    status = serializers.CharField(source="get_status_display")
+    treatment_decision = serializers.CharField(source="get_treatment_decision_display")
+    approval_steps = WorkflowCaseApprovalStepReadSerializer(many=True, read_only=True)
+    events = WorkflowCaseEventReadSerializer(many=True, read_only=True)
+    approval_state = serializers.CharField(read_only=True)
+    remediation_completion = serializers.IntegerField(read_only=True)
+    missing_closure_requirements = serializers.SerializerMethodField()
+
+    class Meta:
+        model = WorkflowCase
+        fields = "__all__"
+
+    def get_missing_closure_requirements(self, obj):
+        return obj.get_missing_closure_requirements()
+
+
 class ComplianceAssessmentEvidenceSerializer(BaseModelSerializer):
     """Serializer for evidences in the context of compliance assessments"""
 

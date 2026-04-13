@@ -8215,6 +8215,390 @@ class FlowEvent(AbstractBaseModel, FolderMixin):
         return f"{self.validation_flow.ref_id} - {self.event_type} - {self.created_at.strftime('%Y-%m-%d %H:%M')}"
 
 
+class WorkflowCase(NameDescriptionMixin, FolderMixin, FilteringLabelMixin, ETADueDateMixin):
+    class WorkflowType(models.TextChoices):
+        RISK = "risk", _("Risk")
+        FINDING = "finding", _("Finding")
+        EXCEPTION = "exception", _("Exception")
+        INCIDENT = "incident", _("Incident")
+        VENDOR = "vendor", _("Vendor")
+
+    class Classification(models.TextChoices):
+        AUDIT_FINDING = "audit_finding", _("Audit finding")
+        COMPLIANCE_GAP = "compliance_gap", _("Compliance gap")
+        CONTROL_DEFICIENCY = "control_deficiency", _("Control deficiency")
+        RISK_OBSERVATION = "risk_observation", _("Risk observation")
+        SECURITY_EXCEPTION = "security_exception", _("Security exception")
+        INCIDENT = "incident", _("Incident")
+        VENDOR_ISSUE = "vendor_issue", _("Vendor issue")
+
+    class Status(models.TextChoices):
+        DRAFT = "draft", _("Draft")
+        OPEN = "open", _("Open")
+        IN_PROGRESS = "in_progress", _("In progress")
+        IN_REVIEW = "in_review", _("In review")
+        CLOSED = "closed", _("Closed")
+        CLOSED_WITH_MONITORING = "closed_with_monitoring", _(
+            "Closed with monitoring"
+        )
+        REOPENED = "reopened", _("Reopened")
+
+    class TreatmentDecision(models.TextChoices):
+        UNDECIDED = "undecided", _("Undecided")
+        ACCEPT = "accept", _("Accept")
+        REMEDIATE = "remediate", _("Remediate")
+        COMPENSATE = "compensate", _("Compensating control")
+        ESCALATE = "escalate", _("Escalate")
+        MONITOR = "monitor", _("Monitor")
+
+    ref_id = models.CharField(
+        max_length=100, null=True, blank=True, verbose_name=_("Reference ID")
+    )
+    workflow_type = models.CharField(
+        max_length=32,
+        choices=WorkflowType.choices,
+        default=WorkflowType.FINDING,
+        verbose_name=_("Workflow type"),
+    )
+    classification = models.CharField(
+        max_length=32,
+        choices=Classification.choices,
+        default=Classification.CONTROL_DEFICIENCY,
+        verbose_name=_("Classification"),
+    )
+    status = models.CharField(
+        max_length=32,
+        choices=Status.choices,
+        default=Status.DRAFT,
+        verbose_name=_("Status"),
+    )
+    treatment_decision = models.CharField(
+        max_length=32,
+        choices=TreatmentDecision.choices,
+        default=TreatmentDecision.UNDECIDED,
+        verbose_name=_("Treatment decision"),
+    )
+    domain = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        verbose_name=_("Domain"),
+        help_text=_("Business or control domain for the case, for example IAM."),
+    )
+    severity = models.SmallIntegerField(
+        verbose_name=_("Severity"),
+        choices=Severity.choices,
+        default=Severity.UNDEFINED,
+    )
+    owners = models.ManyToManyField(
+        "core.Actor",
+        blank=True,
+        verbose_name=_("Owners"),
+        related_name="workflow_cases",
+    )
+    reviewers = models.ManyToManyField(
+        "core.Actor",
+        blank=True,
+        verbose_name=_("Reviewers"),
+        related_name="workflow_case_reviews",
+    )
+    affected_assets = models.ManyToManyField(
+        Asset,
+        blank=True,
+        related_name="workflow_cases",
+        verbose_name=_("Affected assets"),
+    )
+    requirement_assessments = models.ManyToManyField(
+        RequirementAssessment,
+        blank=True,
+        related_name="workflow_cases",
+        verbose_name=_("Requirement assessments"),
+    )
+    findings = models.ManyToManyField(
+        Finding,
+        blank=True,
+        related_name="workflow_cases",
+        verbose_name=_("Findings"),
+    )
+    findings_assessments = models.ManyToManyField(
+        FindingsAssessment,
+        blank=True,
+        related_name="workflow_cases",
+        verbose_name=_("Findings assessments"),
+    )
+    risk_scenarios = models.ManyToManyField(
+        RiskScenario,
+        blank=True,
+        related_name="workflow_cases",
+        verbose_name=_("Risk scenarios"),
+    )
+    incidents = models.ManyToManyField(
+        Incident,
+        blank=True,
+        related_name="workflow_cases",
+        verbose_name=_("Incidents"),
+    )
+    applied_controls = models.ManyToManyField(
+        AppliedControl,
+        blank=True,
+        related_name="workflow_cases",
+        verbose_name=_("Applied controls"),
+    )
+    task_templates = models.ManyToManyField(
+        "TaskTemplate",
+        blank=True,
+        related_name="workflow_cases",
+        verbose_name=_("Task templates"),
+    )
+    evidences = models.ManyToManyField(
+        Evidence,
+        blank=True,
+        related_name="workflow_cases",
+        verbose_name=_("Evidences"),
+    )
+    validation_flows = models.ManyToManyField(
+        ValidationFlow,
+        blank=True,
+        related_name="workflow_cases",
+        verbose_name=_("Validation flows"),
+    )
+    security_exceptions = models.ManyToManyField(
+        SecurityException,
+        blank=True,
+        related_name="workflow_cases",
+        verbose_name=_("Security exceptions"),
+    )
+    require_evidence_for_closure = models.BooleanField(
+        default=True,
+        verbose_name=_("Require evidence for closure"),
+    )
+    require_approval_for_closure = models.BooleanField(
+        default=True,
+        verbose_name=_("Require approval for closure"),
+    )
+    require_task_completion_for_closure = models.BooleanField(
+        default=True,
+        verbose_name=_("Require task completion for closure"),
+    )
+    require_recurring_control_for_closure = models.BooleanField(
+        default=False,
+        verbose_name=_("Require recurring control for closure"),
+    )
+    require_residual_risk_reassessment = models.BooleanField(
+        default=False,
+        verbose_name=_("Require residual risk reassessment"),
+    )
+    recurring_control_confirmed = models.BooleanField(
+        default=False,
+        verbose_name=_("Recurring control confirmed"),
+    )
+    monitoring_required = models.BooleanField(
+        default=False,
+        verbose_name=_("Monitoring required"),
+    )
+    residual_risk_reassessed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name=_("Residual risk reassessed at"),
+    )
+    residual_risk_reassessed_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="workflow_cases_reassessed",
+        verbose_name=_("Residual risk reassessed by"),
+    )
+    residual_risk_summary = models.TextField(
+        null=True,
+        blank=True,
+        verbose_name=_("Residual risk summary"),
+    )
+    closure_notes = models.TextField(
+        null=True,
+        blank=True,
+        verbose_name=_("Closure notes"),
+    )
+    closed_at = models.DateTimeField(null=True, blank=True, verbose_name=_("Closed at"))
+
+    fields_to_check = ["name"]
+
+    class Meta:
+        verbose_name = _("Workflow case")
+        verbose_name_plural = _("Workflow cases")
+
+    def __str__(self) -> str:
+        return self.name
+
+    @classmethod
+    def get_default_ref_id(cls) -> str:
+        last = cls.objects.filter(ref_id__startswith="CASE.").order_by("-ref_id").first()
+        if not last or not last.ref_id:
+            return "CASE.000001"
+        try:
+            suffix = int(last.ref_id.split(".")[1])
+        except (IndexError, ValueError):
+            suffix = 0
+        return f"CASE.{suffix + 1:06d}"
+
+    @property
+    def approval_state(self) -> str:
+        required_steps = self.approval_steps.filter(is_required=True)
+        if not required_steps.exists():
+            return "not_required"
+        if required_steps.filter(status=WorkflowCaseApprovalStep.Status.REJECTED).exists():
+            return "rejected"
+        if required_steps.filter(
+            status=WorkflowCaseApprovalStep.Status.CHANGES_REQUESTED
+        ).exists():
+            return "changes_requested"
+        if required_steps.exclude(status=WorkflowCaseApprovalStep.Status.APPROVED).exists():
+            return "pending"
+        return "approved"
+
+    @property
+    def remediation_completion(self) -> int:
+        templates = list(self.task_templates.all())
+        if not templates:
+            return 100
+        total = len(templates)
+        completed = 0
+        for template in templates:
+            next_status = template.get_next_occurrence_status()
+            if template.is_recurrent:
+                if next_status == "completed":
+                    completed += 1
+                elif next_status is None and template.get_last_occurrence_status() == "completed":
+                    completed += 1
+            else:
+                if next_status == "completed":
+                    completed += 1
+        return int((completed / total) * 100) if total else 100
+
+    def get_missing_closure_requirements(self) -> list[str]:
+        missing = []
+        if self.require_evidence_for_closure and not self.evidences.exists():
+            missing.append("evidence")
+        if (
+            self.require_approval_for_closure
+            and self.approval_state != "approved"
+        ):
+            missing.append("approval")
+        if (
+            self.require_task_completion_for_closure
+            and self.remediation_completion < 100
+        ):
+            missing.append("tasks")
+        if (
+            self.require_recurring_control_for_closure
+            and not self.recurring_control_confirmed
+        ):
+            missing.append("recurring_control")
+        if (
+            self.require_residual_risk_reassessment
+            and not self.residual_risk_reassessed_at
+        ):
+            missing.append("residual_risk_reassessment")
+        return missing
+
+    def can_close(self) -> tuple[bool, list[str]]:
+        missing = self.get_missing_closure_requirements()
+        return (len(missing) == 0, missing)
+
+    def save(self, *args, **kwargs):
+        if not self.ref_id:
+            self.ref_id = self.get_default_ref_id()
+        if self.status in (
+            self.Status.CLOSED,
+            self.Status.CLOSED_WITH_MONITORING,
+        ) and self.closed_at is None:
+            self.closed_at = timezone.now()
+        elif self.status not in (
+            self.Status.CLOSED,
+            self.Status.CLOSED_WITH_MONITORING,
+        ):
+            self.closed_at = None
+        super().save(*args, **kwargs)
+
+
+class WorkflowCaseApprovalStep(AbstractBaseModel, FolderMixin):
+    class Status(models.TextChoices):
+        PENDING = "pending", _("Pending")
+        APPROVED = "approved", _("Approved")
+        REJECTED = "rejected", _("Rejected")
+        CHANGES_REQUESTED = "changes_requested", _("Changes requested")
+
+    workflow_case = models.ForeignKey(
+        WorkflowCase,
+        on_delete=models.CASCADE,
+        related_name="approval_steps",
+        verbose_name=_("Workflow case"),
+    )
+    sequence = models.PositiveIntegerField(verbose_name=_("Sequence"), default=1)
+    approver = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="workflow_case_approval_steps",
+        verbose_name=_("Approver"),
+    )
+    status = models.CharField(
+        max_length=32,
+        choices=Status.choices,
+        default=Status.PENDING,
+        verbose_name=_("Status"),
+    )
+    is_required = models.BooleanField(default=True, verbose_name=_("Required"))
+    notes = models.TextField(blank=True, null=True, verbose_name=_("Notes"))
+    acted_at = models.DateTimeField(blank=True, null=True, verbose_name=_("Acted at"))
+
+    class Meta:
+        verbose_name = _("Workflow case approval step")
+        verbose_name_plural = _("Workflow case approval steps")
+        ordering = ["sequence", "created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["workflow_case", "sequence"],
+                name="unique_workflow_case_approval_sequence",
+            )
+        ]
+
+    def save(self, *args, **kwargs):
+        self.folder = self.workflow_case.folder
+        if self.status == self.Status.PENDING:
+            self.acted_at = None
+        elif self.acted_at is None:
+            self.acted_at = timezone.now()
+        super().save(*args, **kwargs)
+
+
+class WorkflowCaseEvent(AbstractBaseModel, FolderMixin):
+    workflow_case = models.ForeignKey(
+        WorkflowCase,
+        on_delete=models.CASCADE,
+        related_name="events",
+        verbose_name=_("Workflow case"),
+    )
+    event_type = models.CharField(max_length=100, verbose_name=_("Event type"))
+    event_actor = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="workflow_case_events",
+        verbose_name=_("Event actor"),
+    )
+    event_notes = models.TextField(blank=True, null=True, verbose_name=_("Notes"))
+
+    class Meta:
+        verbose_name = _("Workflow case event")
+        verbose_name_plural = _("Workflow case events")
+        ordering = ["-created_at"]
+
+    def save(self, *args, **kwargs):
+        self.folder = self.workflow_case.folder
+        super().save(*args, **kwargs)
+
+
 class Team(ActorSyncMixin, NameDescriptionMixin, FolderMixin):
     objects = ActorSyncManager()
 

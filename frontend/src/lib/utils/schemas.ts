@@ -289,6 +289,48 @@ export const ValidationFlowSchema = z.object({
 	contracts: z.array(z.string()).optional()
 });
 
+export const WorkflowCaseSchema = z.object({
+	...NameDescriptionMixin,
+	folder: z.string(),
+	ref_id: z.string().optional().nullable(),
+	workflow_type: z.string().default('finding'),
+	classification: z.string().default('control_deficiency'),
+	status: z.string().default('draft'),
+	treatment_decision: z.string().default('undecided'),
+	domain: z.string().optional().nullable(),
+	severity: z.number().default(-1).optional(),
+	owners: z.array(z.string().uuid().optional()).optional(),
+	reviewers: z.array(z.string().uuid().optional()).optional(),
+	affected_assets: z.array(z.string().uuid().optional()).optional(),
+	requirement_assessments: z.array(z.string().uuid().optional()).optional(),
+	findings: z.array(z.string().uuid().optional()).optional(),
+	findings_assessments: z.array(z.string().uuid().optional()).optional(),
+	risk_scenarios: z.array(z.string().uuid().optional()).optional(),
+	incidents: z.array(z.string().uuid().optional()).optional(),
+	applied_controls: z.array(z.string().uuid().optional()).optional(),
+	task_templates: z.array(z.string().uuid().optional()).optional(),
+	evidences: z.array(z.string().uuid().optional()).optional(),
+	validation_flows: z.array(z.string().uuid().optional()).optional(),
+	security_exceptions: z.array(z.string().uuid().optional()).optional(),
+	filtering_labels: z.string().optional().array().optional(),
+	require_evidence_for_closure: z.boolean().default(true).optional(),
+	require_approval_for_closure: z.boolean().default(true).optional(),
+	require_task_completion_for_closure: z.boolean().default(true).optional(),
+	require_recurring_control_for_closure: z.boolean().default(false).optional(),
+	require_residual_risk_reassessment: z.boolean().default(false).optional(),
+	recurring_control_confirmed: z.boolean().default(false).optional(),
+	monitoring_required: z.boolean().default(false).optional(),
+	residual_risk_reassessed_at: z.union([
+		z.literal('').transform(() => null),
+		z.string().datetime({ local: true })
+	]).nullish(),
+	residual_risk_reassessed_by: z.string().uuid().optional().nullable(),
+	residual_risk_summary: z.string().optional().nullable(),
+	closure_notes: z.string().optional().nullable(),
+	eta: z.union([z.literal('').transform(() => null), z.string().date()]).nullish(),
+	due_date: z.union([z.literal('').transform(() => null), z.string().date()]).nullish()
+});
+
 export const ReferenceControlSchema = z.object({
 	...NameDescriptionMixin,
 	provider: z.string().optional().nullable(),
@@ -1526,6 +1568,7 @@ const SCHEMA_MAP: Record<string, AnyZodObject> = {
 	policies: PolicySchema,
 	'risk-acceptances': RiskAcceptanceSchema,
 	'validation-flows': ValidationFlowSchema,
+	'workflow-cases': WorkflowCaseSchema,
 	'reference-controls': ReferenceControlSchema,
 	assets: AssetSchema,
 	'requirement-assessments': RequirementAssessmentSchema,

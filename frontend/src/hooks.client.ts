@@ -1,6 +1,7 @@
 import { page } from '$app/state';
 import { DEFAULT_LANGUAGE } from '$lib/utils/constants';
 import { defineCustomClientStrategy } from '$paraglide/runtime';
+import type { HandleClientError, Init } from '@sveltejs/kit';
 
 defineCustomClientStrategy('custom-userPreference', {
 	getLocale: () => {
@@ -18,3 +19,9 @@ defineCustomClientStrategy('custom-fallback', {
 	},
 	setLocale: async () => {}
 });
+
+export const init: Init = async () => {};
+
+export const handleError: HandleClientError = ({ error }) => {
+	console.error(error);
+};

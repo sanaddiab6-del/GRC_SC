@@ -271,6 +271,11 @@ export const navData = {
 					name: 'followUp',
 					fa_icon: 'fa-solid fa-clipboard-list',
 					href: '/findings-assessments'
+				},
+				{
+					name: 'Workflow Cases',
+					fa_icon: 'fa-solid fa-diagram-project',
+					href: '/workflow-cases'
 				}
 			]
 		},
