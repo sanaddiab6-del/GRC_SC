@@ -79,6 +79,20 @@ and run the starter script
 ./docker-compose.sh
 ```
 
+For a direct Docker Compose startup in this repository, use:
+
+```sh
+docker compose up -d
+```
+
+This default path is intended to start the stable containerized frontend, backend, database, and proxy together.
+
+If you explicitly want the source-mounted frontend development server instead, use:
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.dev-frontend.yml up -d
+```
+
 If you are looking for other installation options for self-hosting, check the [config builder](./config/) and the [docs](https://intuitem.gitbook.io/ciso-assistant).
 
 > [!NOTE]

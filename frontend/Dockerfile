@@ -1,18 +1,24 @@
 FROM node:24-slim AS builder
-ENV NODE_OPTIONS="--max-old-space-size=4096"
+ENV NODE_OPTIONS="--max-old-space-size=6144"
+ENV CI=true
 WORKDIR /app
 
 ENV PUBLIC_BACKEND_API_URL=foo
 
-COPY package*.json ./
-COPY . .
 RUN npm install -g pnpm
-RUN pnpm install --frozen-lockfile
-RUN pnpm run build
-RUN pnpm prune
+
+# Copy dependency manifests and local plugins for layer caching
+COPY package.json pnpm-lock.yaml ./
+COPY plugins/ plugins/
+RUN pnpm install --frozen-lockfile --ignore-scripts
+
+# Copy source
+COPY . .
+RUN pnpm exec svelte-kit sync
+RUN pnpm exec vite build
+RUN pnpm prune --prod --ignore-scripts
 
 FROM node:24-slim
-ENV NODE_OPTIONS="--max-old-space-size=4096"
 WORKDIR /app
 COPY --from=builder /app/build build/
 COPY --from=builder /app/server server/
@@ -21,6 +27,5 @@ COPY package.json .
 EXPOSE 3000
 ENV NODE_ENV=production
 ENV BODY_SIZE_LIMIT=25000000
-
 
 CMD [ "node", "server" ]
