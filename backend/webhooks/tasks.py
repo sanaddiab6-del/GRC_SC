@@ -61,11 +61,22 @@ def send_webhook_request(endpoint_id, event_type, data_payload):
         "webhook-signature": f"v1,{signature}",
     }
 
-    # Send request (15s timeout)
+    # Send request (15s timeout).
+    # allow_redirects=False is intentional: following 30x responses can bypass
+    # SSRF checks by redirecting to an internal hostname after validation.
     try:
         response = requests.post(
-            endpoint.url, data=json_payload.encode("utf-8"), headers=headers, timeout=15
+            endpoint.url,
+            data=json_payload.encode("utf-8"),
+            headers=headers,
+            timeout=15,
+            allow_redirects=False,
         )
+        if response.is_redirect or response.is_permanent_redirect:
+            raise Exception(
+                f"Webhook for {endpoint_id} returned a redirect ({response.status_code}). "
+                "Redirects are not followed for security reasons."
+            )
 
         # Any non-2xx status code is a failure
         if 200 <= response.status_code < 300:

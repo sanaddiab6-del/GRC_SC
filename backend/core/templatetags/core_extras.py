@@ -56,9 +56,26 @@ def country_name(country_code):
     return LANGUAGES.get(country_code, "Unknown")
 
 
+# Explicit allowlist avoids the RCE risk of calling eval() with
+# caller-supplied strings.
+_ISINSTANCE_ALLOWLIST: dict = {
+    "list": list,
+    "dict": dict,
+    "str": str,
+    "int": int,
+    "float": float,
+    "bool": bool,
+    "tuple": tuple,
+    "set": set,
+}
+
+
 @register.filter(name="isinstance")
 def isinstance_filter(val, instance_type):
-    return isinstance(val, eval(instance_type))
+    klass = _ISINSTANCE_ALLOWLIST.get(instance_type)
+    if klass is None:
+        return False
+    return isinstance(val, klass)
 
 
 @register.filter(name="is_list")

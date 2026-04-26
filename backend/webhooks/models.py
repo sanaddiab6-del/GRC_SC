@@ -1,4 +1,5 @@
 import ipaddress
+import socket
 import uuid
 from urllib.parse import urlparse
 from django.db import models
@@ -7,6 +8,25 @@ from django.core.exceptions import ValidationError
 from core.base_models import NameDescriptionMixin
 from core.models import Actor
 from iam.models import Folder, FolderMixin
+
+
+def _is_ssrf_unsafe_ip(ip_str: str) -> bool:
+    """
+    Return True if the IP address belongs to any range that must not receive
+    outbound webhook traffic (loopback, private, link-local, multicast, reserved).
+    """
+    try:
+        ip = ipaddress.ip_address(ip_str)
+        return (
+            ip.is_loopback
+            or ip.is_private
+            or ip.is_reserved
+            or ip.is_link_local
+            or ip.is_multicast
+            or ip.is_unspecified
+        )
+    except ValueError:
+        return True  # Unparseable → treat as unsafe
 
 
 class WebhookEventType(models.Model):
@@ -80,28 +100,49 @@ class WebhookEndpoint(NameDescriptionMixin, FolderMixin):
     def clean(self):
         """
         Model-level validation for SSRF mitigation.
+
+        Checks:
+        1. Reject literal private/loopback/reserved IP addresses in the URL.
+        2. Resolve the hostname via DNS and reject any result that maps to an
+           internal address — prevents DNS-rebinding and indirect SSRF.
         """
         super().clean()
 
-        try:
-            hostname = urlparse(self.url).hostname
-            if not hostname:
-                raise ValidationError("The URL provided is invalid.")
+        parsed = urlparse(self.url)
+        hostname = parsed.hostname
+        if not hostname:
+            raise ValidationError("The URL provided is invalid.")
 
-            # Try to parse the hostname as an IP address
-            ip = ipaddress.ip_address(hostname)
+        if not settings.WEBHOOK_ALLOW_PRIVATE_IPS:
+            # --- Check 1: literal IP address ---
+            try:
+                ip_literal = ipaddress.ip_address(hostname)
+                if _is_ssrf_unsafe_ip(str(ip_literal)):
+                    raise ValidationError(
+                        "The URL cannot point to an internal, loopback, link-local, "
+                        "or reserved IP address."
+                    )
+            except ValueError:
+                # Hostname is a domain name — proceed to DNS check.
+                pass
 
-            if not settings.WEBHOOK_ALLOW_PRIVATE_IPS and (
-                ip.is_private or ip.is_loopback or ip.is_reserved
-            ):
+            # --- Check 2: DNS resolution ---
+            try:
+                resolved = socket.getaddrinfo(hostname, None)
+                for family, _type, _proto, _canonname, sockaddr in resolved:
+                    resolved_ip = sockaddr[0]
+                    if _is_ssrf_unsafe_ip(resolved_ip):
+                        raise ValidationError(
+                            f"The hostname '{hostname}' resolves to an internal address "
+                            f"({resolved_ip}), which is not permitted."
+                        )
+            except ValidationError:
+                raise
+            except OSError:
+                # DNS resolution failed — treat as invalid URL.
                 raise ValidationError(
-                    "In production, the URL cannot be an internal, loopback, or reserved IP address."
+                    f"The hostname '{hostname}' could not be resolved."
                 )
-        except ValueError:
-            # It's a domain name, not an IP address. This is fine.
-            # We are NOT resolving DNS here, as that's a blocking network call
-            # and belongs in a proxy solution.
-            pass
 
     def save(self, *args, **kwargs):
         """

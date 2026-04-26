@@ -259,7 +259,12 @@ class SessionTokenView(views.APIView):
     """
 
     def post(self, request):
-        access_token = request.META.get("HTTP_AUTHORIZATION").split(" ")[1]
+        auth_header = request.META.get("HTTP_AUTHORIZATION")
+        if not auth_header or " " not in auth_header:
+            return Response(
+                {"error": "No valid access token provided."}, status=HTTP_401_UNAUTHORIZED
+            )
+        access_token = auth_header.split(" ")[1]
         if not access_token:
             return Response(
                 {"error": "No access token provided"}, status=HTTP_401_UNAUTHORIZED

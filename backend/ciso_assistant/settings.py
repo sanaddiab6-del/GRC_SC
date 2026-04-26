@@ -115,7 +115,13 @@ logger.info("SCHEMA_VERSION: %s", SCHEMA_VERSION)
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
+_KNOWN_WEAK_KEYS = {"changeme", "change-me", "secret", "django-insecure"}
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", get_random_secret_key())
+if not DEBUG and SECRET_KEY.lower().strip() in _KNOWN_WEAK_KEYS:
+    raise ImproperlyConfigured(
+        "DJANGO_SECRET_KEY is set to a well-known insecure value. "
+        "Set a strong, random secret key before deploying to production."
+    )
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DJANGO_DEBUG", "False").lower() in ("true", "1", "yes")
@@ -586,6 +592,29 @@ ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
 ACCOUNT_REAUTHENTICATION_TIMEOUT = 24 * 60 * 60  # 24 hours
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# ── HTTP security hardening ─────────────────────────────────────────────────
+# These settings are safe to enable unconditionally; HTTPS termination is
+# handled by the Caddy/nginx reverse-proxy layer. Values default to the
+# recommended production values recommended by Django's deployment checklist
+# and the OWASP Secure Headers project.
+SESSION_COOKIE_SECURE = not DEBUG          # Transmit session cookie over HTTPS only
+SESSION_COOKIE_HTTPONLY = True             # Prevent JS access to session cookie
+SESSION_COOKIE_SAMESITE = "Lax"           # CSRF defence for top-level navigation
+CSRF_COOKIE_SECURE = not DEBUG            # Transmit CSRF token over HTTPS only
+CSRF_COOKIE_HTTPONLY = True               # Cookie not readable by JS (double-submit not used)
+CSRF_COOKIE_SAMESITE = "Lax"
+SECURE_CONTENT_TYPE_NOSNIFF = True        # X-Content-Type-Options: nosniff
+SECURE_BROWSER_XSS_FILTER = True          # Legacy IE compatibility header
+X_FRAME_OPTIONS = "DENY"                  # Clickjacking protection
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+# HSTS: enable once TLS is confirmed end-to-end; 1 year + includeSubDomains
+SECURE_HSTS_SECONDS = 0 if DEBUG else int(
+    os.environ.get("SECURE_HSTS_SECONDS", 31536000)
+)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
+SECURE_HSTS_PRELOAD = not DEBUG
+# ───────────────────────────────────────────────────────────────────────────
 
 ACCOUNT_ADAPTER = "iam.adapter.AccountAdapter"
 SOCIALACCOUNT_ADAPTER = "iam.adapter.SocialAccountAdapter"

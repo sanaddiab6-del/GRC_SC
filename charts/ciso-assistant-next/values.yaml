@@ -61,8 +61,9 @@ serviceAccount:
   annotations: {} # @schema additionalProperties: true
   # -- Labels applied to created service account
   labels: {} # @schema additionalProperties: true
-  # -- Automount API credentials for the Service Account
-  automountServiceAccountToken: true
+  # -- Automount API credentials for the Service Account.
+  # Disabled by default: pods should not receive a K8s API token unless explicitly required.
+  automountServiceAccountToken: false
 
 ## CISO Assistant backend
 backend:
@@ -104,8 +105,13 @@ backend:
     ## Note : PostgreSQL database configuration at `postgresql` or `externalPgsql` section
     databaseType: sqlite
 
-    # -- Set Django secret key
-    djangoSecretKey: "changeme"
+    # -- Set Django secret key.
+    # REQUIRED: You MUST set this to a long random value before deploying.
+    # Leaving it empty will cause the chart to fail at startup (the backend
+    # startup check rejects an empty or default key).
+    # Generate a suitable value with: python -c "import secrets; print(secrets.token_urlsafe(50))"
+    # Prefer djangoExistingSecretKey to avoid storing the secret in values.yaml.
+    djangoSecretKey: ""
     # -- Name of an existing secret resource containing the django secret in a 'django-secret-key' key
     djangoExistingSecretKey: ""
 
