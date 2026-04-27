@@ -2,6 +2,11 @@ import type { z } from 'zod';
 import type { ModelMapEntry } from './crud';
 import type { RiskScenarioSchema } from './schemas';
 
+/** Shape returned by the backend for a single permission entry. */
+export interface UserPermission {
+	str: string;
+}
+
 export interface User {
 	id: string;
 	actor_id: string;
@@ -12,9 +17,12 @@ export interface User {
 	is_active: boolean;
 	keep_local_login: boolean;
 	date_joined: string;
-	user_groups: Record<string, any>[];
-	roles: Record<string, any>[];
-	permissions: Record<string, any>[];
+	/** Array of [groupName, isBuiltin] tuples. */
+	user_groups: [string, boolean][];
+	/** Flat list of role name strings. */
+	roles: string[];
+	/** Map of permission codename → permission info. */
+	permissions: Record<string, UserPermission>;
 	is_third_party: boolean;
 	is_auditee: boolean;
 	is_admin: boolean;

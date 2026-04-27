@@ -103,7 +103,9 @@ backend:
 
     # -- Set the database type (sqlite, pgsql or externalPgsql)
     ## Note : PostgreSQL database configuration at `postgresql` or `externalPgsql` section
-    databaseType: sqlite
+    ## Note: sqlite is only appropriate for local development. Production deployments should
+    ## use pgsql (bundled PostgreSQL) or externalPgsql (external managed database).
+    databaseType: pgsql
 
     # -- Set Django secret key.
     # REQUIRED: You MUST set this to a long random value before deploying.

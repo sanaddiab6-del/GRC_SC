@@ -50,6 +50,7 @@ User = get_user_model()
 class LoginView(KnoxLoginView):
     permission_classes = (permissions.AllowAny,)
     serializer_class = LoginSerializer
+    throttle_scope = "login"
 
     def post(self, request, format=None):
         serializer = AuthTokenSerializer(data=request.data)

@@ -1,4 +1,5 @@
 import importlib
+from functools import lru_cache
 from typing import Any
 
 import structlog
@@ -26,6 +27,17 @@ from rest_framework.exceptions import PermissionDenied
 from integrations.models import IntegrationConfiguration, SyncMapping
 
 logger = structlog.get_logger(__name__)
+
+
+@lru_cache(maxsize=None)
+def _get_permission_cached(codename: str) -> Permission:
+    """Return the Permission object for *codename*, cached for the process lifetime.
+
+    Django Permission rows are only created during migrations and never change
+    at runtime, so a process-level cache is safe and avoids a DB round-trip on
+    every serializer permission check.
+    """
+    return Permission.objects.get(codename=codename)
 
 
 class SerializerFactory:
@@ -86,8 +98,8 @@ class BaseModelSerializer(serializers.ModelSerializer):
             return
         if not RoleAssignment.is_access_allowed(
             user=request.user,
-            perm=Permission.objects.get(
-                codename=f"{action}_{self.Meta.model._meta.model_name}",
+            perm=_get_permission_cached(
+                f"{action}_{self.Meta.model._meta.model_name}",
             ),
             folder=folder,
         ):

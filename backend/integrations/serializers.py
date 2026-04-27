@@ -1,4 +1,3 @@
-from icecream import ic
 import structlog
 from django.urls import reverse
 from django.utils.crypto import get_random_string

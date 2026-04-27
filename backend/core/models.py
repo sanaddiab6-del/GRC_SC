@@ -9,7 +9,6 @@ import statistics
 
 from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
-from icecream import ic
 from auditlog.registry import auditlog
 
 from django.utils.functional import cached_property

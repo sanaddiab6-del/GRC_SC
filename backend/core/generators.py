@@ -7,11 +7,8 @@ from docxtpl import InlineImage
 from docx.shared import Cm
 import matplotlib.pyplot as plt
 import numpy as np
-from icecream import ic
 
 from django.utils.translation import gettext_lazy as _
-# from icecream import ic
-
 from django.db.models import Count
 
 matplotlib.use("Agg")
