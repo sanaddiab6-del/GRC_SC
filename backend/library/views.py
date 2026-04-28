@@ -28,7 +28,7 @@ from core.excel import ExcelUploadHandler
 from core.helpers import get_sorted_requirement_nodes
 from core.models import StoredLibrary, LoadedLibrary, LibraryUpdater
 from core.sandbox import SandboxTimeoutError, SandboxViolationError
-from core.views import BaseModelViewSet, GenericFilterSet
+from core.views import BaseModelViewSet, GenericFilterSet, _get_permission_cached
 from iam.models import RoleAssignment, Folder, Permission
 from library.validators import validate_file_extension
 from .helpers import update_translations
@@ -175,7 +175,7 @@ class StoredLibraryViewSet(BaseModelViewSet):
             lib = StoredLibrary.objects.get(
                 **{key: pk}
             )  # There is no "locale" value involved in the fetch + we have to handle the exception if the pk urn doesn't exist
-        except:
+        except Exception:
             return Response(data="Library not found.", status=HTTP_404_NOT_FOUND)
         data = StoredLibrarySerializer(lib).data
         return Response(data)
@@ -185,14 +185,14 @@ class StoredLibraryViewSet(BaseModelViewSet):
         try:
             key = "urn" if pk.startswith("urn:") else "id"
             lib = StoredLibrary.objects.get(**{key: pk})
-        except:
+        except Exception:
             return Response("Library not found.", status=HTTP_404_NOT_FOUND)
         return Response(update_translations(lib.content))
 
     def destroy(self, request, *args, pk, **kwargs):
         if not RoleAssignment.is_access_allowed(
             user=request.user,
-            perm=Permission.objects.get(codename="delete_storedlibrary"),
+            perm=_get_permission_cached("delete_storedlibrary"),
             folder=Folder.get_root_folder(),
         ):
             return Response(status=HTTP_403_FORBIDDEN)
@@ -200,7 +200,7 @@ class StoredLibraryViewSet(BaseModelViewSet):
         try:
             key = "urn" if pk.startswith("urn:") else "id"
             lib = StoredLibrary.objects.get(**{key: pk})
-        except:
+        except Exception:
             return Response(data="Library not found.", status=HTTP_404_NOT_FOUND)
 
         lib.delete()
@@ -210,7 +210,7 @@ class StoredLibraryViewSet(BaseModelViewSet):
     def unload(self, request, pk):
         if not RoleAssignment.is_access_allowed(
             user=request.user,
-            perm=Permission.objects.get(codename="delete_loadedlibrary"),
+            perm=_get_permission_cached("delete_loadedlibrary"),
             folder=Folder.get_root_folder(),
         ):
             return Response(status=HTTP_403_FORBIDDEN)
@@ -219,7 +219,7 @@ class StoredLibraryViewSet(BaseModelViewSet):
             key = "urn" if pk.startswith("urn:") else "id"
             libraries = StoredLibrary.objects.filter(**{key: pk})
             library = max(libraries, key=lambda lib: lib.version)
-        except:
+        except Exception:
             return Response(data="Library not found.", status=HTTP_404_NOT_FOUND)
 
         loaded_library = library.get_loaded_library()
@@ -228,7 +228,7 @@ class StoredLibraryViewSet(BaseModelViewSet):
 
         try:
             loaded_library.delete()
-        except:
+        except Exception:
             return Response(
                 data="Loaded library can't be deleted because it's currently being used.",
                 status=HTTP_409_CONFLICT,
@@ -244,7 +244,7 @@ class StoredLibraryViewSet(BaseModelViewSet):
     def import_library(self, request, pk):
         if not RoleAssignment.is_access_allowed(
             user=request.user,
-            perm=Permission.objects.get(codename="add_loadedlibrary"),
+            perm=_get_permission_cached("add_loadedlibrary"),
             folder=Folder.get_root_folder(),
         ):
             return Response(status=HTTP_403_FORBIDDEN)
@@ -257,7 +257,7 @@ class StoredLibraryViewSet(BaseModelViewSet):
             library = max(
                 libraries, key=lambda lib: lib.version
             )  # Which mean we can only import the latest version of the library, if that so library that has a most recent version stored shouldn't be displayed and should even be erased from the database
-        except:
+        except Exception:
             return Response(data="Library not found.", status=HTTP_404_NOT_FOUND)
 
         try:
@@ -284,7 +284,7 @@ class StoredLibraryViewSet(BaseModelViewSet):
     def apply_preset(self, request, pk):
         if not RoleAssignment.is_access_allowed(
             user=request.user,
-            perm=Permission.objects.get(codename="add_loadedlibrary"),
+            perm=_get_permission_cached("add_loadedlibrary"),
             folder=Folder.get_root_folder(),
         ):
             return Response(status=HTTP_403_FORBIDDEN)
@@ -342,7 +342,7 @@ class StoredLibraryViewSet(BaseModelViewSet):
         try:
             key = "urn" if pk.startswith("urn:") else "id"
             lib = StoredLibrary.objects.get(**{key: pk})
-        except:
+        except Exception:
             return Response(data="Library not found.", status=HTTP_404_NOT_FOUND)
 
         library_objects = lib.content  # We may need caching for this
@@ -360,7 +360,7 @@ class StoredLibraryViewSet(BaseModelViewSet):
     def upload_library(self, request):
         if not RoleAssignment.is_access_allowed(
             user=request.user,
-            perm=Permission.objects.get(codename="add_storedlibrary"),
+            perm=_get_permission_cached("add_storedlibrary"),
             folder=Folder.get_root_folder(),
         ):
             return Response(status=HTTP_403_FORBIDDEN)
@@ -781,7 +781,7 @@ class LoadedLibraryViewSet(BaseModelViewSet):
     def destroy(self, request, *args, pk, **kwargs):
         if not RoleAssignment.is_access_allowed(
             user=request.user,
-            perm=Permission.objects.get(codename="delete_loadedlibrary"),
+            perm=_get_permission_cached("delete_loadedlibrary"),
             folder=Folder.get_root_folder(),
         ):
             return Response(status=HTTP_403_FORBIDDEN)

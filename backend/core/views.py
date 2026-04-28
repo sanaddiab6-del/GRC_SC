@@ -3,6 +3,7 @@ from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Alignment
 import copy
+from functools import lru_cache
 import csv
 import json
 import mimetypes
@@ -166,6 +167,13 @@ from global_settings.utils import ff_is_enabled
 import structlog
 
 logger = structlog.get_logger(__name__)
+
+
+@lru_cache(maxsize=None)
+def _get_permission_cached(codename: str):
+    """Cached Permission lookup — permissions are static after migrations run."""
+    return Permission.objects.get(codename=codename)
+
 
 SHORT_CACHE_TTL = 2  # mn
 MED_CACHE_TTL = 5  # mn
@@ -648,15 +656,21 @@ class BaseModelViewSet(viewsets.ModelViewSet):
 
     serializers_module = "core.serializers"
 
+    _filterset_cache: dict = {}
+
     @property
     def filterset_class(self):
         # If you have defined filterset_fields, build the FilterSet on the fly.
+        # Cache the result per (model, fields) pair — the class is static once built.
         if self.filterset_fields:
-            return filterset_factory(
-                model=self.model,
-                filterset=GenericFilterSet,
-                fields=self.filterset_fields,
-            )
+            cache_key = (self.model, tuple(sorted(self.filterset_fields)))
+            if cache_key not in BaseModelViewSet._filterset_cache:
+                BaseModelViewSet._filterset_cache[cache_key] = filterset_factory(
+                    model=self.model,
+                    filterset=GenericFilterSet,
+                    fields=self.filterset_fields,
+                )
+            return BaseModelViewSet._filterset_cache[cache_key]
         return None
 
     def get_queryset(self) -> models.query.QuerySet:
@@ -933,43 +947,44 @@ class BaseModelViewSet(viewsets.ModelViewSet):
 
     def create(self, request: Request, *args, **kwargs) -> Response:
         self._process_request_data(request)
-        if request.data.get("filtering_labels"):
-            request.data["filtering_labels"] = self._process_labels(
-                request.data["filtering_labels"]
-            )
-        # Experimental: process evidences on TaskTemplate creation
-        if request.data.get("evidences") and self.model == TaskTemplate:
-            folder = Folder.objects.get(id=request.data.get("folder"))
-            request.data["evidences"] = self._process_evidences(
-                request.data.get("evidences"), folder=folder
-            )
-        return super().create(request, *args, **kwargs)
+        with transaction.atomic():
+            if request.data.get("filtering_labels"):
+                request.data["filtering_labels"] = self._process_labels(
+                    request.data["filtering_labels"]
+                )
+            # Experimental: process evidences on TaskTemplate creation
+            if request.data.get("evidences") and self.model == TaskTemplate:
+                folder = Folder.objects.get(id=request.data.get("folder"))
+                request.data["evidences"] = self._process_evidences(
+                    request.data.get("evidences"), folder=folder
+                )
+            return super().create(request, *args, **kwargs)
 
     def update(self, request: Request, *args, **kwargs) -> Response:
         # Experimental: process evidences on TaskTemplate update
+        with transaction.atomic():
+            if request.data.get("evidences") and self.model == TaskTemplate:
+                folder = Folder.objects.get(id=request.data.get("folder"))
+                request.data["evidences"] = self._process_evidences(
+                    request.data["evidences"], folder=folder
+                )
 
-        if request.data.get("evidences") and self.model == TaskTemplate:
-            folder = Folder.objects.get(id=request.data.get("folder"))
-            request.data["evidences"] = self._process_evidences(
-                request.data["evidences"], folder=folder
-            )
+            # NOTE: Handle filtering_labels field - SvelteKit SuperForms behavior inconsistency:
+            # Forms with file inputs (like Evidence attachments) use dataType="form" and omit empty fields
+            # Forms without file inputs use dataType="json" and send empty arrays []
+            # When the field is missing, we need to explicitly clear the labels by passing empty list to serializer
+            if hasattr(self.model, "_meta") and "filtering_labels" in [
+                f.name for f in self.model._meta.get_fields()
+            ]:
+                if "filtering_labels" in request.data:
+                    labels = request.data.get("filtering_labels")
+                    if labels:
+                        # Make request.data mutable if needed (e.g., for multipart/form-data)
+                        if hasattr(request.data, "_mutable"):
+                            request.data._mutable = True
+                        request.data["filtering_labels"] = self._process_labels(labels)
 
-        # NOTE: Handle filtering_labels field - SvelteKit SuperForms behavior inconsistency:
-        # Forms with file inputs (like Evidence attachments) use dataType="form" and omit empty fields
-        # Forms without file inputs use dataType="json" and send empty arrays []
-        # When the field is missing, we need to explicitly clear the labels by passing empty list to serializer
-        if hasattr(self.model, "_meta") and "filtering_labels" in [
-            f.name for f in self.model._meta.get_fields()
-        ]:
-            if "filtering_labels" in request.data:
-                labels = request.data.get("filtering_labels")
-                if labels:
-                    # Make request.data mutable if needed (e.g., for multipart/form-data)
-                    if hasattr(request.data, "_mutable"):
-                        request.data._mutable = True
-                    request.data["filtering_labels"] = self._process_labels(labels)
-
-        return super().update(request, *args, **kwargs)
+            return super().update(request, *args, **kwargs)
 
     def partial_update(self, request: Request, *args, **kwargs) -> Response:
         self._process_request_data(request)
@@ -1024,7 +1039,7 @@ class BaseModelViewSet(viewsets.ModelViewSet):
             if action_type == "delete"
             else f"change_{self.model._meta.model_name}"
         )
-        required_perm = Permission.objects.get(codename=perm_codename)
+        required_perm = _get_permission_cached(perm_codename)
 
         # Resolve the write serializer once for all update operations
         if action_type != "delete":
@@ -2478,7 +2493,7 @@ class RiskMatrixViewSet(BaseModelViewSet):
         """Check that the user has change_riskmatrix permission on the matrix's folder."""
         if not RoleAssignment.is_access_allowed(
             user=request.user,
-            perm=Permission.objects.get(codename="change_riskmatrix"),
+            perm=_get_permission_cached("change_riskmatrix"),
             folder=matrix.folder,
         ):
             raise PermissionDenied({"error": "Permission denied."})
@@ -2632,7 +2647,7 @@ class RiskMatrixViewSet(BaseModelViewSet):
 
         if not RoleAssignment.is_access_allowed(
             user=request.user,
-            perm=Permission.objects.get(codename="add_riskmatrix"),
+            perm=_get_permission_cached("add_riskmatrix"),
             folder=folder,
         ):
             return Response(
@@ -2665,7 +2680,7 @@ class RiskMatrixViewSet(BaseModelViewSet):
 
         if not RoleAssignment.is_access_allowed(
             user=request.user,
-            perm=Permission.objects.get(codename="add_riskmatrix"),
+            perm=_get_permission_cached("add_riskmatrix"),
             folder=source.folder,
         ):
             return Response(
@@ -2831,7 +2846,7 @@ class RiskMatrixViewSet(BaseModelViewSet):
 
         if not RoleAssignment.is_access_allowed(
             user=request.user,
-            perm=Permission.objects.get(codename="add_riskmatrix"),
+            perm=_get_permission_cached("add_riskmatrix"),
             folder=folder,
         ):
             return Response(
@@ -4082,7 +4097,7 @@ class RiskAssessmentViewSet(BaseModelViewSet):
 
         if not RoleAssignment.is_access_allowed(
             user=request.user,
-            perm=Permission.objects.get(codename="change_riskassessment"),
+            perm=_get_permission_cached("change_riskassessment"),
             folder=Folder.get_folder(risk_assessment),
         ):
             return Response(status=status.HTTP_403_FORBIDDEN)
@@ -4121,7 +4136,7 @@ class RiskAssessmentViewSet(BaseModelViewSet):
         # Check permissions
         if not RoleAssignment.is_access_allowed(
             user=request.user,
-            perm=Permission.objects.get(codename="add_quantitativeriskstudy"),
+            perm=_get_permission_cached("add_quantitativeriskstudy"),
             folder=risk_assessment.folder,
         ):
             return Response(
@@ -5645,7 +5660,7 @@ class UserRolesOnFolderList(generics.ListAPIView):
     def list(self, request, *args, **kwargs):
         if not RoleAssignment.is_access_allowed(
             user=self.request.user,
-            perm=Permission.objects.get(codename="change_folder"),
+            perm=_get_permission_cached("change_folder"),
             folder=get_object_or_404(Folder, id=self.kwargs["pk"]),
         ):
             raise PermissionDenied()
@@ -6166,7 +6181,7 @@ class RiskScenarioViewSet(ExportMixin, BaseModelViewSet):
 
         if not RoleAssignment.is_access_allowed(
             user=request.user,
-            perm=Permission.objects.get(codename="change_riskscenario"),
+            perm=_get_permission_cached("change_riskscenario"),
             folder=Folder.get_folder(risk_scenario),
         ):
             return Response(status=status.HTTP_403_FORBIDDEN)
@@ -6320,7 +6335,7 @@ class RiskAcceptanceViewSet(BaseModelViewSet):
             for scenario in risk_acceptance.get("risk_scenarios"):
                 if not RoleAssignment.is_access_allowed(
                     risk_acceptance.get("approver"),
-                    Permission.objects.get(codename="approve_riskacceptance"),
+                    _get_permission_cached("approve_riskacceptance"),
                     scenario.risk_assessment.perimeter.folder,
                 ):
                     raise ValidationError(
@@ -7077,7 +7092,7 @@ class FolderViewSet(BaseModelViewSet):
         for model in objects.keys():
             if not RoleAssignment.is_access_allowed(
                 user=request.user,
-                perm=Permission.objects.get(codename=f"view_{model}"),
+                perm=_get_permission_cached(f"view_{model}"),
                 folder=instance,
             ):
                 logger.error(
@@ -7177,7 +7192,7 @@ class FolderViewSet(BaseModelViewSet):
         try:
             if not RoleAssignment.is_access_allowed(
                 user=request.user,
-                perm=Permission.objects.get(codename="add_folder"),
+                perm=_get_permission_cached("add_folder"),
                 folder=Folder.get_root_folder(),
             ):
                 raise PermissionDenied()
@@ -9035,7 +9050,7 @@ class PresetJourneyViewSet(BaseModelViewSet):
 
         apply_feature_flags = RoleAssignment.is_access_allowed(
             user=request.user,
-            perm=Permission.objects.get(codename="change_globalsettings"),
+            perm=_get_permission_cached("change_globalsettings"),
             folder=Folder.get_root_folder(),
         )
 
@@ -10780,7 +10795,7 @@ class ComplianceAssessmentViewSet(BaseModelViewSet):
             dry_run = True
         if not RoleAssignment.is_access_allowed(
             user=request.user,
-            perm=Permission.objects.get(codename="add_appliedcontrol"),
+            perm=_get_permission_cached("add_appliedcontrol"),
             folder=compliance_assessment.folder,
         ):
             return Response(status=status.HTTP_403_FORBIDDEN)
@@ -10810,7 +10825,7 @@ class ComplianceAssessmentViewSet(BaseModelViewSet):
 
         if not RoleAssignment.is_access_allowed(
             user=request.user,
-            perm=Permission.objects.get(codename="change_requirementassessment"),
+            perm=_get_permission_cached("change_requirementassessment"),
             folder=compliance_assessment.folder,
         ):
             return Response(status=status.HTTP_403_FORBIDDEN)
@@ -11624,7 +11639,7 @@ class RequirementAssessmentViewSet(BaseModelViewSet):
         }
         if not RoleAssignment.is_access_allowed(
             user=request.user,
-            perm=Permission.objects.get(codename="add_appliedcontrol"),
+            perm=_get_permission_cached("add_appliedcontrol"),
             folder=requirement_assessment.folder,
         ):
             return Response(status=status.HTTP_403_FORBIDDEN)

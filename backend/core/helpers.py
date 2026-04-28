@@ -4,7 +4,6 @@ from datetime import date, timedelta
 from typing import Optional
 from typing import Dict, List
 
-# from icecream import ic
 from django.core.exceptions import NON_FIELD_ERRORS as DJ_NON_FIELD_ERRORS
 from django.core.exceptions import ValidationError as DjValidationError
 from django.conf import settings
