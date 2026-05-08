@@ -2,6 +2,7 @@
 Star the project 🌟 to get releases notification and help growing the community!
 </p>
 
+
 <p align="center">
     <a href="https://trendshift.io/repositories/9343" target="_blank"><img src="https://trendshift.io/api/badge/repositories/9343" alt="intuitem%2Fciso-assistant-community | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
     <br />
