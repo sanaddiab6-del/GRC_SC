@@ -50,7 +50,6 @@ User = get_user_model()
 class LoginView(KnoxLoginView):
     permission_classes = (permissions.AllowAny,)
     serializer_class = LoginSerializer
-    throttle_scope = "login"
 
     def post(self, request, format=None):
         serializer = AuthTokenSerializer(data=request.data)
@@ -286,7 +285,6 @@ class SessionTokenView(views.APIView):
 
 class PasswordResetView(views.APIView):
     permission_classes = [permissions.AllowAny]
-    throttle_scope = "password_reset"
 
     @method_decorator(ensure_csrf_cookie)
     def post(self, request):

@@ -354,8 +354,6 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.ScopedRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
-        "login": "5/minute",
-        "password_reset": "5/hour",
         "registration": "5/hour",
     },
 }
