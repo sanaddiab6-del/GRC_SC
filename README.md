@@ -96,6 +96,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev-frontend.yml up -d
 
 If you are looking for other installation options for self-hosting, check the [config builder](./config/) and the [docs](https://intuitem.gitbook.io/ciso-assistant).
 
+For a full production deployment guide (live server, DNS, TLS, environment variables, and post-deployment checklist), see **[DEPLOYMENT.md](./DEPLOYMENT.md)**.
+
 > [!NOTE]
 > The docker-compose script uses prebuilt Docker images supporting most of the standard hardware architecture.
 > If you're using **Windows**, Make sure to have [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) installed and trigger the script within a WSL command line. It will feed Docker Desktop on your behalf.
