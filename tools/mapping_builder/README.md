@@ -723,7 +723,7 @@ python heatmap_builder.py \
 ```
 
 ### Custom styling
-```bash
+```bash and dash 
 python heatmap_builder.py \
   --input mapping_cyfun.csv \
   --output heatmap_custom.png \
