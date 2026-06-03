@@ -8,7 +8,7 @@
 
 	interface Props {
 		field?: string;
-		form: SuperForm<Record<string, string>>; // OTP form
+		form: SuperForm<Record<string, string>>; // OTP form data
 		numOfInputs?: number;
 		separator?: string;
 		inputClass?: string;
