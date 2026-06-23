@@ -1,6 +1,6 @@
 # Semantic Framework Mapping Tools
 
-This directory contains tools for semantic comparison between security/compliance framework YAML files.
+This directory contains tools for semantic comparison between security and compliance framework YAML files.
 
 ## Available Tools
 
