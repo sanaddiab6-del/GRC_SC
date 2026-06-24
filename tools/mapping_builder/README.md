@@ -21,7 +21,7 @@ This directory contains tools for semantic comparison between security and compl
 
 ## Prerequisites
 
-1. **Python 3.8+** with the following packages:
+1. **Python 3.9+** with the following packages:
    ```bash
    pip install pyyaml requests pandas openpyxl
    ```
