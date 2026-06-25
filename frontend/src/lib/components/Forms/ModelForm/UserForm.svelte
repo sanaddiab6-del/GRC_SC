@@ -34,22 +34,20 @@
 	bind:cachedValue={formDataCache['email']}
 	data-focusindex="2"
 />
-{#if shape.first_name && shape.last_name}
-	<TextField
-		{form}
-		field="first_name"
-		label={m.firstName()}
-		cacheLock={cacheLocks['first_name']}
-		bind:cachedValue={formDataCache['first_name']}
-	/>
-	<TextField
-		{form}
-		field="last_name"
-		label={m.lastName()}
-		cacheLock={cacheLocks['last_name']}
-		bind:cachedValue={formDataCache['last_name']}
-	/>
-{/if}
+<TextField
+	{form}
+	field="first_name"
+	label={m.firstName()}
+	cacheLock={cacheLocks['first_name']}
+	bind:cachedValue={formDataCache['first_name']}
+/>
+<TextField
+	{form}
+	field="last_name"
+	label={m.lastName()}
+	cacheLock={cacheLocks['last_name']}
+	bind:cachedValue={formDataCache['last_name']}
+/>
 {#if shape.user_groups}
 	<AutocompleteSelect
 		{form}
