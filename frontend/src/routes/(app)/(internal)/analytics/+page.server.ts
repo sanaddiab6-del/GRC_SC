@@ -1,56 +1,106 @@
+
 import { BASE_API_URL } from '$lib/utils/constants';
 import type { PageServerLoad } from './$types';
 import { m } from '$paraglide/messages';
 
-export const load: PageServerLoad = async ({ locals, fetch }) => {
+const emptyMetrics = {
+	controls: {
+		total: 0,
+		active: 0,
+		deprecated: 0,
+		to_do: 0,
+		in_progress: 0,
+		on_hold: 0,
+		p1: 0,
+		eta_missed: 0
+	},
+	csf_functions: {},
+	compliance: {
+		used_frameworks: 0,
+		active_audits: 0,
+		audits: 0,
+		non_compliant_items: 0,
+		evidences: 0,
+		expired_evidences: 0
+	},
+	risk: {
+		assessments: 0,
+		scenarios: 0,
+		threats: 0,
+		acceptances: 0
+	}
+};
+
+const emptyAuditsMetrics = {
+	progress_avg: 0,
+	audits_stats: {
+		names: [],
+		data: [],
+		uuids: []
+	}
+};
+
+const parseResults = async <T>(res: Response, fallback: T): Promise<T> => {
+	if (!res.ok) return fallback;
+	const data = await res.json();
+	return data.results ?? fallback;
+};
+
+export const load: PageServerLoad = async ({ locals, fetch, cookies }) => {
 	const currentYear = new Date().getFullYear();
+	const token = cookies.get('token');
+	const authFetch: typeof fetch = (input, init = {}) => {
+		const headers = new Headers(init.headers);
+		headers.set('content-type', 'application/json');
+		if (token) headers.set('Authorization', `Token ${token}`);
+
+		return fetch(input, { ...init, headers });
+	};
 
 	// All data is streamed — nothing blocks the initial page render.
 
-	const appliedControlStatusPromise = fetch(`${BASE_API_URL}/applied-controls/per_status/`)
+	const appliedControlStatusPromise = authFetch(`${BASE_API_URL}/applied-controls/per_status/`)
 		.then((res) => res.json())
 		.then((res) => res.results)
 		.catch(() => null);
 
-	const taskTemplateStatusPromise = fetch(`${BASE_API_URL}/task-templates/per_status/`)
+	const taskTemplateStatusPromise = authFetch(`${BASE_API_URL}/task-templates/per_status/`)
 		.then((res) => res.json())
 		.then((res) => res.results)
 		.catch(() => null);
 
-	const risksCountPerLevelPromise = fetch(`${BASE_API_URL}/risk-scenarios/count_per_level/`)
+	const risksCountPerLevelPromise = authFetch(`${BASE_API_URL}/risk-scenarios/count_per_level/`)
 		.then((res) => res.json())
 		.then((res) => res.results)
 		.catch(() => ({ current: [], residual: [] }));
 
-	const threatsCountPromise = fetch(`${BASE_API_URL}/threats/threats_count/`)
+	const threatsCountPromise = authFetch(`${BASE_API_URL}/threats/threats_count/`)
 		.then((res) => res.json())
 		.catch(() => ({ results: { labels: [], values: [] } }));
 
-	const qualificationsCountPromise = fetch(`${BASE_API_URL}/risk-scenarios/qualifications_count/`)
+	const qualificationsCountPromise = authFetch(`${BASE_API_URL}/risk-scenarios/qualifications_count/`)
 		.then((res) => res.json())
 		.catch(() => ({ results: { labels: [], values: [] } }));
 
-	const complianceAnalyticsPromise = fetch(`${BASE_API_URL}/compliance-assessments/analytics/`)
+	const complianceAnalyticsPromise = authFetch(`${BASE_API_URL}/compliance-assessments/analytics/`)
 		.then((res) => res.json())
 		.catch(() => ({}));
 
-	const metricsPromise = fetch(`${BASE_API_URL}/get_metrics/`)
-		.then((res) => res.json())
-		.then((data) => data.results)
+	const metricsPromise = authFetch(`${BASE_API_URL}/get_metrics/`)
+		.then((res) => parseResults(res, emptyMetrics))
 		.catch((error) => {
 			console.error('Failed to fetch or parse metrics:', error);
-			return null;
+			return emptyMetrics;
 		});
 
-	const auditsMetricsPromise = fetch(`${BASE_API_URL}/get_audits_metrics/`)
-		.then((res) => res.json())
-		.then((data) => data.results)
+	const auditsMetricsPromise = authFetch(`${BASE_API_URL}/get_audits_metrics/`)
+		.then((res) => parseResults(res, emptyAuditsMetrics))
 		.catch((error) => {
 			console.error('Failed to fetch or parse audits metrics:', error);
-			return null;
+			return emptyAuditsMetrics;
 		});
 
-	const countersPromise = fetch(`${BASE_API_URL}/get_counters/`)
+	const countersPromise = authFetch(`${BASE_API_URL}/get_counters/`)
 		.then((res) => res.json())
 		.then((data) => data.results)
 		.catch((error) => {
@@ -58,7 +108,7 @@ export const load: PageServerLoad = async ({ locals, fetch }) => {
 			return null;
 		});
 
-	const combinedAssessmentsStatusPromise = fetch(`${BASE_API_URL}/get_combined_assessments_status/`)
+	const combinedAssessmentsStatusPromise = authFetch(`${BASE_API_URL}/get_combined_assessments_status/`)
 		.then((res) => res.json())
 		.then((data) => data.results)
 		.catch((error) => {
@@ -66,7 +116,7 @@ export const load: PageServerLoad = async ({ locals, fetch }) => {
 			return null;
 		});
 
-	const governanceCalendarDataPromise = fetch(
+	const governanceCalendarDataPromise = authFetch(
 		`${BASE_API_URL}/get_governance_calendar_data/?year=${currentYear}`
 	)
 		.then((res) => res.json())
@@ -76,14 +126,14 @@ export const load: PageServerLoad = async ({ locals, fetch }) => {
 			return [];
 		});
 
-	const vulnerabilitySankeyDataPromise = fetch(`${BASE_API_URL}/vulnerabilities/sankey_data/`)
+	const vulnerabilitySankeyDataPromise = authFetch(`${BASE_API_URL}/vulnerabilities/sankey_data/`)
 		.then((res) => res.json())
 		.catch((error) => {
 			console.error('Failed to fetch vulnerability sankey data:', error);
 			return [];
 		});
 
-	const findingsAssessmentSunburstDataPromise = fetch(
+	const findingsAssessmentSunburstDataPromise = authFetch(
 		`${BASE_API_URL}/findings-assessments/sunburst_data/`
 	)
 		.then((res) => res.json())
@@ -93,56 +143,56 @@ export const load: PageServerLoad = async ({ locals, fetch }) => {
 		});
 
 	// Start all operations analytics fetches in parallel
-	const detectionPromise = fetch(`${BASE_API_URL}/incidents/detection_breakdown/`)
+	const detectionPromise = authFetch(`${BASE_API_URL}/incidents/detection_breakdown/`)
 		.then((res) => res.json())
 		.catch((error) => {
 			console.error('Failed to fetch incident detection breakdown:', error);
 			return { results: [] };
 		});
 
-	const monthlyPromise = fetch(`${BASE_API_URL}/incidents/monthly_metrics/`)
+	const monthlyPromise = authFetch(`${BASE_API_URL}/incidents/monthly_metrics/`)
 		.then((res) => res.json())
 		.catch((error) => {
 			console.error('Failed to fetch monthly incident metrics:', error);
 			return { results: { months: [], monthly_counts: [], cumulative_counts: [] } };
 		});
 
-	const summaryPromise = fetch(`${BASE_API_URL}/incidents/summary_stats/`)
+	const summaryPromise = authFetch(`${BASE_API_URL}/incidents/summary_stats/`)
 		.then((res) => res.json())
 		.catch((error) => {
 			console.error('Failed to fetch incident summary stats:', error);
 			return { results: { total_incidents: 0, incidents_this_month: 0, open_incidents: 0 } };
 		});
 
-	const severityPromise = fetch(`${BASE_API_URL}/incidents/severity_breakdown/`)
+	const severityPromise = authFetch(`${BASE_API_URL}/incidents/severity_breakdown/`)
 		.then((res) => res.json())
 		.catch((error) => {
 			console.error('Failed to fetch incident severity breakdown:', error);
 			return { results: [] };
 		});
 
-	const qualificationsPromise = fetch(`${BASE_API_URL}/incidents/qualifications_breakdown/`)
+	const qualificationsPromise = authFetch(`${BASE_API_URL}/incidents/qualifications_breakdown/`)
 		.then((res) => res.json())
 		.catch((error) => {
 			console.error('Failed to fetch incident qualifications breakdown:', error);
 			return { results: { labels: [], values: [] } };
 		});
 
-	const exceptionSankeyPromise = fetch(`${BASE_API_URL}/security-exceptions/sankey_data/`)
+	const exceptionSankeyPromise = authFetch(`${BASE_API_URL}/security-exceptions/sankey_data/`)
 		.then((res) => res.json())
 		.catch((error) => {
 			console.error('Failed to fetch security exception Sankey data:', error);
 			return { results: { nodes: [], links: [] } };
 		});
 
-	const sunburstPromise = fetch(`${BASE_API_URL}/applied-controls/sunburst_data/`)
+	const sunburstPromise = authFetch(`${BASE_API_URL}/applied-controls/sunburst_data/`)
 		.then((res) => res.json())
 		.catch((error) => {
 			console.error('Failed to fetch applied controls sunburst data:', error);
 			return { results: [] };
 		});
 
-	const findingsSankeyPromise = fetch(`${BASE_API_URL}/findings/sankey_data/`)
+	const findingsSankeyPromise = authFetch(`${BASE_API_URL}/findings/sankey_data/`)
 		.then((res) => res.json())
 		.catch((error) => {
 			console.error('Failed to fetch findings Sankey data:', error);

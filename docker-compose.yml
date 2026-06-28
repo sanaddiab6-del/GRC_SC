@@ -108,6 +108,8 @@ services:
       - ./caddy_data:/data
     command: |
       sh -c 'echo $$CISO_ASSISTANT_URL "{
+      @en path_regexp en ^/en(/.*)?$$
+      redir @en {re.en.1} 302
       reverse_proxy /api/* backend:8000
       reverse_proxy /* frontend:3000
       tls internal
