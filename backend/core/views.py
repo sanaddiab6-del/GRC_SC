@@ -3,7 +3,6 @@ from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Alignment
 import copy
-from functools import lru_cache
 import csv
 import json
 import mimetypes
@@ -167,13 +166,6 @@ from global_settings.utils import ff_is_enabled
 import structlog
 
 logger = structlog.get_logger(__name__)
-
-
-@lru_cache(maxsize=None)
-def _get_permission_cached(codename: str):
-    """Cached Permission lookup — permissions are static after migrations run."""
-    return Permission.objects.get(codename=codename)
-
 
 SHORT_CACHE_TTL = 2  # mn
 MED_CACHE_TTL = 5  # mn
@@ -656,21 +648,15 @@ class BaseModelViewSet(viewsets.ModelViewSet):
 
     serializers_module = "core.serializers"
 
-    _filterset_cache: dict = {}
-
     @property
     def filterset_class(self):
         # If you have defined filterset_fields, build the FilterSet on the fly.
-        # Cache the result per (model, fields) pair — the class is static once built.
         if self.filterset_fields:
-            cache_key = (self.model, tuple(sorted(self.filterset_fields)))
-            if cache_key not in BaseModelViewSet._filterset_cache:
-                BaseModelViewSet._filterset_cache[cache_key] = filterset_factory(
-                    model=self.model,
-                    filterset=GenericFilterSet,
-                    fields=self.filterset_fields,
-                )
-            return BaseModelViewSet._filterset_cache[cache_key]
+            return filterset_factory(
+                model=self.model,
+                filterset=GenericFilterSet,
+                fields=self.filterset_fields,
+            )
         return None
 
     def get_queryset(self) -> models.query.QuerySet:
@@ -947,44 +933,43 @@ class BaseModelViewSet(viewsets.ModelViewSet):
 
     def create(self, request: Request, *args, **kwargs) -> Response:
         self._process_request_data(request)
-        with transaction.atomic():
-            if request.data.get("filtering_labels"):
-                request.data["filtering_labels"] = self._process_labels(
-                    request.data["filtering_labels"]
-                )
-            # Experimental: process evidences on TaskTemplate creation
-            if request.data.get("evidences") and self.model == TaskTemplate:
-                folder = Folder.objects.get(id=request.data.get("folder"))
-                request.data["evidences"] = self._process_evidences(
-                    request.data.get("evidences"), folder=folder
-                )
-            return super().create(request, *args, **kwargs)
+        if request.data.get("filtering_labels"):
+            request.data["filtering_labels"] = self._process_labels(
+                request.data["filtering_labels"]
+            )
+        # Experimental: process evidences on TaskTemplate creation
+        if request.data.get("evidences") and self.model == TaskTemplate:
+            folder = Folder.objects.get(id=request.data.get("folder"))
+            request.data["evidences"] = self._process_evidences(
+                request.data.get("evidences"), folder=folder
+            )
+        return super().create(request, *args, **kwargs)
 
     def update(self, request: Request, *args, **kwargs) -> Response:
         # Experimental: process evidences on TaskTemplate update
-        with transaction.atomic():
-            if request.data.get("evidences") and self.model == TaskTemplate:
-                folder = Folder.objects.get(id=request.data.get("folder"))
-                request.data["evidences"] = self._process_evidences(
-                    request.data["evidences"], folder=folder
-                )
 
-            # NOTE: Handle filtering_labels field - SvelteKit SuperForms behavior inconsistency:
-            # Forms with file inputs (like Evidence attachments) use dataType="form" and omit empty fields
-            # Forms without file inputs use dataType="json" and send empty arrays []
-            # When the field is missing, we need to explicitly clear the labels by passing empty list to serializer
-            if hasattr(self.model, "_meta") and "filtering_labels" in [
-                f.name for f in self.model._meta.get_fields()
-            ]:
-                if "filtering_labels" in request.data:
-                    labels = request.data.get("filtering_labels")
-                    if labels:
-                        # Make request.data mutable if needed (e.g., for multipart/form-data)
-                        if hasattr(request.data, "_mutable"):
-                            request.data._mutable = True
-                        request.data["filtering_labels"] = self._process_labels(labels)
+        if request.data.get("evidences") and self.model == TaskTemplate:
+            folder = Folder.objects.get(id=request.data.get("folder"))
+            request.data["evidences"] = self._process_evidences(
+                request.data["evidences"], folder=folder
+            )
 
-            return super().update(request, *args, **kwargs)
+        # NOTE: Handle filtering_labels field - SvelteKit SuperForms behavior inconsistency:
+        # Forms with file inputs (like Evidence attachments) use dataType="form" and omit empty fields
+        # Forms without file inputs use dataType="json" and send empty arrays []
+        # When the field is missing, we need to explicitly clear the labels by passing empty list to serializer
+        if hasattr(self.model, "_meta") and "filtering_labels" in [
+            f.name for f in self.model._meta.get_fields()
+        ]:
+            if "filtering_labels" in request.data:
+                labels = request.data.get("filtering_labels")
+                if labels:
+                    # Make request.data mutable if needed (e.g., for multipart/form-data)
+                    if hasattr(request.data, "_mutable"):
+                        request.data._mutable = True
+                    request.data["filtering_labels"] = self._process_labels(labels)
+
+        return super().update(request, *args, **kwargs)
 
     def partial_update(self, request: Request, *args, **kwargs) -> Response:
         self._process_request_data(request)
@@ -1039,7 +1024,7 @@ class BaseModelViewSet(viewsets.ModelViewSet):
             if action_type == "delete"
             else f"change_{self.model._meta.model_name}"
         )
-        required_perm = _get_permission_cached(perm_codename)
+        required_perm = Permission.objects.get(codename=perm_codename)
 
         # Resolve the write serializer once for all update operations
         if action_type != "delete":
@@ -2493,7 +2478,7 @@ class RiskMatrixViewSet(BaseModelViewSet):
         """Check that the user has change_riskmatrix permission on the matrix's folder."""
         if not RoleAssignment.is_access_allowed(
             user=request.user,
-            perm=_get_permission_cached("change_riskmatrix"),
+            perm=Permission.objects.get(codename="change_riskmatrix"),
             folder=matrix.folder,
         ):
             raise PermissionDenied({"error": "Permission denied."})
@@ -2647,7 +2632,7 @@ class RiskMatrixViewSet(BaseModelViewSet):
 
         if not RoleAssignment.is_access_allowed(
             user=request.user,
-            perm=_get_permission_cached("add_riskmatrix"),
+            perm=Permission.objects.get(codename="add_riskmatrix"),
             folder=folder,
         ):
             return Response(
@@ -2680,7 +2665,7 @@ class RiskMatrixViewSet(BaseModelViewSet):
 
         if not RoleAssignment.is_access_allowed(
             user=request.user,
-            perm=_get_permission_cached("add_riskmatrix"),
+            perm=Permission.objects.get(codename="add_riskmatrix"),
             folder=source.folder,
         ):
             return Response(
@@ -2846,7 +2831,7 @@ class RiskMatrixViewSet(BaseModelViewSet):
 
         if not RoleAssignment.is_access_allowed(
             user=request.user,
-            perm=_get_permission_cached("add_riskmatrix"),
+            perm=Permission.objects.get(codename="add_riskmatrix"),
             folder=folder,
         ):
             return Response(
@@ -4097,7 +4082,7 @@ class RiskAssessmentViewSet(BaseModelViewSet):
 
         if not RoleAssignment.is_access_allowed(
             user=request.user,
-            perm=_get_permission_cached("change_riskassessment"),
+            perm=Permission.objects.get(codename="change_riskassessment"),
             folder=Folder.get_folder(risk_assessment),
         ):
             return Response(status=status.HTTP_403_FORBIDDEN)
@@ -4136,7 +4121,7 @@ class RiskAssessmentViewSet(BaseModelViewSet):
         # Check permissions
         if not RoleAssignment.is_access_allowed(
             user=request.user,
-            perm=_get_permission_cached("add_quantitativeriskstudy"),
+            perm=Permission.objects.get(codename="add_quantitativeriskstudy"),
             folder=risk_assessment.folder,
         ):
             return Response(
@@ -5660,7 +5645,7 @@ class UserRolesOnFolderList(generics.ListAPIView):
     def list(self, request, *args, **kwargs):
         if not RoleAssignment.is_access_allowed(
             user=self.request.user,
-            perm=_get_permission_cached("change_folder"),
+            perm=Permission.objects.get(codename="change_folder"),
             folder=get_object_or_404(Folder, id=self.kwargs["pk"]),
         ):
             raise PermissionDenied()
@@ -6181,7 +6166,7 @@ class RiskScenarioViewSet(ExportMixin, BaseModelViewSet):
 
         if not RoleAssignment.is_access_allowed(
             user=request.user,
-            perm=_get_permission_cached("change_riskscenario"),
+            perm=Permission.objects.get(codename="change_riskscenario"),
             folder=Folder.get_folder(risk_scenario),
         ):
             return Response(status=status.HTTP_403_FORBIDDEN)
@@ -6335,7 +6320,7 @@ class RiskAcceptanceViewSet(BaseModelViewSet):
             for scenario in risk_acceptance.get("risk_scenarios"):
                 if not RoleAssignment.is_access_allowed(
                     risk_acceptance.get("approver"),
-                    _get_permission_cached("approve_riskacceptance"),
+                    Permission.objects.get(codename="approve_riskacceptance"),
                     scenario.risk_assessment.perimeter.folder,
                 ):
                     raise ValidationError(
@@ -6573,6 +6558,267 @@ class ValidationFlowViewSet(BaseModelViewSet):
             return Response(
                 {"error": "Error in default_ref_id has occurred."}, status=400
             )
+
+
+class WorkflowCaseViewSet(BaseModelViewSet):
+    model = WorkflowCase
+    filterset_fields = [
+        "folder",
+        "workflow_type",
+        "classification",
+        "status",
+        "treatment_decision",
+        "severity",
+        "owners",
+        "reviewers",
+        "affected_assets",
+        "requirement_assessments",
+        "findings",
+        "findings_assessments",
+        "risk_scenarios",
+        "incidents",
+        "applied_controls",
+        "task_templates",
+        "evidences",
+        "validation_flows",
+    ]
+    search_fields = ["ref_id", "name", "description", "domain"]
+
+    def get_queryset(self):
+        return (
+            super()
+            .get_queryset()
+            .select_related("folder", "residual_risk_reassessed_by")
+            .prefetch_related(
+                "owners",
+                "reviewers",
+                "affected_assets",
+                "requirement_assessments",
+                "findings",
+                "findings_assessments",
+                "risk_scenarios",
+                "incidents",
+                "applied_controls",
+                "task_templates",
+                "evidences",
+                "validation_flows",
+                "security_exceptions",
+                Prefetch(
+                    "approval_steps",
+                    queryset=WorkflowCaseApprovalStep.objects.select_related("approver"),
+                ),
+                Prefetch(
+                    "events",
+                    queryset=WorkflowCaseEvent.objects.select_related("event_actor"),
+                ),
+            )
+        )
+
+    @method_decorator(cache_page(60 * LONG_CACHE_TTL))
+    @action(detail=False, name="Get workflow type choices")
+    def workflow_type(self, request):
+        return Response(dict(WorkflowCase.WorkflowType.choices))
+
+    @method_decorator(cache_page(60 * LONG_CACHE_TTL))
+    @action(detail=False, name="Get classification choices")
+    def classification(self, request):
+        return Response(dict(WorkflowCase.Classification.choices))
+
+    @method_decorator(cache_page(60 * LONG_CACHE_TTL))
+    @action(detail=False, name="Get treatment decisions")
+    def treatment_decision(self, request):
+        return Response(dict(WorkflowCase.TreatmentDecision.choices))
+
+    @action(detail=True, methods=["get"], name="Get closure readiness")
+    def closure_readiness(self, request, pk=None):
+        workflow_case = self.get_object()
+        can_close, missing = workflow_case.can_close()
+        return Response(
+            {
+                "can_close": can_close,
+                "missing": missing,
+                "approval_state": workflow_case.approval_state,
+                "remediation_completion": workflow_case.remediation_completion,
+            }
+        )
+
+    @action(detail=True, methods=["post"], name="Submit for review")
+    def submit_for_review(self, request, pk=None):
+        workflow_case = self.get_object()
+        if not workflow_case.approval_steps.exists() and workflow_case.require_approval_for_closure:
+            return Response(
+                {"error": "Approval steps are required before review submission."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        workflow_case.status = WorkflowCase.Status.IN_REVIEW
+        workflow_case.save(update_fields=["status", "closed_at"])
+        WorkflowCaseEvent.objects.create(
+            workflow_case=workflow_case,
+            event_type="submitted_for_review",
+            event_actor=request.user,
+            folder=workflow_case.folder,
+        )
+        return Response(WorkflowCaseReadSerializer(workflow_case).data)
+
+    @action(detail=True, methods=["post"], name="Mark residual risk reassessed")
+    def reassess_residual_risk(self, request, pk=None):
+        workflow_case = self.get_object()
+        workflow_case.residual_risk_summary = request.data.get("summary", "")
+        workflow_case.residual_risk_reassessed_at = timezone.now()
+        workflow_case.residual_risk_reassessed_by = request.user
+        workflow_case.save(
+            update_fields=[
+                "residual_risk_summary",
+                "residual_risk_reassessed_at",
+                "residual_risk_reassessed_by",
+            ]
+        )
+        WorkflowCaseEvent.objects.create(
+            workflow_case=workflow_case,
+            event_type="residual_risk_reassessed",
+            event_actor=request.user,
+            event_notes=workflow_case.residual_risk_summary,
+            folder=workflow_case.folder,
+        )
+        return Response(WorkflowCaseReadSerializer(workflow_case).data)
+
+    @action(detail=True, methods=["get"], name="Get workflow traceability")
+    def traceability(self, request, pk=None):
+        workflow_case = self.get_object()
+        return Response(
+            {
+                "workflow_case": WorkflowCaseReadSerializer(workflow_case).data,
+                "requirements": RequirementAssessmentReadSerializer(
+                    workflow_case.requirement_assessments.all(), many=True
+                ).data,
+                "findings": FindingReadSerializer(
+                    workflow_case.findings.all(), many=True
+                ).data,
+                "applied_controls": AppliedControlReadSerializer(
+                    workflow_case.applied_controls.all(), many=True
+                ).data,
+                "tasks": TaskTemplateReadSerializer(
+                    workflow_case.task_templates.all(), many=True
+                ).data,
+                "evidences": EvidenceReadSerializer(
+                    workflow_case.evidences.all(), many=True
+                ).data,
+                "risk_scenarios": RiskScenarioReadSerializer(
+                    workflow_case.risk_scenarios.all(), many=True
+                ).data,
+                "validation_flows": ValidationFlowReadSerializer(
+                    workflow_case.validation_flows.all(), many=True
+                ).data,
+            }
+        )
+
+    @action(detail=True, methods=["get"], name="Get case action plan")
+    def action_plan(self, request, pk=None):
+        workflow_case = self.get_object()
+        return Response(
+            {
+                "applied_controls": AppliedControlReadSerializer(
+                    workflow_case.applied_controls.all(), many=True
+                ).data,
+                "task_templates": TaskTemplateReadSerializer(
+                    workflow_case.task_templates.all(), many=True
+                ).data,
+                "remediation_completion": workflow_case.remediation_completion,
+            }
+        )
+
+
+class WorkflowCaseApprovalStepViewSet(BaseModelViewSet):
+    model = WorkflowCaseApprovalStep
+    filterset_fields = ["workflow_case", "approver", "status", "folder"]
+    search_fields = ["notes"]
+
+    def get_queryset(self):
+        return (
+            super()
+            .get_queryset()
+            .select_related("folder", "workflow_case", "approver")
+        )
+
+    def _ensure_can_act(self, step: WorkflowCaseApprovalStep, user: User) -> Response | None:
+        if step.approver != user:
+            return Response(
+                {"error": "Only the assigned approver can act on this approval step."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        previous_unapproved = step.workflow_case.approval_steps.filter(
+            sequence__lt=step.sequence,
+            is_required=True,
+        ).exclude(status=WorkflowCaseApprovalStep.Status.APPROVED)
+        if previous_unapproved.exists():
+            return Response(
+                {"error": "Previous approval steps must be completed first."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return None
+
+    def _record_case_event(self, step: WorkflowCaseApprovalStep, actor: User, action_name: str, notes: str | None = None):
+        WorkflowCaseEvent.objects.create(
+            workflow_case=step.workflow_case,
+            event_type=f"approval_{action_name}",
+            event_actor=actor,
+            event_notes=notes,
+            folder=step.workflow_case.folder,
+        )
+
+    @action(detail=True, methods=["post"], name="Approve step")
+    def approve(self, request, pk=None):
+        step = self.get_object()
+        denial = self._ensure_can_act(step, request.user)
+        if denial:
+            return denial
+        step.status = WorkflowCaseApprovalStep.Status.APPROVED
+        step.notes = request.data.get("notes")
+        step.save(update_fields=["status", "notes", "acted_at", "folder"])
+        if step.workflow_case.approval_state == "approved":
+            self._record_case_event(step, request.user, "completed", step.notes)
+        else:
+            self._record_case_event(step, request.user, "approved", step.notes)
+        return Response(WorkflowCaseApprovalStepReadSerializer(step).data)
+
+    @action(detail=True, methods=["post"], name="Reject step")
+    def reject(self, request, pk=None):
+        step = self.get_object()
+        denial = self._ensure_can_act(step, request.user)
+        if denial:
+            return denial
+        step.status = WorkflowCaseApprovalStep.Status.REJECTED
+        step.notes = request.data.get("notes")
+        step.save(update_fields=["status", "notes", "acted_at", "folder"])
+        step.workflow_case.status = WorkflowCase.Status.IN_PROGRESS
+        step.workflow_case.save(update_fields=["status", "closed_at"])
+        self._record_case_event(step, request.user, "rejected", step.notes)
+        return Response(WorkflowCaseApprovalStepReadSerializer(step).data)
+
+    @action(detail=True, methods=["post"], name="Request changes")
+    def request_changes(self, request, pk=None):
+        step = self.get_object()
+        denial = self._ensure_can_act(step, request.user)
+        if denial:
+            return denial
+        step.status = WorkflowCaseApprovalStep.Status.CHANGES_REQUESTED
+        step.notes = request.data.get("notes")
+        step.save(update_fields=["status", "notes", "acted_at", "folder"])
+        step.workflow_case.status = WorkflowCase.Status.IN_PROGRESS
+        step.workflow_case.save(update_fields=["status", "closed_at"])
+        self._record_case_event(step, request.user, "changes_requested", step.notes)
+        return Response(WorkflowCaseApprovalStepReadSerializer(step).data)
+
+
+class WorkflowCaseEventViewSet(BaseModelViewSet):
+    model = WorkflowCaseEvent
+    filterset_fields = ["workflow_case", "event_type", "folder"]
+    search_fields = ["event_type", "event_notes"]
+
+    def get_queryset(self):
+        return super().get_queryset().select_related(
+            "folder", "workflow_case", "event_actor"
+        )
 
 
 class ActorViewSet(BaseModelViewSet):
@@ -7092,7 +7338,7 @@ class FolderViewSet(BaseModelViewSet):
         for model in objects.keys():
             if not RoleAssignment.is_access_allowed(
                 user=request.user,
-                perm=_get_permission_cached(f"view_{model}"),
+                perm=Permission.objects.get(codename=f"view_{model}"),
                 folder=instance,
             ):
                 logger.error(
@@ -7192,7 +7438,7 @@ class FolderViewSet(BaseModelViewSet):
         try:
             if not RoleAssignment.is_access_allowed(
                 user=request.user,
-                perm=_get_permission_cached("add_folder"),
+                perm=Permission.objects.get(codename="add_folder"),
                 folder=Folder.get_root_folder(),
             ):
                 raise PermissionDenied()
@@ -8421,19 +8667,7 @@ class FrameworkViewSet(BaseModelViewSet):
     search_fields = ["name", "description"]
 
     def get_queryset(self):
-        qs = super().get_queryset().prefetch_related("requirement_nodes")
-
-        # Annotate if the framework is dynamic (any question choice uses implementation groups)
-        qs = qs.annotate(
-            is_dynamic=Exists(
-                RequirementNode.objects.filter(
-                    framework=OuterRef("pk"),
-                    questions__icontains="select_implementation_groups",
-                )
-            )
-        )
-
-        return qs
+        return super().get_queryset()
 
     @method_decorator(cache_page(60 * LONG_CACHE_TTL))
     @method_decorator(vary_on_cookie)
@@ -9050,7 +9284,7 @@ class PresetJourneyViewSet(BaseModelViewSet):
 
         apply_feature_flags = RoleAssignment.is_access_allowed(
             user=request.user,
-            perm=_get_permission_cached("change_globalsettings"),
+            perm=Permission.objects.get(codename="change_globalsettings"),
             folder=Folder.get_root_folder(),
         )
 
@@ -10795,7 +11029,7 @@ class ComplianceAssessmentViewSet(BaseModelViewSet):
             dry_run = True
         if not RoleAssignment.is_access_allowed(
             user=request.user,
-            perm=_get_permission_cached("add_appliedcontrol"),
+            perm=Permission.objects.get(codename="add_appliedcontrol"),
             folder=compliance_assessment.folder,
         ):
             return Response(status=status.HTTP_403_FORBIDDEN)
@@ -10825,7 +11059,7 @@ class ComplianceAssessmentViewSet(BaseModelViewSet):
 
         if not RoleAssignment.is_access_allowed(
             user=request.user,
-            perm=_get_permission_cached("change_requirementassessment"),
+            perm=Permission.objects.get(codename="change_requirementassessment"),
             folder=compliance_assessment.folder,
         ):
             return Response(status=status.HTTP_403_FORBIDDEN)
@@ -11485,6 +11719,64 @@ class ComplianceAssessmentViewSet(BaseModelViewSet):
         analytics_data = get_compliance_analytics(request.user, folder_id)
         return Response(analytics_data, status=status.HTTP_200_OK)
 
+    @action(detail=True, name="Export Statement of Applicability as PDF")
+    def soa_export_pdf(self, request, pk):
+        """
+        ISO 27001:2022 §6.1.3 — Export Statement of Applicability as a PDF.
+        Requires a SoA to exist for this assessment (run generate_soa first).
+        Language is determined by the user's preference.
+        """
+        from core.models import StatementOfApplicability
+
+        (object_ids_view, _, _) = RoleAssignment.get_accessible_object_ids(
+            Folder.get_root_folder(), request.user, ComplianceAssessment
+        )
+        if UUID(pk) not in object_ids_view:
+            return Response(
+                {"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN
+            )
+
+        ca = self.get_object()
+        try:
+            soa = ca.statement_of_applicability
+        except StatementOfApplicability.DoesNotExist:
+            return Response(
+                {
+                    "error": (
+                        "No Statement of Applicability found for this assessment. "
+                        "Run the generate_soa management command first."
+                    )
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        entries = soa.entries.select_related(
+            "requirement_assessment__requirement",
+            "requirement_assessment__compliance_assessment",
+            "owner",
+        ).order_by("requirement_assessment__requirement__order_id")
+
+        lang = (
+            request.user.preferences.get("lang", "en")
+            if hasattr(request.user, "preferences")
+            else get_language() or "en"
+        )
+        lang = lang.split("-")[0]
+        template_name = (
+            "core/soa_export_ar.html" if lang == "ar" else "core/soa_export_en.html"
+        )
+
+        data = {
+            "soa": soa,
+            "entries": entries,
+            "compliance_assessment": ca,
+        }
+        html = render_to_string(template_name, data)
+        pdf_file = HTML(string=html).write_pdf()
+        response = HttpResponse(pdf_file, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="soa_{pk}.pdf"'
+        return response
+
 
 class RequirementAssessmentViewSet(BaseModelViewSet):
     """
@@ -11639,7 +11931,7 @@ class RequirementAssessmentViewSet(BaseModelViewSet):
         }
         if not RoleAssignment.is_access_allowed(
             user=request.user,
-            perm=_get_permission_cached("add_appliedcontrol"),
+            perm=Permission.objects.get(codename="add_appliedcontrol"),
             folder=requirement_assessment.folder,
         ):
             return Response(status=status.HTTP_403_FORBIDDEN)
@@ -14833,6 +15125,7 @@ SEARCHABLE_MODELS = [
     _search_entry(Incident, "incidents", ref_id=True),
     _search_entry(Finding, "findings", ref_id=True),
     _search_entry(SecurityException, "security-exceptions", ref_id=True),
+    _search_entry(WorkflowCase, "workflow-cases", ref_id=True),
     _search_entry(TaskTemplate, "task-templates", ref_id=True, limit=100),
     _search_entry(Evidence, "evidences"),
     # --- Governance ---

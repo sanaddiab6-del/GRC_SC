@@ -8799,6 +8799,100 @@ class PresetJourneyStep(AbstractBaseModel):
         return f"{self.journey.name} - {self.title}"
 
 
+########################### Statement of Applicability (ISO 27001:2022 §6.1.3) #########################
+
+
+class StatementOfApplicability(NameDescriptionMixin, FolderMixin):
+    """
+    ISO 27001:2022 Clause 6.1.3 Statement of Applicability.
+    One SoA per ComplianceAssessment, generated from RequirementAssessments.
+    """
+
+    class Status(models.TextChoices):
+        DRAFT = "draft", _("Draft")
+        IN_REVIEW = "in_review", _("In review")
+        APPROVED = "approved", _("Approved")
+
+    compliance_assessment = models.OneToOneField(
+        ComplianceAssessment,
+        on_delete=models.CASCADE,
+        related_name="statement_of_applicability",
+        verbose_name=_("Compliance assessment"),
+    )
+    version = models.CharField(
+        max_length=100, default="1.0", verbose_name=_("Version")
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.DRAFT,
+        verbose_name=_("Status"),
+    )
+    approved_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name=_("Approved by"),
+        related_name="approved_soa",
+    )
+    approval_date = models.DateField(null=True, blank=True, verbose_name=_("Approval date"))
+
+    fields_to_check = ["name", "version"]
+
+    class Meta:
+        verbose_name = _("Statement of Applicability")
+        verbose_name_plural = _("Statements of Applicability")
+
+    def __str__(self):
+        return f"{self.name} v{self.version}"
+
+
+class SoAEntry(AbstractBaseModel, FolderMixin):
+    """A single control row in a Statement of Applicability."""
+
+    class Applicability(models.TextChoices):
+        APPLICABLE = "applicable", _("Applicable")
+        NOT_APPLICABLE = "not_applicable", _("Not applicable")
+
+    statement = models.ForeignKey(
+        StatementOfApplicability,
+        on_delete=models.CASCADE,
+        related_name="entries",
+        verbose_name=_("Statement"),
+    )
+    requirement_assessment = models.ForeignKey(
+        RequirementAssessment,
+        on_delete=models.CASCADE,
+        related_name="soa_entries",
+        verbose_name=_("Requirement assessment"),
+    )
+    applicability = models.CharField(
+        max_length=20,
+        choices=Applicability.choices,
+        default=Applicability.APPLICABLE,
+        verbose_name=_("Applicability"),
+    )
+    justification = models.TextField(blank=True, verbose_name=_("Justification"))
+    owner = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name=_("Owner"),
+        related_name="soa_entries",
+    )
+
+    class Meta:
+        verbose_name = _("SoA Entry")
+        verbose_name_plural = _("SoA Entries")
+        ordering = ["requirement_assessment__requirement__order_id"]
+        unique_together = [["statement", "requirement_assessment"]]
+
+    def __str__(self):
+        return f"{self.statement} - {self.requirement_assessment}"
+
+
 common_exclude = ["created_at", "updated_at"]
 
 auditlog.register(

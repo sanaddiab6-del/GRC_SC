@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+@page {
+    size: A3 landscape;
+    margin: 1cm;
+}
+body {
+    font-family: DejaVu Sans, Arial, sans-serif;
+    font-size: 9px;
+    color: #111;
+}
+h1 {
+    font-size: 16px;
+    margin-bottom: 4px;
+}
+h2 {
+    font-size: 11px;
+    color: #4b5563;
+    margin-top: 0;
+    margin-bottom: 12px;
+}
+.meta {
+    font-size: 8px;
+    color: #6b7280;
+    margin-bottom: 16px;
+}
+.meta span { margin-right: 20px; }
+table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+th {
+    background-color: #1e3a5f;
+    color: #fff;
+    padding: 5px 6px;
+    text-align: left;
+    font-size: 8px;
+    font-weight: bold;
+}
+td {
+    padding: 4px 6px;
+    border-bottom: 1px solid #e5e7eb;
+    vertical-align: top;
+    word-wrap: break-word;
+}
+tr:nth-child(even) td { background-color: #f9fafb; }
+.applicable   { color: #065f46; font-weight: bold; }
+.not-applicable { color: #6b7280; }
+.compliant    { background-color: #d1fae5; }
+.partially    { background-color: #fef9c3; }
+.non-compliant{ background-color: #fee2e2; }
+.not-assessed { background-color: #f3f4f6; }
+.badge {
+    display: inline-block;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 7px;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+.badge-draft    { background:#fef3c7; color:#92400e; }
+.badge-review   { background:#dbeafe; color:#1e40af; }
+.badge-approved { background:#d1fae5; color:#065f46; }
+col.col-ref     { width: 7%; }
+col.col-name    { width: 18%; }
+col.col-desc    { width: 22%; }
+col.col-applic  { width: 7%; }
+col.col-result  { width: 9%; }
+col.col-justify { width: 20%; }
+col.col-controls{ width: 17%; }
+</style>
+</head>
+<body>
+<h1>Statement of Applicability — {{ soa.name }} v{{ soa.version }}</h1>
+<h2>{{ compliance_assessment.name }}{% if compliance_assessment.framework %} · {{ compliance_assessment.framework.name }}{% endif %}</h2>
+<div class="meta">
+    <span><b>Status:</b>
+        {% if soa.status == 'draft' %}<span class="badge badge-draft">Draft</span>
+        {% elif soa.status == 'in_review' %}<span class="badge badge-review">In review</span>
+        {% elif soa.status == 'approved' %}<span class="badge badge-approved">Approved</span>
+        {% endif %}
+    </span>
+    {% if soa.approved_by %}<span><b>Approved by:</b> {{ soa.approved_by }}</span>{% endif %}
+    {% if soa.approval_date %}<span><b>Approval date:</b> {{ soa.approval_date }}</span>{% endif %}
+    <span><b>Generated:</b> {% now "Y-m-d" %}</span>
+</div>
+
+<table>
+<colgroup>
+    <col class="col-ref">
+    <col class="col-name">
+    <col class="col-desc">
+    <col class="col-applic">
+    <col class="col-result">
+    <col class="col-justify">
+    <col class="col-controls">
+</colgroup>
+<thead>
+<tr>
+    <th>Ref</th>
+    <th>Control / Requirement</th>
+    <th>Description</th>
+    <th>Applicable?</th>
+    <th>Result</th>
+    <th>Justification</th>
+    <th>Applied Controls</th>
+</tr>
+</thead>
+<tbody>
+{% for entry in entries %}
+<tr class="{% if entry.requirement_assessment.result == 'compliant' %}compliant{% elif entry.requirement_assessment.result == 'partially_compliant' %}partially{% elif entry.requirement_assessment.result == 'non_compliant' %}non-compliant{% else %}not-assessed{% endif %}">
+    <td>{{ entry.requirement_assessment.requirement.ref_id|default:"—" }}</td>
+    <td>{{ entry.requirement_assessment.requirement.name|default:entry.requirement_assessment.requirement.ref_id|default:"—" }}</td>
+    <td>{{ entry.requirement_assessment.requirement.description|default:""|truncatechars:200 }}</td>
+    <td>
+        {% if entry.applicability == 'applicable' %}
+            <span class="applicable">✓ Yes</span>
+        {% else %}
+            <span class="not-applicable">✗ No</span>
+        {% endif %}
+    </td>
+    <td>{{ entry.requirement_assessment.get_result_display|default:"—" }}</td>
+    <td>{{ entry.justification|default:"" }}</td>
+    <td>{% for ac in entry.requirement_assessment.applied_controls.all %}{{ ac.name }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</td>
+</tr>
+{% empty %}
+<tr><td colspan="7" style="text-align:center;color:#6b7280;padding:20px;">No entries. Run the generate_soa command to populate this statement.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</body>
+</html>
