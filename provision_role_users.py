@@ -26,7 +26,7 @@ ROLE_USERS = {
 ROLE_TO_UG = {
     'BI-RL-ADM': 'BI-UG-ADM',
     'BI-RL-DMA': 'BI-UG-DMA',
-    'BI-RL-ANA': 'BI-UG-ANA',
+    'BI-RL-ANAs': 'BI-UG-ANA',
     'BI-RL-APP': 'BI-UG-APP',
     'BI-RL-AUD': 'BI-UG-AUD',
     'BI-RL-ADE': 'BI-UG-ADE',
