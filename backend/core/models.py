@@ -1932,6 +1932,10 @@ class ReferenceControl(ReferentialObjectMixin, I18nObjectMixin, FilteringLabelMi
 
 
 class RiskMatrix(ReferentialObjectMixin, I18nObjectMixin):
+    editing_draft = models.JSONField(_("editing draft"), blank=True, null=True, default=None)
+    editing_history = models.JSONField(_("editing history"), blank=True, null=True, default=list)
+    editing_version = models.PositiveIntegerField(_("editing version"), default=1)
+
     library = models.ForeignKey(
         LoadedLibrary,
         on_delete=models.CASCADE,

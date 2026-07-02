@@ -46,12 +46,21 @@ const parseResults = async <T>(res: Response, fallback: T): Promise<T> => {
 	return data.results ?? fallback;
 };
 
-export const load: PageServerLoad = async ({ locals, fetch, cookies }) => {
+export const load: PageServerLoad = async ({ locals, fetch, cookies, request }) => {
 	const currentYear = new Date().getFullYear();
-	const token = cookies.get('token');
+	const token =
+		cookies.get('token') ||
+		cookies.get('access_token') ||
+		cookies.get('auth_token') ||
+		cookies.get('knox_token');
+
 	const authFetch: typeof fetch = (input, init = {}) => {
 		const headers = new Headers(init.headers);
 		headers.set('content-type', 'application/json');
+
+		const cookieHeader = request.headers.get('cookie');
+		if (cookieHeader) headers.set('cookie', cookieHeader);
+
 		if (token) headers.set('Authorization', `Token ${token}`);
 
 		return fetch(input, { ...init, headers });

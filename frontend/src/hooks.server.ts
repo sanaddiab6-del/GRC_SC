@@ -121,11 +121,19 @@ export const handleFetch: HandleFetch = async ({ request, fetch, event }) => {
 		request.headers.set('Content-Type', 'application/json');
 		request.headers.set('Accept-Language', currentLang);
 
-		const token = event.cookies.get('token');
+		const cookieHeader = event.request.headers.get('cookie');
+		if (cookieHeader) request.headers.set('cookie', cookieHeader);
+
+		const token =
+			event.cookies.get('token') ||
+			event.cookies.get('access_token') ||
+			event.cookies.get('auth_token') ||
+			event.cookies.get('knox_token');
+
 		const csrfToken = event.cookies.get('csrftoken');
 
 		if (token) {
-			request.headers.append('Authorization', `Token ${token}`);
+			request.headers.set('Authorization', `Token ${token}`);
 		}
 
 		// Inject focus folder ID header from cookie
