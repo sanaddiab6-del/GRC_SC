@@ -28,7 +28,8 @@ from core.excel import ExcelUploadHandler
 from core.helpers import get_sorted_requirement_nodes
 from core.models import StoredLibrary, LoadedLibrary, LibraryUpdater
 from core.sandbox import SandboxTimeoutError, SandboxViolationError
-from core.views import BaseModelViewSet, GenericFilterSet, _get_permission_cached
+from core.views import BaseModelViewSet, GenericFilterSet
+from core.serializers import _get_permission_cached
 from iam.models import RoleAssignment, Folder, Permission
 from library.validators import validate_file_extension
 from .helpers import update_translations
