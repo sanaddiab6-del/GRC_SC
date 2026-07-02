@@ -908,7 +908,7 @@ class LibraryImporter:
             return error_message  # This error check should be done when storing the Library but no after.
         logger.debug("Getting library dependencies")
         error_msg = self.check_and_import_dependencies()
-        logger.debug("Library dependencies resolved"))
+        logger.debug("Library dependencies resolved")
         if error_msg is not None:
             return error_msg
 

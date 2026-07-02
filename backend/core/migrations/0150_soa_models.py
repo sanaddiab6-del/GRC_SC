@@ -10,7 +10,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('core', '0149_soa_statement_of_applicability'),
+        ('core', '0148_workflowcase_workflowcaseapprovalstep_and_more'),
         ('iam', '0024_soa_models'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]

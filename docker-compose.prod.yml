@@ -1,0 +1,120 @@
+services:
+  postgres:
+    container_name: postgres
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      - POSTGRES_DB=ciso-assistant
+      - POSTGRES_USER=ciso-assistantuser
+      - POSTGRES_PASSWORD=cisoassistant2024
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ciso-assistantuser -d ciso-assistant"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    container_name: backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: sanadcom-backend:local
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - ALLOWED_HOSTS=backend,localhost,grc.san-adcom.com,san-adcom.com
+      - CISO_ASSISTANT_URL=https://grc.san-adcom.com
+      - DJANGO_DEBUG=False
+      - AUTH_TOKEN_TTL=7200
+      - POSTGRES_NAME=ciso-assistant
+      - POSTGRES_USER=ciso-assistantuser
+      - POSTGRES_PASSWORD=cisoassistant2024
+      - DB_HOST=postgres
+      - DB_PORT=5432
+    volumes:
+      - ./db:/code/db
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://backend:8000/api/health/ || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 150s
+
+  huey:
+    container_name: huey
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: sanadcom-huey:local
+    depends_on:
+      postgres:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    restart: always
+    environment:
+      - ALLOWED_HOSTS=backend,localhost,grc.san-adcom.com,san-adcom.com
+      - CISO_ASSISTANT_URL=https://grc.san-adcom.com
+      - DJANGO_DEBUG=False
+      - AUTH_TOKEN_TTL=7200
+      - POSTGRES_NAME=ciso-assistant
+      - POSTGRES_USER=ciso-assistantuser
+      - POSTGRES_PASSWORD=cisoassistant2024
+      - DB_HOST=postgres
+      - DB_PORT=5432
+    volumes:
+      - ./db:/code/db
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        poetry run python manage.py run_huey -w 2 --scheduler-interval 60
+
+  frontend:
+    container_name: frontend
+    environment:
+      - PUBLIC_BACKEND_API_URL=http://backend:8000/api
+      - PUBLIC_BACKEND_API_EXPOSED_URL=https://grc.san-adcom.com/api
+      - ORIGIN=https://grc.san-adcom.com
+      - PROTOCOL_HEADER=x-forwarded-proto
+      - HOST_HEADER=x-forwarded-host
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: sanadcom-frontend:local
+    volumes:
+      - ./frontend/static/favicon.svg:/app/build/client/favicon.svg:ro
+      - ./frontend/static/favicon.ico:/app/build/client/favicon.ico:ro
+    restart: always
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  caddy:
+    container_name: caddy
+    image: caddy:2.10.0
+    environment:
+      - CISO_ASSISTANT_URL=https://grc.san-adcom.com
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ./caddy_data:/data
+    command: |
+      sh -c 'echo $$CISO_ASSISTANT_URL "{
+      @en path_regexp en ^/en(/.*)?$$
+      redir @en {re.en.1} 302
+      reverse_proxy /api/* backend:8000
+      reverse_proxy /* frontend:3000
+      }" > Caddyfile && caddy run'
+
+volumes:
+  postgres_data:
