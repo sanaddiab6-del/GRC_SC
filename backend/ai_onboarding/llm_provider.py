@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from .llm_config import (
+    CAPABILITY_APPLIED_CONTROL_SUGGESTION,
     CAPABILITY_ASSET_SUGGESTION,
     CAPABILITY_CASE_INTAKE,
     LOCAL_AI_STYLE_OLLAMA,
@@ -138,11 +139,13 @@ def _build_ollama_prompt(
         "input": user_payload,
         "output_contract": {
             "type": "object",
-            "required_top_level_keys": sorted(json_schema.get("required", [])),
             "must_return_json_only": True,
             "reject_markdown_or_explanations": True,
         },
     }
+
+    if capability != CAPABILITY_APPLIED_CONTROL_SUGGESTION:
+        instruction["output_contract"]["required_top_level_keys"] = sorted(json_schema.get("required", []))
 
     if capability == CAPABILITY_CASE_INTAKE:
         instruction["output_contract"]["step1_compact_skeleton"] = {
@@ -257,6 +260,27 @@ def _build_ollama_prompt(
             "Do not emit create_now or auto_create.",
             "Do not include controls, vulnerabilities, evidence, risk scenarios, or final decisions.",
             "Do not return wrapper keys capability, schema_name, input, output_contract.",
+        ]
+    elif capability == CAPABILITY_APPLIED_CONTROL_SUGGESTION:
+        instruction["output_contract"]["required_top_level_keys"] = ["candidate_applied_controls"]
+        instruction["output_contract"]["step4a_minimal_contract"] = {
+            "candidate_applied_controls": [
+                {
+                    "temporary_id": "CTL-CAND-001",
+                    "proposed_name": "Multi-Factor Authentication for Remote Access",
+                    "proposed_description": "Require MFA for remote access.",
+                    "rationale": "Addresses remote access weakness.",
+                    "related_weaknesses": ["No MFA for remote access"],
+                    "confidence": 0.9,
+                },
+            ]
+        }
+        instruction["output_contract"]["step4a_hard_rules"] = [
+            "Return exactly one JSON object with only candidate_applied_controls.",
+            "Return no more than 4 candidate_applied_controls.",
+            "Each candidate may only use: temporary_id, proposed_name, proposed_description, rationale, related_weaknesses, confidence.",
+            "Use short text. Do not include ids, asset ids, status fields, actions, source_summary, provider_mode, duplicate_candidates, warnings, or blocking_questions.",
+            "Do not include compliance_result, final_result, result, risk_acceptance, risk_decision, audit_closure, close_audit, status, evidence, finding, vulnerability, remediation, risk_scenario, create_now, or auto_create.",
         ]
     else:
         instruction["output_contract"]["json_schema"] = json_schema

@@ -78,7 +78,9 @@ class AiAppliedControlSuggestionService:
                     },
                 )
 
+        _enrich_provider_candidate_draft(draft, normalized, context, resolved_assets)
         _inject_context_summary(draft, normalized, context, resolved_assets)
+        _normalize_provider_candidate_asset_links(draft, resolved_assets)
         _apply_duplicate_detection(draft, request.user, context["folder"])
         _refresh_ambiguous_candidates(draft)
         _refresh_overall_confidence(draft)
@@ -392,6 +394,151 @@ def _inject_context_summary(
     note = "Step 4A remained advisory-only and performed zero database writes."
     if note not in parser_notes:
         parser_notes.append(note)
+
+
+def _enrich_provider_candidate_draft(
+    draft: dict[str, Any],
+    request_data: dict[str, Any],
+    context: dict[str, Any],
+    resolved_assets: list[dict[str, Any]],
+) -> None:
+    _normalize_minimal_candidate_keys(draft)
+    draft.setdefault("draft_type", "AiAppliedControlSuggestionDraft")
+    draft.setdefault("schema_version", SCHEMA_VERSION)
+    draft.setdefault("provider_mode", "configured_local_provider")
+    draft.setdefault("duplicate_candidates", [])
+    draft.setdefault("ambiguous_candidates", [])
+    draft.setdefault("rejected_candidates", [])
+    draft.setdefault("warnings", [])
+    draft.setdefault("blocking_questions", [])
+    draft.setdefault("needs_human_review", True)
+    draft.setdefault(
+        "next_allowed_steps",
+        [
+            "review_control_candidates",
+            "resolve_control_duplicates",
+            "prepare_applied_control_commit_dry_run",
+        ],
+    )
+
+    source_summary = draft.setdefault("source_summary", {})
+    source_summary.setdefault("detected_language", request_data.get("user_locale", DEFAULT_USER_LOCALE))
+    source_summary.setdefault("input_char_count", len(request_data.get("scenario_text", "")))
+    source_summary.setdefault("strict_mode_applied", bool(request_data.get("strict_mode", True)))
+    source_summary.setdefault(
+        "scenario_excerpt",
+        (request_data.get("scenario_text") or request_data.get("scope_summary") or "")[:160],
+    )
+    source_summary.setdefault("provider_mode", draft.get("provider_mode", "configured_local_provider"))
+    source_summary.setdefault("folder_id", context["folder"].id)
+    source_summary.setdefault("perimeter_id", getattr(context.get("perimeter"), "id", None))
+    source_summary.setdefault("compliance_assessment_id", getattr(context.get("compliance_assessment"), "id", None))
+    source_summary.setdefault("risk_assessment_id", getattr(context.get("risk_assessment"), "id", None))
+    source_summary.setdefault("selected_framework_id", getattr(context.get("framework"), "id", None))
+    source_summary.setdefault("asset_count", len(resolved_assets))
+    source_summary.setdefault("parser_notes", [])
+
+    source_ref = _build_default_candidate_source_ref(request_data)
+    safe_actions = [
+        "accept_for_later_commit",
+        "edit_before_commit",
+        "reuse_existing_control",
+        "reject",
+        "mark_as_asset_candidate",
+        "mark_as_evidence_candidate",
+        "mark_as_vulnerability_candidate",
+        "mark_as_risk_scenario_input",
+        "defer",
+    ]
+    for index, candidate in enumerate(draft.get("candidate_applied_controls") or [], start=1):
+        if not isinstance(candidate, dict):
+            continue
+        candidate.setdefault("temporary_id", f"CTL-CAND-{index:03d}")
+        candidate.setdefault("proposed_name", f"Applied Control Candidate {index}")
+        candidate.setdefault("proposed_description", "")
+        candidate.setdefault("proposed_reference_id", None)
+        candidate.setdefault("proposed_control_type", "preventive")
+        candidate.setdefault("proposed_control_category", "technical")
+        candidate.setdefault("proposed_status", "to_do")
+        candidate.setdefault("proposed_implementation_state", "planned")
+        candidate.setdefault("linked_asset_ids", [])
+        candidate.setdefault("linked_asset_temporary_ids", [])
+        candidate.setdefault("related_weaknesses", [])
+        candidate.setdefault("related_framework_requirements", [])
+        candidate.setdefault("source_text_references", [source_ref])
+        candidate.setdefault("rationale", "Suggested from the approved Step 4A scenario.")
+        candidate.setdefault("confidence", 0.75)
+        candidate.setdefault("human_review_status", "pending_review")
+        candidate.setdefault("ambiguity_flags", [])
+        candidate.setdefault("allowed_next_actions", list(safe_actions))
+
+
+def _normalize_minimal_candidate_keys(draft: dict[str, Any]) -> None:
+    allowed_candidate_keys = {
+        "temporary_id",
+        "proposed_name",
+        "proposed_description",
+        "proposed_reference_id",
+        "proposed_control_type",
+        "proposed_control_category",
+        "proposed_status",
+        "proposed_implementation_state",
+        "linked_asset_ids",
+        "linked_asset_temporary_ids",
+        "related_weaknesses",
+        "related_framework_requirements",
+        "source_text_references",
+        "rationale",
+        "confidence",
+        "human_review_status",
+        "ambiguity_flags",
+        "allowed_next_actions",
+    }
+    candidates = draft.get("candidate_applied_controls")
+    if not isinstance(candidates, list):
+        return
+    for candidate in candidates:
+        if isinstance(candidate, dict):
+            for key in list(candidate.keys()):
+                if key not in allowed_candidate_keys:
+                    candidate.pop(key)
+
+
+def _build_default_candidate_source_ref(request_data: dict[str, Any]) -> dict[str, Any]:
+    text = request_data.get("scenario_text") or request_data.get("scope_summary") or ""
+    excerpt = text[:160]
+    return _build_source_ref(text, excerpt, "T1")
+
+
+def _normalize_provider_candidate_asset_links(
+    draft: dict[str, Any],
+    resolved_assets: list[dict[str, Any]],
+) -> None:
+    candidates = draft.get("candidate_applied_controls")
+    if not isinstance(candidates, list):
+        return
+
+    draft["candidate_applied_controls"] = candidates[:4]
+    if not resolved_assets:
+        return
+
+    approved_asset_ids = [str(item["instance"].id) for item in resolved_assets]
+    approved_temporary_ids = [
+        temporary_id
+        for temporary_id in (
+            item["reference"].get("source_temporary_id") or item["reference"].get("temporary_id")
+            for item in resolved_assets
+        )
+        if temporary_id
+    ]
+
+    for candidate in draft["candidate_applied_controls"]:
+        if not isinstance(candidate, dict):
+            continue
+        if not candidate.get("linked_asset_ids"):
+            candidate["linked_asset_ids"] = list(approved_asset_ids)
+        if not candidate.get("linked_asset_temporary_ids"):
+            candidate["linked_asset_temporary_ids"] = list(approved_temporary_ids)
 
 
 def _build_default_source_refs(

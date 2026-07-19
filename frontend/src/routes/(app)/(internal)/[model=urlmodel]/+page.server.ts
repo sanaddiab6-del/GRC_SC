@@ -120,12 +120,15 @@ export const actions: Actions = {
 	aiAssetCommit: async (event) => {
 		return proxyAiOnboardingAction(event, '/ai/onboarding/assets/commit/');
 	},
+	aiAppliedControlSuggest: async (event) => {
+		return proxyAiOnboardingAction(event, '/ai/onboarding/applied-controls/suggest/');
+	},
 	create: async (event) => {
 		const redirectToWrittenObject = Boolean(
 			event.params.model === 'entity-assessments' ||
-				event.params.model === 'quantitative-risk-hypotheses' ||
-				event.params.model === 'quantitative-risk-studies' ||
-				event.params.model === 'quantitative-risk-scenarios'
+			event.params.model === 'quantitative-risk-hypotheses' ||
+			event.params.model === 'quantitative-risk-studies' ||
+			event.params.model === 'quantitative-risk-scenarios'
 		);
 		return defaultWriteFormAction({
 			event,

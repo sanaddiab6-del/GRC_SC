@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Protocol
 
-from .applied_control_suggestion_serializers import SAFE_NEXT_ACTIONS, SCHEMA_VERSION
+from .applied_control_suggestion_serializers import SCHEMA_VERSION
 from .llm_config import (
     CAPABILITY_APPLIED_CONTROL_SUGGESTION,
     resolve_advisory_capability_config,
@@ -55,12 +55,6 @@ def _build_applied_control_suggestion_prompt(request_payload: dict[str, Any]) ->
     payload = {
         "schema_version": SCHEMA_VERSION,
         "request": request_payload,
-        "response_requirements": {
-            "draft_type": "AiAppliedControlSuggestionDraft",
-            "needs_human_review": True,
-            "advisory_only": True,
-            "allowed_next_actions": list(SAFE_NEXT_ACTIONS),
-        },
     }
     return system_prompt, payload
 

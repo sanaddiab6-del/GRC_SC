@@ -569,30 +569,18 @@ def test_step4a_configured_local_provider_path_asset_linking_and_no_write(
 ):
     _configure_local_provider_env(monkeypatch)
     request_payload = _step4a_payload(setup_context)
-    resolved_assets = [
-        {
-            "instance": asset,
-            "reference": {
-                "asset_id": str(asset.id),
-                "name": asset.name,
-                "ref_id": asset.ref_id,
-                "asset_class": None,
-                "type": asset.type,
-            },
-        }
-        for asset in setup_context["assets"]
-    ]
-    fallback_draft = build_applied_control_suggestion_fallback_draft(
-        request_payload,
-        {
-            "folder": setup_context["folder"],
-            "perimeter": setup_context["perimeter"],
-            "compliance_assessment": setup_context["compliance_assessment"],
-            "risk_assessment": setup_context["risk_assessment"],
-            "framework": setup_context["framework"],
-        },
-        resolved_assets,
-    )
+    minimal_draft = {
+        "candidate_applied_controls": [
+            {
+                "temporary_id": "CTL-CAND-001",
+                "proposed_name": "Multi-Factor Authentication for Remote Access",
+                "proposed_description": "Require MFA for remote access.",
+                "rationale": "Addresses remote access weakness.",
+                "related_weaknesses": ["No MFA for remote access"],
+                "confidence": 0.9,
+            }
+        ]
+    }
 
     calls = []
 
@@ -600,7 +588,7 @@ def test_step4a_configured_local_provider_path_asset_linking_and_no_write(
         calls.append({"url": request.full_url, "body": body})
         return {
             "model": body["model"],
-            "response": json.dumps(fallback_draft, default=str),
+            "response": json.dumps(minimal_draft, default=str),
             "done": True,
         }
 
@@ -617,14 +605,19 @@ def test_step4a_configured_local_provider_path_asset_linking_and_no_write(
     assert response.status_code == 200
     body = response.json()
     assert body["provider_mode"] == "configured_local_provider"
+    assert len(body["candidate_applied_controls"]) == 1
 
     allowed_ids = {str(asset.id) for asset in setup_context["assets"]}
     for item in body["candidate_applied_controls"]:
         assert set(str(asset_id) for asset_id in item["linked_asset_ids"]).issubset(allowed_ids)
+        assert item["source_text_references"]
+        assert item["allowed_next_actions"]
 
     assert calls
     assert calls[0]["url"].endswith("/api/generate")
     assert calls[0]["body"]["model"] == "qwen3:4b-instruct"
+    assert "step4a_minimal_contract" in calls[0]["body"]["prompt"]
+    assert "step4a_compact_skeleton" not in calls[0]["body"]["prompt"]
     assert before == after
 
 

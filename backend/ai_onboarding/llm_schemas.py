@@ -46,8 +46,15 @@ FORBIDDEN_KEYS_BY_CAPABILITY = {
         "vulnerability_drafts",
         "risk_scenario_drafts",
         "evidence_drafts",
+        "evidence",
+        "finding",
+        "findings",
+        "vulnerability",
+        "remediation",
+        "risk_scenario",
         "requirement_assessment_updates",
         "result",
+        "status",
     },
 }
 
@@ -260,36 +267,54 @@ def validate_provider_output_schema(
 
     errors: list[str] = []
 
-    required_keys = TOP_LEVEL_REQUIRED_KEYS[capability]
-    missing_keys = sorted(required_keys - set(payload.keys()))
-    if missing_keys:
-        errors.append(
-            "Missing required top-level keys: " + ", ".join(missing_keys)
-        )
-
-    if strict_mode:
-        allowed_keys = ALLOWED_TOP_LEVEL_KEYS[capability]
-        unknown_keys = sorted(set(payload.keys()) - allowed_keys)
-        if unknown_keys:
+    if capability == CAPABILITY_APPLIED_CONTROL_SUGGESTION:
+        candidates = payload.get("candidate_applied_controls")
+        if not isinstance(candidates, list):
+            errors.append("candidate_applied_controls must be an array.")
+        if strict_mode:
+            unknown_keys = sorted(set(payload.keys()) - ALLOWED_TOP_LEVEL_KEYS[capability])
+            if unknown_keys:
+                errors.append(
+                    "Unknown top-level keys are not allowed in strict mode: "
+                    + ", ".join(unknown_keys)
+                )
+        if "draft_type" in payload and payload.get("draft_type") != EXPECTED_DRAFT_TYPE[capability]:
+            errors.append(f"draft_type must be '{EXPECTED_DRAFT_TYPE[capability]}'.")
+        if "schema_version" in payload and payload.get("schema_version") != EXPECTED_SCHEMA_VERSION[capability]:
+            errors.append(f"schema_version must be '{EXPECTED_SCHEMA_VERSION[capability]}'.")
+        if "needs_human_review" in payload and payload.get("needs_human_review") is not True:
+            errors.append("needs_human_review must be true.")
+    else:
+        required_keys = TOP_LEVEL_REQUIRED_KEYS[capability]
+        missing_keys = sorted(required_keys - set(payload.keys()))
+        if missing_keys:
             errors.append(
-                "Unknown top-level keys are not allowed in strict mode: "
-                + ", ".join(unknown_keys)
+                "Missing required top-level keys: " + ", ".join(missing_keys)
             )
 
-    expected_draft_type = EXPECTED_DRAFT_TYPE[capability]
-    if payload.get("draft_type") != expected_draft_type:
-        errors.append(
-            f"draft_type must be '{expected_draft_type}'."
-        )
+        if strict_mode:
+            allowed_keys = ALLOWED_TOP_LEVEL_KEYS[capability]
+            unknown_keys = sorted(set(payload.keys()) - allowed_keys)
+            if unknown_keys:
+                errors.append(
+                    "Unknown top-level keys are not allowed in strict mode: "
+                    + ", ".join(unknown_keys)
+                )
 
-    expected_schema_version = EXPECTED_SCHEMA_VERSION[capability]
-    if payload.get("schema_version") != expected_schema_version:
-        errors.append(
-            f"schema_version must be '{expected_schema_version}'."
-        )
+        expected_draft_type = EXPECTED_DRAFT_TYPE[capability]
+        if payload.get("draft_type") != expected_draft_type:
+            errors.append(
+                f"draft_type must be '{expected_draft_type}'."
+            )
 
-    if payload.get("needs_human_review") is not True:
-        errors.append("needs_human_review must be true.")
+        expected_schema_version = EXPECTED_SCHEMA_VERSION[capability]
+        if payload.get("schema_version") != expected_schema_version:
+            errors.append(
+                f"schema_version must be '{expected_schema_version}'."
+            )
+
+        if payload.get("needs_human_review") is not True:
+            errors.append("needs_human_review must be true.")
 
     forbidden_keys = FORBIDDEN_KEYS_BY_CAPABILITY[capability]
     for key_path in _walk_keys(payload):
