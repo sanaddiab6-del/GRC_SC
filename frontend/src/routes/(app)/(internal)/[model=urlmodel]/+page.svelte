@@ -10,6 +10,7 @@
 	import type { ActionData, PageData } from './$types';
 	import Anchor from '$lib/components/Anchor/Anchor.svelte';
 	import { onMount } from 'svelte';
+	import AiSuggestedAssets from '$lib/components/Assets/AiSuggestedAssets.svelte';
 	import {
 		getModalStore,
 		type ModalComponent,
@@ -110,6 +111,9 @@
 </script>
 
 {#if data?.table}
+	{#if URLModel === 'assets'}
+		<AiSuggestedAssets />
+	{/if}
 	<div class="shadow-lg">
 		{#key URLModel}
 			<ModelTable
@@ -276,7 +280,7 @@
 					{#if URLModel === 'risk-assessments'}
 						{#if key === 'perimeter' && row.meta.ebios_rm_study}
 							<span
-								class="badge inline-block bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-md border border-amber-200 rotate-[-6deg] font-semibold uppercase tracking-wide"
+								class="badge inline-block bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-md border border-amber-200 -rotate-6 font-semibold uppercase tracking-wide"
 								>ebios-rm</span
 							>
 						{/if}
