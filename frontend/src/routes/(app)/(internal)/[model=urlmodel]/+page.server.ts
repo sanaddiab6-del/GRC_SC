@@ -15,6 +15,60 @@ import type { PageServerLoad } from './$types';
 import { setFlash } from 'sveltekit-flash-message/server';
 import { m } from '$paraglide/messages';
 import { safeTranslate } from '$lib/utils/i18n';
+import type { RequestEvent } from '@sveltejs/kit';
+
+async function readAiPayload(event: RequestEvent) {
+	const contentType = event.request.headers.get('content-type')?.toLowerCase() ?? '';
+
+	if (contentType.includes('application/json')) {
+		try {
+			return await event.request.json();
+		} catch {
+			return null;
+		}
+	}
+
+	if (
+		contentType.includes('application/x-www-form-urlencoded') ||
+		contentType.includes('multipart/form-data')
+	) {
+		try {
+			const formData = await event.request.formData();
+			const rawPayload = formData.get('payload');
+			if (typeof rawPayload !== 'string' || !rawPayload.trim()) return null;
+			return JSON.parse(rawPayload);
+		} catch {
+			return null;
+		}
+	}
+
+	return null;
+}
+
+async function readResponseBody(response: Response) {
+	const text = await response.text();
+	if (!text) return null;
+	try {
+		return JSON.parse(text);
+	} catch {
+		return { detail: text };
+	}
+}
+
+async function proxyAiOnboardingAction(event: RequestEvent, endpoint: string) {
+	const payload = await readAiPayload(event);
+	if (!payload) return fail(400, { aiError: { detail: 'Invalid AI request payload.' } });
+
+	const response = await event.fetch(`${BASE_API_URL}${endpoint}`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(payload)
+	});
+	const responseBody = await readResponseBody(response);
+
+	if (!response.ok) return fail(response.status, { aiError: responseBody });
+	return { aiResult: responseBody };
+}
 
 export const load: PageServerLoad = async ({ params, fetch }) => {
 	const schema = z.object({ id: z.string().uuid() });
@@ -60,12 +114,21 @@ export const load: PageServerLoad = async ({ params, fetch }) => {
 };
 
 export const actions: Actions = {
+	aiAssetSuggest: async (event) => {
+		return proxyAiOnboardingAction(event, '/ai/onboarding/assets/suggest/');
+	},
+	aiAssetCommit: async (event) => {
+		return proxyAiOnboardingAction(event, '/ai/onboarding/assets/commit/');
+	},
+	aiAppliedControlSuggest: async (event) => {
+		return proxyAiOnboardingAction(event, '/ai/onboarding/applied-controls/suggest/');
+	},
 	create: async (event) => {
 		const redirectToWrittenObject = Boolean(
 			event.params.model === 'entity-assessments' ||
-				event.params.model === 'quantitative-risk-hypotheses' ||
-				event.params.model === 'quantitative-risk-studies' ||
-				event.params.model === 'quantitative-risk-scenarios'
+			event.params.model === 'quantitative-risk-hypotheses' ||
+			event.params.model === 'quantitative-risk-studies' ||
+			event.params.model === 'quantitative-risk-scenarios'
 		);
 		return defaultWriteFormAction({
 			event,

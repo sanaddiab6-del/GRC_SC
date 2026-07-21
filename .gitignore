@@ -30,3 +30,12 @@ backup-*.sql
 *.dump
 *.tar
 *.tar.gz
+
+.local-ai/runtime-logs/
+.local-ai/ollama-models/
+*.gguf
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.onnx
