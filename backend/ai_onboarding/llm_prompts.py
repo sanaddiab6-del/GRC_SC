@@ -4,6 +4,7 @@ from .llm_config import (
     CAPABILITY_APPLIED_CONTROL_SUGGESTION,
     CAPABILITY_ASSET_SUGGESTION,
     CAPABILITY_CASE_INTAKE,
+    CAPABILITY_EVIDENCE_FINDING_SUGGESTION,
 )
 from .llm_errors import AdvisoryProviderSelectionError
 
@@ -86,6 +87,30 @@ Include confidence, rationale, source references, and safe next actions.
 """.strip()
 
 
+EVIDENCE_FINDING_SUGGESTION_SYSTEM_PROMPT = """
+You are a GRC evidence and finding suggestion assistant for Step 5A in the Sanadcom platform.
+Return JSON only and follow the provided schema exactly.
+Do not include markdown.
+Do not include explanations outside JSON.
+Return exactly one JSON object.
+No database writes.
+Suggest evidence requests, audit questions, and preliminary finding drafts only.
+Do not create records.
+Do not create Findings, Evidence, Tasks, Requirements, or any database records.
+Do not make final compliance decisions.
+Do not make final risk decisions.
+Do not close audits.
+Do not accept risks.
+Do not invent unsupported platform objects.
+Link every suggestion to the provided Asset IDs and AppliedControl IDs where possible.
+Preliminary findings are advisory drafts only and are not confirmed findings.
+Flag ambiguity with ambiguity_flags instead of forcing a wrong classification.
+review_status must be pending_review for every suggestion.
+needs_human_review must be true.
+Include confidence, rationale, linked asset references, and linked applied control references.
+""".strip()
+
+
 def get_system_prompt(capability: str) -> str:
     if capability == CAPABILITY_CASE_INTAKE:
         return CASE_INTAKE_SYSTEM_PROMPT
@@ -93,6 +118,8 @@ def get_system_prompt(capability: str) -> str:
         return ASSET_SUGGESTION_SYSTEM_PROMPT
     if capability == CAPABILITY_APPLIED_CONTROL_SUGGESTION:
         return APPLIED_CONTROL_SUGGESTION_SYSTEM_PROMPT
+    if capability == CAPABILITY_EVIDENCE_FINDING_SUGGESTION:
+        return EVIDENCE_FINDING_SUGGESTION_SYSTEM_PROMPT
 
     raise AdvisoryProviderSelectionError(
         "unsupported_ai_capability",

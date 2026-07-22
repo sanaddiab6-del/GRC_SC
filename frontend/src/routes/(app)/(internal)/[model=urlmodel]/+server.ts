@@ -7,7 +7,9 @@ const aiOnboardingActionEndpoints: Record<string, string> = {
 	aiAssetSuggest: '/ai/onboarding/assets/suggest/',
 	aiAssetCommit: '/ai/onboarding/assets/commit/',
 	aiAppliedControlSuggest: '/ai/onboarding/applied-controls/suggest/',
-	aiAppliedControlCommit: '/ai/onboarding/applied-controls/commit/'
+	aiAppliedControlCommit: '/ai/onboarding/applied-controls/commit/',
+	aiEvidenceFindingSuggest: '/ai/onboarding/evidence-findings/suggest/',
+	aiEvidenceFindingCommit: '/ai/onboarding/evidence-findings/commit/'
 };
 
 function getNamedAction(url: URL) {

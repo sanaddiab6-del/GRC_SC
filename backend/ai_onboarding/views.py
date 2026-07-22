@@ -21,6 +21,13 @@ from .asset_suggestion_guardrails import AssetSuggestionDraftValidationError
 from .asset_suggestion_provider import AssetSuggestionProviderError
 from .asset_suggestion_serializers import AiAssetSuggestionInputSerializer
 from .asset_suggestion_service import build_asset_suggestion_draft
+from .evidence_finding_commit_guardrails import EvidenceFindingCommitValidationError
+from .evidence_finding_commit_serializers import AiEvidenceFindingCommitInputSerializer
+from .evidence_finding_commit_service import execute_evidence_finding_commit
+from .evidence_finding_suggestion_guardrails import EvidenceFindingSuggestionDraftValidationError
+from .evidence_finding_suggestion_provider import EvidenceFindingSuggestionProviderError
+from .evidence_finding_suggestion_serializers import AiEvidenceFindingSuggestionInputSerializer
+from .evidence_finding_suggestion_service import build_evidence_finding_suggestion_draft
 from .case_setup_guardrails import CaseSetupValidationError
 from .case_setup_serializers import AiCaseSetupInputSerializer
 from .case_setup_service import execute_case_setup
@@ -140,6 +147,47 @@ class AiAppliedControlCommitView(APIView):
         try:
             result = execute_applied_control_commit(request, serializer.validated_data)
         except AppliedControlCommitValidationError as exc:
+            return Response(exc.to_response(), status=exc.status_code)
+
+        return Response(result)
+
+
+class AiEvidenceFindingSuggestionView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(request=AiEvidenceFindingSuggestionInputSerializer)
+    def post(self, request, format=None):
+        serializer = AiEvidenceFindingSuggestionInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            with transaction.atomic():
+                draft = build_evidence_finding_suggestion_draft(
+                    request,
+                    serializer.validated_data,
+                    base_dir=str(settings.BASE_DIR.parent),
+                )
+                transaction.set_rollback(True)
+        except (
+            EvidenceFindingSuggestionDraftValidationError,
+            EvidenceFindingSuggestionProviderError,
+        ) as exc:
+            return Response(exc.to_response(), status=exc.status_code)
+
+        return Response(draft)
+
+
+class AiEvidenceFindingCommitView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(request=AiEvidenceFindingCommitInputSerializer)
+    def post(self, request, format=None):
+        serializer = AiEvidenceFindingCommitInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            result = execute_evidence_finding_commit(request, serializer.validated_data)
+        except EvidenceFindingCommitValidationError as exc:
             return Response(exc.to_response(), status=exc.status_code)
 
         return Response(result)

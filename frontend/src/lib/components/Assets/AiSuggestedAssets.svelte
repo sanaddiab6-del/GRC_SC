@@ -32,6 +32,9 @@
 		| 'control-suggest'
 		| 'control-dry-run'
 		| 'control-commit'
+		| 'evidence-suggest'
+		| 'evidence-commit-dry-run'
+		| 'evidence-commit'
 		| null
 	>(null);
 	let error = $state<any>(null);
@@ -48,6 +51,15 @@
 	let appliedControlCommitApproved = $state(false);
 	let appliedControlCommitDryRun = $state<any>(null);
 	let appliedControlCommitResult = $state<any>(null);
+	let appliedControlCommitHash = $state('');
+	let evidenceFindingDraft = $state<any>(null);
+	let evidenceFindingDraftHash = $state('');
+	let selectedEvidenceRequestIds = $state<Record<string, boolean>>({});
+	let selectedAuditQuestionIds = $state<Record<string, boolean>>({});
+	let selectedPreliminaryFindingIds = $state<Record<string, boolean>>({});
+	let evidenceFindingCommitApproved = $state(false);
+	let evidenceFindingCommitDryRun = $state<any>(null);
+	let evidenceFindingCommitResult = $state<any>(null);
 
 	const providerMode = $derived(
 		assetDraft?.provider_mode ?? assetDraft?.source_summary?.provider_mode ?? 'not run'
@@ -55,6 +67,11 @@
 	const appliedControlProviderMode = $derived(
 		appliedControlDraft?.provider_mode ??
 			appliedControlDraft?.source_summary?.provider_mode ??
+			'not run'
+	);
+	const evidenceFindingProviderMode = $derived(
+		evidenceFindingDraft?.provider_mode ??
+			evidenceFindingDraft?.source_summary?.provider_mode ??
 			'not run'
 	);
 	const isConfiguredLocalProvider = $derived(providerMode === 'configured_local_provider');
@@ -328,6 +345,8 @@
 				appliedControlCommitApproved = false;
 				appliedControlCommitDryRun = null;
 				appliedControlCommitResult = null;
+				appliedControlCommitHash = '';
+				evidenceFindingDraft = null;
 			}
 		} catch (caught) {
 			error = caught;
@@ -354,6 +373,8 @@
 			appliedControlCommitApproved = false;
 			appliedControlCommitDryRun = null;
 			appliedControlCommitResult = null;
+			appliedControlCommitHash = '';
+			evidenceFindingDraft = null;
 		} catch (caught) {
 			error = caught;
 		} finally {
@@ -370,7 +391,190 @@
 				buildAppliedControlCommitPayload(dryRun)
 			);
 			if (dryRun) appliedControlCommitDryRun = result;
-			else appliedControlCommitResult = result;
+			else {
+				appliedControlCommitResult = result;
+				appliedControlCommitHash = await sha256Draft(result);
+				evidenceFindingDraft = null;
+			}
+		} catch (caught) {
+			error = caught;
+		} finally {
+			loading = null;
+		}
+	}
+
+	function buildApprovedAppliedControlReferences() {
+		const controls = [
+			...(appliedControlCommitResult?.created_applied_controls ?? []),
+			...(appliedControlCommitResult?.reused_applied_controls ?? [])
+		];
+		return controls
+			.filter((control: any) => control?.applied_control_id)
+			.map((control: any) => ({
+				applied_control_id: control.applied_control_id,
+				name: control.name,
+				ref_id: control.ref_id ?? null,
+				category: control.category ?? null,
+				status: control.status ?? null,
+				source_temporary_id: control.source_temporary_id ?? null
+			}));
+	}
+
+	function buildEvidenceFindingSuggestionPayload() {
+		if (!appliedControlCommitResult || !appliedControlCommitHash) {
+			throw { detail: 'Complete the approved applied control commit (Step 4B) before Step 5A.' };
+		}
+		if (!assetCommitHash) throw { detail: 'Missing source_asset_commit_hash from Step 3B result.' };
+		if (!appliedControlDraftHash) throw { detail: 'Missing source_applied_control_draft_hash from Step 4A.' };
+		const appliedControlReferences = buildApprovedAppliedControlReferences();
+		if (!approvedAssetReferences.length) {
+			throw { detail: 'Step 5A requires at least one created or reused approved asset.' };
+		}
+		if (!appliedControlReferences.length) {
+			throw { detail: 'Step 5A requires at least one committed or reused applied control.' };
+		}
+
+		return {
+			source_step1_draft_hash: sourceStep1DraftHash,
+			source_asset_commit_hash: assetCommitHash,
+			source_applied_control_draft_hash: appliedControlDraftHash,
+			source_applied_control_commit_hash: appliedControlCommitHash,
+			case_setup_reference: cleanSetupReferenceForCommit(),
+			asset_references: approvedAssetReferences,
+			applied_control_references: appliedControlReferences,
+			scenario_text: scenarioText,
+			scope_summary: scopeSummary,
+			known_weaknesses: knownWeaknessList(),
+			selected_framework_id: setupReference.selected_framework_id || null,
+			user_locale: 'en',
+			strict_mode: true
+		};
+	}
+
+	async function runEvidenceFindingSuggestion() {
+		loading = 'evidence-suggest';
+		error = null;
+		try {
+			const draft = await postAiAction(
+				'aiEvidenceFindingSuggest',
+				buildEvidenceFindingSuggestionPayload()
+			);
+			evidenceFindingDraft = draft;
+			evidenceFindingDraftHash = await sha256Draft(draft);
+			selectedEvidenceRequestIds = Object.fromEntries(
+				(draft?.evidence_requests ?? []).map((item: any) => [item.temporary_id, false])
+			);
+			selectedAuditQuestionIds = Object.fromEntries(
+				(draft?.audit_questions ?? []).map((item: any) => [item.temporary_id, false])
+			);
+			selectedPreliminaryFindingIds = Object.fromEntries(
+				(draft?.preliminary_findings ?? []).map((item: any) => [item.temporary_id, false])
+			);
+			evidenceFindingCommitApproved = false;
+			evidenceFindingCommitDryRun = null;
+			evidenceFindingCommitResult = null;
+		} catch (caught) {
+			error = caught;
+		} finally {
+			loading = null;
+		}
+	}
+
+	function buildEvidenceFindingDecisions(
+		items: any[],
+		selection: Record<string, boolean>,
+		kind: string
+	) {
+		return (items ?? [])
+			.filter((item: any) => selection[item.temporary_id])
+			.map((item: any) => ({
+				temporary_id: item.temporary_id,
+				kind,
+				selected: true,
+				action: 'create',
+				human_approved: evidenceFindingCommitApproved,
+				approved_fields: {
+					name: item.title ?? item.question_text ?? null,
+					description: item.description ?? item.summary ?? item.rationale ?? null
+				},
+				original_suggestion_summary: {
+					title: item.title ?? null,
+					question_text: item.question_text ?? null,
+					summary: item.summary ?? null,
+					rationale: item.rationale ?? null,
+					review_status: item.review_status ?? null,
+					confidence: item.confidence,
+					related_weaknesses: item.related_weaknesses ?? [],
+					linked_asset_ids: item.linked_asset_ids ?? [],
+					linked_applied_control_ids: item.linked_applied_control_ids ?? []
+				}
+			}));
+	}
+
+	function selectedEvidenceFindingCount() {
+		const draft = evidenceFindingDraft;
+		if (!draft) return 0;
+		return (
+			buildEvidenceFindingDecisions(draft.evidence_requests, selectedEvidenceRequestIds, 'x').length +
+			buildEvidenceFindingDecisions(draft.audit_questions, selectedAuditQuestionIds, 'x').length +
+			buildEvidenceFindingDecisions(draft.preliminary_findings, selectedPreliminaryFindingIds, 'x')
+				.length
+		);
+	}
+
+	function buildEvidenceFindingCommitPayload(dryRun: boolean) {
+		if (!evidenceFindingDraft || !evidenceFindingDraftHash) {
+			throw { detail: 'Run Step 5A before Step 5B.' };
+		}
+		if (!appliedControlCommitHash) {
+			throw { detail: 'Complete the approved applied control commit (Step 4B) before Step 5B.' };
+		}
+		if (!selectedEvidenceFindingCount()) {
+			throw { detail: 'Select at least one evidence/finding suggestion to commit.' };
+		}
+		if (!dryRun && !evidenceFindingCommitApproved) {
+			throw { detail: 'Approve the deterministic Step 5B write first.' };
+		}
+
+		return {
+			dry_run: dryRun,
+			approved_by_user: !dryRun && evidenceFindingCommitApproved,
+			idempotency_key: dryRun ? null : `frontend-step5b-${Date.now()}`,
+			source_step1_draft_hash: sourceStep1DraftHash,
+			source_asset_commit_hash: assetCommitHash,
+			source_applied_control_commit_hash: appliedControlCommitHash,
+			source_evidence_finding_draft_hash: evidenceFindingDraftHash,
+			case_setup_reference: cleanSetupReferenceForCommit(),
+			asset_references: approvedAssetReferences,
+			applied_control_references: buildApprovedAppliedControlReferences(),
+			evidence_request_decisions: buildEvidenceFindingDecisions(
+				evidenceFindingDraft.evidence_requests,
+				selectedEvidenceRequestIds,
+				'evidence_request'
+			),
+			audit_question_decisions: buildEvidenceFindingDecisions(
+				evidenceFindingDraft.audit_questions,
+				selectedAuditQuestionIds,
+				'audit_question'
+			),
+			preliminary_finding_decisions: buildEvidenceFindingDecisions(
+				evidenceFindingDraft.preliminary_findings,
+				selectedPreliminaryFindingIds,
+				'preliminary_finding'
+			)
+		};
+	}
+
+	async function runEvidenceFindingCommit(dryRun: boolean) {
+		loading = dryRun ? 'evidence-commit-dry-run' : 'evidence-commit';
+		error = null;
+		try {
+			const result = await postAiAction(
+				'aiEvidenceFindingCommit',
+				buildEvidenceFindingCommitPayload(dryRun)
+			);
+			if (dryRun) evidenceFindingCommitDryRun = result;
+			else evidenceFindingCommitResult = result;
 		} catch (caught) {
 			error = caught;
 		} finally {
@@ -851,6 +1055,223 @@
 				</div>
 			{/if}
 
+			{#if appliedControlCommitResult}
+				<div class="mt-4 rounded border border-indigo-200 bg-indigo-50/60 p-3 text-sm text-indigo-950">
+					<div class="font-semibold">Step 5A Evidence / Finding Suggestion</div>
+					<p class="mt-1 text-indigo-900">
+						AI suggestions only. No findings or evidence records are created in Step 5A.
+					</p>
+					<div class="mt-3 flex flex-wrap items-center gap-3">
+						<button
+							class="btn btn-sm preset-filled-primary-500"
+							type="button"
+							disabled={loading !== null || !appliedControlCommitResult}
+							onclick={() => runEvidenceFindingSuggestion()}
+						>
+							{loading === 'evidence-suggest'
+								? 'Running...'
+								: 'Run Local AI Evidence/Finding Suggestion'}
+						</button>
+						<span class="text-xs text-indigo-900">
+							Provider mode: {evidenceFindingProviderMode}
+						</span>
+					</div>
+
+					{#if evidenceFindingDraft}
+						<div class="mt-3 grid gap-2 rounded border bg-white p-3 text-sm">
+							<div class="font-semibold">
+								Overall confidence: {evidenceFindingDraft.overall_confidence ?? 'n/a'}
+							</div>
+							<div>
+								Evidence requests: {evidenceFindingDraft.evidence_requests?.length ?? 0}
+							</div>
+							<div>
+								Audit questions: {evidenceFindingDraft.audit_questions?.length ?? 0}
+							</div>
+							<div>
+								Preliminary findings: {evidenceFindingDraft.preliminary_findings?.length ?? 0}
+							</div>
+							<div>
+								Warnings: {evidenceFindingDraft.warnings?.length ?? 0}
+							</div>
+						</div>
+
+						{#if evidenceFindingDraft.evidence_requests?.length}
+							<div class="mt-3">
+								<div class="font-semibold text-indigo-950">Evidence requests</div>
+								<ul class="mt-1 list-disc pl-5 text-xs text-slate-800">
+									{#each evidenceFindingDraft.evidence_requests as request}
+										<li>{request.title} (confidence: {request.confidence})</li>
+									{/each}
+								</ul>
+							</div>
+						{/if}
+
+						{#if evidenceFindingDraft.audit_questions?.length}
+							<div class="mt-3">
+								<div class="font-semibold text-indigo-950">Audit questions</div>
+								<ul class="mt-1 list-disc pl-5 text-xs text-slate-800">
+									{#each evidenceFindingDraft.audit_questions as question}
+										<li>{question.question_text} (confidence: {question.confidence})</li>
+									{/each}
+								</ul>
+							</div>
+						{/if}
+
+						{#if evidenceFindingDraft.preliminary_findings?.length}
+							<div class="mt-3">
+								<div class="font-semibold text-indigo-950">Preliminary findings</div>
+								<ul class="mt-1 list-disc pl-5 text-xs text-slate-800">
+									{#each evidenceFindingDraft.preliminary_findings as finding}
+										<li>{finding.title} (confidence: {finding.confidence})</li>
+									{/each}
+								</ul>
+							</div>
+						{/if}
+
+						{#if evidenceFindingDraft.warnings?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-amber-800">
+								{#each evidenceFindingDraft.warnings as warning}
+									<li>{warning.message ?? warning.detail ?? warning.code}</li>
+								{/each}
+							</ul>
+						{/if}
+					{/if}
+				</div>
+			{/if}
+
+			{#if evidenceFindingDraft}
+				<div class="mt-4 rounded border border-emerald-300 bg-emerald-50/60 p-3 text-sm text-emerald-950">
+					<div class="font-semibold">Step 5B Evidence / Finding Commit</div>
+					<p class="mt-1 text-emerald-900">
+						AI suggestions only in Step 5A. No findings or evidence records are created in Step 5A.
+						Step 5B is the deterministic write step. No AI model is used in this write step.
+					</p>
+
+					{#if evidenceFindingDraft.evidence_requests?.length}
+						<div class="mt-3">
+							<div class="font-semibold text-emerald-950">Evidence requests</div>
+							{#each evidenceFindingDraft.evidence_requests as request}
+								<label class="flex items-start gap-2 text-xs text-slate-800">
+									<input
+										type="checkbox"
+										bind:checked={selectedEvidenceRequestIds[request.temporary_id]}
+									/>
+									<span>{request.title}</span>
+								</label>
+							{/each}
+						</div>
+					{/if}
+
+					{#if evidenceFindingDraft.audit_questions?.length}
+						<div class="mt-3">
+							<div class="font-semibold text-emerald-950">Audit questions</div>
+							{#each evidenceFindingDraft.audit_questions as question}
+								<label class="flex items-start gap-2 text-xs text-slate-800">
+									<input
+										type="checkbox"
+										bind:checked={selectedAuditQuestionIds[question.temporary_id]}
+									/>
+									<span>{question.question_text}</span>
+								</label>
+							{/each}
+						</div>
+					{/if}
+
+					{#if evidenceFindingDraft.preliminary_findings?.length}
+						<div class="mt-3">
+							<div class="font-semibold text-emerald-950">Preliminary findings</div>
+							{#each evidenceFindingDraft.preliminary_findings as finding}
+								<label class="flex items-start gap-2 text-xs text-slate-800">
+									<input
+										type="checkbox"
+										bind:checked={selectedPreliminaryFindingIds[finding.temporary_id]}
+									/>
+									<span>{finding.title}</span>
+								</label>
+							{/each}
+						</div>
+					{/if}
+
+					<div class="mt-3 flex flex-wrap items-center gap-3">
+						<button
+							class="btn btn-sm preset-tonal-primary"
+							type="button"
+							disabled={loading !== null}
+							onclick={() => runEvidenceFindingCommit(true)}
+						>
+							{loading === 'evidence-commit-dry-run' ? 'Dry-running...' : 'Step 5B dry-run'}
+						</button>
+						<label class="flex items-center gap-2 text-sm">
+							<input type="checkbox" bind:checked={evidenceFindingCommitApproved} />
+							<span>
+								I approve deterministic Step 5B decisions for selected evidence/finding suggestions
+							</span>
+						</label>
+						<button
+							class="btn btn-sm preset-filled-primary-500"
+							type="button"
+							disabled={loading !== null || !evidenceFindingCommitApproved}
+							onclick={() => runEvidenceFindingCommit(false)}
+						>
+							{loading === 'evidence-commit' ? 'Committing...' : 'Approved evidence/finding commit'}
+						</button>
+						<span class="text-xs text-emerald-900">No AI model is used in this write step.</span>
+					</div>
+
+					{#if evidenceFindingCommitDryRun}
+						<div class="mt-3 rounded border bg-white p-3 text-sm">
+							<div class="font-semibold">
+								Dry-run status: {evidenceFindingCommitDryRun.status}
+							</div>
+							<ul class="mt-2 list-disc pl-5 text-xs text-slate-800">
+								{#each evidenceFindingCommitDryRun.planned_actions ?? [] as action}
+									<li>{action.kind} - {action.action} - {action.detail}</li>
+								{/each}
+							</ul>
+							{#if evidenceFindingCommitDryRun.blocking_errors?.length}
+								<ul class="mt-2 list-disc pl-5 text-xs text-red-700">
+									{#each evidenceFindingCommitDryRun.blocking_errors as blockingError}
+										<li>{blockingError.detail}</li>
+									{/each}
+								</ul>
+							{/if}
+						</div>
+					{/if}
+
+					{#if evidenceFindingCommitResult}
+						<div class="mt-3 grid gap-2 rounded border border-emerald-200 bg-white p-3 text-sm">
+							<div class="font-semibold">
+								Commit status: {evidenceFindingCommitResult.status}
+							</div>
+							<div>Created: {evidenceFindingCommitResult.counts?.created ?? 0}</div>
+							<div>Reused: {evidenceFindingCommitResult.counts?.reused ?? 0}</div>
+							<div>Rejected: {evidenceFindingCommitResult.counts?.rejected ?? 0}</div>
+							<div>Deferred: {evidenceFindingCommitResult.counts?.deferred ?? 0}</div>
+							<div>Skipped: {evidenceFindingCommitResult.counts?.skipped ?? 0}</div>
+							<div>Warnings: {evidenceFindingCommitResult.warnings?.length ?? 0}</div>
+							<div>
+								Blocking errors: {evidenceFindingCommitResult.blocking_errors?.length ?? 0}
+							</div>
+						</div>
+						{#if evidenceFindingCommitResult.warnings?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-amber-800">
+								{#each evidenceFindingCommitResult.warnings as warning}
+									<li>{warning.detail ?? warning.message ?? warning.code}</li>
+								{/each}
+							</ul>
+						{/if}
+						{#if evidenceFindingCommitResult.blocking_errors?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-red-700">
+								{#each evidenceFindingCommitResult.blocking_errors as blockingError}
+									<li>{blockingError.detail}</li>
+								{/each}
+							</ul>
+						{/if}
+					{/if}
+				</div>
+			{/if}
+
 			<details class="mt-3">
 				<summary class="cursor-pointer font-semibold">Raw JSON</summary>
 				<pre
@@ -861,7 +1282,10 @@
 							commitResult,
 							appliedControlDraft,
 							appliedControlCommitDryRun,
-							appliedControlCommitResult
+							appliedControlCommitResult,
+							evidenceFindingDraft,
+							evidenceFindingCommitDryRun,
+							evidenceFindingCommitResult
 						},
 						null,
 						2

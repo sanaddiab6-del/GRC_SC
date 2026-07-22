@@ -6,7 +6,9 @@ describe('[model=urlmodel] route POST AI actions', () => {
 		['aiAssetSuggest', '/ai/onboarding/assets/suggest/'],
 		['aiAssetCommit', '/ai/onboarding/assets/commit/'],
 		['aiAppliedControlSuggest', '/ai/onboarding/applied-controls/suggest/'],
-		['aiAppliedControlCommit', '/ai/onboarding/applied-controls/commit/']
+		['aiAppliedControlCommit', '/ai/onboarding/applied-controls/commit/'],
+		['aiEvidenceFindingSuggest', '/ai/onboarding/evidence-findings/suggest/'],
+		['aiEvidenceFindingCommit', '/ai/onboarding/evidence-findings/commit/']
 	])('proxies %s for /assets without returning 405', async (action, expectedEndpoint) => {
 		const backendPayload = { provider_mode: 'configured_local_provider', candidates: [{ id: 1 }] };
 		const fetch = vi.fn().mockResolvedValue(
