@@ -3,10 +3,11 @@ import { getModelInfo } from '$lib/utils/crud';
 import { error, type NumericRange, type RequestEvent } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
-const aiOnboardingAssetEndpoints: Record<string, string> = {
+const aiOnboardingActionEndpoints: Record<string, string> = {
 	aiAssetSuggest: '/ai/onboarding/assets/suggest/',
 	aiAssetCommit: '/ai/onboarding/assets/commit/',
-	aiAppliedControlSuggest: '/ai/onboarding/applied-controls/suggest/'
+	aiAppliedControlSuggest: '/ai/onboarding/applied-controls/suggest/',
+	aiAppliedControlCommit: '/ai/onboarding/applied-controls/commit/'
 };
 
 function getNamedAction(url: URL) {
@@ -108,7 +109,7 @@ export const GET: RequestHandler = async ({ fetch, params, url }) => {
 
 export const POST: RequestHandler = async (event) => {
 	const action = getNamedAction(event.url);
-	const endpoint = action ? aiOnboardingAssetEndpoints[action] : null;
+	const endpoint = action ? aiOnboardingActionEndpoints[action] : null;
 
 	if (event.params.model !== 'assets' || !endpoint) {
 		return new Response(JSON.stringify({ detail: 'POST method not allowed' }), {

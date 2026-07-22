@@ -5,7 +5,8 @@ describe('[model=urlmodel] route POST AI actions', () => {
 	it.each([
 		['aiAssetSuggest', '/ai/onboarding/assets/suggest/'],
 		['aiAssetCommit', '/ai/onboarding/assets/commit/'],
-		['aiAppliedControlSuggest', '/ai/onboarding/applied-controls/suggest/']
+		['aiAppliedControlSuggest', '/ai/onboarding/applied-controls/suggest/'],
+		['aiAppliedControlCommit', '/ai/onboarding/applied-controls/commit/']
 	])('proxies %s for /assets without returning 405', async (action, expectedEndpoint) => {
 		const backendPayload = { provider_mode: 'configured_local_provider', candidates: [{ id: 1 }] };
 		const fetch = vi.fn().mockResolvedValue(
