@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    AiAppliedControlCommitView,
     AiAppliedControlSuggestionView,
     AiAssetCommitView,
     AiAssetSuggestionView,
@@ -18,5 +19,10 @@ urlpatterns = [
         "onboarding/applied-controls/suggest/",
         AiAppliedControlSuggestionView.as_view(),
         name="ai-applied-control-suggestion",
+    ),
+    path(
+        "onboarding/applied-controls/commit/",
+        AiAppliedControlCommitView.as_view(),
+        name="ai-applied-control-commit",
     ),
 ]

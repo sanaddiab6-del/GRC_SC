@@ -7,6 +7,9 @@ from rest_framework import permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .applied_control_commit_guardrails import AppliedControlCommitValidationError
+from .applied_control_commit_serializers import AiAppliedControlCommitInputSerializer
+from .applied_control_commit_service import execute_applied_control_commit
 from .asset_commit_guardrails import AssetCommitValidationError
 from .asset_commit_serializers import AiAssetCommitInputSerializer
 from .asset_commit_service import execute_asset_commit
@@ -124,3 +127,19 @@ class AiAppliedControlSuggestionView(APIView):
             return Response(exc.to_response(), status=exc.status_code)
 
         return Response(draft)
+
+
+class AiAppliedControlCommitView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(request=AiAppliedControlCommitInputSerializer)
+    def post(self, request, format=None):
+        serializer = AiAppliedControlCommitInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            result = execute_applied_control_commit(request, serializer.validated_data)
+        except AppliedControlCommitValidationError as exc:
+            return Response(exc.to_response(), status=exc.status_code)
+
+        return Response(result)

@@ -123,6 +123,9 @@ export const actions: Actions = {
 	aiAppliedControlSuggest: async (event) => {
 		return proxyAiOnboardingAction(event, '/ai/onboarding/applied-controls/suggest/');
 	},
+	aiAppliedControlCommit: async (event) => {
+		return proxyAiOnboardingAction(event, '/ai/onboarding/applied-controls/commit/');
+	},
 	create: async (event) => {
 		const redirectToWrittenObject = Boolean(
 			event.params.model === 'entity-assessments' ||

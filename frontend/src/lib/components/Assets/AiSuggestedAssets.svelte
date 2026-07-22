@@ -3,6 +3,11 @@
 	import type { ActionResult } from '@sveltejs/kit';
 	import { onMount } from 'svelte';
 	import {
+		buildReviewedAppliedControlDecisions,
+		getAutoReuseAppliedControlMatch,
+		type AppliedControlDuplicateCandidate
+	} from './appliedControlCommitDecisions';
+	import {
 		buildReviewedAssetDecisions,
 		getAutoReuseMatch,
 		type DuplicateCandidate
@@ -20,7 +25,15 @@
 	let scopeSummary = $state('');
 	let knownWeaknesses = $state('');
 	let strictMode = $state(true);
-	let loading = $state<'suggest' | 'dry-run' | 'commit' | null>(null);
+	let loading = $state<
+		| 'suggest'
+		| 'dry-run'
+		| 'commit'
+		| 'control-suggest'
+		| 'control-dry-run'
+		| 'control-commit'
+		| null
+	>(null);
 	let error = $state<any>(null);
 	let assetDraft = $state<any>(null);
 	let assetDraftHash = $state('');
@@ -30,6 +43,11 @@
 	let commitResult = $state<any>(null);
 	let assetCommitHash = $state('');
 	let appliedControlDraft = $state<any>(null);
+	let appliedControlDraftHash = $state('');
+	let selectedAppliedControlTemporaryIds = $state<Record<string, boolean>>({});
+	let appliedControlCommitApproved = $state(false);
+	let appliedControlCommitDryRun = $state<any>(null);
+	let appliedControlCommitResult = $state<any>(null);
 
 	const providerMode = $derived(
 		assetDraft?.provider_mode ?? assetDraft?.source_summary?.provider_mode ?? 'not run'
@@ -50,6 +68,14 @@
 	);
 	const duplicateCandidates = $derived((assetDraft?.duplicate_candidates ?? []) as DuplicateCandidate[]);
 	const approvedAssetReferences = $derived(buildApprovedAssetReferences());
+	const selectedAppliedControlCandidates = $derived(
+		(appliedControlDraft?.candidate_applied_controls ?? []).filter(
+			(candidate: any) => selectedAppliedControlTemporaryIds[candidate.temporary_id]
+		)
+	);
+	const appliedControlDuplicateCandidates = $derived(
+		(appliedControlDraft?.duplicate_candidates ?? []) as AppliedControlDuplicateCandidate[]
+	);
 	const linkedAssetNamesById = $derived(
 		Object.fromEntries(approvedAssetReferences.map((asset: any) => [asset.asset_id, asset.name]))
 	);
@@ -227,6 +253,38 @@
 		};
 	}
 
+	function buildAppliedControlDecisions() {
+		return buildReviewedAppliedControlDecisions(
+			selectedAppliedControlCandidates as any[],
+			appliedControlDuplicateCandidates
+		);
+	}
+
+	function buildAppliedControlCommitPayload(dryRun: boolean) {
+		if (!appliedControlDraft || !appliedControlDraftHash) {
+			throw { detail: 'Run Step 4A before Step 4B.' };
+		}
+		if (!assetCommitHash) throw { detail: 'Complete the approved asset commit before Step 4B.' };
+		if (!selectedAppliedControlCandidates.length) {
+			throw { detail: 'Select at least one candidate applied control.' };
+		}
+		if (!dryRun && !appliedControlCommitApproved) {
+			throw { detail: 'Approve the deterministic applied-control write first.' };
+		}
+
+		return {
+			dry_run: dryRun,
+			approved_by_user: !dryRun && appliedControlCommitApproved,
+			idempotency_key: dryRun ? null : `frontend-step4b-${Date.now()}`,
+			source_step1_draft_hash: sourceStep1DraftHash,
+			source_asset_commit_hash: assetCommitHash,
+			source_applied_control_draft_hash: appliedControlDraftHash,
+			case_setup_reference: cleanSetupReferenceForCommit(),
+			asset_references: approvedAssetReferences,
+			applied_control_decisions: buildAppliedControlDecisions()
+		};
+	}
+
 	async function runSuggestion() {
 		loading = 'suggest';
 		error = null;
@@ -234,6 +292,11 @@
 		commitResult = null;
 		assetCommitHash = '';
 		appliedControlDraft = null;
+		appliedControlDraftHash = '';
+		selectedAppliedControlTemporaryIds = {};
+		appliedControlCommitApproved = false;
+		appliedControlCommitDryRun = null;
+		appliedControlCommitResult = null;
 		try {
 			assetDraft = await postAiAction('aiAssetSuggest', buildSuggestionPayload());
 			assetDraftHash = await sha256Draft(assetDraft);
@@ -260,6 +323,11 @@
 				commitResult = result;
 				assetCommitHash = await sha256Draft(result);
 				appliedControlDraft = null;
+				appliedControlDraftHash = '';
+				selectedAppliedControlTemporaryIds = {};
+				appliedControlCommitApproved = false;
+				appliedControlCommitDryRun = null;
+				appliedControlCommitResult = null;
 			}
 		} catch (caught) {
 			error = caught;
@@ -276,6 +344,33 @@
 				'aiAppliedControlSuggest',
 				buildAppliedControlSuggestionPayload()
 			);
+			appliedControlDraftHash = await sha256Draft(appliedControlDraft);
+			selectedAppliedControlTemporaryIds = Object.fromEntries(
+				(appliedControlDraft?.candidate_applied_controls ?? []).map((candidate: any) => [
+					candidate.temporary_id,
+					false
+				])
+			);
+			appliedControlCommitApproved = false;
+			appliedControlCommitDryRun = null;
+			appliedControlCommitResult = null;
+		} catch (caught) {
+			error = caught;
+		} finally {
+			loading = null;
+		}
+	}
+
+	async function runAppliedControlCommit(dryRun: boolean) {
+		loading = dryRun ? 'control-dry-run' : 'control-commit';
+		error = null;
+		try {
+			const result = await postAiAction(
+				'aiAppliedControlCommit',
+				buildAppliedControlCommitPayload(dryRun)
+			);
+			if (dryRun) appliedControlCommitDryRun = result;
+			else appliedControlCommitResult = result;
 		} catch (caught) {
 			error = caught;
 		} finally {
@@ -562,8 +657,24 @@
 
 							<div class="mt-3 grid gap-3">
 								{#each appliedControlDraft.candidate_applied_controls ?? [] as candidate}
+									{@const autoReuseAppliedControlMatch = getAutoReuseAppliedControlMatch(
+										candidate,
+										appliedControlDuplicateCandidates
+									)}
 									<div class="rounded border p-3">
-										<div class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+										<div class="flex items-start gap-3">
+											<input
+												type="checkbox"
+												checked={!!selectedAppliedControlTemporaryIds[candidate.temporary_id]}
+												onchange={(event) => {
+													selectedAppliedControlTemporaryIds = {
+														...selectedAppliedControlTemporaryIds,
+														[candidate.temporary_id]: event.currentTarget.checked
+													};
+												}}
+											/>
+											<div class="grow">
+												<div class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
 											<div>
 												<div class="font-semibold text-slate-950">{candidate.proposed_name}</div>
 												<div class="mt-1 text-slate-700">{candidate.proposed_description}</div>
@@ -573,49 +684,167 @@
 											>
 												confidence: {candidate.confidence}
 											</div>
+												</div>
+												{#if autoReuseAppliedControlMatch}
+													<div class="mt-3 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-900">
+														Exact duplicate detected. Step 4B will reuse existing applied control
+														{autoReuseAppliedControlMatch.existing_name} instead of creating another one.
+													</div>
+												{/if}
+												<div class="mt-3 grid gap-2 text-xs text-slate-700 md:grid-cols-3">
+													<div>
+														<span class="font-semibold">Category:</span>
+														{candidate.proposed_control_category ?? 'n/a'}
+													</div>
+													<div>
+														<span class="font-semibold">Status:</span>
+														{candidate.proposed_status ?? 'n/a'}
+													</div>
+													<div>
+														<span class="font-semibold">Implementation:</span>
+														{candidate.proposed_implementation_state ?? 'n/a'}
+													</div>
+													<div>
+														<span class="font-semibold">Review:</span>
+														{candidate.human_review_status ?? 'n/a'}
+													</div>
+													<div class="md:col-span-2">
+														<span class="font-semibold">Linked assets:</span>
+														{(candidate.linked_asset_ids ?? [])
+															.map((assetId: string) => linkedAssetLabel(assetId))
+															.join(', ') || 'none'}
+													</div>
+												</div>
+												<div class="mt-3 text-sm">
+													<span class="font-semibold">Rationale:</span>
+													{candidate.rationale}
+												</div>
+												{#if candidate.related_weaknesses?.length}
+													<div class="mt-2 text-xs text-slate-700">
+														<span class="font-semibold">Related weaknesses:</span>
+														{candidate.related_weaknesses.join('; ')}
+													</div>
+												{/if}
+												{#if candidate.allowed_next_actions?.length}
+													<div class="mt-2 text-xs text-slate-700">
+														<span class="font-semibold">Allowed next actions:</span>
+														{candidate.allowed_next_actions.join(', ')}
+													</div>
+												{/if}
+											</div>
 										</div>
-										<div class="mt-3 grid gap-2 text-xs text-slate-700 md:grid-cols-3">
-											<div>
-												<span class="font-semibold">Category:</span>
-												{candidate.proposed_control_category ?? 'n/a'}
-											</div>
-											<div>
-												<span class="font-semibold">Status:</span>
-												{candidate.proposed_status ?? 'n/a'}
-											</div>
-											<div>
-												<span class="font-semibold">Implementation:</span>
-												{candidate.proposed_implementation_state ?? 'n/a'}
-											</div>
-											<div>
-												<span class="font-semibold">Review:</span>
-												{candidate.human_review_status ?? 'n/a'}
-											</div>
-											<div class="md:col-span-2">
-												<span class="font-semibold">Linked assets:</span>
-												{(candidate.linked_asset_ids ?? [])
-													.map((assetId: string) => linkedAssetLabel(assetId))
-													.join(', ') || 'none'}
-											</div>
-										</div>
-										<div class="mt-3 text-sm">
-											<span class="font-semibold">Rationale:</span>
-											{candidate.rationale}
-										</div>
-										{#if candidate.related_weaknesses?.length}
-											<div class="mt-2 text-xs text-slate-700">
-												<span class="font-semibold">Related weaknesses:</span>
-												{candidate.related_weaknesses.join('; ')}
-											</div>
-										{/if}
-										{#if candidate.allowed_next_actions?.length}
-											<div class="mt-2 text-xs text-slate-700">
-												<span class="font-semibold">Allowed next actions:</span>
-												{candidate.allowed_next_actions.join(', ')}
-											</div>
-										{/if}
 									</div>
 								{/each}
+							</div>
+
+							{#if appliedControlDraft.duplicate_candidates?.length}
+								<div class="mt-3 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+									<div class="font-semibold">Duplicate applied-control candidates</div>
+									<ul class="list-disc pl-5">
+										{#each appliedControlDraft.duplicate_candidates as duplicate}
+											<li>
+												{duplicate.proposed_name}: {duplicate.recommended_human_action}
+												{#if duplicate.matches?.[0]}
+													(reuse {duplicate.matches[0].existing_name})
+												{/if}
+											</li>
+										{/each}
+									</ul>
+								</div>
+							{/if}
+
+							<div class="mt-4 rounded border border-cyan-200 bg-cyan-50/60 p-3 text-sm text-cyan-950">
+								<div class="font-semibold">Step 4B Applied Control Commit</div>
+								<p class="mt-1 text-cyan-900">
+									Step 4A above remains advisory and no-write. Step 4B below is the first write step for
+									applied controls.
+								</p>
+								<div class="mt-3 flex flex-wrap items-center gap-3">
+									<button
+										class="btn btn-sm preset-tonal-primary"
+										type="button"
+										disabled={loading !== null || !selectedAppliedControlCandidates.length}
+										onclick={() => runAppliedControlCommit(true)}
+									>
+										{loading === 'control-dry-run' ? 'Dry-running...' : 'Step 4B dry-run'}
+									</button>
+									<label class="flex items-center gap-2 text-sm">
+										<input type="checkbox" bind:checked={appliedControlCommitApproved} />
+										<span>
+											I approve deterministic Step 4B decisions for selected applied controls
+										</span>
+									</label>
+									<button
+										class="btn btn-sm preset-filled-primary-500"
+										type="button"
+										disabled={
+											loading !== null ||
+											!selectedAppliedControlCandidates.length ||
+											!appliedControlCommitApproved
+										}
+										onclick={() => runAppliedControlCommit(false)}
+									>
+										{loading === 'control-commit'
+											? 'Committing...'
+											: 'Approved applied control commit'}
+									</button>
+									<span class="text-xs text-cyan-900">
+										No AI model is used in this write step.
+									</span>
+								</div>
+
+								{#if appliedControlCommitDryRun}
+									<div class="mt-3 rounded border bg-white p-3 text-sm">
+										<div class="font-semibold">
+											Dry-run status: {appliedControlCommitDryRun.status}
+										</div>
+										<ul class="mt-2 list-disc pl-5">
+											{#each appliedControlCommitDryRun.planned_actions ?? [] as action}
+												<li>{action.action} - {action.detail}</li>
+											{/each}
+										</ul>
+									</div>
+								{/if}
+
+								{#if appliedControlCommitResult}
+									<div class="mt-3 grid gap-2 rounded border border-emerald-200 bg-emerald-50 p-3 text-sm">
+										<div class="font-semibold">
+											Commit status: {appliedControlCommitResult.status}
+										</div>
+										<div>
+											Created: {appliedControlCommitResult.created_applied_controls?.length ?? 0}
+										</div>
+										<div>
+											Reused: {appliedControlCommitResult.reused_applied_controls?.length ?? 0}
+										</div>
+										<div>
+											Rejected: {appliedControlCommitResult.rejected_applied_controls?.length ?? 0}
+										</div>
+										<div>
+											Deferred: {appliedControlCommitResult.deferred_applied_controls?.length ?? 0}
+										</div>
+										<div>
+											Warnings: {appliedControlCommitResult.warnings?.length ?? 0}
+										</div>
+										<div>
+											Blocking errors: {appliedControlCommitResult.blocking_errors?.length ?? 0}
+										</div>
+									</div>
+									{#if appliedControlCommitResult.warnings?.length}
+										<ul class="mt-3 list-disc pl-5 text-xs text-amber-800">
+											{#each appliedControlCommitResult.warnings as warning}
+												<li>{warning.detail ?? warning.message ?? warning.code}</li>
+											{/each}
+										</ul>
+									{/if}
+									{#if appliedControlCommitResult.blocking_errors?.length}
+										<ul class="mt-3 list-disc pl-5 text-xs text-red-700">
+											{#each appliedControlCommitResult.blocking_errors as blockingError}
+												<li>{blockingError.detail}</li>
+											{/each}
+										</ul>
+									{/if}
+								{/if}
 							</div>
 						</div>
 					{/if}
@@ -626,7 +855,14 @@
 				<summary class="cursor-pointer font-semibold">Raw JSON</summary>
 				<pre
 					class="mt-2 max-h-80 overflow-auto rounded bg-slate-950 p-3 text-xs text-slate-50">{JSON.stringify(
-						{ assetDraft, commitDryRun, commitResult, appliedControlDraft },
+						{
+							assetDraft,
+							commitDryRun,
+							commitResult,
+							appliedControlDraft,
+							appliedControlCommitDryRun,
+							appliedControlCommitResult
+						},
 						null,
 						2
 					)}</pre>
