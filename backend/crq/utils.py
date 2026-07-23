@@ -1,6 +1,50 @@
-import numpy as np
-from scipy.stats import norm, lognorm
+import math
+from statistics import NormalDist
 from typing import Dict, Tuple, List, Optional
+
+import numpy as np
+
+
+_STANDARD_NORMAL = NormalDist()
+
+
+def _normal_cdf(values):
+    if np.isscalar(values):
+        return _STANDARD_NORMAL.cdf(float(values))
+    vectorized = np.vectorize(lambda value: _STANDARD_NORMAL.cdf(float(value)))
+    return vectorized(values)
+
+
+def _normal_ppf(values):
+    if np.isscalar(values):
+        return _STANDARD_NORMAL.inv_cdf(float(values))
+    vectorized = np.vectorize(lambda value: _STANDARD_NORMAL.inv_cdf(float(value)))
+    return vectorized(values)
+
+
+class _LogNormalDistribution:
+    def __init__(self, sigma: float, scale: float):
+        self._sigma = sigma
+        self._mu = math.log(scale)
+
+    def mean(self) -> float:
+        return math.exp(self._mu + (self._sigma**2) / 2)
+
+    def median(self) -> float:
+        return math.exp(self._mu)
+
+    def std(self) -> float:
+        variance = (math.exp(self._sigma**2) - 1) * math.exp(
+            2 * self._mu + self._sigma**2
+        )
+        return math.sqrt(variance)
+
+    def ppf(self, probability: float) -> float:
+        return math.exp(self._mu + self._sigma * _STANDARD_NORMAL.inv_cdf(probability))
+
+
+def _lognorm(*, s: float, scale: float) -> _LogNormalDistribution:
+    return _LogNormalDistribution(sigma=s, scale=scale)
 
 
 def mu_sigma_from_lognorm_90pct(lower_bound: float, upper_bound: float):
@@ -285,7 +329,7 @@ def simulate_portfolio_with_correlation(
         for i in range(n_simulations):
             correlated_normals = rng.multivariate_normal(mean, correlation_matrix)
             # Convert to uniform using normal CDF approximation
-            uniform_draws = norm.cdf(correlated_normals)
+            uniform_draws = _normal_cdf(correlated_normals)
 
             for j, scenario_dist in enumerate(scenario_distributions):
                 if uniform_draws[j] < scenario_dist["probability"]:
@@ -420,8 +464,8 @@ def get_lognormal_params_from_points(point1: Dict, point2: Dict) -> Tuple[float,
 
     # Convert probabilities to z-scores (normal quantiles)
     # We use 1-p because we want exceedance probabilities
-    z1 = norm.ppf(1 - p1)  # Exceedance probability
-    z2 = norm.ppf(1 - p2)
+    z1 = _normal_ppf(1 - p1)  # Exceedance probability
+    z2 = _normal_ppf(1 - p2)
 
     # Take logarithm of losses
     ln_loss1 = np.log(loss1)
@@ -470,7 +514,7 @@ def generate_risk_tolerance_lec(
     )[::-1]  # Reverse for decreasing order
 
     # Convert to normal quantiles and then to lognormal losses
-    z_scores = norm.ppf(1 - exceedance_probs)
+    z_scores = _normal_ppf(1 - exceedance_probs)
     loss_values = np.exp(mu + sigma * z_scores)
 
     return loss_values, exceedance_probs
@@ -517,7 +561,7 @@ def risk_tolerance_curve(risk_tolerance_data: Dict) -> Dict:
         mu, sigma = get_lognormal_params_from_points(point1, point2)
 
         # Calculate distribution statistics
-        dist = lognorm(s=sigma, scale=np.exp(mu))
+        dist = _lognorm(s=sigma, scale=np.exp(mu))
 
         return {
             "loss_values": loss_values.tolist(),

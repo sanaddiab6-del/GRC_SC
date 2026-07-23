@@ -4,6 +4,7 @@
 	import SideBarHeader from './SideBarHeader.svelte';
 	import SideBarNavigation from './SideBarNavigation.svelte';
 	import SideBarToggle from './SideBarToggle.svelte';
+	import QuickStartModal from './QuickStart/QuickStartModal.svelte';
 	import { writable } from 'svelte/store';
 
 	import { getCookie, setCookie } from '$lib/utils/cookies';
@@ -204,6 +205,23 @@
 			ref: FirstLoginModal,
 			props: {
 				actions: [
+					{
+						label: 'Local AI Case Onboarding',
+						description: 'Run Step 1 case intake, then dry-run and approve deterministic Step 2 setup.',
+						action: () => {
+							modalStore.trigger({
+								type: 'component',
+								component: {
+									ref: QuickStartModal,
+									props: { initialMode: 'ai' }
+								},
+								title: 'Local AI Case Onboarding'
+							});
+							return true;
+						},
+						btnIcon: 'fa-wand-magic-sparkles',
+						async: false
+					},
 					{
 						label: m.browsePresets(),
 						description: m.browsePresetsDescription(),
