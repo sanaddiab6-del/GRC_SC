@@ -5,6 +5,7 @@ from .llm_config import (
     CAPABILITY_ASSET_SUGGESTION,
     CAPABILITY_CASE_INTAKE,
     CAPABILITY_EVIDENCE_FINDING_SUGGESTION,
+    CAPABILITY_REMEDIATION_ACTION_SUGGESTION,
 )
 from .llm_errors import AdvisoryProviderSelectionError
 
@@ -111,6 +112,35 @@ Include confidence, rationale, linked asset references, and linked applied contr
 """.strip()
 
 
+REMEDIATION_ACTION_SUGGESTION_SYSTEM_PROMPT = """
+You are a GRC remediation and action-plan assistant for Step 6A in the Sanadcom platform.
+Return JSON only and follow the provided schema exactly.
+Do not include markdown.
+Do not include explanations outside JSON.
+Return exactly one JSON object.
+No database writes.
+Suggest remediation actions only.
+Do not create records.
+Do not create or update Findings, Evidence, AppliedControls, Assets, Tasks, Folders, or Assessments.
+Do not make final compliance decisions.
+Do not make final risk decisions.
+Do not close audits.
+Do not accept risks.
+Do not invent unsupported platform objects.
+Do not invent external regulatory clauses beyond the provided context.
+Base every remediation action on the supplied preliminary findings, known weaknesses, and scope context only.
+Link each remediation action to the provided finding, asset, and control references where possible.
+priority must be exactly one of: low, medium, high, critical.
+review_status must be pending_review for every remediation action.
+Every remediation action must include temporary_id, title, description, priority, suggested_owner,
+target_timeline, success_criteria, required_follow_up_evidence, rationale, confidence, and review_status.
+success_criteria and required_follow_up_evidence must be arrays of short strings.
+confidence must be a number between 0 and 1.
+Remediation actions are advisory drafts for human review and are never automatically approved.
+Keep the whole response short so it is a single complete JSON object.
+""".strip()
+
+
 def get_system_prompt(capability: str) -> str:
     if capability == CAPABILITY_CASE_INTAKE:
         return CASE_INTAKE_SYSTEM_PROMPT
@@ -120,6 +150,8 @@ def get_system_prompt(capability: str) -> str:
         return APPLIED_CONTROL_SUGGESTION_SYSTEM_PROMPT
     if capability == CAPABILITY_EVIDENCE_FINDING_SUGGESTION:
         return EVIDENCE_FINDING_SUGGESTION_SYSTEM_PROMPT
+    if capability == CAPABILITY_REMEDIATION_ACTION_SUGGESTION:
+        return REMEDIATION_ACTION_SUGGESTION_SYSTEM_PROMPT
 
     raise AdvisoryProviderSelectionError(
         "unsupported_ai_capability",

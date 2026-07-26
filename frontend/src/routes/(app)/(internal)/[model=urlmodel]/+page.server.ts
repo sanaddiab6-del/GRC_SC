@@ -132,6 +132,9 @@ export const actions: Actions = {
 	aiEvidenceFindingCommit: async (event) => {
 		return proxyAiOnboardingAction(event, '/ai/onboarding/evidence-findings/commit/');
 	},
+	aiRemediationActionSuggest: async (event) => {
+		return proxyAiOnboardingAction(event, '/ai/onboarding/remediation-actions/suggest/');
+	},
 	create: async (event) => {
 		const redirectToWrittenObject = Boolean(
 			event.params.model === 'entity-assessments' ||

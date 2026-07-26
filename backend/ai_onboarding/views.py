@@ -28,6 +28,15 @@ from .evidence_finding_suggestion_guardrails import EvidenceFindingSuggestionDra
 from .evidence_finding_suggestion_provider import EvidenceFindingSuggestionProviderError
 from .evidence_finding_suggestion_serializers import AiEvidenceFindingSuggestionInputSerializer
 from .evidence_finding_suggestion_service import build_evidence_finding_suggestion_draft
+from .remediation_action_suggestion_guardrails import (
+    RemediationActionSuggestionDraftValidationError,
+    validate_remediation_action_suggestion_request_guardrails,
+)
+from .remediation_action_suggestion_provider import RemediationActionSuggestionProviderError
+from .remediation_action_suggestion_serializers import (
+    AiRemediationActionSuggestionInputSerializer,
+)
+from .remediation_action_suggestion_service import build_remediation_action_suggestion_draft
 from .case_setup_guardrails import CaseSetupValidationError
 from .case_setup_serializers import AiCaseSetupInputSerializer
 from .case_setup_service import execute_case_setup
@@ -191,3 +200,35 @@ class AiEvidenceFindingCommitView(APIView):
             return Response(exc.to_response(), status=exc.status_code)
 
         return Response(result)
+
+
+class AiRemediationActionSuggestionView(APIView):
+    """Step 6A: advisory remediation/action-plan suggestion. No database writes."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(request=AiRemediationActionSuggestionInputSerializer)
+    def post(self, request, format=None):
+        request_guardrail_errors = validate_remediation_action_suggestion_request_guardrails(
+            request.data if isinstance(request.data, dict) else {}
+        )
+        if request_guardrail_errors:
+            return Response(request_guardrail_errors, status=400)
+
+        serializer = AiRemediationActionSuggestionInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            with transaction.atomic():
+                draft = build_remediation_action_suggestion_draft(
+                    serializer.validated_data,
+                    base_dir=str(settings.BASE_DIR.parent),
+                )
+                transaction.set_rollback(True)
+        except (
+            RemediationActionSuggestionDraftValidationError,
+            RemediationActionSuggestionProviderError,
+        ) as exc:
+            return Response(exc.to_response(), status=exc.status_code)
+
+        return Response(draft)

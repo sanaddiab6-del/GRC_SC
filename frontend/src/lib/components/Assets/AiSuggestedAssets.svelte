@@ -35,6 +35,7 @@
 		| 'evidence-suggest'
 		| 'evidence-commit-dry-run'
 		| 'evidence-commit'
+		| 'remediation-suggest'
 		| null
 	>(null);
 	let error = $state<any>(null);
@@ -60,6 +61,8 @@
 	let evidenceFindingCommitApproved = $state(false);
 	let evidenceFindingCommitDryRun = $state<any>(null);
 	let evidenceFindingCommitResult = $state<any>(null);
+	// Step 6A is advisory only: there is no commit state, no dry-run state, and no approval flag.
+	let remediationActionDraft = $state<any>(null);
 
 	const providerMode = $derived(
 		assetDraft?.provider_mode ?? assetDraft?.source_summary?.provider_mode ?? 'not run'
@@ -73,6 +76,9 @@
 		evidenceFindingDraft?.provider_mode ??
 			evidenceFindingDraft?.source_summary?.provider_mode ??
 			'not run'
+	);
+	const remediationActionProviderMode = $derived(
+		remediationActionDraft?.provider_mode ?? 'not run'
 	);
 	const isConfiguredLocalProvider = $derived(providerMode === 'configured_local_provider');
 	const isAppliedControlConfiguredLocalProvider = $derived(
@@ -347,6 +353,7 @@
 				appliedControlCommitResult = null;
 				appliedControlCommitHash = '';
 				evidenceFindingDraft = null;
+				remediationActionDraft = null;
 			}
 		} catch (caught) {
 			error = caught;
@@ -375,6 +382,7 @@
 			appliedControlCommitResult = null;
 			appliedControlCommitHash = '';
 			evidenceFindingDraft = null;
+			remediationActionDraft = null;
 		} catch (caught) {
 			error = caught;
 		} finally {
@@ -395,6 +403,7 @@
 				appliedControlCommitResult = result;
 				appliedControlCommitHash = await sha256Draft(result);
 				evidenceFindingDraft = null;
+				remediationActionDraft = null;
 			}
 		} catch (caught) {
 			error = caught;
@@ -473,6 +482,7 @@
 			evidenceFindingCommitApproved = false;
 			evidenceFindingCommitDryRun = null;
 			evidenceFindingCommitResult = null;
+			remediationActionDraft = null;
 		} catch (caught) {
 			error = caught;
 		} finally {
@@ -582,6 +592,95 @@
 		}
 	}
 
+	// ---- Step 6A: advisory remediation suggestion. No commit, no dry-run, no write. ----
+
+	function toContextItem(reference: any, title: any, description: any = null) {
+		const readableTitle = typeof title === 'string' ? title.trim() : '';
+		if (!readableTitle) return null;
+		const readableReference = typeof reference === 'string' ? reference.trim() : '';
+		const readableDescription = typeof description === 'string' ? description.trim() : '';
+		return {
+			reference: readableReference ? readableReference.slice(0, 200) : null,
+			title: readableTitle.slice(0, 500),
+			description: readableDescription ? readableDescription.slice(0, 5000) : null
+		};
+	}
+
+	function buildRemediationContextItems(items: any[], toTitle: (item: any, index: number) => any) {
+		return (items ?? [])
+			.map((item: any, index: number) =>
+				toContextItem(
+					item?.temporary_id ?? item?.reference ?? null,
+					toTitle(item, index),
+					item?.description ?? item?.summary ?? item?.rationale ?? null
+				)
+			)
+			.filter(Boolean);
+	}
+
+	function buildRemediationActionSuggestionPayload() {
+		const preliminaryFindings = buildRemediationContextItems(
+			evidenceFindingDraft?.preliminary_findings ?? [],
+			(item, index) => displayFindingTitle(item, index)
+		);
+		const weaknesses = knownWeaknessList();
+		if (!preliminaryFindings.length && !weaknesses.length) {
+			throw {
+				detail: 'Step 6A needs at least one Step 5A preliminary finding or one known weakness.'
+			};
+		}
+
+		const caseSummary = [scenarioText, scopeSummary]
+			.map((value) => (typeof value === 'string' ? value.trim() : ''))
+			.filter(Boolean)
+			.join('\n\n');
+
+		// Optional references are sent when available; missing ones never block the request.
+		return {
+			case_summary: caseSummary.slice(0, 20000),
+			scenario_name: (scopeSummary || scenarioText || '').trim().slice(0, 500),
+			folder_reference: {
+				folder_id: setupReference.folder_id || null,
+				folder_name: null
+			},
+			assets: approvedAssetReferences
+				.map((asset: any) => toContextItem(asset.ref_id ?? asset.asset_id, asset.name))
+				.filter(Boolean),
+			applied_controls: buildApprovedAppliedControlReferences()
+				.map((control: any) =>
+					toContextItem(control.ref_id ?? control.applied_control_id, control.name)
+				)
+				.filter(Boolean),
+			evidence_requests: buildRemediationContextItems(
+				evidenceFindingDraft?.evidence_requests ?? [],
+				(item, index) => displayEvidenceTitle(item, index)
+			),
+			audit_questions: buildRemediationContextItems(
+				evidenceFindingDraft?.audit_questions ?? [],
+				(item, index) => displayAuditQuestionTitle(item, index)
+			),
+			preliminary_findings: preliminaryFindings,
+			known_weaknesses: weaknesses,
+			user_locale: 'en',
+			strict_mode: true
+		};
+	}
+
+	async function runRemediationActionSuggestion() {
+		loading = 'remediation-suggest';
+		error = null;
+		try {
+			remediationActionDraft = await postAiAction(
+				'aiRemediationActionSuggest',
+				buildRemediationActionSuggestionPayload()
+			);
+		} catch (caught) {
+			error = caught;
+		} finally {
+			loading = null;
+		}
+	}
+
 	function linkedAssetLabel(assetId: string) {
 		return linkedAssetNamesById[assetId] ?? assetId;
 	}
@@ -677,6 +776,14 @@
 		return (
 			firstMeaningfulText(item?.summary, item?.rationale) || `Audit question ${index + 1}`
 		);
+	}
+
+	function remediationPriorityBadgeClass(priority: any) {
+		if (priority === 'critical') return 'bg-red-100 text-red-900';
+		if (priority === 'high') return 'bg-orange-100 text-orange-900';
+		if (priority === 'medium') return 'bg-yellow-100 text-yellow-900';
+		if (priority === 'low') return 'bg-slate-100 text-slate-700';
+		return 'bg-slate-100 text-slate-700';
 	}
 
 	function displayFindingTitle(item: any, index: number) {
@@ -1697,6 +1804,167 @@
 				</div>
 			{/if}
 
+			{#if evidenceFindingDraft}
+				<div class="mt-4 rounded border border-violet-200 bg-violet-50/60 p-3 text-sm text-violet-950">
+					<div class="font-semibold">Step 6A &middot; Remediation Action Suggestion</div>
+					<p class="mt-1 text-violet-900">
+						<span class="font-semibold">AI suggestion only / no database write.</span>
+						Step 6A drafts remediation actions for review. No remediation records are created in this
+						step.
+					</p>
+					<div class="mt-3 flex flex-wrap items-center gap-3">
+						<button
+							class="btn btn-sm preset-filled-primary-500"
+							type="button"
+							disabled={loading !== null}
+							onclick={() => runRemediationActionSuggestion()}
+						>
+							{loading === 'remediation-suggest'
+								? 'Running...'
+								: 'Run Local AI Remediation Suggestion'}
+						</button>
+						<span class="text-xs text-violet-900">
+							AI Provider: {humanizeProviderMode(remediationActionProviderMode)} &middot; No database
+							writes occur in Step 6A.
+						</span>
+					</div>
+
+					{#if remediationActionDraft}
+						<div class="mt-3 grid gap-2 rounded border bg-white p-3 text-sm">
+							<div class="font-semibold">Step 6A suggestion summary</div>
+							<div class="flex flex-wrap gap-2 text-xs">
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Overall confidence: {formatConfidence(remediationActionDraft.overall_confidence)}
+								</span>
+								<span class="rounded bg-violet-100 px-2 py-1 font-semibold text-violet-900">
+									Remediation actions: {remediationActionDraft.remediation_actions?.length ?? 0}
+								</span>
+								<span class="rounded bg-amber-100 px-2 py-1 font-semibold text-amber-900">
+									Warnings: {remediationActionDraft.warnings?.length ?? 0}
+								</span>
+							</div>
+						</div>
+
+						{#if remediationActionDraft.remediation_actions?.length}
+							<div class="mt-3">
+								<div class="font-semibold text-violet-950">
+									Remediation actions ({remediationActionDraft.remediation_actions.length})
+								</div>
+								<p class="text-xs text-violet-900">
+									Corrective actions the AI suggests for the preliminary findings. Advisory drafts
+									only.
+								</p>
+								<div class="mt-2 grid gap-2">
+									{#each remediationActionDraft.remediation_actions as action}
+										<div class="rounded border bg-white p-3 text-xs text-slate-800">
+											<div class="flex flex-wrap items-start justify-between gap-2">
+												<div class="text-sm font-semibold text-slate-950">{action.title}</div>
+												<div class="flex flex-wrap gap-1">
+													{#if action.priority}
+														<span
+															class="rounded px-2 py-0.5 font-semibold {remediationPriorityBadgeClass(
+																action.priority
+															)}"
+														>
+															Priority: {humanizeFieldLabel(action.priority)}
+														</span>
+													{/if}
+													<span class="rounded bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">
+														Confidence: {formatConfidence(action.confidence)}
+													</span>
+													{#if action.review_status}
+														<span class="rounded bg-violet-100 px-2 py-0.5 font-semibold text-violet-900">
+															{humanizeFieldLabel(action.review_status)}
+														</span>
+													{/if}
+												</div>
+											</div>
+											<div class="mt-1 flex flex-wrap gap-3">
+												{#if action.suggested_owner}
+													<div>
+														<span class="font-semibold">Suggested owner:</span>
+														{action.suggested_owner}
+													</div>
+												{/if}
+												{#if action.target_timeline}
+													<div>
+														<span class="font-semibold">Target timeline:</span>
+														{action.target_timeline}
+													</div>
+												{/if}
+											</div>
+											{#if action.description}
+												<div class="mt-1 text-slate-700">{action.description}</div>
+											{/if}
+											{#if action.rationale}
+												<div class="mt-1">
+													<span class="font-semibold">Rationale:</span>
+													{action.rationale}
+												</div>
+											{/if}
+											{#if action.linked_finding_title || action.linked_finding_reference}
+												<div class="mt-1">
+													<span class="font-semibold">Linked finding:</span>
+													{action.linked_finding_title || action.linked_finding_reference}
+												</div>
+											{/if}
+											{#if action.linked_asset_title || action.linked_asset_reference}
+												<div class="mt-1">
+													<span class="font-semibold">Linked asset:</span>
+													{action.linked_asset_title || action.linked_asset_reference}
+												</div>
+											{/if}
+											{#if action.linked_control_title || action.linked_control_reference}
+												<div class="mt-1">
+													<span class="font-semibold">Linked control:</span>
+													{action.linked_control_title || action.linked_control_reference}
+												</div>
+											{/if}
+											{#if action.success_criteria?.length}
+												<div class="mt-1">
+													<span class="font-semibold">Success criteria:</span>
+													<ul class="list-disc pl-5">
+														{#each action.success_criteria as criterion}
+															<li>{criterion}</li>
+														{/each}
+													</ul>
+												</div>
+											{/if}
+											{#if action.required_follow_up_evidence?.length}
+												<div class="mt-1">
+													<span class="font-semibold">Required follow-up evidence:</span>
+													<ul class="list-disc pl-5">
+														{#each action.required_follow_up_evidence as evidenceItem}
+															<li>{evidenceItem}</li>
+														{/each}
+													</ul>
+												</div>
+											{/if}
+										</div>
+									{/each}
+								</div>
+							</div>
+						{/if}
+
+						{#if remediationActionDraft.warnings?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-amber-800">
+								{#each remediationActionDraft.warnings as warning}
+									<li>{warning.message ?? warning.detail ?? warning.code}</li>
+								{/each}
+							</ul>
+						{/if}
+
+						{#if remediationActionDraft.ambiguity_flags?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-amber-800">
+								{#each remediationActionDraft.ambiguity_flags as flag}
+									<li>{flag.message ?? flag.code}</li>
+								{/each}
+							</ul>
+						{/if}
+					{/if}
+				</div>
+			{/if}
+
 			<details class="mt-3">
 				<summary class="cursor-pointer font-semibold">Raw JSON</summary>
 				<pre
@@ -1710,7 +1978,8 @@
 							appliedControlCommitResult,
 							evidenceFindingDraft,
 							evidenceFindingCommitDryRun,
-							evidenceFindingCommitResult
+							evidenceFindingCommitResult,
+							remediationActionDraft
 						},
 						null,
 						2
