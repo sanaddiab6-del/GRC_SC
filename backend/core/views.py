@@ -72,6 +72,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
 from django.core.cache import cache
+from ctypes.util import find_library
 
 
 from django.apps import apps
@@ -108,9 +109,27 @@ from rest_framework.views import APIView
 from rest_framework.exceptions import NotFound, PermissionDenied
 
 
-from weasyprint import HTML
+try:
+    def _can_load_weasyprint() -> bool:
+        return bool(
+            find_library("gobject-2.0")
+            or find_library("libgobject-2.0-0")
+            or find_library("gobject-2.0-0")
+        )
+
+
+    if _can_load_weasyprint():
+        try:
+            from weasyprint import HTML
+        except Exception:
+            HTML = None
+    else:
+        HTML = None
+except Exception:
+    HTML = None
 
 from core.helpers import *
+from ai_onboarding.service import build_onboarding_recommendations
 from core.models import (
     AppliedControl,
     ComplianceAssessment,
@@ -173,6 +192,14 @@ LONG_CACHE_TTL = 60  # mn
 
 
 MAPPING_MAX_DEPTH = 3
+
+
+def _render_pdf(html: str):
+    if HTML is None:
+        raise RuntimeError(
+            "PDF generation is unavailable because WeasyPrint native libraries could not be loaded."
+        )
+    return HTML(string=html).write_pdf()
 
 SETTINGS_MODULE = __import__(os.environ.get("DJANGO_SETTINGS_MODULE"))
 MODULE_PATHS = SETTINGS_MODULE.settings.MODULE_PATHS
@@ -3932,7 +3959,7 @@ class RiskAssessmentViewSet(BaseModelViewSet):
                 "feature_flags": feature_flags,
             }
             html = render_to_string("core/ra_pdf.html", data)
-            pdf_file = HTML(string=html).write_pdf()
+            pdf_file = _render_pdf(html)
             response = HttpResponse(pdf_file, content_type="application/pdf")
             return response
         else:
@@ -3979,7 +4006,7 @@ class RiskAssessmentViewSet(BaseModelViewSet):
                 "risk_assessment": risk_assessment_object,
             }
             html = render_to_string("core/risk_action_plan_pdf.html", data)
-            pdf_file = HTML(string=html).write_pdf()
+            pdf_file = _render_pdf(html)
             response = HttpResponse(pdf_file, content_type="application/pdf")
             return response
         else:
@@ -7078,6 +7105,23 @@ class FolderViewSet(BaseModelViewSet):
         folder = serializer.save()
         Folder.create_default_ug_and_ra(folder)
 
+    @action(
+        detail=False,
+        methods=["post"],
+        permission_classes=[permissions.IsAuthenticated],
+        url_path="ai-recommendations",
+    )
+    def ai_recommendations(self, request):
+        """
+        Return advisory-only framework and scope recommendations for folder creation.
+        """
+        payload = request.data if isinstance(request.data, dict) else {}
+        recommendations = build_onboarding_recommendations(
+            payload,
+            base_dir=settings.BASE_DIR.parent,
+        )
+        return Response(recommendations)
+
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
 
@@ -10093,7 +10137,7 @@ class ComplianceAssessmentViewSet(BaseModelViewSet):
                 "compliance_assessment": compliance_assessment_object,
             }
             html = render_to_string("core/action_plan_pdf.html", data)
-            pdf_file = HTML(string=html).write_pdf()
+            pdf_file = _render_pdf(html)
             response = HttpResponse(pdf_file, content_type="application/pdf")
             return response
         else:
@@ -11772,7 +11816,7 @@ class ComplianceAssessmentViewSet(BaseModelViewSet):
             "compliance_assessment": ca,
         }
         html = render_to_string(template_name, data)
-        pdf_file = HTML(string=html).write_pdf()
+        pdf_file = _render_pdf(html)
         response = HttpResponse(pdf_file, content_type="application/pdf")
         response["Content-Disposition"] = f'attachment; filename="soa_{pk}.pdf"'
         return response
@@ -13043,7 +13087,7 @@ class FindingsAssessmentViewSet(BaseModelViewSet):
         }
 
         html = render_to_string("core/findings_assessment_pdf.html", context)
-        pdf_file = HTML(string=html).write_pdf()
+        pdf_file = _render_pdf(html)
         response = HttpResponse(pdf_file, content_type="application/pdf")
         safe_name = slugify(findings_assessment.name) or "findings_assessment"
         response["Content-Disposition"] = (
@@ -13438,7 +13482,7 @@ class IncidentViewSet(ExportMixin, BaseModelViewSet):
         }
 
         html = render_to_string("core/incident_pdf.html", context)
-        pdf_file = HTML(string=html).write_pdf()
+        pdf_file = _render_pdf(html)
         response = HttpResponse(pdf_file, content_type="application/pdf")
         safe_name = slugify(incident.name) or "incident"
         response["Content-Disposition"] = (

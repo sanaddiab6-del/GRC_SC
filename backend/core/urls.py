@@ -155,6 +155,7 @@ for route in ROUTES:
 
 urlpatterns = [
     path("", include(router.urls)),
+    path("ai/", include("ai_onboarding.urls")),
     path("iam/", include("iam.urls")),
     path("serdes/", include("serdes.urls")),
     path("data-wizard/", include("data_wizard.urls")),
