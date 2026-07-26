@@ -9,6 +9,7 @@ from .views import (
     AiCaseSetupView,
     AiEvidenceFindingCommitView,
     AiEvidenceFindingSuggestionView,
+    AiRemediationActionCommitView,
     AiRemediationActionSuggestionView,
 )
 
@@ -42,5 +43,10 @@ urlpatterns = [
         "onboarding/remediation-actions/suggest/",
         AiRemediationActionSuggestionView.as_view(),
         name="ai-remediation-action-suggestion",
+    ),
+    path(
+        "onboarding/remediation-actions/commit/",
+        AiRemediationActionCommitView.as_view(),
+        name="ai-remediation-action-commit",
     ),
 ]

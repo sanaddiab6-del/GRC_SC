@@ -28,6 +28,9 @@ from .evidence_finding_suggestion_guardrails import EvidenceFindingSuggestionDra
 from .evidence_finding_suggestion_provider import EvidenceFindingSuggestionProviderError
 from .evidence_finding_suggestion_serializers import AiEvidenceFindingSuggestionInputSerializer
 from .evidence_finding_suggestion_service import build_evidence_finding_suggestion_draft
+from .remediation_action_commit_guardrails import RemediationActionCommitValidationError
+from .remediation_action_commit_serializers import AiRemediationActionCommitInputSerializer
+from .remediation_action_commit_service import execute_remediation_action_commit
 from .remediation_action_suggestion_guardrails import (
     RemediationActionSuggestionDraftValidationError,
     validate_remediation_action_suggestion_request_guardrails,
@@ -232,3 +235,21 @@ class AiRemediationActionSuggestionView(APIView):
             return Response(exc.to_response(), status=exc.status_code)
 
         return Response(draft)
+
+
+class AiRemediationActionCommitView(APIView):
+    """Step 6B: deterministic remediation action commit. No AI provider is used."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(request=AiRemediationActionCommitInputSerializer)
+    def post(self, request, format=None):
+        serializer = AiRemediationActionCommitInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            result = execute_remediation_action_commit(request, serializer.validated_data)
+        except RemediationActionCommitValidationError as exc:
+            return Response(exc.to_response(), status=exc.status_code)
+
+        return Response(result)

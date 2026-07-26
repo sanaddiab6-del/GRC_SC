@@ -36,6 +36,8 @@
 		| 'evidence-commit-dry-run'
 		| 'evidence-commit'
 		| 'remediation-suggest'
+		| 'remediation-commit-dry-run'
+		| 'remediation-commit'
 		| null
 	>(null);
 	let error = $state<any>(null);
@@ -63,6 +65,11 @@
 	let evidenceFindingCommitResult = $state<any>(null);
 	// Step 6A is advisory only: there is no commit state, no dry-run state, and no approval flag.
 	let remediationActionDraft = $state<any>(null);
+	// Step 6B is the deterministic write step for the Step 6A suggestions.
+	let selectedRemediationActionIds = $state<Record<string, boolean>>({});
+	let remediationCommitApproved = $state(false);
+	let remediationCommitDryRun = $state<any>(null);
+	let remediationCommitResult = $state<any>(null);
 
 	const providerMode = $derived(
 		assetDraft?.provider_mode ?? assetDraft?.source_summary?.provider_mode ?? 'not run'
@@ -670,10 +677,98 @@
 		loading = 'remediation-suggest';
 		error = null;
 		try {
-			remediationActionDraft = await postAiAction(
+			const draft = await postAiAction(
 				'aiRemediationActionSuggest',
 				buildRemediationActionSuggestionPayload()
 			);
+			remediationActionDraft = draft;
+			selectedRemediationActionIds = Object.fromEntries(
+				(draft?.remediation_actions ?? []).map((action: any) => [action.temporary_id, false])
+			);
+			remediationCommitApproved = false;
+			remediationCommitDryRun = null;
+			remediationCommitResult = null;
+		} catch (caught) {
+			error = caught;
+		} finally {
+			loading = null;
+		}
+	}
+
+	// ---- Step 6B: deterministic commit. No AI model is called in this step. ----
+
+	const selectedRemediationActions = $derived(
+		(remediationActionDraft?.remediation_actions ?? []).filter(
+			(action: any) => selectedRemediationActionIds[action.temporary_id]
+		)
+	);
+	const remediationDryRunSucceeded = $derived(
+		Boolean(remediationCommitDryRun) &&
+			!(remediationCommitDryRun?.blocking_errors ?? []).length &&
+			remediationCommitDryRun?.commit_status !== 'blocked'
+	);
+
+	function buildRemediationActionCommitPayload(dryRun: boolean) {
+		if (!remediationActionDraft) throw { detail: 'Run Step 6A before Step 6B.' };
+		if (!setupReference.folder_id) {
+			throw { detail: 'A Folder ID is required before the deterministic Step 6B write.' };
+		}
+		if (!selectedRemediationActions.length) {
+			throw { detail: 'Select at least one remediation action to commit.' };
+		}
+		if (!dryRun && !remediationDryRunSucceeded) {
+			throw { detail: 'Run a successful Step 6B dry-run before the approved commit.' };
+		}
+		if (!dryRun && !remediationCommitApproved) {
+			throw { detail: 'Approve the deterministic Step 6B write first.' };
+		}
+
+		return {
+			dry_run: dryRun,
+			approved: dryRun ? false : remediationCommitApproved,
+			folder_reference: setupReference.folder_id,
+			decisions: selectedRemediationActions.map((action: any) => ({
+				temporary_id: action.temporary_id,
+				selected: true,
+				decision: 'create',
+				existing_record_reference: '',
+				payload: {
+					temporary_id: action.temporary_id,
+					title: action.title,
+					description: action.description ?? '',
+					linked_finding_reference: action.linked_finding_reference ?? '',
+					linked_finding_title: action.linked_finding_title ?? '',
+					linked_asset_reference: action.linked_asset_reference ?? '',
+					linked_asset_title: action.linked_asset_title ?? '',
+					linked_control_reference: action.linked_control_reference ?? '',
+					linked_control_title: action.linked_control_title ?? '',
+					priority: action.priority,
+					suggested_owner: action.suggested_owner ?? '',
+					target_timeline: action.target_timeline ?? '',
+					success_criteria: action.success_criteria ?? [],
+					required_follow_up_evidence: action.required_follow_up_evidence ?? [],
+					rationale: action.rationale ?? '',
+					confidence: action.confidence,
+					review_status: action.review_status
+				}
+			}))
+		};
+	}
+
+	async function runRemediationActionCommit(dryRun: boolean) {
+		loading = dryRun ? 'remediation-commit-dry-run' : 'remediation-commit';
+		error = null;
+		try {
+			const result = await postAiAction(
+				'aiRemediationActionCommit',
+				buildRemediationActionCommitPayload(dryRun)
+			);
+			if (dryRun) {
+				remediationCommitDryRun = result;
+				remediationCommitResult = null;
+			} else {
+				remediationCommitResult = result;
+			}
 		} catch (caught) {
 			error = caught;
 		} finally {
@@ -1965,6 +2060,193 @@
 				</div>
 			{/if}
 
+			{#if remediationActionDraft?.remediation_actions?.length}
+				<div class="mt-4 rounded border border-emerald-300 bg-emerald-50/60 p-3 text-sm text-emerald-950">
+					<div class="font-semibold">Step 6B &middot; Remediation Action Commit</div>
+					<p class="mt-1 text-emerald-900">
+						<span class="font-semibold">No AI model is used / writes only after approval.</span>
+						Select the Step 6A remediation actions to keep, then dry-run to preview. Dry-run does not
+						write. The approved commit writes deterministic records only for selected and approved
+						remediation actions.
+					</p>
+
+					<div class="mt-3 grid gap-2">
+						{#each remediationActionDraft.remediation_actions as action}
+							<label class="flex items-start gap-2 rounded border bg-white p-2 text-xs">
+								<input
+									type="checkbox"
+									bind:checked={selectedRemediationActionIds[action.temporary_id]}
+								/>
+								<span>
+									<span class="font-semibold">{action.title}</span>
+									<span class="text-slate-600">
+										&middot; Priority: {humanizeFieldLabel(action.priority)} &middot; Confidence: {formatConfidence(
+											action.confidence
+										)}
+									</span>
+								</span>
+							</label>
+						{/each}
+					</div>
+
+					<div class="mt-3 flex flex-wrap items-center gap-3">
+						<button
+							class="btn btn-sm preset-tonal"
+							type="button"
+							disabled={loading !== null || !selectedRemediationActions.length}
+							onclick={() => runRemediationActionCommit(true)}
+						>
+							{loading === 'remediation-commit-dry-run' ? 'Dry-running...' : 'Step 6B dry-run'}
+						</button>
+						<label class="flex items-center gap-2 text-xs">
+							<input type="checkbox" bind:checked={remediationCommitApproved} />
+							<span>
+								I approve deterministic Step 6B decisions for selected remediation actions
+							</span>
+						</label>
+						<button
+							class="btn btn-sm preset-filled-error-500"
+							type="button"
+							disabled={loading !== null ||
+								!remediationCommitApproved ||
+								!remediationDryRunSucceeded ||
+								!selectedRemediationActions.length}
+							onclick={() => runRemediationActionCommit(false)}
+						>
+							{loading === 'remediation-commit'
+								? 'Committing...'
+								: 'Approved remediation action commit'}
+						</button>
+						<span class="text-xs text-emerald-900">No AI model is used in this write step.</span>
+					</div>
+
+					{#if remediationCommitDryRun}
+						<div class="mt-3 grid gap-2 rounded border bg-white p-3 text-sm">
+							<div class="font-semibold">
+								Step 6B dry-run status: {humanizeFieldLabel(remediationCommitDryRun.commit_status)}
+							</div>
+							<p class="text-xs text-slate-700">
+								Dry-run only previews the deterministic write. Nothing was written.
+							</p>
+							{#if remediationCommitDryRun.planned_actions?.length}
+								<div class="text-xs font-semibold text-emerald-950">Planned actions</div>
+								<ul class="list-disc pl-5 text-xs text-slate-800">
+									{#each remediationCommitDryRun.planned_actions as action}
+										<li>
+											{action.target_name ?? action.source_temporary_id}:
+											{humanizeActionName(action.decision)} &middot; {humanizeFieldLabel(
+												action.status
+											)} &middot; {action.detail}
+										</li>
+									{/each}
+								</ul>
+							{/if}
+							{#if remediationCommitDryRun.rejected_records?.length || remediationCommitDryRun.deferred_records?.length || remediationCommitDryRun.skipped_records?.length}
+								<div class="flex flex-wrap gap-2 text-xs">
+									<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+										Rejected: {remediationCommitDryRun.rejected_records?.length ?? 0}
+									</span>
+									<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+										Deferred: {remediationCommitDryRun.deferred_records?.length ?? 0}
+									</span>
+									<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+										Skipped: {remediationCommitDryRun.skipped_records?.length ?? 0}
+									</span>
+								</div>
+							{/if}
+						</div>
+						{#if remediationCommitDryRun.warnings?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-amber-800">
+								{#each remediationCommitDryRun.warnings as warning}
+									<li>{warning.detail ?? warning.message ?? warning.code}</li>
+								{/each}
+							</ul>
+						{/if}
+						{#if remediationCommitDryRun.blocking_errors?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-red-700">
+								{#each remediationCommitDryRun.blocking_errors as blockingError}
+									<li>{blockingError.detail}</li>
+								{/each}
+							</ul>
+						{/if}
+					{/if}
+
+					{#if remediationCommitResult}
+						<div class="mt-3 grid gap-2 rounded border bg-white p-3 text-sm">
+							<div class="font-semibold">
+								Step 6B commit status: {humanizeFieldLabel(remediationCommitResult.commit_status)}
+							</div>
+							<div class="flex flex-wrap gap-2 text-xs">
+								<span class="rounded bg-emerald-100 px-2 py-1 font-semibold text-emerald-900">
+									Created: {remediationCommitResult.created_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-emerald-100 px-2 py-1 font-semibold text-emerald-900">
+									Reused: {remediationCommitResult.reused_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Rejected: {remediationCommitResult.rejected_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Deferred: {remediationCommitResult.deferred_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Skipped: {remediationCommitResult.skipped_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-amber-100 px-2 py-1 font-semibold text-amber-900">
+									Warnings: {remediationCommitResult.warnings?.length ?? 0}
+								</span>
+								<span class="rounded bg-red-100 px-2 py-1 font-semibold text-red-900">
+									Blocking errors: {remediationCommitResult.blocking_errors?.length ?? 0}
+								</span>
+							</div>
+							{#if remediationCommitResult.created_records?.length}
+								<div class="text-xs font-semibold text-emerald-950">Created records</div>
+								<ul class="list-disc pl-5 text-xs text-slate-800">
+									{#each remediationCommitResult.created_records as record}
+										<li>{humanizeFieldLabel(record.record_type)}: {record.name}</li>
+									{/each}
+								</ul>
+							{/if}
+							{#if remediationCommitResult.reused_records?.length}
+								<div class="text-xs font-semibold text-emerald-950">Reused existing records</div>
+								<ul class="list-disc pl-5 text-xs text-slate-800">
+									{#each remediationCommitResult.reused_records as record}
+										<li>{humanizeFieldLabel(record.record_type)}: {record.name}</li>
+									{/each}
+								</ul>
+							{/if}
+							{#if remediationCommitResult.planned_actions?.length}
+								<div class="text-xs font-semibold text-emerald-950">Planned actions</div>
+								<ul class="list-disc pl-5 text-xs text-slate-800">
+									{#each remediationCommitResult.planned_actions as action}
+										<li>
+											{action.target_name ?? action.source_temporary_id}:
+											{humanizeActionName(action.decision)} &middot; {humanizeFieldLabel(
+												action.status
+											)}
+										</li>
+									{/each}
+								</ul>
+							{/if}
+						</div>
+						{#if remediationCommitResult.warnings?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-amber-800">
+								{#each remediationCommitResult.warnings as warning}
+									<li>{warning.detail ?? warning.message ?? warning.code}</li>
+								{/each}
+							</ul>
+						{/if}
+						{#if remediationCommitResult.blocking_errors?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-red-700">
+								{#each remediationCommitResult.blocking_errors as blockingError}
+									<li>{blockingError.detail}</li>
+								{/each}
+							</ul>
+						{/if}
+					{/if}
+				</div>
+			{/if}
+
 			<details class="mt-3">
 				<summary class="cursor-pointer font-semibold">Raw JSON</summary>
 				<pre
@@ -1979,7 +2261,9 @@
 							evidenceFindingDraft,
 							evidenceFindingCommitDryRun,
 							evidenceFindingCommitResult,
-							remediationActionDraft
+							remediationActionDraft,
+							remediationCommitDryRun,
+							remediationCommitResult
 						},
 						null,
 						2
