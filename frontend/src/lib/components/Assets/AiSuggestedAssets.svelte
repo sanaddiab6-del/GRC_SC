@@ -38,6 +38,7 @@
 		| 'remediation-suggest'
 		| 'remediation-commit-dry-run'
 		| 'remediation-commit'
+		| 'framework-mapping-suggest'
 		| null
 	>(null);
 	let error = $state<any>(null);
@@ -70,6 +71,9 @@
 	let remediationCommitApproved = $state(false);
 	let remediationCommitDryRun = $state<any>(null);
 	let remediationCommitResult = $state<any>(null);
+	// Step 7A is advisory only: no commit state, no dry-run state, and no approval flag.
+	let frameworkControlMappingDraft = $state<any>(null);
+	let caseContext = $state<any>(null);
 
 	const providerMode = $derived(
 		assetDraft?.provider_mode ?? assetDraft?.source_summary?.provider_mode ?? 'not run'
@@ -86,6 +90,9 @@
 	);
 	const remediationActionProviderMode = $derived(
 		remediationActionDraft?.provider_mode ?? 'not run'
+	);
+	const frameworkControlMappingProviderMode = $derived(
+		frameworkControlMappingDraft?.provider_mode ?? 'not run'
 	);
 	const isConfiguredLocalProvider = $derived(providerMode === 'configured_local_provider');
 	const isAppliedControlConfiguredLocalProvider = $derived(
@@ -117,6 +124,7 @@
 			const parsed = JSON.parse(stored);
 			sourceStep1DraftHash = parsed.source_step1_draft_hash ?? '';
 			scenarioText = parsed.scenario_summary ?? '';
+			caseContext = parsed.case_context ?? null;
 			setupReference = {
 				folder_id: parsed.setupReference?.folder_id ?? '',
 				perimeter_id: parsed.setupReference?.perimeter_id ?? '',
@@ -769,6 +777,89 @@
 			} else {
 				remediationCommitResult = result;
 			}
+		} catch (caught) {
+			error = caught;
+		} finally {
+			loading = null;
+		}
+	}
+
+	// ---- Step 7A: advisory framework control mapping. No commit, no dry-run, no write. ----
+
+	// Best-effort framework label from the Step 1 case context. It only narrows the
+	// read-only candidate lookup; a missing label never blocks Step 7A.
+	function frameworkNameHint() {
+		const entries = caseContext?.regulatory_context;
+		for (const entry of Array.isArray(entries) ? entries : []) {
+			const label =
+				typeof entry === 'string' ? entry : (entry?.value ?? entry?.label ?? entry?.name ?? '');
+			if (typeof label === 'string' && label.trim()) return label.trim().slice(0, 200);
+		}
+		return '';
+	}
+
+	function buildFrameworkControlMappingSuggestionPayload() {
+		const frameworkName = frameworkNameHint();
+		const caseSummary = [scenarioText, scopeSummary]
+			.map((value) => (typeof value === 'string' ? value.trim() : ''))
+			.filter(Boolean)
+			.join('\n\n');
+
+		// Optional references are sent when available; missing ones never block the demo.
+		// Framework controls are never invented here: the backend only maps to controls
+		// that were supplied or safely discovered read-only from the referenced framework.
+		return {
+			case_summary: caseSummary.slice(0, 20000),
+			scenario_name: (scopeSummary || scenarioText || '').trim().slice(0, 500),
+			folder_reference: {
+				folder_id: setupReference.folder_id || null,
+				folder_name: null
+			},
+			framework_name: frameworkName || null,
+			framework_reference: {
+				framework_id: setupReference.selected_framework_id || null,
+				framework_urn: null,
+				framework_name: frameworkName || null
+			},
+			assets: approvedAssetReferences
+				.map((asset: any) => toContextItem(asset.ref_id ?? asset.asset_id, asset.name))
+				.filter(Boolean),
+			applied_controls: buildApprovedAppliedControlReferences()
+				.map((control: any) =>
+					toContextItem(control.ref_id ?? control.applied_control_id, control.name)
+				)
+				.filter(Boolean),
+			remediation_actions: buildRemediationContextItems(
+				remediationActionDraft?.remediation_actions ?? [],
+				(item, index) => item?.title || `Remediation action ${index + 1}`
+			),
+			evidence_requests: buildRemediationContextItems(
+				evidenceFindingDraft?.evidence_requests ?? [],
+				(item, index) => displayEvidenceTitle(item, index)
+			),
+			audit_questions: buildRemediationContextItems(
+				evidenceFindingDraft?.audit_questions ?? [],
+				(item, index) => displayAuditQuestionTitle(item, index)
+			),
+			preliminary_findings: buildRemediationContextItems(
+				evidenceFindingDraft?.preliminary_findings ?? [],
+				(item, index) => displayFindingTitle(item, index)
+			),
+			known_weaknesses: knownWeaknessList(),
+			candidate_framework_controls: [],
+			user_locale: 'en',
+			strict_mode: true
+		};
+	}
+
+	async function runFrameworkControlMappingSuggestion() {
+		loading = 'framework-mapping-suggest';
+		error = null;
+		try {
+			frameworkControlMappingDraft = await postAiAction(
+				'aiFrameworkControlMappingSuggest',
+				buildFrameworkControlMappingSuggestionPayload()
+			);
 		} catch (caught) {
 			error = caught;
 		} finally {
@@ -2247,6 +2338,159 @@
 				</div>
 			{/if}
 
+			{#if remediationActionDraft}
+				<div class="mt-4 rounded border border-sky-200 bg-sky-50/60 p-3 text-sm text-sky-950">
+					<div class="font-semibold">Step 7A &middot; Framework Control Mapping Suggestion</div>
+					<p class="mt-1 text-sky-900">
+						<span class="font-semibold">AI suggestion only / no database write.</span>
+						Step 7A suggests mappings to existing framework controls for review. No framework
+						controls or mappings are created in this step.
+					</p>
+					<div class="mt-3 flex flex-wrap items-center gap-3">
+						<button
+							class="btn btn-sm preset-filled-primary-500"
+							type="button"
+							disabled={loading !== null}
+							onclick={() => runFrameworkControlMappingSuggestion()}
+						>
+							{loading === 'framework-mapping-suggest'
+								? 'Running...'
+								: 'Run Local AI Framework Mapping Suggestion'}
+						</button>
+						<span class="text-xs text-sky-900">
+							AI Provider: {humanizeProviderMode(frameworkControlMappingProviderMode)} &middot; No
+							database writes occur in Step 7A.
+						</span>
+					</div>
+
+					{#if frameworkControlMappingDraft}
+						<div class="mt-3 grid gap-2 rounded border bg-white p-3 text-sm">
+							<div class="font-semibold">Step 7A suggestion summary</div>
+							<div class="flex flex-wrap gap-2 text-xs">
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Overall confidence: {formatConfidence(
+										frameworkControlMappingDraft.overall_confidence
+									)}
+								</span>
+								<span class="rounded bg-sky-100 px-2 py-1 font-semibold text-sky-900">
+									Framework mappings: {frameworkControlMappingDraft.framework_control_mappings
+										?.length ?? 0}
+								</span>
+								<span class="rounded bg-amber-100 px-2 py-1 font-semibold text-amber-900">
+									Warnings: {frameworkControlMappingDraft.warnings?.length ?? 0}
+								</span>
+							</div>
+						</div>
+
+						{#if frameworkControlMappingDraft.framework_control_mappings?.length}
+							<div class="mt-3">
+								<div class="font-semibold text-sky-950">
+									Framework control mappings ({frameworkControlMappingDraft
+										.framework_control_mappings.length})
+								</div>
+								<p class="text-xs text-sky-900">
+									Existing framework controls the AI considers relevant. Advisory drafts only; no
+									framework control is created.
+								</p>
+								<div class="mt-2 grid gap-2">
+									{#each frameworkControlMappingDraft.framework_control_mappings as mapping}
+										<div class="rounded border bg-white p-3 text-xs text-slate-800">
+											<div class="flex flex-wrap items-start justify-between gap-2">
+												<div class="text-sm font-semibold text-slate-950">
+													{#if mapping.framework_control_code}
+														<span class="text-slate-600">{mapping.framework_control_code}</span>
+														&middot;
+													{/if}
+													{mapping.framework_control_title}
+												</div>
+												<div class="flex flex-wrap gap-1">
+													<span class="rounded bg-sky-100 px-2 py-0.5 font-semibold text-sky-900">
+														{humanizeFieldLabel(mapping.mapping_type)}
+													</span>
+													<span class="rounded bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">
+														Confidence: {formatConfidence(mapping.confidence)}
+													</span>
+													{#if mapping.review_status}
+														<span
+															class="rounded bg-violet-100 px-2 py-0.5 font-semibold text-violet-900"
+														>
+															{humanizeFieldLabel(mapping.review_status)}
+														</span>
+													{/if}
+												</div>
+											</div>
+											{#if mapping.framework_name}
+												<div class="mt-1">
+													<span class="font-semibold">Framework:</span>
+													{mapping.framework_name}
+												</div>
+											{/if}
+											{#if mapping.framework_control_description}
+												<div class="mt-1 text-slate-700">
+													{mapping.framework_control_description}
+												</div>
+											{/if}
+											{#if mapping.rationale}
+												<div class="mt-1">
+													<span class="font-semibold">Rationale:</span>
+													{mapping.rationale}
+												</div>
+											{/if}
+											{#if mapping.linked_finding_title || mapping.linked_finding_reference}
+												<div class="mt-1">
+													<span class="font-semibold">Linked finding:</span>
+													{mapping.linked_finding_title || mapping.linked_finding_reference}
+												</div>
+											{/if}
+											{#if mapping.linked_applied_control_title || mapping.linked_applied_control_reference}
+												<div class="mt-1">
+													<span class="font-semibold">Linked applied control:</span>
+													{mapping.linked_applied_control_title ||
+														mapping.linked_applied_control_reference}
+												</div>
+											{/if}
+											{#if mapping.linked_remediation_action_title || mapping.linked_remediation_action_reference}
+												<div class="mt-1">
+													<span class="font-semibold">Linked remediation action:</span>
+													{mapping.linked_remediation_action_title ||
+														mapping.linked_remediation_action_reference}
+												</div>
+											{/if}
+											{#if mapping.evidence_needed?.length}
+												<div class="mt-1">
+													<span class="font-semibold">Evidence needed:</span>
+													<ul class="list-disc pl-5">
+														{#each mapping.evidence_needed as evidenceItem}
+															<li>{evidenceItem}</li>
+														{/each}
+													</ul>
+												</div>
+											{/if}
+										</div>
+									{/each}
+								</div>
+							</div>
+						{/if}
+
+						{#if frameworkControlMappingDraft.warnings?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-amber-800">
+								{#each frameworkControlMappingDraft.warnings as warning}
+									<li>{warning.message ?? warning.detail ?? warning.code}</li>
+								{/each}
+							</ul>
+						{/if}
+
+						{#if frameworkControlMappingDraft.ambiguity_flags?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-amber-800">
+								{#each frameworkControlMappingDraft.ambiguity_flags as flag}
+									<li>{flag.message ?? flag.code}</li>
+								{/each}
+							</ul>
+						{/if}
+					{/if}
+				</div>
+			{/if}
+
 			<details class="mt-3">
 				<summary class="cursor-pointer font-semibold">Raw JSON</summary>
 				<pre
@@ -2263,7 +2507,8 @@
 							evidenceFindingCommitResult,
 							remediationActionDraft,
 							remediationCommitDryRun,
-							remediationCommitResult
+							remediationCommitResult,
+							frameworkControlMappingDraft
 						},
 						null,
 						2
