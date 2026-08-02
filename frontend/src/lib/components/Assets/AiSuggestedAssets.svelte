@@ -39,6 +39,8 @@
 		| 'remediation-commit-dry-run'
 		| 'remediation-commit'
 		| 'framework-mapping-suggest'
+		| 'framework-mapping-commit-dry-run'
+		| 'framework-mapping-commit'
 		| null
 	>(null);
 	let error = $state<any>(null);
@@ -74,6 +76,11 @@
 	// Step 7A is advisory only: no commit state, no dry-run state, and no approval flag.
 	let frameworkControlMappingDraft = $state<any>(null);
 	let caseContext = $state<any>(null);
+	// Step 7B is the deterministic write step for the Step 7A framework mappings.
+	let selectedFrameworkMappingIds = $state<Record<string, boolean>>({});
+	let frameworkMappingCommitApproved = $state(false);
+	let frameworkMappingCommitDryRun = $state<any>(null);
+	let frameworkMappingCommitResult = $state<any>(null);
 
 	const providerMode = $derived(
 		assetDraft?.provider_mode ?? assetDraft?.source_summary?.provider_mode ?? 'not run'
@@ -856,10 +863,109 @@
 		loading = 'framework-mapping-suggest';
 		error = null;
 		try {
-			frameworkControlMappingDraft = await postAiAction(
+			const draft = await postAiAction(
 				'aiFrameworkControlMappingSuggest',
 				buildFrameworkControlMappingSuggestionPayload()
 			);
+			frameworkControlMappingDraft = draft;
+			// Hand the Step 7A suggestions to the Step 7B review state. Nothing is written.
+			selectedFrameworkMappingIds = Object.fromEntries(
+				(draft?.framework_control_mappings ?? []).map((mapping: any) => [
+					mapping.temporary_id,
+					false
+				])
+			);
+			frameworkMappingCommitApproved = false;
+			frameworkMappingCommitDryRun = null;
+			frameworkMappingCommitResult = null;
+		} catch (caught) {
+			error = caught;
+		} finally {
+			loading = null;
+		}
+	}
+
+	// ---- Step 7B: deterministic commit. No AI model is called in this step. ----
+
+	const selectedFrameworkMappings = $derived(
+		(frameworkControlMappingDraft?.framework_control_mappings ?? []).filter(
+			(mapping: any) => selectedFrameworkMappingIds[mapping.temporary_id]
+		)
+	);
+	const frameworkMappingDryRunSucceeded = $derived(
+		Boolean(frameworkMappingCommitDryRun) &&
+			!(frameworkMappingCommitDryRun?.blocking_errors ?? []).length &&
+			frameworkMappingCommitDryRun?.commit_status !== 'blocked'
+	);
+
+	function buildFrameworkControlMappingCommitPayload(dryRun: boolean) {
+		if (!frameworkControlMappingDraft) throw { detail: 'Run Step 7A before Step 7B.' };
+		if (!setupReference.folder_id) {
+			throw { detail: 'A Folder ID is required before the deterministic Step 7B write.' };
+		}
+		if (!setupReference.compliance_assessment_id) {
+			throw {
+				detail: 'A Compliance Assessment ID is required before the deterministic Step 7B write.'
+			};
+		}
+		if (!selectedFrameworkMappings.length) {
+			throw { detail: 'Select at least one framework control mapping to commit.' };
+		}
+		if (!dryRun && !frameworkMappingDryRunSucceeded) {
+			throw { detail: 'Run a successful Step 7B dry-run before the approved commit.' };
+		}
+		if (!dryRun && !frameworkMappingCommitApproved) {
+			throw { detail: 'Approve the deterministic Step 7B write first.' };
+		}
+
+		return {
+			dry_run: dryRun,
+			approved: dryRun ? false : frameworkMappingCommitApproved,
+			folder_reference: setupReference.folder_id,
+			assessment_reference: setupReference.compliance_assessment_id,
+			framework_reference: setupReference.selected_framework_id || '',
+			decisions: selectedFrameworkMappings.map((mapping: any) => ({
+				temporary_id: mapping.temporary_id,
+				selected: true,
+				decision: 'create',
+				existing_record_reference: '',
+				payload: {
+					temporary_id: mapping.temporary_id,
+					framework_control_reference: mapping.framework_control_reference,
+					framework_control_code: mapping.framework_control_code ?? '',
+					framework_control_title: mapping.framework_control_title ?? '',
+					framework_control_description: mapping.framework_control_description ?? '',
+					framework_name: mapping.framework_name ?? '',
+					mapping_type: mapping.mapping_type,
+					linked_finding_reference: mapping.linked_finding_reference ?? '',
+					linked_finding_title: mapping.linked_finding_title ?? '',
+					linked_applied_control_reference: mapping.linked_applied_control_reference ?? '',
+					linked_applied_control_title: mapping.linked_applied_control_title ?? '',
+					linked_remediation_action_reference: mapping.linked_remediation_action_reference ?? '',
+					linked_remediation_action_title: mapping.linked_remediation_action_title ?? '',
+					rationale: mapping.rationale ?? '',
+					evidence_needed: mapping.evidence_needed ?? [],
+					confidence: mapping.confidence,
+					review_status: mapping.review_status
+				}
+			}))
+		};
+	}
+
+	async function runFrameworkControlMappingCommit(dryRun: boolean) {
+		loading = dryRun ? 'framework-mapping-commit-dry-run' : 'framework-mapping-commit';
+		error = null;
+		try {
+			const result = await postAiAction(
+				'aiFrameworkControlMappingCommit',
+				buildFrameworkControlMappingCommitPayload(dryRun)
+			);
+			if (dryRun) {
+				frameworkMappingCommitDryRun = result;
+				frameworkMappingCommitResult = null;
+			} else {
+				frameworkMappingCommitResult = result;
+			}
 		} catch (caught) {
 			error = caught;
 		} finally {
@@ -2491,6 +2597,201 @@
 				</div>
 			{/if}
 
+			{#if frameworkControlMappingDraft?.framework_control_mappings?.length}
+				<div class="mt-4 rounded border border-emerald-300 bg-emerald-50/60 p-3 text-sm text-emerald-950">
+					<div class="font-semibold">Step 7B &middot; Framework Control Mapping Commit</div>
+					<p class="mt-1 text-emerald-900">
+						<span class="font-semibold">No AI model is used / writes only after approval.</span>
+						Select the Step 7A framework mappings to keep, then dry-run to preview. The approved
+						commit writes deterministic mappings only for selected and approved items.
+					</p>
+
+					<div class="mt-3 grid gap-2">
+						{#each frameworkControlMappingDraft.framework_control_mappings as mapping}
+							<label class="flex items-start gap-2 rounded border bg-white p-2 text-xs">
+								<input
+									type="checkbox"
+									bind:checked={selectedFrameworkMappingIds[mapping.temporary_id]}
+								/>
+								<span>
+									<span class="font-semibold">
+										{#if mapping.framework_control_code}
+											{mapping.framework_control_code} &middot;
+										{/if}
+										{mapping.framework_control_title}
+									</span>
+									<span class="text-slate-600">
+										&middot; {humanizeFieldLabel(mapping.mapping_type)} &middot; Confidence: {formatConfidence(
+											mapping.confidence
+										)}
+									</span>
+								</span>
+							</label>
+						{/each}
+					</div>
+
+					<div class="mt-3 flex flex-wrap items-center gap-3">
+						<button
+							class="btn btn-sm preset-tonal"
+							type="button"
+							disabled={loading !== null || !selectedFrameworkMappings.length}
+							onclick={() => runFrameworkControlMappingCommit(true)}
+						>
+							{loading === 'framework-mapping-commit-dry-run'
+								? 'Dry-running...'
+								: 'Step 7B dry-run'}
+						</button>
+						<label class="flex items-center gap-2 text-xs">
+							<input type="checkbox" bind:checked={frameworkMappingCommitApproved} />
+							<span>
+								I approve deterministic Step 7B decisions for selected framework control mappings
+							</span>
+						</label>
+						<button
+							class="btn btn-sm preset-filled-error-500"
+							type="button"
+							disabled={loading !== null ||
+								!frameworkMappingCommitApproved ||
+								!frameworkMappingDryRunSucceeded ||
+								!selectedFrameworkMappings.length}
+							onclick={() => runFrameworkControlMappingCommit(false)}
+						>
+							{loading === 'framework-mapping-commit'
+								? 'Committing...'
+								: 'Approved framework mapping commit'}
+						</button>
+						<span class="text-xs text-emerald-900">No AI model is used in this write step.</span>
+					</div>
+
+					{#if frameworkMappingCommitDryRun}
+						<div class="mt-3 grid gap-2 rounded border bg-white p-3 text-sm">
+							<div class="font-semibold">
+								Step 7B dry-run status: {humanizeFieldLabel(
+									frameworkMappingCommitDryRun.commit_status
+								)}
+							</div>
+							<p class="text-xs text-slate-700">
+								Dry-run only previews the deterministic write. Nothing was written.
+							</p>
+							<div class="flex flex-wrap gap-2 text-xs">
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Rejected: {frameworkMappingCommitDryRun.rejected_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Deferred: {frameworkMappingCommitDryRun.deferred_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Skipped: {frameworkMappingCommitDryRun.skipped_records?.length ?? 0}
+								</span>
+							</div>
+							{#if frameworkMappingCommitDryRun.planned_actions?.length}
+								<div class="text-xs font-semibold text-emerald-950">Planned actions</div>
+								<ul class="list-disc pl-5 text-xs text-slate-800">
+									{#each frameworkMappingCommitDryRun.planned_actions as action}
+										<li>
+											{action.target_name ?? action.source_temporary_id}:
+											{humanizeActionName(action.decision)} &middot; {humanizeFieldLabel(
+												action.status
+											)} &middot; {action.detail}
+										</li>
+									{/each}
+								</ul>
+							{/if}
+						</div>
+						{#if frameworkMappingCommitDryRun.warnings?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-amber-800">
+								{#each frameworkMappingCommitDryRun.warnings as warning}
+									<li>{warning.detail ?? warning.message ?? warning.code}</li>
+								{/each}
+							</ul>
+						{/if}
+						{#if frameworkMappingCommitDryRun.blocking_errors?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-red-700">
+								{#each frameworkMappingCommitDryRun.blocking_errors as blockingError}
+									<li>{blockingError.detail}</li>
+								{/each}
+							</ul>
+						{/if}
+					{/if}
+
+					{#if frameworkMappingCommitResult}
+						<div class="mt-3 grid gap-2 rounded border bg-white p-3 text-sm">
+							<div class="font-semibold">
+								Step 7B commit status: {humanizeFieldLabel(
+									frameworkMappingCommitResult.commit_status
+								)}
+							</div>
+							<div class="flex flex-wrap gap-2 text-xs">
+								<span class="rounded bg-emerald-100 px-2 py-1 font-semibold text-emerald-900">
+									Created: {frameworkMappingCommitResult.created_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-emerald-100 px-2 py-1 font-semibold text-emerald-900">
+									Reused: {frameworkMappingCommitResult.reused_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Rejected: {frameworkMappingCommitResult.rejected_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Deferred: {frameworkMappingCommitResult.deferred_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Skipped: {frameworkMappingCommitResult.skipped_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-amber-100 px-2 py-1 font-semibold text-amber-900">
+									Warnings: {frameworkMappingCommitResult.warnings?.length ?? 0}
+								</span>
+								<span class="rounded bg-red-100 px-2 py-1 font-semibold text-red-900">
+									Blocking errors: {frameworkMappingCommitResult.blocking_errors?.length ?? 0}
+								</span>
+							</div>
+							{#if frameworkMappingCommitResult.created_records?.length}
+								<div class="text-xs font-semibold text-emerald-950">Created mappings</div>
+								<ul class="list-disc pl-5 text-xs text-slate-800">
+									{#each frameworkMappingCommitResult.created_records as record}
+										<li>{humanizeFieldLabel(record.record_type)}: {record.name}</li>
+									{/each}
+								</ul>
+							{/if}
+							{#if frameworkMappingCommitResult.reused_records?.length}
+								<div class="text-xs font-semibold text-emerald-950">Reused existing mappings</div>
+								<ul class="list-disc pl-5 text-xs text-slate-800">
+									{#each frameworkMappingCommitResult.reused_records as record}
+										<li>{humanizeFieldLabel(record.record_type)}: {record.name}</li>
+									{/each}
+								</ul>
+							{/if}
+							{#if frameworkMappingCommitResult.planned_actions?.length}
+								<div class="text-xs font-semibold text-emerald-950">Planned actions</div>
+								<ul class="list-disc pl-5 text-xs text-slate-800">
+									{#each frameworkMappingCommitResult.planned_actions as action}
+										<li>
+											{action.target_name ?? action.source_temporary_id}:
+											{humanizeActionName(action.decision)} &middot; {humanizeFieldLabel(
+												action.status
+											)}
+										</li>
+									{/each}
+								</ul>
+							{/if}
+						</div>
+						{#if frameworkMappingCommitResult.warnings?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-amber-800">
+								{#each frameworkMappingCommitResult.warnings as warning}
+									<li>{warning.detail ?? warning.message ?? warning.code}</li>
+								{/each}
+							</ul>
+						{/if}
+						{#if frameworkMappingCommitResult.blocking_errors?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-red-700">
+								{#each frameworkMappingCommitResult.blocking_errors as blockingError}
+									<li>{blockingError.detail}</li>
+								{/each}
+							</ul>
+						{/if}
+					{/if}
+				</div>
+			{/if}
+
 			<details class="mt-3">
 				<summary class="cursor-pointer font-semibold">Raw JSON</summary>
 				<pre
@@ -2508,7 +2809,9 @@
 							remediationActionDraft,
 							remediationCommitDryRun,
 							remediationCommitResult,
-							frameworkControlMappingDraft
+							frameworkControlMappingDraft,
+							frameworkMappingCommitDryRun,
+							frameworkMappingCommitResult
 						},
 						null,
 						2

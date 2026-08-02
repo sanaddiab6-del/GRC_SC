@@ -12,7 +12,8 @@ const aiOnboardingActionEndpoints: Record<string, string> = {
 	aiEvidenceFindingCommit: '/ai/onboarding/evidence-findings/commit/',
 	aiRemediationActionSuggest: '/ai/onboarding/remediation-actions/suggest/',
 	aiRemediationActionCommit: '/ai/onboarding/remediation-actions/commit/',
-	aiFrameworkControlMappingSuggest: '/ai/onboarding/framework-control-mappings/suggest/'
+	aiFrameworkControlMappingSuggest: '/ai/onboarding/framework-control-mappings/suggest/',
+	aiFrameworkControlMappingCommit: '/ai/onboarding/framework-control-mappings/commit/'
 };
 
 function getNamedAction(url: URL) {

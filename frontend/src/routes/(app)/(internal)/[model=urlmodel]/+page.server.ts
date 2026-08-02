@@ -141,6 +141,9 @@ export const actions: Actions = {
 	aiFrameworkControlMappingSuggest: async (event) => {
 		return proxyAiOnboardingAction(event, '/ai/onboarding/framework-control-mappings/suggest/');
 	},
+	aiFrameworkControlMappingCommit: async (event) => {
+		return proxyAiOnboardingAction(event, '/ai/onboarding/framework-control-mappings/commit/');
+	},
 	create: async (event) => {
 		const redirectToWrittenObject = Boolean(
 			event.params.model === 'entity-assessments' ||

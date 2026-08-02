@@ -21,6 +21,16 @@ from .asset_suggestion_guardrails import AssetSuggestionDraftValidationError
 from .asset_suggestion_provider import AssetSuggestionProviderError
 from .asset_suggestion_serializers import AiAssetSuggestionInputSerializer
 from .asset_suggestion_service import build_asset_suggestion_draft
+from .framework_control_mapping_commit_guardrails import (
+    FrameworkControlMappingCommitValidationError,
+    validate_framework_control_mapping_commit_guardrails,
+)
+from .framework_control_mapping_commit_serializers import (
+    AiFrameworkControlMappingCommitInputSerializer,
+)
+from .framework_control_mapping_commit_service import (
+    execute_framework_control_mapping_commit,
+)
 from .framework_control_mapping_suggestion_guardrails import (
     FrameworkControlMappingSuggestionDraftValidationError,
     validate_framework_control_mapping_suggestion_request_guardrails,
@@ -288,6 +298,36 @@ class AiFrameworkControlMappingSuggestionView(APIView):
             return Response(exc.to_response(), status=exc.status_code)
 
         return Response(draft)
+
+
+class AiFrameworkControlMappingCommitView(APIView):
+    """Step 7B: deterministic framework control mapping commit. No AI provider is used."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(request=AiFrameworkControlMappingCommitInputSerializer)
+    def post(self, request, format=None):
+        try:
+            # Run on the raw payload so AI/provider, write-intent, and raw-identifier keys
+            # are reported through the Step 7B blocking_errors contract rather than as a
+            # generic unknown-field error.
+            validate_framework_control_mapping_commit_guardrails(
+                request.data if isinstance(request.data, dict) else {}
+            )
+        except FrameworkControlMappingCommitValidationError as exc:
+            return Response(exc.to_response(), status=exc.status_code)
+
+        serializer = AiFrameworkControlMappingCommitInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            result = execute_framework_control_mapping_commit(
+                request, serializer.validated_data
+            )
+        except FrameworkControlMappingCommitValidationError as exc:
+            return Response(exc.to_response(), status=exc.status_code)
+
+        return Response(result)
 
 
 class AiRemediationActionCommitView(APIView):
