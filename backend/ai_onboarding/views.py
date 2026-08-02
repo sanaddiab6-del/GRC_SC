@@ -21,6 +21,29 @@ from .asset_suggestion_guardrails import AssetSuggestionDraftValidationError
 from .asset_suggestion_provider import AssetSuggestionProviderError
 from .asset_suggestion_serializers import AiAssetSuggestionInputSerializer
 from .asset_suggestion_service import build_asset_suggestion_draft
+from .framework_control_mapping_commit_guardrails import (
+    FrameworkControlMappingCommitValidationError,
+    validate_framework_control_mapping_commit_guardrails,
+)
+from .framework_control_mapping_commit_serializers import (
+    AiFrameworkControlMappingCommitInputSerializer,
+)
+from .framework_control_mapping_commit_service import (
+    execute_framework_control_mapping_commit,
+)
+from .framework_control_mapping_suggestion_guardrails import (
+    FrameworkControlMappingSuggestionDraftValidationError,
+    validate_framework_control_mapping_suggestion_request_guardrails,
+)
+from .framework_control_mapping_suggestion_provider import (
+    FrameworkControlMappingSuggestionProviderError,
+)
+from .framework_control_mapping_suggestion_serializers import (
+    AiFrameworkControlMappingSuggestionInputSerializer,
+)
+from .framework_control_mapping_suggestion_service import (
+    build_framework_control_mapping_suggestion_draft,
+)
 from .evidence_finding_commit_guardrails import EvidenceFindingCommitValidationError
 from .evidence_finding_commit_serializers import AiEvidenceFindingCommitInputSerializer
 from .evidence_finding_commit_service import execute_evidence_finding_commit
@@ -235,6 +258,76 @@ class AiRemediationActionSuggestionView(APIView):
             return Response(exc.to_response(), status=exc.status_code)
 
         return Response(draft)
+
+
+class AiFrameworkControlMappingSuggestionView(APIView):
+    """Step 7A: advisory framework control mapping suggestion. No database writes.
+
+    Mappings may only point at framework controls that already exist: either supplied in
+    candidate_framework_controls or found by a safe read-only lookup. No frameworks,
+    requirements, framework controls, or mappings are created here.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(request=AiFrameworkControlMappingSuggestionInputSerializer)
+    def post(self, request, format=None):
+        request_guardrail_errors = (
+            validate_framework_control_mapping_suggestion_request_guardrails(
+                request.data if isinstance(request.data, dict) else {}
+            )
+        )
+        if request_guardrail_errors:
+            return Response(request_guardrail_errors, status=400)
+
+        serializer = AiFrameworkControlMappingSuggestionInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            with transaction.atomic():
+                draft = build_framework_control_mapping_suggestion_draft(
+                    request,
+                    serializer.validated_data,
+                    base_dir=str(settings.BASE_DIR.parent),
+                )
+                transaction.set_rollback(True)
+        except (
+            FrameworkControlMappingSuggestionDraftValidationError,
+            FrameworkControlMappingSuggestionProviderError,
+        ) as exc:
+            return Response(exc.to_response(), status=exc.status_code)
+
+        return Response(draft)
+
+
+class AiFrameworkControlMappingCommitView(APIView):
+    """Step 7B: deterministic framework control mapping commit. No AI provider is used."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(request=AiFrameworkControlMappingCommitInputSerializer)
+    def post(self, request, format=None):
+        try:
+            # Run on the raw payload so AI/provider, write-intent, and raw-identifier keys
+            # are reported through the Step 7B blocking_errors contract rather than as a
+            # generic unknown-field error.
+            validate_framework_control_mapping_commit_guardrails(
+                request.data if isinstance(request.data, dict) else {}
+            )
+        except FrameworkControlMappingCommitValidationError as exc:
+            return Response(exc.to_response(), status=exc.status_code)
+
+        serializer = AiFrameworkControlMappingCommitInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            result = execute_framework_control_mapping_commit(
+                request, serializer.validated_data
+            )
+        except FrameworkControlMappingCommitValidationError as exc:
+            return Response(exc.to_response(), status=exc.status_code)
+
+        return Response(result)
 
 
 class AiRemediationActionCommitView(APIView):

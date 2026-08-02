@@ -9,6 +9,8 @@ from .views import (
     AiCaseSetupView,
     AiEvidenceFindingCommitView,
     AiEvidenceFindingSuggestionView,
+    AiFrameworkControlMappingCommitView,
+    AiFrameworkControlMappingSuggestionView,
     AiRemediationActionCommitView,
     AiRemediationActionSuggestionView,
 )
@@ -48,5 +50,15 @@ urlpatterns = [
         "onboarding/remediation-actions/commit/",
         AiRemediationActionCommitView.as_view(),
         name="ai-remediation-action-commit",
+    ),
+    path(
+        "onboarding/framework-control-mappings/suggest/",
+        AiFrameworkControlMappingSuggestionView.as_view(),
+        name="ai-framework-control-mapping-suggestion",
+    ),
+    path(
+        "onboarding/framework-control-mappings/commit/",
+        AiFrameworkControlMappingCommitView.as_view(),
+        name="ai-framework-control-mapping-commit",
     ),
 ]
