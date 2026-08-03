@@ -41,6 +41,21 @@
 		| 'framework-mapping-suggest'
 		| 'framework-mapping-commit-dry-run'
 		| 'framework-mapping-commit'
+		| 'risk-scenario-suggest'
+		| 'risk-scenario-commit-dry-run'
+		| 'risk-scenario-commit'
+		| 'control-effectiveness-suggest'
+		| 'control-effectiveness-commit-dry-run'
+		| 'control-effectiveness-commit'
+		| 'audit-readiness-suggest'
+		| 'audit-readiness-commit-dry-run'
+		| 'audit-readiness-commit'
+		| 'audit-report-suggest'
+		| 'audit-report-commit-dry-run'
+		| 'audit-report-commit'
+		| 'final-review-suggest'
+		| 'final-review-commit-dry-run'
+		| 'final-review-commit'
 		| null
 	>(null);
 	let error = $state<any>(null);
@@ -81,6 +96,41 @@
 	let frameworkMappingCommitApproved = $state(false);
 	let frameworkMappingCommitDryRun = $state<any>(null);
 	let frameworkMappingCommitResult = $state<any>(null);
+	// Step 8A is advisory only: no commit state, no dry-run state, and no approval flag.
+	let riskScenarioDraft = $state<any>(null);
+	// Step 8B is the deterministic write step for the Step 8A risk scenarios.
+	let selectedRiskScenarioIds = $state<Record<string, boolean>>({});
+	let riskScenarioCommitApproved = $state(false);
+	let riskScenarioCommitDryRun = $state<any>(null);
+	let riskScenarioCommitResult = $state<any>(null);
+	// Step 9A is advisory only: no commit state, no dry-run state, and no approval flag.
+	let controlEffectivenessDraft = $state<any>(null);
+	// Step 9B is the deterministic write step for the Step 9A judgements.
+	let selectedControlEffectivenessIds = $state<Record<string, boolean>>({});
+	let controlEffectivenessCommitApproved = $state(false);
+	let controlEffectivenessCommitDryRun = $state<any>(null);
+	let controlEffectivenessCommitResult = $state<any>(null);
+	// Step 10A is advisory only: no commit state, no dry-run state, and no approval flag.
+	let auditReadinessDraft = $state<any>(null);
+	// Step 10B is the deterministic write step for the Step 10A readiness summary.
+	let auditReadinessSelected = $state(false);
+	let auditReadinessCommitApproved = $state(false);
+	let auditReadinessCommitDryRun = $state<any>(null);
+	let auditReadinessCommitResult = $state<any>(null);
+	// Step 11A is advisory only: no commit state, no dry-run state, and no approval flag.
+	let auditReportDraft = $state<any>(null);
+	// Step 11B is the deterministic write step for the Step 11A report draft.
+	let auditReportSelected = $state(false);
+	let auditReportCommitApproved = $state(false);
+	let auditReportCommitDryRun = $state<any>(null);
+	let auditReportCommitResult = $state<any>(null);
+	// Step 12A is advisory only: no commit state, no dry-run state, and no approval flag.
+	let finalReviewDraft = $state<any>(null);
+	// Step 12B is the deterministic write step for the Step 12A handoff summary.
+	let finalReviewSelected = $state(false);
+	let finalReviewCommitApproved = $state(false);
+	let finalReviewCommitDryRun = $state<any>(null);
+	let finalReviewCommitResult = $state<any>(null);
 
 	const providerMode = $derived(
 		assetDraft?.provider_mode ?? assetDraft?.source_summary?.provider_mode ?? 'not run'
@@ -101,6 +151,13 @@
 	const frameworkControlMappingProviderMode = $derived(
 		frameworkControlMappingDraft?.provider_mode ?? 'not run'
 	);
+	const riskScenarioProviderMode = $derived(riskScenarioDraft?.provider_mode ?? 'not run');
+	const controlEffectivenessProviderMode = $derived(
+		controlEffectivenessDraft?.provider_mode ?? 'not run'
+	);
+	const auditReadinessProviderMode = $derived(auditReadinessDraft?.provider_mode ?? 'not run');
+	const auditReportProviderMode = $derived(auditReportDraft?.provider_mode ?? 'not run');
+	const finalReviewProviderMode = $derived(finalReviewDraft?.provider_mode ?? 'not run');
 	const isConfiguredLocalProvider = $derived(providerMode === 'configured_local_provider');
 	const isAppliedControlConfiguredLocalProvider = $derived(
 		appliedControlProviderMode === 'configured_local_provider'
@@ -965,6 +1022,850 @@
 				frameworkMappingCommitResult = null;
 			} else {
 				frameworkMappingCommitResult = result;
+			}
+		} catch (caught) {
+			error = caught;
+		} finally {
+			loading = null;
+		}
+	}
+
+	// ---- Shared onboarding context helpers for Steps 8A-12A ----------------------------
+
+	function caseSummaryText() {
+		return [scenarioText, scopeSummary]
+			.map((value) => (typeof value === 'string' ? value.trim() : ''))
+			.filter(Boolean)
+			.join('\n\n')
+			.slice(0, 20000);
+	}
+
+	function scenarioLabel() {
+		return (scopeSummary || scenarioText || '').trim().slice(0, 500);
+	}
+
+	function folderReferenceContext() {
+		return { folder_id: setupReference.folder_id || null, folder_name: null };
+	}
+
+	function assessmentReferenceContext() {
+		return {
+			assessment_id: setupReference.compliance_assessment_id || null,
+			assessment_name: null
+		};
+	}
+
+	function approvedAssetContextItems() {
+		return approvedAssetReferences
+			.map((asset: any) => toContextItem(asset.ref_id ?? asset.asset_id, asset.name))
+			.filter(Boolean);
+	}
+
+	function approvedControlContextItems() {
+		return buildApprovedAppliedControlReferences()
+			.map((control: any) => toContextItem(control.ref_id ?? control.applied_control_id, control.name))
+			.filter(Boolean);
+	}
+
+	function evidenceRequestContextItems() {
+		return buildRemediationContextItems(evidenceFindingDraft?.evidence_requests ?? [], (item, index) =>
+			displayEvidenceTitle(item, index)
+		);
+	}
+
+	function auditQuestionContextItems() {
+		return buildRemediationContextItems(evidenceFindingDraft?.audit_questions ?? [], (item, index) =>
+			displayAuditQuestionTitle(item, index)
+		);
+	}
+
+	function findingContextItems() {
+		return buildRemediationContextItems(
+			evidenceFindingDraft?.preliminary_findings ?? [],
+			(item, index) => displayFindingTitle(item, index)
+		);
+	}
+
+	function remediationActionContextItems() {
+		return buildRemediationContextItems(
+			remediationActionDraft?.remediation_actions ?? [],
+			(item, index) => item?.title || `Remediation action ${index + 1}`
+		);
+	}
+
+	// Framework mappings are carried over exactly as Step 7A resolved them, so later steps
+	// can only ever reference framework controls that already exist.
+	function frameworkMappingContextItems() {
+		return (frameworkControlMappingDraft?.framework_control_mappings ?? [])
+			.map((mapping: any) => {
+				const title = (mapping?.framework_control_title ?? '').trim();
+				if (!title) return null;
+				return {
+					reference: mapping.framework_control_reference || null,
+					code: mapping.framework_control_code || null,
+					title: title.slice(0, 500),
+					description: (mapping.framework_control_description || '').slice(0, 5000) || null
+				};
+			})
+			.filter(Boolean);
+	}
+
+	function riskScenarioContextItems() {
+		return (riskScenarioDraft?.risk_scenarios ?? [])
+			.map((scenario: any) => toContextItem(scenario?.temporary_id, scenario?.title, scenario?.description))
+			.filter(Boolean);
+	}
+
+	function controlEffectivenessContextItems() {
+		return (controlEffectivenessDraft?.control_effectiveness_suggestions ?? [])
+			.map((suggestion: any) => {
+				const title = (suggestion?.framework_control_title ?? '').trim();
+				if (!title) return null;
+				return {
+					reference: suggestion.temporary_id || null,
+					title: title.slice(0, 500),
+					description: (suggestion.rationale || '').slice(0, 5000) || null,
+					status: suggestion.suggested_compliance_status || null
+				};
+			})
+			.filter(Boolean);
+	}
+
+	// ---- Step 8A: advisory risk scenario suggestion. No commit, no dry-run, no write. ----
+
+	function buildRiskScenarioSuggestionPayload() {
+		const findings = findingContextItems();
+		const weaknesses = knownWeaknessList();
+		const assets = approvedAssetContextItems();
+		if (!findings.length && !weaknesses.length && !assets.length) {
+			throw {
+				detail:
+					'Step 8A needs at least one approved asset, one Step 5A preliminary finding, or one known weakness.'
+			};
+		}
+
+		// Optional references are sent when available; missing ones never block the request.
+		return {
+			case_summary: caseSummaryText(),
+			scenario_name: scenarioLabel(),
+			folder_reference: folderReferenceContext(),
+			assessment_reference: assessmentReferenceContext(),
+			assets,
+			applied_controls: approvedControlContextItems(),
+			evidence_requests: evidenceRequestContextItems(),
+			audit_questions: auditQuestionContextItems(),
+			preliminary_findings: findings,
+			remediation_actions: remediationActionContextItems(),
+			framework_mappings: frameworkMappingContextItems(),
+			known_weaknesses: weaknesses,
+			user_locale: 'en',
+			strict_mode: true
+		};
+	}
+
+	async function runRiskScenarioSuggestion() {
+		loading = 'risk-scenario-suggest';
+		error = null;
+		try {
+			const draft = await postAiAction('aiRiskScenarioSuggest', buildRiskScenarioSuggestionPayload());
+			riskScenarioDraft = draft;
+			// Hand the Step 8A suggestions to the Step 8B review state. Nothing is written.
+			selectedRiskScenarioIds = Object.fromEntries(
+				(draft?.risk_scenarios ?? []).map((scenario: any) => [scenario.temporary_id, false])
+			);
+			riskScenarioCommitApproved = false;
+			riskScenarioCommitDryRun = null;
+			riskScenarioCommitResult = null;
+		} catch (caught) {
+			error = caught;
+		} finally {
+			loading = null;
+		}
+	}
+
+	// ---- Step 8B: deterministic commit. No AI model is called in this step. ----
+
+	const selectedRiskScenarios = $derived(
+		(riskScenarioDraft?.risk_scenarios ?? []).filter(
+			(scenario: any) => selectedRiskScenarioIds[scenario.temporary_id]
+		)
+	);
+	const riskScenarioDryRunSucceeded = $derived(
+		Boolean(riskScenarioCommitDryRun) &&
+			!(riskScenarioCommitDryRun?.blocking_errors ?? []).length &&
+			riskScenarioCommitDryRun?.commit_status !== 'blocked'
+	);
+
+	function buildRiskScenarioCommitPayload(dryRun: boolean) {
+		if (!riskScenarioDraft) throw { detail: 'Run Step 8A before Step 8B.' };
+		if (!setupReference.folder_id) {
+			throw { detail: 'A Folder ID is required before the deterministic Step 8B write.' };
+		}
+		if (!setupReference.risk_assessment_id) {
+			throw {
+				detail:
+					'A Risk Assessment ID is required before the deterministic Step 8B write. Step 8B never creates a risk assessment.'
+			};
+		}
+		if (!selectedRiskScenarios.length) {
+			throw { detail: 'Select at least one risk scenario to commit.' };
+		}
+		if (!dryRun && !riskScenarioDryRunSucceeded) {
+			throw { detail: 'Run a successful Step 8B dry-run before the approved commit.' };
+		}
+		if (!dryRun && !riskScenarioCommitApproved) {
+			throw { detail: 'Approve the deterministic Step 8B write first.' };
+		}
+
+		return {
+			dry_run: dryRun,
+			approved: dryRun ? false : riskScenarioCommitApproved,
+			folder_reference: setupReference.folder_id,
+			assessment_reference: setupReference.risk_assessment_id,
+			decisions: selectedRiskScenarios.map((scenario: any) => ({
+				temporary_id: scenario.temporary_id,
+				selected: true,
+				decision: 'create',
+				existing_record_reference: '',
+				payload: {
+					temporary_id: scenario.temporary_id,
+					title: scenario.title,
+					description: scenario.description ?? '',
+					asset_reference: scenario.asset_reference ?? '',
+					asset_title: scenario.asset_title ?? '',
+					linked_finding_reference: scenario.linked_finding_reference ?? '',
+					linked_finding_title: scenario.linked_finding_title ?? '',
+					linked_applied_control_reference: scenario.linked_applied_control_reference ?? '',
+					linked_applied_control_title: scenario.linked_applied_control_title ?? '',
+					linked_remediation_action_reference: scenario.linked_remediation_action_reference ?? '',
+					linked_remediation_action_title: scenario.linked_remediation_action_title ?? '',
+					linked_framework_control_reference: scenario.linked_framework_control_reference ?? '',
+					linked_framework_control_code: scenario.linked_framework_control_code ?? '',
+					linked_framework_control_title: scenario.linked_framework_control_title ?? '',
+					threat: scenario.threat ?? '',
+					vulnerability: scenario.vulnerability ?? '',
+					impact_description: scenario.impact_description ?? '',
+					likelihood: scenario.likelihood,
+					impact: scenario.impact,
+					risk_level: scenario.risk_level,
+					rationale: scenario.rationale ?? '',
+					recommended_next_steps: scenario.recommended_next_steps ?? [],
+					confidence: scenario.confidence,
+					review_status: scenario.review_status
+				}
+			}))
+		};
+	}
+
+	async function runRiskScenarioCommit(dryRun: boolean) {
+		loading = dryRun ? 'risk-scenario-commit-dry-run' : 'risk-scenario-commit';
+		error = null;
+		try {
+			const result = await postAiAction('aiRiskScenarioCommit', buildRiskScenarioCommitPayload(dryRun));
+			if (dryRun) {
+				riskScenarioCommitDryRun = result;
+				riskScenarioCommitResult = null;
+			} else {
+				riskScenarioCommitResult = result;
+			}
+		} catch (caught) {
+			error = caught;
+		} finally {
+			loading = null;
+		}
+	}
+
+	// ---- Step 9A: advisory control effectiveness suggestion. No write. ----
+
+	// Requirement assessments that Step 7B actually paired with the audit. They are the
+	// existing rows Step 9B may later update; Step 9A never invents one.
+	function requirementAssessmentContextItems() {
+		return [
+			...(frameworkMappingCommitResult?.created_records ?? []),
+			...(frameworkMappingCommitResult?.reused_records ?? [])
+		]
+			.filter((record: any) => record?.record_id && record?.name)
+			.map((record: any) => ({
+				reference: record.record_id,
+				framework_control_title: String(record.name).slice(0, 500)
+			}));
+	}
+
+	function buildControlEffectivenessSuggestionPayload() {
+		const frameworkMappings = frameworkMappingContextItems();
+		const requirementAssessments = requirementAssessmentContextItems();
+		if (!frameworkMappings.length && !requirementAssessments.length) {
+			throw {
+				detail:
+					'Step 9A needs at least one Step 7A framework control mapping or one committed requirement assessment.'
+			};
+		}
+
+		return {
+			case_summary: caseSummaryText(),
+			scenario_name: scenarioLabel(),
+			folder_reference: folderReferenceContext(),
+			assessment_reference: assessmentReferenceContext(),
+			framework_mappings: frameworkMappings,
+			requirement_assessments: requirementAssessments,
+			applied_controls: approvedControlContextItems(),
+			evidence_requests: evidenceRequestContextItems(),
+			audit_questions: auditQuestionContextItems(),
+			preliminary_findings: findingContextItems(),
+			remediation_actions: remediationActionContextItems(),
+			risk_scenarios: riskScenarioContextItems(),
+			known_weaknesses: knownWeaknessList(),
+			user_locale: 'en',
+			strict_mode: true
+		};
+	}
+
+	async function runControlEffectivenessSuggestion() {
+		loading = 'control-effectiveness-suggest';
+		error = null;
+		try {
+			const draft = await postAiAction(
+				'aiControlEffectivenessSuggest',
+				buildControlEffectivenessSuggestionPayload()
+			);
+			controlEffectivenessDraft = draft;
+			selectedControlEffectivenessIds = Object.fromEntries(
+				(draft?.control_effectiveness_suggestions ?? []).map((suggestion: any) => [
+					suggestion.temporary_id,
+					false
+				])
+			);
+			controlEffectivenessCommitApproved = false;
+			controlEffectivenessCommitDryRun = null;
+			controlEffectivenessCommitResult = null;
+		} catch (caught) {
+			error = caught;
+		} finally {
+			loading = null;
+		}
+	}
+
+	// ---- Step 9B: deterministic commit. No AI model is called in this step. ----
+
+	const selectedControlEffectiveness = $derived(
+		(controlEffectivenessDraft?.control_effectiveness_suggestions ?? []).filter(
+			(suggestion: any) => selectedControlEffectivenessIds[suggestion.temporary_id]
+		)
+	);
+	const controlEffectivenessDryRunSucceeded = $derived(
+		Boolean(controlEffectivenessCommitDryRun) &&
+			!(controlEffectivenessCommitDryRun?.blocking_errors ?? []).length &&
+			controlEffectivenessCommitDryRun?.commit_status !== 'blocked'
+	);
+
+	function buildControlEffectivenessCommitPayload(dryRun: boolean) {
+		if (!controlEffectivenessDraft) throw { detail: 'Run Step 9A before Step 9B.' };
+		if (!setupReference.folder_id) {
+			throw { detail: 'A Folder ID is required before the deterministic Step 9B write.' };
+		}
+		if (!setupReference.compliance_assessment_id) {
+			throw {
+				detail: 'A Compliance Assessment ID is required before the deterministic Step 9B write.'
+			};
+		}
+		if (!selectedControlEffectiveness.length) {
+			throw { detail: 'Select at least one control effectiveness judgement to commit.' };
+		}
+		if (!dryRun && !controlEffectivenessDryRunSucceeded) {
+			throw { detail: 'Run a successful Step 9B dry-run before the approved commit.' };
+		}
+		if (!dryRun && !controlEffectivenessCommitApproved) {
+			throw { detail: 'Approve the deterministic Step 9B write first.' };
+		}
+
+		return {
+			dry_run: dryRun,
+			approved: dryRun ? false : controlEffectivenessCommitApproved,
+			folder_reference: setupReference.folder_id,
+			assessment_reference: setupReference.compliance_assessment_id,
+			decisions: selectedControlEffectiveness.map((suggestion: any) => ({
+				temporary_id: suggestion.temporary_id,
+				selected: true,
+				decision: 'create',
+				existing_record_reference: '',
+				payload: {
+					temporary_id: suggestion.temporary_id,
+					framework_control_reference: suggestion.framework_control_reference,
+					framework_control_code: suggestion.framework_control_code ?? '',
+					framework_control_title: suggestion.framework_control_title ?? '',
+					linked_requirement_assessment_reference:
+						suggestion.linked_requirement_assessment_reference ?? '',
+					linked_applied_control_reference: suggestion.linked_applied_control_reference ?? '',
+					linked_applied_control_title: suggestion.linked_applied_control_title ?? '',
+					linked_finding_reference: suggestion.linked_finding_reference ?? '',
+					linked_finding_title: suggestion.linked_finding_title ?? '',
+					suggested_effectiveness: suggestion.suggested_effectiveness,
+					suggested_compliance_status: suggestion.suggested_compliance_status,
+					evidence_summary: suggestion.evidence_summary ?? '',
+					gaps: suggestion.gaps ?? [],
+					recommended_auditor_action: suggestion.recommended_auditor_action ?? '',
+					rationale: suggestion.rationale ?? '',
+					confidence: suggestion.confidence,
+					review_status: suggestion.review_status
+				}
+			}))
+		};
+	}
+
+	async function runControlEffectivenessCommit(dryRun: boolean) {
+		loading = dryRun ? 'control-effectiveness-commit-dry-run' : 'control-effectiveness-commit';
+		error = null;
+		try {
+			const result = await postAiAction(
+				'aiControlEffectivenessCommit',
+				buildControlEffectivenessCommitPayload(dryRun)
+			);
+			if (dryRun) {
+				controlEffectivenessCommitDryRun = result;
+				controlEffectivenessCommitResult = null;
+			} else {
+				controlEffectivenessCommitResult = result;
+			}
+		} catch (caught) {
+			error = caught;
+		} finally {
+			loading = null;
+		}
+	}
+
+	// ---- Step 10A: advisory audit readiness summary. No write. ----
+
+	function buildAuditReadinessSuggestionPayload() {
+		return {
+			case_summary: caseSummaryText(),
+			scenario_name: scenarioLabel(),
+			folder_reference: folderReferenceContext(),
+			assessment_reference: assessmentReferenceContext(),
+			assets: approvedAssetContextItems(),
+			applied_controls: approvedControlContextItems(),
+			evidence_requests: evidenceRequestContextItems(),
+			audit_questions: auditQuestionContextItems(),
+			preliminary_findings: findingContextItems(),
+			remediation_actions: remediationActionContextItems(),
+			framework_mappings: frameworkMappingContextItems().map((mapping: any) => ({
+				reference: mapping.reference,
+				title: mapping.title,
+				description: mapping.description
+			})),
+			risk_scenarios: riskScenarioContextItems(),
+			control_effectiveness_suggestions: controlEffectivenessContextItems(),
+			known_weaknesses: knownWeaknessList(),
+			user_locale: 'en',
+			strict_mode: true
+		};
+	}
+
+	async function runAuditReadinessSuggestion() {
+		loading = 'audit-readiness-suggest';
+		error = null;
+		try {
+			const draft = await postAiAction(
+				'aiAuditReadinessSuggest',
+				buildAuditReadinessSuggestionPayload()
+			);
+			auditReadinessDraft = draft;
+			auditReadinessSelected = false;
+			auditReadinessCommitApproved = false;
+			auditReadinessCommitDryRun = null;
+			auditReadinessCommitResult = null;
+		} catch (caught) {
+			error = caught;
+		} finally {
+			loading = null;
+		}
+	}
+
+	// ---- Step 10B: deterministic commit. No AI model is called in this step. ----
+
+	const auditReadinessDryRunSucceeded = $derived(
+		Boolean(auditReadinessCommitDryRun) &&
+			!(auditReadinessCommitDryRun?.blocking_errors ?? []).length &&
+			auditReadinessCommitDryRun?.commit_status !== 'blocked'
+	);
+
+	function buildAuditReadinessCommitPayload(dryRun: boolean) {
+		if (!auditReadinessDraft) throw { detail: 'Run Step 10A before Step 10B.' };
+		if (!setupReference.folder_id) {
+			throw { detail: 'A Folder ID is required before the deterministic Step 10B write.' };
+		}
+		if (!setupReference.compliance_assessment_id) {
+			throw {
+				detail: 'A Compliance Assessment ID is required before the deterministic Step 10B write.'
+			};
+		}
+		if (!auditReadinessSelected) {
+			throw { detail: 'Select the readiness summary to record before committing.' };
+		}
+		if (!dryRun && !auditReadinessDryRunSucceeded) {
+			throw { detail: 'Run a successful Step 10B dry-run before the approved commit.' };
+		}
+		if (!dryRun && !auditReadinessCommitApproved) {
+			throw { detail: 'Approve the deterministic Step 10B write first.' };
+		}
+
+		return {
+			dry_run: dryRun,
+			approved: dryRun ? false : auditReadinessCommitApproved,
+			folder_reference: setupReference.folder_id,
+			assessment_reference: setupReference.compliance_assessment_id,
+			decisions: [
+				{
+					temporary_id: 'audit_readiness_1',
+					selected: true,
+					decision: 'create',
+					existing_record_reference: '',
+					payload: {
+						temporary_id: 'audit_readiness_1',
+						readiness_status: auditReadinessDraft.readiness_status,
+						readiness_score: auditReadinessDraft.readiness_score,
+						summary: auditReadinessDraft.summary ?? '',
+						ready_items: auditReadinessDraft.ready_items ?? [],
+						missing_evidence: auditReadinessDraft.missing_evidence ?? [],
+						open_findings: auditReadinessDraft.open_findings ?? [],
+						open_risks: auditReadinessDraft.open_risks ?? [],
+						blocked_controls: auditReadinessDraft.blocked_controls ?? [],
+						recommended_next_steps: auditReadinessDraft.recommended_next_steps ?? [],
+						priority_actions: auditReadinessDraft.priority_actions ?? [],
+						confidence: auditReadinessDraft.overall_confidence,
+						review_status: auditReadinessDraft.review_status
+					}
+				}
+			]
+		};
+	}
+
+	async function runAuditReadinessCommit(dryRun: boolean) {
+		loading = dryRun ? 'audit-readiness-commit-dry-run' : 'audit-readiness-commit';
+		error = null;
+		try {
+			const result = await postAiAction(
+				'aiAuditReadinessCommit',
+				buildAuditReadinessCommitPayload(dryRun)
+			);
+			if (dryRun) {
+				auditReadinessCommitDryRun = result;
+				auditReadinessCommitResult = null;
+			} else {
+				auditReadinessCommitResult = result;
+			}
+		} catch (caught) {
+			error = caught;
+		} finally {
+			loading = null;
+		}
+	}
+
+	// ---- Step 11A: advisory report draft. No write. ----
+
+	function buildAuditReportSuggestionPayload() {
+		return {
+			case_summary: caseSummaryText(),
+			scenario_name: scenarioLabel(),
+			organization_name: (caseContext?.organization ?? '') || null,
+			framework_name: frameworkNameHint() || null,
+			folder_reference: folderReferenceContext(),
+			assessment_reference: assessmentReferenceContext(),
+			assets: approvedAssetContextItems(),
+			applied_controls: approvedControlContextItems(),
+			evidence_requests: evidenceRequestContextItems(),
+			audit_questions: auditQuestionContextItems(),
+			preliminary_findings: findingContextItems(),
+			remediation_actions: remediationActionContextItems(),
+			framework_mappings: frameworkMappingContextItems().map((mapping: any) => ({
+				reference: mapping.reference,
+				title: mapping.title,
+				description: mapping.description
+			})),
+			risk_scenarios: riskScenarioContextItems(),
+			control_effectiveness_suggestions: controlEffectivenessContextItems(),
+			evidence_gaps: auditReadinessDraft?.missing_evidence ?? [],
+			audit_readiness: auditReadinessDraft
+				? {
+						readiness_status: auditReadinessDraft.readiness_status,
+						readiness_score: auditReadinessDraft.readiness_score,
+						summary: (auditReadinessDraft.summary ?? '').slice(0, 5000)
+					}
+				: null,
+			known_weaknesses: knownWeaknessList(),
+			user_locale: 'en',
+			strict_mode: true
+		};
+	}
+
+	async function runAuditReportSuggestion() {
+		loading = 'audit-report-suggest';
+		error = null;
+		try {
+			const draft = await postAiAction('aiAuditReportSuggest', buildAuditReportSuggestionPayload());
+			auditReportDraft = draft;
+			auditReportSelected = false;
+			auditReportCommitApproved = false;
+			auditReportCommitDryRun = null;
+			auditReportCommitResult = null;
+		} catch (caught) {
+			error = caught;
+		} finally {
+			loading = null;
+		}
+	}
+
+	// ---- Step 11B: deterministic commit. No AI model is called in this step. ----
+
+	const auditReportDryRunSucceeded = $derived(
+		Boolean(auditReportCommitDryRun) &&
+			!(auditReportCommitDryRun?.blocking_errors ?? []).length &&
+			auditReportCommitDryRun?.commit_status !== 'blocked'
+	);
+
+	function buildAuditReportCommitPayload(dryRun: boolean) {
+		if (!auditReportDraft) throw { detail: 'Run Step 11A before Step 11B.' };
+		if (!setupReference.folder_id) {
+			throw { detail: 'A Folder ID is required before the deterministic Step 11B write.' };
+		}
+		if (!(auditReportDraft.limitations ?? []).length) {
+			throw { detail: 'The report draft must carry its limitations before it can be saved.' };
+		}
+		if (!auditReportSelected) {
+			throw { detail: 'Select the report draft to save before committing.' };
+		}
+		if (!dryRun && !auditReportDryRunSucceeded) {
+			throw { detail: 'Run a successful Step 11B dry-run before the approved commit.' };
+		}
+		if (!dryRun && !auditReportCommitApproved) {
+			throw { detail: 'Approve the deterministic Step 11B write first.' };
+		}
+
+		return {
+			dry_run: dryRun,
+			approved: dryRun ? false : auditReportCommitApproved,
+			folder_reference: setupReference.folder_id,
+			assessment_reference: setupReference.compliance_assessment_id || '',
+			decisions: [
+				{
+					temporary_id: 'audit_report_1',
+					selected: true,
+					decision: 'create',
+					existing_record_reference: '',
+					payload: {
+						temporary_id: 'audit_report_1',
+						report_title: auditReportDraft.report_title,
+						executive_summary: auditReportDraft.executive_summary ?? '',
+						report_sections: (auditReportDraft.report_sections ?? []).map((section: any) => ({
+							heading: section.heading,
+							content: section.content ?? '',
+							source_items: section.source_items ?? [],
+							confidence: section.confidence
+						})),
+						limitations: auditReportDraft.limitations ?? [],
+						recommended_next_steps: auditReportDraft.recommended_next_steps ?? [],
+						confidence: auditReportDraft.overall_confidence,
+						review_status: auditReportDraft.review_status
+					}
+				}
+			]
+		};
+	}
+
+	async function runAuditReportCommit(dryRun: boolean) {
+		loading = dryRun ? 'audit-report-commit-dry-run' : 'audit-report-commit';
+		error = null;
+		try {
+			const result = await postAiAction('aiAuditReportCommit', buildAuditReportCommitPayload(dryRun));
+			if (dryRun) {
+				auditReportCommitDryRun = result;
+				auditReportCommitResult = null;
+			} else {
+				auditReportCommitResult = result;
+			}
+		} catch (caught) {
+			error = caught;
+		} finally {
+			loading = null;
+		}
+	}
+
+	// ---- Step 12A: advisory final review summary. No write. ----
+
+	// Every commit step reports its own outcome; Step 12A only ever summarizes what those
+	// steps actually returned.
+	function commitStepResults(): [string, any][] {
+		return [
+			['3B', commitResult],
+			['4B', appliedControlCommitResult],
+			['5B', evidenceFindingCommitResult],
+			['6B', remediationCommitResult],
+			['7B', frameworkMappingCommitResult],
+			['8B', riskScenarioCommitResult],
+			['9B', controlEffectivenessCommitResult],
+			['10B', auditReadinessCommitResult],
+			['11B', auditReportCommitResult]
+		];
+	}
+
+	function buildStepOutcomes() {
+		return commitStepResults()
+			.filter(([, result]) => Boolean(result))
+			.map(([step, result]) => {
+				const blocking = result.blocking_errors ?? [];
+				const detail = blocking.length
+					? String(blocking[0].detail ?? blocking[0].code ?? '').slice(0, 2000)
+					: `${(result.created_records ?? []).length} created, ${
+							(result.reused_records ?? []).length
+						} reused.`;
+				return {
+					step,
+					status: String(result.commit_status ?? result.status ?? '').slice(0, 64),
+					detail
+				};
+			});
+	}
+
+	function collectRecordSummaries(key: 'created_records' | 'reused_records', action: string) {
+		return commitStepResults()
+			.filter(([, result]) => Boolean(result))
+			.flatMap(([, result]) => result[key] ?? [])
+			.filter((record: any) => record?.name)
+			.map((record: any) => ({
+				record_type: record.record_type ?? null,
+				name: String(record.name).slice(0, 500),
+				action
+			}));
+	}
+
+	function collectBlockedItems() {
+		return commitStepResults()
+			.filter(([, result]) => Boolean(result))
+			.flatMap(([step, result]) =>
+				(result.blocking_errors ?? []).map((blockingError: any) =>
+					`Step ${step}: ${blockingError.detail ?? blockingError.code ?? 'blocked'}`.slice(0, 500)
+				)
+			);
+	}
+
+	function buildFinalReviewSuggestionPayload() {
+		const stepOutcomes = buildStepOutcomes();
+		const createdRecords = collectRecordSummaries('created_records', 'create');
+		const reusedRecords = collectRecordSummaries('reused_records', 'reuse');
+		const blockedItems = collectBlockedItems();
+		const outstandingItems = auditReadinessDraft?.missing_evidence ?? [];
+
+		if (
+			!stepOutcomes.length &&
+			!createdRecords.length &&
+			!reusedRecords.length &&
+			!blockedItems.length &&
+			!outstandingItems.length
+		) {
+			throw {
+				detail: 'Step 12A needs at least one completed commit step before it can review the flow.'
+			};
+		}
+
+		return {
+			case_summary: caseSummaryText(),
+			scenario_name: scenarioLabel(),
+			folder_reference: folderReferenceContext(),
+			assessment_reference: assessmentReferenceContext(),
+			step_outcomes: stepOutcomes,
+			created_records: createdRecords,
+			reused_records: reusedRecords,
+			blocked_items: blockedItems,
+			outstanding_items: outstandingItems,
+			user_locale: 'en',
+			strict_mode: true
+		};
+	}
+
+	async function runFinalReviewSuggestion() {
+		loading = 'final-review-suggest';
+		error = null;
+		try {
+			const draft = await postAiAction('aiFinalReviewSuggest', buildFinalReviewSuggestionPayload());
+			finalReviewDraft = draft;
+			finalReviewSelected = false;
+			finalReviewCommitApproved = false;
+			finalReviewCommitDryRun = null;
+			finalReviewCommitResult = null;
+		} catch (caught) {
+			error = caught;
+		} finally {
+			loading = null;
+		}
+	}
+
+	// ---- Step 12B: deterministic commit. No AI model is called in this step. ----
+
+	const finalReviewDryRunSucceeded = $derived(
+		Boolean(finalReviewCommitDryRun) &&
+			!(finalReviewCommitDryRun?.blocking_errors ?? []).length &&
+			finalReviewCommitDryRun?.commit_status !== 'blocked'
+	);
+
+	function buildFinalReviewCommitPayload(dryRun: boolean) {
+		if (!finalReviewDraft) throw { detail: 'Run Step 12A before Step 12B.' };
+		if (!setupReference.folder_id) {
+			throw { detail: 'A Folder ID is required before the deterministic Step 12B write.' };
+		}
+		if (!setupReference.compliance_assessment_id) {
+			throw {
+				detail: 'A Compliance Assessment ID is required before the deterministic Step 12B write.'
+			};
+		}
+		if (!finalReviewSelected) {
+			throw { detail: 'Select the case handoff summary to record before committing.' };
+		}
+		if (!dryRun && !finalReviewDryRunSucceeded) {
+			throw { detail: 'Run a successful Step 12B dry-run before the approved commit.' };
+		}
+		if (!dryRun && !finalReviewCommitApproved) {
+			throw { detail: 'Approve the deterministic Step 12B write first.' };
+		}
+
+		return {
+			dry_run: dryRun,
+			approved: dryRun ? false : finalReviewCommitApproved,
+			folder_reference: setupReference.folder_id,
+			assessment_reference: setupReference.compliance_assessment_id,
+			decisions: [
+				{
+					temporary_id: 'final_review_1',
+					selected: true,
+					decision: 'create',
+					existing_record_reference: '',
+					payload: {
+						temporary_id: 'final_review_1',
+						completion_summary: finalReviewDraft.completion_summary ?? '',
+						completed_steps: finalReviewDraft.completed_steps ?? [],
+						incomplete_steps: finalReviewDraft.incomplete_steps ?? [],
+						created_or_reused_records_summary:
+							finalReviewDraft.created_or_reused_records_summary ?? [],
+						blocked_items: finalReviewDraft.blocked_items ?? [],
+						human_review_required: finalReviewDraft.human_review_required ?? [],
+						recommended_next_steps: finalReviewDraft.recommended_next_steps ?? [],
+						demo_readiness_status: finalReviewDraft.demo_readiness_status,
+						confidence: finalReviewDraft.overall_confidence,
+						review_status: finalReviewDraft.review_status
+					}
+				}
+			]
+		};
+	}
+
+	async function runFinalReviewCommit(dryRun: boolean) {
+		loading = dryRun ? 'final-review-commit-dry-run' : 'final-review-commit';
+		error = null;
+		try {
+			const result = await postAiAction('aiFinalReviewCommit', buildFinalReviewCommitPayload(dryRun));
+			if (dryRun) {
+				finalReviewCommitDryRun = result;
+				finalReviewCommitResult = null;
+			} else {
+				finalReviewCommitResult = result;
 			}
 		} catch (caught) {
 			error = caught;
@@ -2792,6 +3693,1454 @@
 				</div>
 			{/if}
 
+			{#if frameworkControlMappingDraft}
+				<div class="mt-4 rounded border border-sky-200 bg-sky-50/60 p-3 text-sm text-sky-950">
+					<div class="font-semibold">Step 8A &middot; Risk Scenario Suggestion</div>
+					<p class="mt-1 text-sky-900">
+						<span class="font-semibold">AI suggestion only / no database write.</span>
+						Step 8A drafts risk scenarios for review. No risk records are created, no risk is
+						accepted or treated, and no risk is closed in this step.
+					</p>
+					<div class="mt-3 flex flex-wrap items-center gap-3">
+						<button
+							class="btn btn-sm preset-filled-primary-500"
+							type="button"
+							disabled={loading !== null}
+							onclick={() => runRiskScenarioSuggestion()}
+						>
+							{loading === 'risk-scenario-suggest'
+								? 'Running...'
+								: 'Run Local AI Risk Scenario Suggestion'}
+						</button>
+						<span class="text-xs text-sky-900">
+							AI Provider: {humanizeProviderMode(riskScenarioProviderMode)} &middot; No database
+							writes occur in Step 8A.
+						</span>
+					</div>
+
+					{#if riskScenarioDraft}
+						<div class="mt-3 grid gap-2 rounded border bg-white p-3 text-sm">
+							<div class="font-semibold">Step 8A suggestion summary</div>
+							<div class="flex flex-wrap gap-2 text-xs">
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Overall confidence: {formatConfidence(riskScenarioDraft.overall_confidence)}
+								</span>
+								<span class="rounded bg-sky-100 px-2 py-1 font-semibold text-sky-900">
+									Risk scenarios: {riskScenarioDraft.risk_scenarios?.length ?? 0}
+								</span>
+								<span class="rounded bg-amber-100 px-2 py-1 font-semibold text-amber-900">
+									Warnings: {riskScenarioDraft.warnings?.length ?? 0}
+								</span>
+							</div>
+						</div>
+
+						{#if riskScenarioDraft.risk_scenarios?.length}
+							<div class="mt-3">
+								<div class="font-semibold text-sky-950">
+									Risk scenarios ({riskScenarioDraft.risk_scenarios.length})
+								</div>
+								<p class="text-xs text-sky-900">
+									Advisory drafts only. Likelihood, impact, and risk level are review labels, not
+									platform risk ratings.
+								</p>
+								<div class="mt-2 grid gap-2">
+									{#each riskScenarioDraft.risk_scenarios as scenario}
+										<div class="rounded border bg-white p-3 text-xs text-slate-800">
+											<div class="flex flex-wrap items-start justify-between gap-2">
+												<div class="text-sm font-semibold text-slate-950">{scenario.title}</div>
+												<div class="flex flex-wrap gap-1">
+													<span class="rounded bg-sky-100 px-2 py-0.5 font-semibold text-sky-900">
+														Likelihood: {humanizeFieldLabel(scenario.likelihood)}
+													</span>
+													<span class="rounded bg-orange-100 px-2 py-0.5 font-semibold text-orange-900">
+														Impact: {humanizeFieldLabel(scenario.impact)}
+													</span>
+													<span class="rounded bg-red-100 px-2 py-0.5 font-semibold text-red-900">
+														Risk level: {humanizeFieldLabel(scenario.risk_level)}
+													</span>
+													<span class="rounded bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">
+														Confidence: {formatConfidence(scenario.confidence)}
+													</span>
+													{#if scenario.review_status}
+														<span
+															class="rounded bg-violet-100 px-2 py-0.5 font-semibold text-violet-900"
+														>
+															{humanizeFieldLabel(scenario.review_status)}
+														</span>
+													{/if}
+												</div>
+											</div>
+											{#if scenario.description}
+												<div class="mt-1 text-slate-700">{scenario.description}</div>
+											{/if}
+											{#if scenario.threat}
+												<div class="mt-1"><span class="font-semibold">Threat:</span> {scenario.threat}</div>
+											{/if}
+											{#if scenario.vulnerability}
+												<div class="mt-1">
+													<span class="font-semibold">Vulnerability:</span>
+													{scenario.vulnerability}
+												</div>
+											{/if}
+											{#if scenario.impact_description}
+												<div class="mt-1">
+													<span class="font-semibold">Potential impact:</span>
+													{scenario.impact_description}
+												</div>
+											{/if}
+											{#if scenario.asset_title || scenario.asset_reference}
+												<div class="mt-1">
+													<span class="font-semibold">Asset:</span>
+													{scenario.asset_title || scenario.asset_reference}
+												</div>
+											{/if}
+											{#if scenario.linked_finding_title || scenario.linked_finding_reference}
+												<div class="mt-1">
+													<span class="font-semibold">Linked finding:</span>
+													{scenario.linked_finding_title || scenario.linked_finding_reference}
+												</div>
+											{/if}
+											{#if scenario.linked_applied_control_title || scenario.linked_applied_control_reference}
+												<div class="mt-1">
+													<span class="font-semibold">Linked applied control:</span>
+													{scenario.linked_applied_control_title ||
+														scenario.linked_applied_control_reference}
+												</div>
+											{/if}
+											{#if scenario.linked_framework_control_title || scenario.linked_framework_control_code}
+												<div class="mt-1">
+													<span class="font-semibold">Linked framework control:</span>
+													{scenario.linked_framework_control_code}
+													{scenario.linked_framework_control_title}
+												</div>
+											{/if}
+											{#if scenario.rationale}
+												<div class="mt-1">
+													<span class="font-semibold">Rationale:</span>
+													{scenario.rationale}
+												</div>
+											{/if}
+											{#if scenario.recommended_next_steps?.length}
+												<div class="mt-1">
+													<span class="font-semibold">Recommended next steps:</span>
+													<ul class="list-disc pl-5">
+														{#each scenario.recommended_next_steps as nextStep}
+															<li>{nextStep}</li>
+														{/each}
+													</ul>
+												</div>
+											{/if}
+										</div>
+									{/each}
+								</div>
+							</div>
+						{/if}
+
+						{#if riskScenarioDraft.warnings?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-amber-800">
+								{#each riskScenarioDraft.warnings as warning}
+									<li>{warning.message ?? warning.detail ?? warning.code}</li>
+								{/each}
+							</ul>
+						{/if}
+
+						{#if riskScenarioDraft.ambiguity_flags?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-amber-800">
+								{#each riskScenarioDraft.ambiguity_flags as flag}
+									<li>{flag.message ?? flag.code}</li>
+								{/each}
+							</ul>
+						{/if}
+					{/if}
+				</div>
+			{/if}
+
+			{#if riskScenarioDraft?.risk_scenarios?.length}
+				<div class="mt-4 rounded border border-emerald-300 bg-emerald-50/60 p-3 text-sm text-emerald-950">
+					<div class="font-semibold">Step 8B &middot; Risk Scenario Commit</div>
+					<p class="mt-1 text-emerald-900">
+						<span class="font-semibold">No AI model is used / writes only after approval.</span>
+						Select the Step 8A risk scenarios to keep, then dry-run to preview. The approved commit
+						creates unrated risk scenarios under the existing risk assessment; no risk rating,
+						treatment, or acceptance is recorded.
+					</p>
+
+					<div class="mt-3 grid gap-2">
+						{#each riskScenarioDraft.risk_scenarios as scenario}
+							<label class="flex items-start gap-2 rounded border bg-white p-2 text-xs">
+								<input type="checkbox" bind:checked={selectedRiskScenarioIds[scenario.temporary_id]} />
+								<span>
+									<span class="font-semibold">{scenario.title}</span>
+									<span class="text-slate-600">
+										&middot; Risk level: {humanizeFieldLabel(scenario.risk_level)} &middot; Confidence: {formatConfidence(
+											scenario.confidence
+										)}
+									</span>
+								</span>
+							</label>
+						{/each}
+					</div>
+
+					<div class="mt-3 flex flex-wrap items-center gap-3">
+						<button
+							class="btn btn-sm preset-tonal"
+							type="button"
+							disabled={loading !== null || !selectedRiskScenarios.length}
+							onclick={() => runRiskScenarioCommit(true)}
+						>
+							{loading === 'risk-scenario-commit-dry-run' ? 'Dry-running...' : 'Step 8B dry-run'}
+						</button>
+						<label class="flex items-center gap-2 text-xs">
+							<input type="checkbox" bind:checked={riskScenarioCommitApproved} />
+							<span>I approve deterministic Step 8B decisions for selected risk scenarios</span>
+						</label>
+						<button
+							class="btn btn-sm preset-filled-error-500"
+							type="button"
+							disabled={loading !== null ||
+								!riskScenarioCommitApproved ||
+								!riskScenarioDryRunSucceeded ||
+								!selectedRiskScenarios.length}
+							onclick={() => runRiskScenarioCommit(false)}
+						>
+							{loading === 'risk-scenario-commit' ? 'Committing...' : 'Approved risk scenario commit'}
+						</button>
+						<span class="text-xs text-emerald-900">No AI model is used in this write step.</span>
+					</div>
+
+					{#if riskScenarioCommitDryRun}
+						<div class="mt-3 grid gap-2 rounded border bg-white p-3 text-sm">
+							<div class="font-semibold">
+								Step 8B dry-run status: {humanizeFieldLabel(riskScenarioCommitDryRun.commit_status)}
+							</div>
+							<p class="text-xs text-slate-700">
+								Dry-run only previews the deterministic write. Nothing was written.
+							</p>
+							<div class="flex flex-wrap gap-2 text-xs">
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Rejected: {riskScenarioCommitDryRun.rejected_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Deferred: {riskScenarioCommitDryRun.deferred_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Skipped: {riskScenarioCommitDryRun.skipped_records?.length ?? 0}
+								</span>
+							</div>
+							{#if riskScenarioCommitDryRun.planned_actions?.length}
+								<div class="text-xs font-semibold text-emerald-950">Planned actions</div>
+								<ul class="list-disc pl-5 text-xs text-slate-800">
+									{#each riskScenarioCommitDryRun.planned_actions as action}
+										<li>
+											{action.target_name ?? action.source_temporary_id}:
+											{humanizeActionName(action.decision)} &middot; {humanizeFieldLabel(action.status)}
+											&middot; {action.detail}
+										</li>
+									{/each}
+								</ul>
+							{/if}
+						</div>
+						{#if riskScenarioCommitDryRun.warnings?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-amber-800">
+								{#each riskScenarioCommitDryRun.warnings as warning}
+									<li>{warning.detail ?? warning.message ?? warning.code}</li>
+								{/each}
+							</ul>
+						{/if}
+						{#if riskScenarioCommitDryRun.blocking_errors?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-red-700">
+								{#each riskScenarioCommitDryRun.blocking_errors as blockingError}
+									<li>{blockingError.detail}</li>
+								{/each}
+							</ul>
+						{/if}
+					{/if}
+
+					{#if riskScenarioCommitResult}
+						<div class="mt-3 grid gap-2 rounded border bg-white p-3 text-sm">
+							<div class="font-semibold">
+								Step 8B commit status: {humanizeFieldLabel(riskScenarioCommitResult.commit_status)}
+							</div>
+							<div class="flex flex-wrap gap-2 text-xs">
+								<span class="rounded bg-emerald-100 px-2 py-1 font-semibold text-emerald-900">
+									Created: {riskScenarioCommitResult.created_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-emerald-100 px-2 py-1 font-semibold text-emerald-900">
+									Reused: {riskScenarioCommitResult.reused_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Rejected: {riskScenarioCommitResult.rejected_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Deferred: {riskScenarioCommitResult.deferred_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Skipped: {riskScenarioCommitResult.skipped_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-amber-100 px-2 py-1 font-semibold text-amber-900">
+									Warnings: {riskScenarioCommitResult.warnings?.length ?? 0}
+								</span>
+								<span class="rounded bg-red-100 px-2 py-1 font-semibold text-red-900">
+									Blocking errors: {riskScenarioCommitResult.blocking_errors?.length ?? 0}
+								</span>
+							</div>
+							{#if riskScenarioCommitResult.created_records?.length}
+								<div class="text-xs font-semibold text-emerald-950">Created risk scenarios</div>
+								<ul class="list-disc pl-5 text-xs text-slate-800">
+									{#each riskScenarioCommitResult.created_records as record}
+										<li>{humanizeFieldLabel(record.record_type)}: {record.name}</li>
+									{/each}
+								</ul>
+							{/if}
+							{#if riskScenarioCommitResult.reused_records?.length}
+								<div class="text-xs font-semibold text-emerald-950">Reused risk scenarios</div>
+								<ul class="list-disc pl-5 text-xs text-slate-800">
+									{#each riskScenarioCommitResult.reused_records as record}
+										<li>{humanizeFieldLabel(record.record_type)}: {record.name}</li>
+									{/each}
+								</ul>
+							{/if}
+							{#if riskScenarioCommitResult.planned_actions?.length}
+								<div class="text-xs font-semibold text-emerald-950">Planned actions</div>
+								<ul class="list-disc pl-5 text-xs text-slate-800">
+									{#each riskScenarioCommitResult.planned_actions as action}
+										<li>
+											{action.target_name ?? action.source_temporary_id}:
+											{humanizeActionName(action.decision)} &middot; {humanizeFieldLabel(action.status)}
+										</li>
+									{/each}
+								</ul>
+							{/if}
+						</div>
+						{#if riskScenarioCommitResult.warnings?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-amber-800">
+								{#each riskScenarioCommitResult.warnings as warning}
+									<li>{warning.detail ?? warning.message ?? warning.code}</li>
+								{/each}
+							</ul>
+						{/if}
+						{#if riskScenarioCommitResult.blocking_errors?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-red-700">
+								{#each riskScenarioCommitResult.blocking_errors as blockingError}
+									<li>{blockingError.detail}</li>
+								{/each}
+							</ul>
+						{/if}
+					{/if}
+				</div>
+			{/if}
+
+			{#if riskScenarioDraft}
+				<div class="mt-4 rounded border border-sky-200 bg-sky-50/60 p-3 text-sm text-sky-950">
+					<div class="font-semibold">Step 9A &middot; Control Effectiveness Suggestion</div>
+					<p class="mt-1 text-sky-900">
+						<span class="font-semibold">AI suggestion only / no database write.</span>
+						Step 9A suggests how effective each mapped control appears and what compliance status
+						the evidence supports. No requirement assessment is updated, no audit is closed, and no
+						compliance is certified in this step.
+					</p>
+					<div class="mt-3 flex flex-wrap items-center gap-3">
+						<button
+							class="btn btn-sm preset-filled-primary-500"
+							type="button"
+							disabled={loading !== null}
+							onclick={() => runControlEffectivenessSuggestion()}
+						>
+							{loading === 'control-effectiveness-suggest'
+								? 'Running...'
+								: 'Run Local AI Control Effectiveness Suggestion'}
+						</button>
+						<span class="text-xs text-sky-900">
+							AI Provider: {humanizeProviderMode(controlEffectivenessProviderMode)} &middot; No
+							database writes occur in Step 9A.
+						</span>
+					</div>
+
+					{#if controlEffectivenessDraft}
+						<div class="mt-3 grid gap-2 rounded border bg-white p-3 text-sm">
+							<div class="font-semibold">Step 9A suggestion summary</div>
+							<div class="flex flex-wrap gap-2 text-xs">
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Overall confidence: {formatConfidence(controlEffectivenessDraft.overall_confidence)}
+								</span>
+								<span class="rounded bg-sky-100 px-2 py-1 font-semibold text-sky-900">
+									Judgements: {controlEffectivenessDraft.control_effectiveness_suggestions?.length ?? 0}
+								</span>
+								<span class="rounded bg-amber-100 px-2 py-1 font-semibold text-amber-900">
+									Warnings: {controlEffectivenessDraft.warnings?.length ?? 0}
+								</span>
+							</div>
+						</div>
+
+						{#if controlEffectivenessDraft.control_effectiveness_suggestions?.length}
+							<div class="mt-3">
+								<div class="font-semibold text-sky-950">
+									Control effectiveness suggestions ({controlEffectivenessDraft
+										.control_effectiveness_suggestions.length})
+								</div>
+								<p class="text-xs text-sky-900">
+									Advisory judgements for auditor review. They are not compliance conclusions.
+								</p>
+								<div class="mt-2 grid gap-2">
+									{#each controlEffectivenessDraft.control_effectiveness_suggestions as suggestion}
+										<div class="rounded border bg-white p-3 text-xs text-slate-800">
+											<div class="flex flex-wrap items-start justify-between gap-2">
+												<div class="text-sm font-semibold text-slate-950">
+													{#if suggestion.framework_control_code}
+														<span class="text-slate-600">{suggestion.framework_control_code}</span>
+														&middot;
+													{/if}
+													{suggestion.framework_control_title}
+												</div>
+												<div class="flex flex-wrap gap-1">
+													<span class="rounded bg-sky-100 px-2 py-0.5 font-semibold text-sky-900">
+														{humanizeFieldLabel(suggestion.suggested_effectiveness)}
+													</span>
+													<span class="rounded bg-orange-100 px-2 py-0.5 font-semibold text-orange-900">
+														{humanizeFieldLabel(suggestion.suggested_compliance_status)}
+													</span>
+													<span class="rounded bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">
+														Confidence: {formatConfidence(suggestion.confidence)}
+													</span>
+													{#if suggestion.review_status}
+														<span
+															class="rounded bg-violet-100 px-2 py-0.5 font-semibold text-violet-900"
+														>
+															{humanizeFieldLabel(suggestion.review_status)}
+														</span>
+													{/if}
+												</div>
+											</div>
+											{#if suggestion.evidence_summary}
+												<div class="mt-1">
+													<span class="font-semibold">Evidence summary:</span>
+													{suggestion.evidence_summary}
+												</div>
+											{/if}
+											{#if suggestion.gaps?.length}
+												<div class="mt-1">
+													<span class="font-semibold">Gaps:</span>
+													<ul class="list-disc pl-5">
+														{#each suggestion.gaps as gap}
+															<li>{gap}</li>
+														{/each}
+													</ul>
+												</div>
+											{/if}
+											{#if suggestion.recommended_auditor_action}
+												<div class="mt-1">
+													<span class="font-semibold">Recommended auditor action:</span>
+													{suggestion.recommended_auditor_action}
+												</div>
+											{/if}
+											{#if suggestion.rationale}
+												<div class="mt-1">
+													<span class="font-semibold">Rationale:</span>
+													{suggestion.rationale}
+												</div>
+											{/if}
+										</div>
+									{/each}
+								</div>
+							</div>
+						{/if}
+
+						{#if controlEffectivenessDraft.warnings?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-amber-800">
+								{#each controlEffectivenessDraft.warnings as warning}
+									<li>{warning.message ?? warning.detail ?? warning.code}</li>
+								{/each}
+							</ul>
+						{/if}
+
+						{#if controlEffectivenessDraft.ambiguity_flags?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-amber-800">
+								{#each controlEffectivenessDraft.ambiguity_flags as flag}
+									<li>{flag.message ?? flag.code}</li>
+								{/each}
+							</ul>
+						{/if}
+					{/if}
+				</div>
+			{/if}
+
+			{#if controlEffectivenessDraft?.control_effectiveness_suggestions?.length}
+				<div class="mt-4 rounded border border-emerald-300 bg-emerald-50/60 p-3 text-sm text-emerald-950">
+					<div class="font-semibold">Step 9B &middot; Control Effectiveness Commit</div>
+					<p class="mt-1 text-emerald-900">
+						<span class="font-semibold">No AI model is used / writes only after approval.</span>
+						Select the Step 9A judgements to record, then dry-run to preview. The approved commit
+						updates only the result and observation of existing requirement assessments; it never
+						changes the audit status and never certifies compliance.
+					</p>
+
+					<div class="mt-3 grid gap-2">
+						{#each controlEffectivenessDraft.control_effectiveness_suggestions as suggestion}
+							<label class="flex items-start gap-2 rounded border bg-white p-2 text-xs">
+								<input
+									type="checkbox"
+									bind:checked={selectedControlEffectivenessIds[suggestion.temporary_id]}
+								/>
+								<span>
+									<span class="font-semibold">
+										{#if suggestion.framework_control_code}
+											{suggestion.framework_control_code} &middot;
+										{/if}
+										{suggestion.framework_control_title}
+									</span>
+									<span class="text-slate-600">
+										&middot; {humanizeFieldLabel(suggestion.suggested_compliance_status)} &middot;
+										Confidence: {formatConfidence(suggestion.confidence)}
+									</span>
+								</span>
+							</label>
+						{/each}
+					</div>
+
+					<div class="mt-3 flex flex-wrap items-center gap-3">
+						<button
+							class="btn btn-sm preset-tonal"
+							type="button"
+							disabled={loading !== null || !selectedControlEffectiveness.length}
+							onclick={() => runControlEffectivenessCommit(true)}
+						>
+							{loading === 'control-effectiveness-commit-dry-run'
+								? 'Dry-running...'
+								: 'Step 9B dry-run'}
+						</button>
+						<label class="flex items-center gap-2 text-xs">
+							<input type="checkbox" bind:checked={controlEffectivenessCommitApproved} />
+							<span>
+								I approve deterministic Step 9B decisions for selected control effectiveness
+								judgements
+							</span>
+						</label>
+						<button
+							class="btn btn-sm preset-filled-error-500"
+							type="button"
+							disabled={loading !== null ||
+								!controlEffectivenessCommitApproved ||
+								!controlEffectivenessDryRunSucceeded ||
+								!selectedControlEffectiveness.length}
+							onclick={() => runControlEffectivenessCommit(false)}
+						>
+							{loading === 'control-effectiveness-commit'
+								? 'Committing...'
+								: 'Approved control effectiveness commit'}
+						</button>
+						<span class="text-xs text-emerald-900">No AI model is used in this write step.</span>
+					</div>
+
+					{#if controlEffectivenessCommitDryRun}
+						<div class="mt-3 grid gap-2 rounded border bg-white p-3 text-sm">
+							<div class="font-semibold">
+								Step 9B dry-run status: {humanizeFieldLabel(
+									controlEffectivenessCommitDryRun.commit_status
+								)}
+							</div>
+							<p class="text-xs text-slate-700">
+								Dry-run only previews the deterministic write. Nothing was written.
+							</p>
+							<div class="flex flex-wrap gap-2 text-xs">
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Rejected: {controlEffectivenessCommitDryRun.rejected_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Deferred: {controlEffectivenessCommitDryRun.deferred_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Skipped: {controlEffectivenessCommitDryRun.skipped_records?.length ?? 0}
+								</span>
+							</div>
+							{#if controlEffectivenessCommitDryRun.planned_actions?.length}
+								<div class="text-xs font-semibold text-emerald-950">Planned actions</div>
+								<ul class="list-disc pl-5 text-xs text-slate-800">
+									{#each controlEffectivenessCommitDryRun.planned_actions as action}
+										<li>
+											{action.target_name ?? action.source_temporary_id}:
+											{humanizeActionName(action.decision)} &middot; {humanizeFieldLabel(action.status)}
+											&middot; {action.detail}
+										</li>
+									{/each}
+								</ul>
+							{/if}
+						</div>
+						{#if controlEffectivenessCommitDryRun.warnings?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-amber-800">
+								{#each controlEffectivenessCommitDryRun.warnings as warning}
+									<li>{warning.detail ?? warning.message ?? warning.code}</li>
+								{/each}
+							</ul>
+						{/if}
+						{#if controlEffectivenessCommitDryRun.blocking_errors?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-red-700">
+								{#each controlEffectivenessCommitDryRun.blocking_errors as blockingError}
+									<li>{blockingError.detail}</li>
+								{/each}
+							</ul>
+						{/if}
+					{/if}
+
+					{#if controlEffectivenessCommitResult}
+						<div class="mt-3 grid gap-2 rounded border bg-white p-3 text-sm">
+							<div class="font-semibold">
+								Step 9B commit status: {humanizeFieldLabel(
+									controlEffectivenessCommitResult.commit_status
+								)}
+							</div>
+							<div class="flex flex-wrap gap-2 text-xs">
+								<span class="rounded bg-emerald-100 px-2 py-1 font-semibold text-emerald-900">
+									Recorded: {controlEffectivenessCommitResult.created_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-emerald-100 px-2 py-1 font-semibold text-emerald-900">
+									Unchanged: {controlEffectivenessCommitResult.reused_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Rejected: {controlEffectivenessCommitResult.rejected_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Deferred: {controlEffectivenessCommitResult.deferred_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Skipped: {controlEffectivenessCommitResult.skipped_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-amber-100 px-2 py-1 font-semibold text-amber-900">
+									Warnings: {controlEffectivenessCommitResult.warnings?.length ?? 0}
+								</span>
+								<span class="rounded bg-red-100 px-2 py-1 font-semibold text-red-900">
+									Blocking errors: {controlEffectivenessCommitResult.blocking_errors?.length ?? 0}
+								</span>
+							</div>
+							{#if controlEffectivenessCommitResult.created_records?.length}
+								<div class="text-xs font-semibold text-emerald-950">
+									Updated requirement assessments
+								</div>
+								<ul class="list-disc pl-5 text-xs text-slate-800">
+									{#each controlEffectivenessCommitResult.created_records as record}
+										<li>{record.name} &middot; result: {humanizeFieldLabel(record.result)}</li>
+									{/each}
+								</ul>
+							{/if}
+							{#if controlEffectivenessCommitResult.reused_records?.length}
+								<div class="text-xs font-semibold text-emerald-950">Unchanged (already recorded)</div>
+								<ul class="list-disc pl-5 text-xs text-slate-800">
+									{#each controlEffectivenessCommitResult.reused_records as record}
+										<li>{record.name}</li>
+									{/each}
+								</ul>
+							{/if}
+							{#if controlEffectivenessCommitResult.planned_actions?.length}
+								<div class="text-xs font-semibold text-emerald-950">Planned actions</div>
+								<ul class="list-disc pl-5 text-xs text-slate-800">
+									{#each controlEffectivenessCommitResult.planned_actions as action}
+										<li>
+											{action.target_name ?? action.source_temporary_id}:
+											{humanizeActionName(action.decision)} &middot; {humanizeFieldLabel(action.status)}
+										</li>
+									{/each}
+								</ul>
+							{/if}
+						</div>
+						{#if controlEffectivenessCommitResult.warnings?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-amber-800">
+								{#each controlEffectivenessCommitResult.warnings as warning}
+									<li>{warning.detail ?? warning.message ?? warning.code}</li>
+								{/each}
+							</ul>
+						{/if}
+						{#if controlEffectivenessCommitResult.blocking_errors?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-red-700">
+								{#each controlEffectivenessCommitResult.blocking_errors as blockingError}
+									<li>{blockingError.detail}</li>
+								{/each}
+							</ul>
+						{/if}
+					{/if}
+				</div>
+			{/if}
+
+			{#if controlEffectivenessDraft}
+				<div class="mt-4 rounded border border-sky-200 bg-sky-50/60 p-3 text-sm text-sky-950">
+					<div class="font-semibold">Step 10A &middot; Evidence Gap / Audit Readiness Summary</div>
+					<p class="mt-1 text-sky-900">
+						<span class="font-semibold">AI suggestion only / no database write.</span>
+						Step 10A summarizes what is ready, what is missing, and what is blocking the assessment.
+						Nothing is marked ready and nothing is closed in this step.
+					</p>
+					<div class="mt-3 flex flex-wrap items-center gap-3">
+						<button
+							class="btn btn-sm preset-filled-primary-500"
+							type="button"
+							disabled={loading !== null}
+							onclick={() => runAuditReadinessSuggestion()}
+						>
+							{loading === 'audit-readiness-suggest'
+								? 'Running...'
+								: 'Run Local AI Audit Readiness Summary'}
+						</button>
+						<span class="text-xs text-sky-900">
+							AI Provider: {humanizeProviderMode(auditReadinessProviderMode)} &middot; No database
+							writes occur in Step 10A.
+						</span>
+					</div>
+
+					{#if auditReadinessDraft}
+						<div class="mt-3 grid gap-2 rounded border bg-white p-3 text-sm">
+							<div class="font-semibold">Step 10A readiness summary</div>
+							<div class="flex flex-wrap gap-2 text-xs">
+								<span class="rounded bg-sky-100 px-2 py-1 font-semibold text-sky-900">
+									Readiness: {humanizeFieldLabel(auditReadinessDraft.readiness_status)}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Advisory score: {auditReadinessDraft.readiness_score}/100
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Overall confidence: {formatConfidence(auditReadinessDraft.overall_confidence)}
+								</span>
+								<span class="rounded bg-amber-100 px-2 py-1 font-semibold text-amber-900">
+									Warnings: {auditReadinessDraft.warnings?.length ?? 0}
+								</span>
+							</div>
+							{#if auditReadinessDraft.summary}
+								<p class="text-xs text-slate-800">{auditReadinessDraft.summary}</p>
+							{/if}
+						</div>
+
+						<div class="mt-3 grid gap-2 md:grid-cols-2">
+							{#each [['Ready items', auditReadinessDraft.ready_items], ['Missing evidence', auditReadinessDraft.missing_evidence], ['Open findings', auditReadinessDraft.open_findings], ['Open risks', auditReadinessDraft.open_risks], ['Blocked controls', auditReadinessDraft.blocked_controls], ['Priority actions', auditReadinessDraft.priority_actions], ['Recommended next steps', auditReadinessDraft.recommended_next_steps]] as [sectionLabel, entries]}
+								{#if entries?.length}
+									<div class="rounded border bg-white p-3 text-xs text-slate-800">
+										<div class="font-semibold text-slate-950">{sectionLabel}</div>
+										<ul class="mt-1 list-disc pl-5">
+											{#each entries as entry}
+												<li>{entry}</li>
+											{/each}
+										</ul>
+									</div>
+								{/if}
+							{/each}
+						</div>
+
+						{#if auditReadinessDraft.warnings?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-amber-800">
+								{#each auditReadinessDraft.warnings as warning}
+									<li>{warning.message ?? warning.detail ?? warning.code}</li>
+								{/each}
+							</ul>
+						{/if}
+
+						{#if auditReadinessDraft.ambiguity_flags?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-amber-800">
+								{#each auditReadinessDraft.ambiguity_flags as flag}
+									<li>{flag.message ?? flag.code}</li>
+								{/each}
+							</ul>
+						{/if}
+					{/if}
+				</div>
+			{/if}
+
+			{#if auditReadinessDraft}
+				<div class="mt-4 rounded border border-emerald-300 bg-emerald-50/60 p-3 text-sm text-emerald-950">
+					<div class="font-semibold">Step 10B &middot; Audit Readiness Commit</div>
+					<p class="mt-1 text-emerald-900">
+						<span class="font-semibold">No AI model is used / writes only after approval.</span>
+						Select the readiness summary to record, then dry-run to preview. The approved commit
+						appends it to the audit's observation note only; the audit status is never changed and
+						the audit is never marked ready or complete.
+					</p>
+
+					<div class="mt-3 grid gap-2">
+						<label class="flex items-start gap-2 rounded border bg-white p-2 text-xs">
+							<input type="checkbox" bind:checked={auditReadinessSelected} />
+							<span>
+								<span class="font-semibold">
+									Readiness summary: {humanizeFieldLabel(auditReadinessDraft.readiness_status)}
+								</span>
+								<span class="text-slate-600">
+									&middot; advisory score {auditReadinessDraft.readiness_score}/100
+								</span>
+							</span>
+						</label>
+					</div>
+
+					<div class="mt-3 flex flex-wrap items-center gap-3">
+						<button
+							class="btn btn-sm preset-tonal"
+							type="button"
+							disabled={loading !== null || !auditReadinessSelected}
+							onclick={() => runAuditReadinessCommit(true)}
+						>
+							{loading === 'audit-readiness-commit-dry-run' ? 'Dry-running...' : 'Step 10B dry-run'}
+						</button>
+						<label class="flex items-center gap-2 text-xs">
+							<input type="checkbox" bind:checked={auditReadinessCommitApproved} />
+							<span>I approve the deterministic Step 10B readiness note</span>
+						</label>
+						<button
+							class="btn btn-sm preset-filled-error-500"
+							type="button"
+							disabled={loading !== null ||
+								!auditReadinessCommitApproved ||
+								!auditReadinessDryRunSucceeded ||
+								!auditReadinessSelected}
+							onclick={() => runAuditReadinessCommit(false)}
+						>
+							{loading === 'audit-readiness-commit'
+								? 'Committing...'
+								: 'Approved audit readiness commit'}
+						</button>
+						<span class="text-xs text-emerald-900">No AI model is used in this write step.</span>
+					</div>
+
+					{#if auditReadinessCommitDryRun}
+						<div class="mt-3 grid gap-2 rounded border bg-white p-3 text-sm">
+							<div class="font-semibold">
+								Step 10B dry-run status: {humanizeFieldLabel(auditReadinessCommitDryRun.commit_status)}
+							</div>
+							<p class="text-xs text-slate-700">
+								Dry-run only previews the deterministic write. Nothing was written.
+							</p>
+							<div class="flex flex-wrap gap-2 text-xs">
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Rejected: {auditReadinessCommitDryRun.rejected_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Deferred: {auditReadinessCommitDryRun.deferred_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Skipped: {auditReadinessCommitDryRun.skipped_records?.length ?? 0}
+								</span>
+							</div>
+							{#if auditReadinessCommitDryRun.planned_actions?.length}
+								<div class="text-xs font-semibold text-emerald-950">Planned actions</div>
+								<ul class="list-disc pl-5 text-xs text-slate-800">
+									{#each auditReadinessCommitDryRun.planned_actions as action}
+										<li>
+											{action.target_name ?? action.source_temporary_id}:
+											{humanizeActionName(action.decision)} &middot; {humanizeFieldLabel(action.status)}
+											&middot; {action.detail}
+										</li>
+									{/each}
+								</ul>
+							{/if}
+						</div>
+						{#if auditReadinessCommitDryRun.warnings?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-amber-800">
+								{#each auditReadinessCommitDryRun.warnings as warning}
+									<li>{warning.detail ?? warning.message ?? warning.code}</li>
+								{/each}
+							</ul>
+						{/if}
+						{#if auditReadinessCommitDryRun.blocking_errors?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-red-700">
+								{#each auditReadinessCommitDryRun.blocking_errors as blockingError}
+									<li>{blockingError.detail}</li>
+								{/each}
+							</ul>
+						{/if}
+					{/if}
+
+					{#if auditReadinessCommitResult}
+						<div class="mt-3 grid gap-2 rounded border bg-white p-3 text-sm">
+							<div class="font-semibold">
+								Step 10B commit status: {humanizeFieldLabel(auditReadinessCommitResult.commit_status)}
+							</div>
+							<div class="flex flex-wrap gap-2 text-xs">
+								<span class="rounded bg-emerald-100 px-2 py-1 font-semibold text-emerald-900">
+									Recorded: {auditReadinessCommitResult.created_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-emerald-100 px-2 py-1 font-semibold text-emerald-900">
+									Unchanged: {auditReadinessCommitResult.reused_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Rejected: {auditReadinessCommitResult.rejected_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Deferred: {auditReadinessCommitResult.deferred_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Skipped: {auditReadinessCommitResult.skipped_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-amber-100 px-2 py-1 font-semibold text-amber-900">
+									Warnings: {auditReadinessCommitResult.warnings?.length ?? 0}
+								</span>
+								<span class="rounded bg-red-100 px-2 py-1 font-semibold text-red-900">
+									Blocking errors: {auditReadinessCommitResult.blocking_errors?.length ?? 0}
+								</span>
+							</div>
+							{#if auditReadinessCommitResult.created_records?.length}
+								<div class="text-xs font-semibold text-emerald-950">Recorded on</div>
+								<ul class="list-disc pl-5 text-xs text-slate-800">
+									{#each auditReadinessCommitResult.created_records as record}
+										<li>{record.name} &middot; {humanizeFieldLabel(record.record_type)}</li>
+									{/each}
+								</ul>
+							{/if}
+							{#if auditReadinessCommitResult.planned_actions?.length}
+								<div class="text-xs font-semibold text-emerald-950">Planned actions</div>
+								<ul class="list-disc pl-5 text-xs text-slate-800">
+									{#each auditReadinessCommitResult.planned_actions as action}
+										<li>
+											{action.target_name ?? action.source_temporary_id}:
+											{humanizeActionName(action.decision)} &middot; {humanizeFieldLabel(action.status)}
+										</li>
+									{/each}
+								</ul>
+							{/if}
+						</div>
+						{#if auditReadinessCommitResult.warnings?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-amber-800">
+								{#each auditReadinessCommitResult.warnings as warning}
+									<li>{warning.detail ?? warning.message ?? warning.code}</li>
+								{/each}
+							</ul>
+						{/if}
+						{#if auditReadinessCommitResult.blocking_errors?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-red-700">
+								{#each auditReadinessCommitResult.blocking_errors as blockingError}
+									<li>{blockingError.detail}</li>
+								{/each}
+							</ul>
+						{/if}
+					{/if}
+				</div>
+			{/if}
+
+			{#if auditReadinessDraft}
+				<div class="mt-4 rounded border border-sky-200 bg-sky-50/60 p-3 text-sm text-sky-950">
+					<div class="font-semibold">Step 11A &middot; Management / Audit Report Draft</div>
+					<p class="mt-1 text-sky-900">
+						<span class="font-semibold">AI draft only / no database write.</span>
+						Step 11A drafts the management report from the reviewed onboarding output. It is never a
+						final audit opinion, a compliance certification, or a regulator-approved result.
+					</p>
+					<div class="mt-3 flex flex-wrap items-center gap-3">
+						<button
+							class="btn btn-sm preset-filled-primary-500"
+							type="button"
+							disabled={loading !== null}
+							onclick={() => runAuditReportSuggestion()}
+						>
+							{loading === 'audit-report-suggest' ? 'Running...' : 'Run Local AI Report Draft'}
+						</button>
+						<span class="text-xs text-sky-900">
+							AI Provider: {humanizeProviderMode(auditReportProviderMode)} &middot; No database
+							writes occur in Step 11A.
+						</span>
+					</div>
+
+					{#if auditReportDraft}
+						<div class="mt-3 grid gap-2 rounded border bg-white p-3 text-sm">
+							<div class="font-semibold">{auditReportDraft.report_title}</div>
+							<div class="flex flex-wrap gap-2 text-xs">
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Overall confidence: {formatConfidence(auditReportDraft.overall_confidence)}
+								</span>
+								<span class="rounded bg-sky-100 px-2 py-1 font-semibold text-sky-900">
+									Sections: {auditReportDraft.report_sections?.length ?? 0}
+								</span>
+								<span class="rounded bg-amber-100 px-2 py-1 font-semibold text-amber-900">
+									Warnings: {auditReportDraft.warnings?.length ?? 0}
+								</span>
+								{#if auditReportDraft.review_status}
+									<span class="rounded bg-violet-100 px-2 py-1 font-semibold text-violet-900">
+										{humanizeFieldLabel(auditReportDraft.review_status)}
+									</span>
+								{/if}
+							</div>
+							{#if auditReportDraft.executive_summary}
+								<p class="text-xs text-slate-800">{auditReportDraft.executive_summary}</p>
+							{/if}
+						</div>
+
+						{#if auditReportDraft.report_sections?.length}
+							<div class="mt-3 grid gap-2">
+								{#each auditReportDraft.report_sections as section}
+									<div class="rounded border bg-white p-3 text-xs text-slate-800">
+										<div class="flex flex-wrap items-start justify-between gap-2">
+											<div class="text-sm font-semibold text-slate-950">{section.heading}</div>
+											<span class="rounded bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">
+												Confidence: {formatConfidence(section.confidence)}
+											</span>
+										</div>
+										{#if section.content}
+											<div class="mt-1 whitespace-pre-line text-slate-700">{section.content}</div>
+										{/if}
+										{#if section.source_items?.length}
+											<div class="mt-1">
+												<span class="font-semibold">Source items:</span>
+												<ul class="list-disc pl-5">
+													{#each section.source_items as sourceItem}
+														<li>{sourceItem}</li>
+													{/each}
+												</ul>
+											</div>
+										{/if}
+									</div>
+								{/each}
+							</div>
+						{/if}
+
+						{#if auditReportDraft.limitations?.length}
+							<div class="mt-3 rounded border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+								<div class="font-semibold">Limitations / human review required</div>
+								<ul class="mt-1 list-disc pl-5">
+									{#each auditReportDraft.limitations as limitation}
+										<li>{limitation}</li>
+									{/each}
+								</ul>
+							</div>
+						{/if}
+
+						{#if auditReportDraft.recommended_next_steps?.length}
+							<div class="mt-3 rounded border bg-white p-3 text-xs text-slate-800">
+								<div class="font-semibold text-slate-950">Recommended next steps</div>
+								<ul class="mt-1 list-disc pl-5">
+									{#each auditReportDraft.recommended_next_steps as nextStep}
+										<li>{nextStep}</li>
+									{/each}
+								</ul>
+							</div>
+						{/if}
+
+						{#if auditReportDraft.warnings?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-amber-800">
+								{#each auditReportDraft.warnings as warning}
+									<li>{warning.message ?? warning.detail ?? warning.code}</li>
+								{/each}
+							</ul>
+						{/if}
+
+						{#if auditReportDraft.ambiguity_flags?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-amber-800">
+								{#each auditReportDraft.ambiguity_flags as flag}
+									<li>{flag.message ?? flag.code}</li>
+								{/each}
+							</ul>
+						{/if}
+					{/if}
+				</div>
+			{/if}
+
+			{#if auditReportDraft}
+				<div class="mt-4 rounded border border-emerald-300 bg-emerald-50/60 p-3 text-sm text-emerald-950">
+					<div class="font-semibold">Step 11B &middot; Report Save Commit</div>
+					<p class="mt-1 text-emerald-900">
+						<span class="font-semibold">No AI model is used / writes only after approval.</span>
+						Select the report draft to save, then dry-run to preview. The approved commit stores it
+						as a draft document; the report is never marked final or published and the audit status
+						is never changed.
+					</p>
+
+					<div class="mt-3 grid gap-2">
+						<label class="flex items-start gap-2 rounded border bg-white p-2 text-xs">
+							<input type="checkbox" bind:checked={auditReportSelected} />
+							<span>
+								<span class="font-semibold">{auditReportDraft.report_title}</span>
+								<span class="text-slate-600">
+									&middot; {auditReportDraft.report_sections?.length ?? 0} section(s) &middot; saved as
+									a draft document
+								</span>
+							</span>
+						</label>
+					</div>
+
+					<div class="mt-3 flex flex-wrap items-center gap-3">
+						<button
+							class="btn btn-sm preset-tonal"
+							type="button"
+							disabled={loading !== null || !auditReportSelected}
+							onclick={() => runAuditReportCommit(true)}
+						>
+							{loading === 'audit-report-commit-dry-run' ? 'Dry-running...' : 'Step 11B dry-run'}
+						</button>
+						<label class="flex items-center gap-2 text-xs">
+							<input type="checkbox" bind:checked={auditReportCommitApproved} />
+							<span>I approve saving the deterministic Step 11B report draft</span>
+						</label>
+						<button
+							class="btn btn-sm preset-filled-error-500"
+							type="button"
+							disabled={loading !== null ||
+								!auditReportCommitApproved ||
+								!auditReportDryRunSucceeded ||
+								!auditReportSelected}
+							onclick={() => runAuditReportCommit(false)}
+						>
+							{loading === 'audit-report-commit' ? 'Committing...' : 'Approved report save commit'}
+						</button>
+						<span class="text-xs text-emerald-900">No AI model is used in this write step.</span>
+					</div>
+
+					{#if auditReportCommitDryRun}
+						<div class="mt-3 grid gap-2 rounded border bg-white p-3 text-sm">
+							<div class="font-semibold">
+								Step 11B dry-run status: {humanizeFieldLabel(auditReportCommitDryRun.commit_status)}
+							</div>
+							<p class="text-xs text-slate-700">
+								Dry-run only previews the deterministic write. Nothing was written.
+							</p>
+							<div class="flex flex-wrap gap-2 text-xs">
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Rejected: {auditReportCommitDryRun.rejected_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Deferred: {auditReportCommitDryRun.deferred_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Skipped: {auditReportCommitDryRun.skipped_records?.length ?? 0}
+								</span>
+							</div>
+							{#if auditReportCommitDryRun.planned_actions?.length}
+								<div class="text-xs font-semibold text-emerald-950">Planned actions</div>
+								<ul class="list-disc pl-5 text-xs text-slate-800">
+									{#each auditReportCommitDryRun.planned_actions as action}
+										<li>
+											{action.target_name ?? action.source_temporary_id}:
+											{humanizeActionName(action.decision)} &middot; {humanizeFieldLabel(action.status)}
+											&middot; {action.detail}
+										</li>
+									{/each}
+								</ul>
+							{/if}
+						</div>
+						{#if auditReportCommitDryRun.warnings?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-amber-800">
+								{#each auditReportCommitDryRun.warnings as warning}
+									<li>{warning.detail ?? warning.message ?? warning.code}</li>
+								{/each}
+							</ul>
+						{/if}
+						{#if auditReportCommitDryRun.blocking_errors?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-red-700">
+								{#each auditReportCommitDryRun.blocking_errors as blockingError}
+									<li>{blockingError.detail}</li>
+								{/each}
+							</ul>
+						{/if}
+					{/if}
+
+					{#if auditReportCommitResult}
+						<div class="mt-3 grid gap-2 rounded border bg-white p-3 text-sm">
+							<div class="font-semibold">
+								Step 11B commit status: {humanizeFieldLabel(auditReportCommitResult.commit_status)}
+							</div>
+							<div class="flex flex-wrap gap-2 text-xs">
+								<span class="rounded bg-emerald-100 px-2 py-1 font-semibold text-emerald-900">
+									Created: {auditReportCommitResult.created_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-emerald-100 px-2 py-1 font-semibold text-emerald-900">
+									Reused: {auditReportCommitResult.reused_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Rejected: {auditReportCommitResult.rejected_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Deferred: {auditReportCommitResult.deferred_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Skipped: {auditReportCommitResult.skipped_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-amber-100 px-2 py-1 font-semibold text-amber-900">
+									Warnings: {auditReportCommitResult.warnings?.length ?? 0}
+								</span>
+								<span class="rounded bg-red-100 px-2 py-1 font-semibold text-red-900">
+									Blocking errors: {auditReportCommitResult.blocking_errors?.length ?? 0}
+								</span>
+							</div>
+							{#if auditReportCommitResult.created_records?.length}
+								<div class="text-xs font-semibold text-emerald-950">Saved report documents</div>
+								<ul class="list-disc pl-5 text-xs text-slate-800">
+									{#each auditReportCommitResult.created_records as record}
+										<li>{record.name} &middot; status: {humanizeFieldLabel(record.status)}</li>
+									{/each}
+								</ul>
+							{/if}
+							{#if auditReportCommitResult.reused_records?.length}
+								<div class="text-xs font-semibold text-emerald-950">Reused existing documents</div>
+								<ul class="list-disc pl-5 text-xs text-slate-800">
+									{#each auditReportCommitResult.reused_records as record}
+										<li>{record.name}</li>
+									{/each}
+								</ul>
+							{/if}
+							{#if auditReportCommitResult.planned_actions?.length}
+								<div class="text-xs font-semibold text-emerald-950">Planned actions</div>
+								<ul class="list-disc pl-5 text-xs text-slate-800">
+									{#each auditReportCommitResult.planned_actions as action}
+										<li>
+											{action.target_name ?? action.source_temporary_id}:
+											{humanizeActionName(action.decision)} &middot; {humanizeFieldLabel(action.status)}
+										</li>
+									{/each}
+								</ul>
+							{/if}
+						</div>
+						{#if auditReportCommitResult.warnings?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-amber-800">
+								{#each auditReportCommitResult.warnings as warning}
+									<li>{warning.detail ?? warning.message ?? warning.code}</li>
+								{/each}
+							</ul>
+						{/if}
+						{#if auditReportCommitResult.blocking_errors?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-red-700">
+								{#each auditReportCommitResult.blocking_errors as blockingError}
+									<li>{blockingError.detail}</li>
+								{/each}
+							</ul>
+						{/if}
+					{/if}
+				</div>
+			{/if}
+
+			{#if auditReportDraft}
+				<div class="mt-4 rounded border border-sky-200 bg-sky-50/60 p-3 text-sm text-sky-950">
+					<div class="font-semibold">Step 12A &middot; Final End-to-End Review Summary</div>
+					<p class="mt-1 text-sky-900">
+						<span class="font-semibold">AI suggestion only / no database write.</span>
+						Step 12A explains what the onboarding flow completed and what remains for human review.
+						The workflow is never marked complete and no audit is closed in this step.
+					</p>
+					<div class="mt-3 flex flex-wrap items-center gap-3">
+						<button
+							class="btn btn-sm preset-filled-primary-500"
+							type="button"
+							disabled={loading !== null}
+							onclick={() => runFinalReviewSuggestion()}
+						>
+							{loading === 'final-review-suggest' ? 'Running...' : 'Run Local AI Final Review Summary'}
+						</button>
+						<span class="text-xs text-sky-900">
+							AI Provider: {humanizeProviderMode(finalReviewProviderMode)} &middot; No database
+							writes occur in Step 12A.
+						</span>
+					</div>
+
+					{#if finalReviewDraft}
+						<div class="mt-3 grid gap-2 rounded border bg-white p-3 text-sm">
+							<div class="font-semibold">Step 12A completion summary</div>
+							<div class="flex flex-wrap gap-2 text-xs">
+								<span class="rounded bg-sky-100 px-2 py-1 font-semibold text-sky-900">
+									Demo readiness: {humanizeFieldLabel(finalReviewDraft.demo_readiness_status)}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Overall confidence: {formatConfidence(finalReviewDraft.overall_confidence)}
+								</span>
+								<span class="rounded bg-amber-100 px-2 py-1 font-semibold text-amber-900">
+									Warnings: {finalReviewDraft.warnings?.length ?? 0}
+								</span>
+								{#if finalReviewDraft.review_status}
+									<span class="rounded bg-violet-100 px-2 py-1 font-semibold text-violet-900">
+										{humanizeFieldLabel(finalReviewDraft.review_status)}
+									</span>
+								{/if}
+							</div>
+							{#if finalReviewDraft.completion_summary}
+								<p class="text-xs text-slate-800">{finalReviewDraft.completion_summary}</p>
+							{/if}
+						</div>
+
+						<div class="mt-3 grid gap-2 md:grid-cols-2">
+							{#each [['Completed steps', finalReviewDraft.completed_steps], ['Incomplete steps', finalReviewDraft.incomplete_steps], ['Created or reused records', finalReviewDraft.created_or_reused_records_summary], ['Blocked items', finalReviewDraft.blocked_items], ['Human review required', finalReviewDraft.human_review_required], ['Recommended next steps', finalReviewDraft.recommended_next_steps]] as [sectionLabel, entries]}
+								{#if entries?.length}
+									<div class="rounded border bg-white p-3 text-xs text-slate-800">
+										<div class="font-semibold text-slate-950">{sectionLabel}</div>
+										<ul class="mt-1 list-disc pl-5">
+											{#each entries as entry}
+												<li>{entry}</li>
+											{/each}
+										</ul>
+									</div>
+								{/if}
+							{/each}
+						</div>
+
+						{#if finalReviewDraft.warnings?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-amber-800">
+								{#each finalReviewDraft.warnings as warning}
+									<li>{warning.message ?? warning.detail ?? warning.code}</li>
+								{/each}
+							</ul>
+						{/if}
+
+						{#if finalReviewDraft.ambiguity_flags?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-amber-800">
+								{#each finalReviewDraft.ambiguity_flags as flag}
+									<li>{flag.message ?? flag.code}</li>
+								{/each}
+							</ul>
+						{/if}
+					{/if}
+				</div>
+			{/if}
+
+			{#if finalReviewDraft}
+				<div class="mt-4 rounded border border-emerald-300 bg-emerald-50/60 p-3 text-sm text-emerald-950">
+					<div class="font-semibold">Step 12B &middot; Final Review Commit / Case Handoff</div>
+					<p class="mt-1 text-emerald-900">
+						<span class="font-semibold">No AI model is used / writes only after approval.</span>
+						Select the case handoff summary to record, then dry-run to preview. The approved commit
+						appends it to the audit's observation note only; the workflow is never marked complete,
+						the audit is never closed, and no compliance is certified.
+					</p>
+
+					<div class="mt-3 grid gap-2">
+						<label class="flex items-start gap-2 rounded border bg-white p-2 text-xs">
+							<input type="checkbox" bind:checked={finalReviewSelected} />
+							<span>
+								<span class="font-semibold">
+									Case handoff summary: {humanizeFieldLabel(finalReviewDraft.demo_readiness_status)}
+								</span>
+								<span class="text-slate-600">
+									&middot; {finalReviewDraft.human_review_required?.length ?? 0} human-review item(s)
+								</span>
+							</span>
+						</label>
+					</div>
+
+					<div class="mt-3 flex flex-wrap items-center gap-3">
+						<button
+							class="btn btn-sm preset-tonal"
+							type="button"
+							disabled={loading !== null || !finalReviewSelected}
+							onclick={() => runFinalReviewCommit(true)}
+						>
+							{loading === 'final-review-commit-dry-run' ? 'Dry-running...' : 'Step 12B dry-run'}
+						</button>
+						<label class="flex items-center gap-2 text-xs">
+							<input type="checkbox" bind:checked={finalReviewCommitApproved} />
+							<span>I approve the deterministic Step 12B case handoff note</span>
+						</label>
+						<button
+							class="btn btn-sm preset-filled-error-500"
+							type="button"
+							disabled={loading !== null ||
+								!finalReviewCommitApproved ||
+								!finalReviewDryRunSucceeded ||
+								!finalReviewSelected}
+							onclick={() => runFinalReviewCommit(false)}
+						>
+							{loading === 'final-review-commit' ? 'Committing...' : 'Approved case handoff commit'}
+						</button>
+						<span class="text-xs text-emerald-900">No AI model is used in this write step.</span>
+					</div>
+
+					{#if finalReviewCommitDryRun}
+						<div class="mt-3 grid gap-2 rounded border bg-white p-3 text-sm">
+							<div class="font-semibold">
+								Step 12B dry-run status: {humanizeFieldLabel(finalReviewCommitDryRun.commit_status)}
+							</div>
+							<p class="text-xs text-slate-700">
+								Dry-run only previews the deterministic write. Nothing was written.
+							</p>
+							<div class="flex flex-wrap gap-2 text-xs">
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Rejected: {finalReviewCommitDryRun.rejected_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Deferred: {finalReviewCommitDryRun.deferred_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Skipped: {finalReviewCommitDryRun.skipped_records?.length ?? 0}
+								</span>
+							</div>
+							{#if finalReviewCommitDryRun.planned_actions?.length}
+								<div class="text-xs font-semibold text-emerald-950">Planned actions</div>
+								<ul class="list-disc pl-5 text-xs text-slate-800">
+									{#each finalReviewCommitDryRun.planned_actions as action}
+										<li>
+											{action.target_name ?? action.source_temporary_id}:
+											{humanizeActionName(action.decision)} &middot; {humanizeFieldLabel(action.status)}
+											&middot; {action.detail}
+										</li>
+									{/each}
+								</ul>
+							{/if}
+						</div>
+						{#if finalReviewCommitDryRun.warnings?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-amber-800">
+								{#each finalReviewCommitDryRun.warnings as warning}
+									<li>{warning.detail ?? warning.message ?? warning.code}</li>
+								{/each}
+							</ul>
+						{/if}
+						{#if finalReviewCommitDryRun.blocking_errors?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-red-700">
+								{#each finalReviewCommitDryRun.blocking_errors as blockingError}
+									<li>{blockingError.detail}</li>
+								{/each}
+							</ul>
+						{/if}
+					{/if}
+
+					{#if finalReviewCommitResult}
+						<div class="mt-3 grid gap-2 rounded border bg-white p-3 text-sm">
+							<div class="font-semibold">
+								Step 12B commit status: {humanizeFieldLabel(finalReviewCommitResult.commit_status)}
+							</div>
+							<div class="flex flex-wrap gap-2 text-xs">
+								<span class="rounded bg-emerald-100 px-2 py-1 font-semibold text-emerald-900">
+									Recorded: {finalReviewCommitResult.created_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-emerald-100 px-2 py-1 font-semibold text-emerald-900">
+									Unchanged: {finalReviewCommitResult.reused_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Rejected: {finalReviewCommitResult.rejected_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Deferred: {finalReviewCommitResult.deferred_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+									Skipped: {finalReviewCommitResult.skipped_records?.length ?? 0}
+								</span>
+								<span class="rounded bg-amber-100 px-2 py-1 font-semibold text-amber-900">
+									Warnings: {finalReviewCommitResult.warnings?.length ?? 0}
+								</span>
+								<span class="rounded bg-red-100 px-2 py-1 font-semibold text-red-900">
+									Blocking errors: {finalReviewCommitResult.blocking_errors?.length ?? 0}
+								</span>
+							</div>
+							{#if finalReviewCommitResult.created_records?.length}
+								<div class="text-xs font-semibold text-emerald-950">Recorded on</div>
+								<ul class="list-disc pl-5 text-xs text-slate-800">
+									{#each finalReviewCommitResult.created_records as record}
+										<li>{record.name} &middot; {humanizeFieldLabel(record.record_type)}</li>
+									{/each}
+								</ul>
+							{/if}
+							{#if finalReviewCommitResult.planned_actions?.length}
+								<div class="text-xs font-semibold text-emerald-950">Planned actions</div>
+								<ul class="list-disc pl-5 text-xs text-slate-800">
+									{#each finalReviewCommitResult.planned_actions as action}
+										<li>
+											{action.target_name ?? action.source_temporary_id}:
+											{humanizeActionName(action.decision)} &middot; {humanizeFieldLabel(action.status)}
+										</li>
+									{/each}
+								</ul>
+							{/if}
+						</div>
+						{#if finalReviewCommitResult.warnings?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-amber-800">
+								{#each finalReviewCommitResult.warnings as warning}
+									<li>{warning.detail ?? warning.message ?? warning.code}</li>
+								{/each}
+							</ul>
+						{/if}
+						{#if finalReviewCommitResult.blocking_errors?.length}
+							<ul class="mt-3 list-disc pl-5 text-xs text-red-700">
+								{#each finalReviewCommitResult.blocking_errors as blockingError}
+									<li>{blockingError.detail}</li>
+								{/each}
+							</ul>
+						{/if}
+					{/if}
+				</div>
+			{/if}
+
 			<details class="mt-3">
 				<summary class="cursor-pointer font-semibold">Raw JSON</summary>
 				<pre
@@ -2811,7 +5160,22 @@
 							remediationCommitResult,
 							frameworkControlMappingDraft,
 							frameworkMappingCommitDryRun,
-							frameworkMappingCommitResult
+							frameworkMappingCommitResult,
+							riskScenarioDraft,
+							riskScenarioCommitDryRun,
+							riskScenarioCommitResult,
+							controlEffectivenessDraft,
+							controlEffectivenessCommitDryRun,
+							controlEffectivenessCommitResult,
+							auditReadinessDraft,
+							auditReadinessCommitDryRun,
+							auditReadinessCommitResult,
+							auditReportDraft,
+							auditReportCommitDryRun,
+							auditReportCommitResult,
+							finalReviewDraft,
+							finalReviewCommitDryRun,
+							finalReviewCommitResult
 						},
 						null,
 						2

@@ -13,7 +13,17 @@ const aiOnboardingActionEndpoints: Record<string, string> = {
 	aiRemediationActionSuggest: '/ai/onboarding/remediation-actions/suggest/',
 	aiRemediationActionCommit: '/ai/onboarding/remediation-actions/commit/',
 	aiFrameworkControlMappingSuggest: '/ai/onboarding/framework-control-mappings/suggest/',
-	aiFrameworkControlMappingCommit: '/ai/onboarding/framework-control-mappings/commit/'
+	aiFrameworkControlMappingCommit: '/ai/onboarding/framework-control-mappings/commit/',
+	aiRiskScenarioSuggest: '/ai/onboarding/risk-scenarios/suggest/',
+	aiRiskScenarioCommit: '/ai/onboarding/risk-scenarios/commit/',
+	aiControlEffectivenessSuggest: '/ai/onboarding/control-effectiveness/suggest/',
+	aiControlEffectivenessCommit: '/ai/onboarding/control-effectiveness/commit/',
+	aiAuditReadinessSuggest: '/ai/onboarding/audit-readiness/suggest/',
+	aiAuditReadinessCommit: '/ai/onboarding/audit-readiness/commit/',
+	aiAuditReportSuggest: '/ai/onboarding/audit-report/suggest/',
+	aiAuditReportCommit: '/ai/onboarding/audit-report/commit/',
+	aiFinalReviewSuggest: '/ai/onboarding/final-review/suggest/',
+	aiFinalReviewCommit: '/ai/onboarding/final-review/commit/'
 };
 
 function getNamedAction(url: URL) {

@@ -21,6 +21,68 @@ from .asset_suggestion_guardrails import AssetSuggestionDraftValidationError
 from .asset_suggestion_provider import AssetSuggestionProviderError
 from .asset_suggestion_serializers import AiAssetSuggestionInputSerializer
 from .asset_suggestion_service import build_asset_suggestion_draft
+from .audit_report_commit_guardrails import (
+    AuditReportCommitValidationError,
+    validate_audit_report_commit_guardrails,
+)
+from .audit_report_commit_serializers import AiAuditReportCommitInputSerializer
+from .audit_report_commit_service import execute_audit_report_commit
+from .audit_report_suggestion_guardrails import (
+    AuditReportSuggestionDraftValidationError,
+    validate_audit_report_suggestion_request_guardrails,
+)
+from .audit_report_suggestion_provider import AuditReportSuggestionProviderError
+from .audit_report_suggestion_serializers import AiAuditReportSuggestionInputSerializer
+from .audit_report_suggestion_service import build_audit_report_suggestion_draft
+from .audit_readiness_commit_guardrails import (
+    AuditReadinessCommitValidationError,
+    validate_audit_readiness_commit_guardrails,
+)
+from .audit_readiness_commit_serializers import AiAuditReadinessCommitInputSerializer
+from .audit_readiness_commit_service import execute_audit_readiness_commit
+from .audit_readiness_suggestion_guardrails import (
+    AuditReadinessSuggestionDraftValidationError,
+    validate_audit_readiness_suggestion_request_guardrails,
+)
+from .audit_readiness_suggestion_provider import AuditReadinessSuggestionProviderError
+from .audit_readiness_suggestion_serializers import (
+    AiAuditReadinessSuggestionInputSerializer,
+)
+from .audit_readiness_suggestion_service import build_audit_readiness_suggestion_draft
+from .control_effectiveness_commit_guardrails import (
+    ControlEffectivenessCommitValidationError,
+    validate_control_effectiveness_commit_guardrails,
+)
+from .control_effectiveness_commit_serializers import (
+    AiControlEffectivenessCommitInputSerializer,
+)
+from .control_effectiveness_commit_service import execute_control_effectiveness_commit
+from .control_effectiveness_suggestion_guardrails import (
+    ControlEffectivenessSuggestionDraftValidationError,
+    validate_control_effectiveness_suggestion_request_guardrails,
+)
+from .control_effectiveness_suggestion_provider import (
+    ControlEffectivenessSuggestionProviderError,
+)
+from .control_effectiveness_suggestion_serializers import (
+    AiControlEffectivenessSuggestionInputSerializer,
+)
+from .control_effectiveness_suggestion_service import (
+    build_control_effectiveness_suggestion_draft,
+)
+from .final_review_commit_guardrails import (
+    FinalReviewCommitValidationError,
+    validate_final_review_commit_guardrails,
+)
+from .final_review_commit_serializers import AiFinalReviewCommitInputSerializer
+from .final_review_commit_service import execute_final_review_commit
+from .final_review_suggestion_guardrails import (
+    FinalReviewSuggestionDraftValidationError,
+    validate_final_review_suggestion_request_guardrails,
+)
+from .final_review_suggestion_provider import FinalReviewSuggestionProviderError
+from .final_review_suggestion_serializers import AiFinalReviewSuggestionInputSerializer
+from .final_review_suggestion_service import build_final_review_suggestion_draft
 from .framework_control_mapping_commit_guardrails import (
     FrameworkControlMappingCommitValidationError,
     validate_framework_control_mapping_commit_guardrails,
@@ -63,6 +125,19 @@ from .remediation_action_suggestion_serializers import (
     AiRemediationActionSuggestionInputSerializer,
 )
 from .remediation_action_suggestion_service import build_remediation_action_suggestion_draft
+from .risk_scenario_commit_guardrails import (
+    RiskScenarioCommitValidationError,
+    validate_risk_scenario_commit_guardrails,
+)
+from .risk_scenario_commit_serializers import AiRiskScenarioCommitInputSerializer
+from .risk_scenario_commit_service import execute_risk_scenario_commit
+from .risk_scenario_suggestion_guardrails import (
+    RiskScenarioSuggestionDraftValidationError,
+    validate_risk_scenario_suggestion_request_guardrails,
+)
+from .risk_scenario_suggestion_provider import RiskScenarioSuggestionProviderError
+from .risk_scenario_suggestion_serializers import AiRiskScenarioSuggestionInputSerializer
+from .risk_scenario_suggestion_service import build_risk_scenario_suggestion_draft
 from .case_setup_guardrails import CaseSetupValidationError
 from .case_setup_serializers import AiCaseSetupInputSerializer
 from .case_setup_service import execute_case_setup
@@ -325,6 +400,345 @@ class AiFrameworkControlMappingCommitView(APIView):
                 request, serializer.validated_data
             )
         except FrameworkControlMappingCommitValidationError as exc:
+            return Response(exc.to_response(), status=exc.status_code)
+
+        return Response(result)
+
+
+class AiRiskScenarioSuggestionView(APIView):
+    """Step 8A: advisory risk scenario suggestion. No database writes.
+
+    Scenarios are advisory drafts only: no risk record is created, no risk is accepted or
+    treated, and no assessment is closed.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(request=AiRiskScenarioSuggestionInputSerializer)
+    def post(self, request, format=None):
+        request_guardrail_errors = validate_risk_scenario_suggestion_request_guardrails(
+            request.data if isinstance(request.data, dict) else {}
+        )
+        if request_guardrail_errors:
+            return Response(request_guardrail_errors, status=400)
+
+        serializer = AiRiskScenarioSuggestionInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            with transaction.atomic():
+                draft = build_risk_scenario_suggestion_draft(
+                    serializer.validated_data,
+                    base_dir=str(settings.BASE_DIR.parent),
+                )
+                transaction.set_rollback(True)
+        except (
+            RiskScenarioSuggestionDraftValidationError,
+            RiskScenarioSuggestionProviderError,
+        ) as exc:
+            return Response(exc.to_response(), status=exc.status_code)
+
+        return Response(draft)
+
+
+class AiControlEffectivenessSuggestionView(APIView):
+    """Step 9A: advisory control effectiveness suggestion. No database writes.
+
+    Judgements are advisory drafts only: no RequirementAssessment is updated, no audit is
+    closed, and no compliance is certified.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(request=AiControlEffectivenessSuggestionInputSerializer)
+    def post(self, request, format=None):
+        request_guardrail_errors = (
+            validate_control_effectiveness_suggestion_request_guardrails(
+                request.data if isinstance(request.data, dict) else {}
+            )
+        )
+        if request_guardrail_errors:
+            return Response(request_guardrail_errors, status=400)
+
+        serializer = AiControlEffectivenessSuggestionInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            with transaction.atomic():
+                draft = build_control_effectiveness_suggestion_draft(
+                    serializer.validated_data,
+                    base_dir=str(settings.BASE_DIR.parent),
+                )
+                transaction.set_rollback(True)
+        except (
+            ControlEffectivenessSuggestionDraftValidationError,
+            ControlEffectivenessSuggestionProviderError,
+        ) as exc:
+            return Response(exc.to_response(), status=exc.status_code)
+
+        return Response(draft)
+
+
+class AiFinalReviewCommitView(APIView):
+    """Step 12B: deterministic case handoff commit. No AI provider is used.
+
+    Only the audit's own observation note is appended to. The workflow is never marked
+    complete, the audit status is never changed, the audit is never closed, and no
+    compliance is certified.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(request=AiFinalReviewCommitInputSerializer)
+    def post(self, request, format=None):
+        try:
+            # Run on the raw payload so AI/provider, completion, and raw-identifier keys are
+            # reported through the Step 12B blocking_errors contract rather than as a generic
+            # unknown-field error.
+            validate_final_review_commit_guardrails(
+                request.data if isinstance(request.data, dict) else {}
+            )
+        except FinalReviewCommitValidationError as exc:
+            return Response(exc.to_response(), status=exc.status_code)
+
+        serializer = AiFinalReviewCommitInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            result = execute_final_review_commit(request, serializer.validated_data)
+        except FinalReviewCommitValidationError as exc:
+            return Response(exc.to_response(), status=exc.status_code)
+
+        return Response(result)
+
+
+class AiFinalReviewSuggestionView(APIView):
+    """Step 12A: advisory final end-to-end review summary. No database writes.
+
+    The summary is a review aid only: the workflow is never marked complete, no audit is
+    closed, and no compliance is certified.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(request=AiFinalReviewSuggestionInputSerializer)
+    def post(self, request, format=None):
+        request_guardrail_errors = validate_final_review_suggestion_request_guardrails(
+            request.data if isinstance(request.data, dict) else {}
+        )
+        if request_guardrail_errors:
+            return Response(request_guardrail_errors, status=400)
+
+        serializer = AiFinalReviewSuggestionInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            with transaction.atomic():
+                draft = build_final_review_suggestion_draft(
+                    serializer.validated_data,
+                    base_dir=str(settings.BASE_DIR.parent),
+                )
+                transaction.set_rollback(True)
+        except (
+            FinalReviewSuggestionDraftValidationError,
+            FinalReviewSuggestionProviderError,
+        ) as exc:
+            return Response(exc.to_response(), status=exc.status_code)
+
+        return Response(draft)
+
+
+class AiAuditReportCommitView(APIView):
+    """Step 11B: deterministic report save. No AI provider is used.
+
+    The reviewed draft is stored as a DRAFT document record. The report is never marked
+    final or published, the audit status is never changed, and no compliance is certified.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(request=AiAuditReportCommitInputSerializer)
+    def post(self, request, format=None):
+        try:
+            # Run on the raw payload so AI/provider, report-finalization, and raw-identifier
+            # keys are reported through the Step 11B blocking_errors contract rather than as
+            # a generic unknown-field error.
+            validate_audit_report_commit_guardrails(
+                request.data if isinstance(request.data, dict) else {}
+            )
+        except AuditReportCommitValidationError as exc:
+            return Response(exc.to_response(), status=exc.status_code)
+
+        serializer = AiAuditReportCommitInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            result = execute_audit_report_commit(request, serializer.validated_data)
+        except AuditReportCommitValidationError as exc:
+            return Response(exc.to_response(), status=exc.status_code)
+
+        return Response(result)
+
+
+class AiAuditReportSuggestionView(APIView):
+    """Step 11A: advisory management/audit report draft. No database writes.
+
+    The draft is never a final audit opinion, a compliance certification, or a
+    regulator-approved result, and it always states that human review is required.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(request=AiAuditReportSuggestionInputSerializer)
+    def post(self, request, format=None):
+        request_guardrail_errors = validate_audit_report_suggestion_request_guardrails(
+            request.data if isinstance(request.data, dict) else {}
+        )
+        if request_guardrail_errors:
+            return Response(request_guardrail_errors, status=400)
+
+        serializer = AiAuditReportSuggestionInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            with transaction.atomic():
+                draft = build_audit_report_suggestion_draft(
+                    serializer.validated_data,
+                    base_dir=str(settings.BASE_DIR.parent),
+                )
+                transaction.set_rollback(True)
+        except (
+            AuditReportSuggestionDraftValidationError,
+            AuditReportSuggestionProviderError,
+        ) as exc:
+            return Response(exc.to_response(), status=exc.status_code)
+
+        return Response(draft)
+
+
+class AiAuditReadinessCommitView(APIView):
+    """Step 10B: deterministic audit readiness commit. No AI provider is used.
+
+    Only the audit's own observation note is appended to. The audit status is never
+    changed, the audit is never marked ready or complete, and no compliance is certified.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(request=AiAuditReadinessCommitInputSerializer)
+    def post(self, request, format=None):
+        try:
+            # Run on the raw payload so AI/provider, readiness-marking, and raw-identifier
+            # keys are reported through the Step 10B blocking_errors contract rather than as
+            # a generic unknown-field error.
+            validate_audit_readiness_commit_guardrails(
+                request.data if isinstance(request.data, dict) else {}
+            )
+        except AuditReadinessCommitValidationError as exc:
+            return Response(exc.to_response(), status=exc.status_code)
+
+        serializer = AiAuditReadinessCommitInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            result = execute_audit_readiness_commit(request, serializer.validated_data)
+        except AuditReadinessCommitValidationError as exc:
+            return Response(exc.to_response(), status=exc.status_code)
+
+        return Response(result)
+
+
+class AiAuditReadinessSuggestionView(APIView):
+    """Step 10A: advisory audit readiness summary. No database writes.
+
+    The summary is a draft only: nothing is marked ready, nothing is closed, and no
+    compliance is certified.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(request=AiAuditReadinessSuggestionInputSerializer)
+    def post(self, request, format=None):
+        request_guardrail_errors = validate_audit_readiness_suggestion_request_guardrails(
+            request.data if isinstance(request.data, dict) else {}
+        )
+        if request_guardrail_errors:
+            return Response(request_guardrail_errors, status=400)
+
+        serializer = AiAuditReadinessSuggestionInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            with transaction.atomic():
+                draft = build_audit_readiness_suggestion_draft(
+                    serializer.validated_data,
+                    base_dir=str(settings.BASE_DIR.parent),
+                )
+                transaction.set_rollback(True)
+        except (
+            AuditReadinessSuggestionDraftValidationError,
+            AuditReadinessSuggestionProviderError,
+        ) as exc:
+            return Response(exc.to_response(), status=exc.status_code)
+
+        return Response(draft)
+
+
+class AiControlEffectivenessCommitView(APIView):
+    """Step 9B: deterministic control effectiveness commit. No AI provider is used.
+
+    Only the auditor-owned result and observation of an existing RequirementAssessment are
+    written. No audit status is changed, no audit is closed, and no compliance is certified.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(request=AiControlEffectivenessCommitInputSerializer)
+    def post(self, request, format=None):
+        try:
+            # Run on the raw payload so AI/provider, audit-closure, and raw-identifier keys
+            # are reported through the Step 9B blocking_errors contract rather than as a
+            # generic unknown-field error.
+            validate_control_effectiveness_commit_guardrails(
+                request.data if isinstance(request.data, dict) else {}
+            )
+        except ControlEffectivenessCommitValidationError as exc:
+            return Response(exc.to_response(), status=exc.status_code)
+
+        serializer = AiControlEffectivenessCommitInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            result = execute_control_effectiveness_commit(request, serializer.validated_data)
+        except ControlEffectivenessCommitValidationError as exc:
+            return Response(exc.to_response(), status=exc.status_code)
+
+        return Response(result)
+
+
+class AiRiskScenarioCommitView(APIView):
+    """Step 8B: deterministic risk scenario commit. No AI provider is used."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(request=AiRiskScenarioCommitInputSerializer)
+    def post(self, request, format=None):
+        try:
+            # Run on the raw payload so AI/provider, risk-treatment, and raw-identifier keys
+            # are reported through the Step 8B blocking_errors contract rather than as a
+            # generic unknown-field error.
+            validate_risk_scenario_commit_guardrails(
+                request.data if isinstance(request.data, dict) else {}
+            )
+        except RiskScenarioCommitValidationError as exc:
+            return Response(exc.to_response(), status=exc.status_code)
+
+        serializer = AiRiskScenarioCommitInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            result = execute_risk_scenario_commit(request, serializer.validated_data)
+        except RiskScenarioCommitValidationError as exc:
             return Response(exc.to_response(), status=exc.status_code)
 
         return Response(result)

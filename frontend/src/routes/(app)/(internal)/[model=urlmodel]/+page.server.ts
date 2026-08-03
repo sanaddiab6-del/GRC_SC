@@ -144,6 +144,36 @@ export const actions: Actions = {
 	aiFrameworkControlMappingCommit: async (event) => {
 		return proxyAiOnboardingAction(event, '/ai/onboarding/framework-control-mappings/commit/');
 	},
+	aiRiskScenarioSuggest: async (event) => {
+		return proxyAiOnboardingAction(event, '/ai/onboarding/risk-scenarios/suggest/');
+	},
+	aiRiskScenarioCommit: async (event) => {
+		return proxyAiOnboardingAction(event, '/ai/onboarding/risk-scenarios/commit/');
+	},
+	aiControlEffectivenessSuggest: async (event) => {
+		return proxyAiOnboardingAction(event, '/ai/onboarding/control-effectiveness/suggest/');
+	},
+	aiControlEffectivenessCommit: async (event) => {
+		return proxyAiOnboardingAction(event, '/ai/onboarding/control-effectiveness/commit/');
+	},
+	aiAuditReadinessSuggest: async (event) => {
+		return proxyAiOnboardingAction(event, '/ai/onboarding/audit-readiness/suggest/');
+	},
+	aiAuditReadinessCommit: async (event) => {
+		return proxyAiOnboardingAction(event, '/ai/onboarding/audit-readiness/commit/');
+	},
+	aiAuditReportSuggest: async (event) => {
+		return proxyAiOnboardingAction(event, '/ai/onboarding/audit-report/suggest/');
+	},
+	aiAuditReportCommit: async (event) => {
+		return proxyAiOnboardingAction(event, '/ai/onboarding/audit-report/commit/');
+	},
+	aiFinalReviewSuggest: async (event) => {
+		return proxyAiOnboardingAction(event, '/ai/onboarding/final-review/suggest/');
+	},
+	aiFinalReviewCommit: async (event) => {
+		return proxyAiOnboardingAction(event, '/ai/onboarding/final-review/commit/');
+	},
 	create: async (event) => {
 		const redirectToWrittenObject = Boolean(
 			event.params.model === 'entity-assessments' ||

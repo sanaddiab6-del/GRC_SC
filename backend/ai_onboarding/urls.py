@@ -2,17 +2,27 @@ from django.urls import path
 
 from .views import (
     AiAppliedControlCommitView,
+    AiControlEffectivenessCommitView,
+    AiControlEffectivenessSuggestionView,
     AiAppliedControlSuggestionView,
+    AiAuditReadinessCommitView,
+    AiAuditReadinessSuggestionView,
+    AiAuditReportCommitView,
+    AiAuditReportSuggestionView,
     AiAssetCommitView,
     AiAssetSuggestionView,
     AiCaseIntakeView,
     AiCaseSetupView,
     AiEvidenceFindingCommitView,
+    AiFinalReviewCommitView,
+    AiFinalReviewSuggestionView,
     AiEvidenceFindingSuggestionView,
     AiFrameworkControlMappingCommitView,
     AiFrameworkControlMappingSuggestionView,
     AiRemediationActionCommitView,
     AiRemediationActionSuggestionView,
+    AiRiskScenarioCommitView,
+    AiRiskScenarioSuggestionView,
 )
 
 
@@ -60,5 +70,55 @@ urlpatterns = [
         "onboarding/framework-control-mappings/commit/",
         AiFrameworkControlMappingCommitView.as_view(),
         name="ai-framework-control-mapping-commit",
+    ),
+    path(
+        "onboarding/risk-scenarios/suggest/",
+        AiRiskScenarioSuggestionView.as_view(),
+        name="ai-risk-scenario-suggestion",
+    ),
+    path(
+        "onboarding/risk-scenarios/commit/",
+        AiRiskScenarioCommitView.as_view(),
+        name="ai-risk-scenario-commit",
+    ),
+    path(
+        "onboarding/control-effectiveness/suggest/",
+        AiControlEffectivenessSuggestionView.as_view(),
+        name="ai-control-effectiveness-suggestion",
+    ),
+    path(
+        "onboarding/control-effectiveness/commit/",
+        AiControlEffectivenessCommitView.as_view(),
+        name="ai-control-effectiveness-commit",
+    ),
+    path(
+        "onboarding/audit-readiness/suggest/",
+        AiAuditReadinessSuggestionView.as_view(),
+        name="ai-audit-readiness-suggestion",
+    ),
+    path(
+        "onboarding/audit-readiness/commit/",
+        AiAuditReadinessCommitView.as_view(),
+        name="ai-audit-readiness-commit",
+    ),
+    path(
+        "onboarding/audit-report/suggest/",
+        AiAuditReportSuggestionView.as_view(),
+        name="ai-audit-report-suggestion",
+    ),
+    path(
+        "onboarding/audit-report/commit/",
+        AiAuditReportCommitView.as_view(),
+        name="ai-audit-report-commit",
+    ),
+    path(
+        "onboarding/final-review/suggest/",
+        AiFinalReviewSuggestionView.as_view(),
+        name="ai-final-review-suggestion",
+    ),
+    path(
+        "onboarding/final-review/commit/",
+        AiFinalReviewCommitView.as_view(),
+        name="ai-final-review-commit",
     ),
 ]
