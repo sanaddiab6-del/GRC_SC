@@ -3865,6 +3865,29 @@
 						treatment, or acceptance is recorded.
 					</p>
 
+					<!-- A RiskScenario always belongs to an existing RiskAssessment, and Step 8B never
+					     creates one. Step 2 only creates a RiskAssessment when it was explicitly
+					     requested there, so the reference is surfaced here as a required field: it is
+					     prefilled from the Step 2 handoff when one exists and can otherwise be pasted. -->
+					<label class="mt-3 grid gap-1">
+						<span class="text-sm font-semibold">
+							Risk Assessment ID <span class="text-red-700">(required for Step 8B)</span>
+						</span>
+						<input
+							class="input"
+							placeholder="UUID of an existing Risk Assessment"
+							bind:value={setupReference.risk_assessment_id}
+						/>
+					</label>
+					{#if !setupReference.risk_assessment_id}
+						<p class="mt-2 rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+							No Risk Assessment is linked to this case yet, so Step 8B cannot run. A risk scenario
+							can only be created under an existing risk assessment, and Step 8B never creates one.
+							Either re-run Step 2 with "create risk assessment" enabled (it needs a Risk Matrix
+							ID), or paste the ID of an existing Risk Assessment above.
+						</p>
+					{/if}
+
 					<div class="mt-3 grid gap-2">
 						{#each riskScenarioDraft.risk_scenarios as scenario}
 							<label class="flex items-start gap-2 rounded border bg-white p-2 text-xs">
@@ -3885,7 +3908,9 @@
 						<button
 							class="btn btn-sm preset-tonal"
 							type="button"
-							disabled={loading !== null || !selectedRiskScenarios.length}
+							disabled={loading !== null ||
+								!selectedRiskScenarios.length ||
+								!setupReference.risk_assessment_id}
 							onclick={() => runRiskScenarioCommit(true)}
 						>
 							{loading === 'risk-scenario-commit-dry-run' ? 'Dry-running...' : 'Step 8B dry-run'}
