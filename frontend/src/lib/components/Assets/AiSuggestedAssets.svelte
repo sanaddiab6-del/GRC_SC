@@ -954,6 +954,15 @@
 			!(frameworkMappingCommitDryRun?.blocking_errors ?? []).length &&
 			frameworkMappingCommitDryRun?.commit_status !== 'blocked'
 	);
+	// Step 7A falls back to the read-only framework export file when the referenced framework
+	// has no assessable requirement nodes in the database. Those controls exist in the export
+	// but not as platform records, and Step 7B never creates framework controls, so the commit
+	// will block. Surfacing it here explains the block before the dry-run rather than after.
+	const frameworkMappingUsedCsvFallback = $derived(
+		(frameworkControlMappingDraft?.warnings ?? []).some(
+			(warning: any) => warning?.code === 'framework_controls_loaded_from_csv_export'
+		)
+	);
 
 	function buildFrameworkControlMappingCommitPayload(dryRun: boolean) {
 		if (!frameworkControlMappingDraft) throw { detail: 'Run Step 7A before Step 7B.' };
@@ -3506,6 +3515,16 @@
 						Select the Step 7A framework mappings to keep, then dry-run to preview. The approved
 						commit writes deterministic mappings only for selected and approved items.
 					</p>
+
+					{#if frameworkMappingUsedCsvFallback}
+						<p class="mt-2 rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+							These controls were matched from the read-only framework export file, not from the
+							database, because the selected audit's framework has no assessable requirement nodes
+							loaded. Step 7B never creates framework controls, so the dry-run will block. To get a
+							committable mapping: load the framework library from the Libraries page, then run
+							Step 2 for a new case against that loaded framework.
+						</p>
+					{/if}
 
 					<div class="mt-3 grid gap-2">
 						{#each frameworkControlMappingDraft.framework_control_mappings as mapping}
