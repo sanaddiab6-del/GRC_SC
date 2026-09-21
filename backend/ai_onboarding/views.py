@@ -7,6 +7,7 @@ from rest_framework import permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .advisory_transaction import advisory_rollback_transaction
 from .applied_control_commit_guardrails import AppliedControlCommitValidationError
 from .applied_control_commit_serializers import AiAppliedControlCommitInputSerializer
 from .applied_control_commit_service import execute_applied_control_commit
@@ -156,7 +157,7 @@ class AiCaseIntakeView(APIView):
         serializer.is_valid(raise_exception=True)
 
         try:
-            with transaction.atomic():
+            with advisory_rollback_transaction():
                 draft = build_case_intake_draft(
                     serializer.validated_data,
                     base_dir=str(settings.BASE_DIR.parent),
@@ -193,7 +194,7 @@ class AiAssetSuggestionView(APIView):
         serializer.is_valid(raise_exception=True)
 
         try:
-            with transaction.atomic():
+            with advisory_rollback_transaction():
                 draft = build_asset_suggestion_draft(
                     request,
                     serializer.validated_data,
@@ -230,7 +231,7 @@ class AiAppliedControlSuggestionView(APIView):
         serializer.is_valid(raise_exception=True)
 
         try:
-            with transaction.atomic():
+            with advisory_rollback_transaction():
                 draft = build_applied_control_suggestion_draft(
                     request,
                     serializer.validated_data,
@@ -271,7 +272,7 @@ class AiEvidenceFindingSuggestionView(APIView):
         serializer.is_valid(raise_exception=True)
 
         try:
-            with transaction.atomic():
+            with advisory_rollback_transaction():
                 draft = build_evidence_finding_suggestion_draft(
                     request,
                     serializer.validated_data,
@@ -320,7 +321,7 @@ class AiRemediationActionSuggestionView(APIView):
         serializer.is_valid(raise_exception=True)
 
         try:
-            with transaction.atomic():
+            with advisory_rollback_transaction():
                 draft = build_remediation_action_suggestion_draft(
                     serializer.validated_data,
                     base_dir=str(settings.BASE_DIR.parent),
@@ -359,7 +360,7 @@ class AiFrameworkControlMappingSuggestionView(APIView):
         serializer.is_valid(raise_exception=True)
 
         try:
-            with transaction.atomic():
+            with advisory_rollback_transaction():
                 draft = build_framework_control_mapping_suggestion_draft(
                     request,
                     serializer.validated_data,
@@ -426,7 +427,7 @@ class AiRiskScenarioSuggestionView(APIView):
         serializer.is_valid(raise_exception=True)
 
         try:
-            with transaction.atomic():
+            with advisory_rollback_transaction():
                 draft = build_risk_scenario_suggestion_draft(
                     serializer.validated_data,
                     base_dir=str(settings.BASE_DIR.parent),
@@ -464,7 +465,7 @@ class AiControlEffectivenessSuggestionView(APIView):
         serializer.is_valid(raise_exception=True)
 
         try:
-            with transaction.atomic():
+            with advisory_rollback_transaction():
                 draft = build_control_effectiveness_suggestion_draft(
                     serializer.validated_data,
                     base_dir=str(settings.BASE_DIR.parent),
@@ -533,7 +534,7 @@ class AiFinalReviewSuggestionView(APIView):
         serializer.is_valid(raise_exception=True)
 
         try:
-            with transaction.atomic():
+            with advisory_rollback_transaction():
                 draft = build_final_review_suggestion_draft(
                     serializer.validated_data,
                     base_dir=str(settings.BASE_DIR.parent),
@@ -601,7 +602,7 @@ class AiAuditReportSuggestionView(APIView):
         serializer.is_valid(raise_exception=True)
 
         try:
-            with transaction.atomic():
+            with advisory_rollback_transaction():
                 draft = build_audit_report_suggestion_draft(
                     serializer.validated_data,
                     base_dir=str(settings.BASE_DIR.parent),
@@ -669,7 +670,7 @@ class AiAuditReadinessSuggestionView(APIView):
         serializer.is_valid(raise_exception=True)
 
         try:
-            with transaction.atomic():
+            with advisory_rollback_transaction():
                 draft = build_audit_readiness_suggestion_draft(
                     serializer.validated_data,
                     base_dir=str(settings.BASE_DIR.parent),
