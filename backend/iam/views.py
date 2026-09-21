@@ -11,6 +11,7 @@ from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.utils.translation import gettext_lazy as _
 from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.debug import sensitive_variables
 from knox import crypto
 from knox.auth import TokenAuthentication, get_token_model, knox_settings
 from knox.models import AuthToken
@@ -63,6 +64,7 @@ class LogoutView(views.APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     @method_decorator(ensure_csrf_cookie)
+    @sensitive_variables("auth_header", "access_token")
     def post(self, request) -> Response:
         try:
             logger.info("logout request", user=request.user)
@@ -258,6 +260,7 @@ class SessionTokenView(views.APIView):
     This is needed for allauth's authentication flows.
     """
 
+    @sensitive_variables("auth_header", "access_token")
     def post(self, request):
         auth_header = request.META.get("HTTP_AUTHORIZATION")
         if not auth_header or " " not in auth_header:
@@ -463,6 +466,7 @@ class RevokeOtherSessionsView(views.APIView):
 
     permission_classes = (permissions.IsAuthenticated,)
 
+    @sensitive_variables("auth_header", "access_token")
     def post(self, request, *args, **kwargs):
         auth_header = request.META.get("HTTP_AUTHORIZATION")
         if not auth_header or " " not in auth_header:
