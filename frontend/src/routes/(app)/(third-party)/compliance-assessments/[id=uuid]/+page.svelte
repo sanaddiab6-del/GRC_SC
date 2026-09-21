@@ -45,6 +45,13 @@
 	import MarkdownRenderer from '$lib/components/MarkdownRenderer.svelte';
 	import ValidationFlowsSection from '$lib/components/ValidationFlows/ValidationFlowsSection.svelte';
 	import { countMasked, isMaskedPlaceholder } from '$lib/utils/related-visibility';
+	import AiOnboardingPanel from '$lib/components/AiOnboarding/AiOnboardingPanel.svelte';
+	import Step7FrameworkMappings from '$lib/components/AiOnboarding/Step7FrameworkMappings.svelte';
+	import Step9ControlEffectiveness from '$lib/components/AiOnboarding/Step9ControlEffectiveness.svelte';
+	import Step10AuditReadiness from '$lib/components/AiOnboarding/Step10AuditReadiness.svelte';
+	import Step11AuditReport from '$lib/components/AiOnboarding/Step11AuditReport.svelte';
+	import Step12FinalReview from '$lib/components/AiOnboarding/Step12FinalReview.svelte';
+	import { ai, hydrateAiOnboarding } from '$lib/components/AiOnboarding/aiOnboardingState.svelte';
 
 	interface Props {
 		data: PageData;
@@ -54,6 +61,16 @@
 	let { data, form }: Props = $props();
 
 	const compliance_assessment = $derived(data.compliance_assessment);
+
+	/**
+	 * The audit-level onboarding steps belong to the audit Step 2 created for the case, not to
+	 * every audit. Comparing ids keeps this page's onboarding actions scoped to that one audit;
+	 * the backend still validates the reference on every call.
+	 */
+	const isAiOnboardingCase = $derived(
+		Boolean(ai.setupReference.compliance_assessment_id) &&
+			ai.setupReference.compliance_assessment_id === page.params.id
+	);
 
 	const user = page.data.user;
 	const model = URL_MODEL_MAP['compliance-assessments'];
@@ -114,6 +131,11 @@
 	}
 
 	onMount(() => {
+		// The onboarding panel below is gated on this page being the case's audit, so the case
+		// reference has to be read out of storage before that condition can be evaluated. The
+		// panel cannot do it itself here: it only renders once the condition is already true.
+		hydrateAiOnboarding();
+
 		// Add event listener to the document
 		document.addEventListener('keydown', handleKeydown);
 
@@ -504,6 +526,20 @@
 				<span class="ml-2 text-sm">{m.lockedAssessmentMessage()}</span>
 			</div>
 		</div>
+	{/if}
+
+	<!-- Steps 7, 9, 10, 11, and 12 all act on this audit: 7B and 9B write its requirement
+	     assessments, 10B/12B append to its observation, and 11B saves its report document. They
+	     are shown only on the audit the Local AI case was set up against, so another audit's page
+	     never offers to write this case's records. -->
+	{#if isAiOnboardingCase}
+		<AiOnboardingPanel steps={['7A', '7B', '9A', '9B', '10A', '10B', '11A', '11B', '12A', '12B']}>
+			<Step7FrameworkMappings />
+			<Step9ControlEffectiveness />
+			<Step10AuditReadiness />
+			<Step11AuditReport />
+			<Step12FinalReview />
+		</AiOnboardingPanel>
 	{/if}
 
 	<div class="flex flex-col card px-6 py-4 bg-white shadow-lg w-full">

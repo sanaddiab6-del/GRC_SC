@@ -1,3 +1,8 @@
+import {
+	AI_ONBOARDING_SESSION_EXPIRED,
+	fetchAiOnboardingBackend,
+	hasAiOnboardingSession
+} from '$lib/utils/aiOnboardingProxy';
 import { BASE_API_URL } from '$lib/utils/constants';
 import { quickStartSchema } from '$lib/utils/schemas';
 import { fail as kitFail, type Actions, type RequestEvent } from '@sveltejs/kit';
@@ -43,14 +48,15 @@ async function readResponseBody(response: Response) {
 }
 
 async function proxyAiOnboardingAction(event: RequestEvent, endpoint: string) {
+	// Form actions do not run the (app) layout session guard, so refuse an unauthenticated
+	// caller here instead of proxying the request anonymously.
+	if (!hasAiOnboardingSession(event))
+		return kitFail(401, { aiError: AI_ONBOARDING_SESSION_EXPIRED });
+
 	const payload = await readAiPayload(event);
 	if (!payload) return kitFail(400, { aiError: { detail: 'Invalid AI request payload.' } });
 
-	const response = await event.fetch(`${BASE_API_URL}${endpoint}`, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify(payload)
-	});
+	const response = await fetchAiOnboardingBackend(event, endpoint, payload);
 	const responseBody = await readResponseBody(response);
 
 	if (!response.ok) return kitFail(response.status, { aiError: responseBody });

@@ -1,4 +1,10 @@
 import { defaultDeleteFormAction, defaultWriteFormAction } from '$lib/utils/actions';
+import { AI_ONBOARDING_ACTION_ENDPOINTS } from '$lib/utils/aiOnboardingActions';
+import {
+	AI_ONBOARDING_SESSION_EXPIRED,
+	fetchAiOnboardingBackend,
+	hasAiOnboardingSession
+} from '$lib/utils/aiOnboardingProxy';
 import { BASE_API_URL } from '$lib/utils/constants';
 import {
 	getModelInfo,
@@ -56,14 +62,14 @@ async function readResponseBody(response: Response) {
 }
 
 async function proxyAiOnboardingAction(event: RequestEvent, endpoint: string) {
+	// Form actions do not run the (app) layout session guard, so refuse an unauthenticated
+	// caller here instead of proxying the request anonymously.
+	if (!hasAiOnboardingSession(event)) return fail(401, { aiError: AI_ONBOARDING_SESSION_EXPIRED });
+
 	const payload = await readAiPayload(event);
 	if (!payload) return fail(400, { aiError: { detail: 'Invalid AI request payload.' } });
 
-	const response = await event.fetch(`${BASE_API_URL}${endpoint}`, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify(payload)
-	});
+	const response = await fetchAiOnboardingBackend(event, endpoint, payload);
 	const responseBody = await readResponseBody(response);
 
 	if (!response.ok) return fail(response.status, { aiError: responseBody });
@@ -113,67 +119,23 @@ export const load: PageServerLoad = async ({ params, fetch }) => {
 	return { createForm, deleteForm, model, URLModel };
 };
 
+/**
+ * The AI onboarding step actions kept as form actions on this route.
+ *
+ * Step components post to the shared `/fe-api/ai-onboarding/[action]` proxy instead, because a
+ * step now renders on the page that owns its resource rather than on Assets. These entries are
+ * derived from the same action map so the two entry points can never resolve an action to
+ * different backend endpoints.
+ */
+const aiOnboardingActions: Actions = Object.fromEntries(
+	Object.entries(AI_ONBOARDING_ACTION_ENDPOINTS).map(([action, endpoint]) => [
+		action,
+		async (event: RequestEvent) => proxyAiOnboardingAction(event, endpoint)
+	])
+);
+
 export const actions: Actions = {
-	aiAssetSuggest: async (event) => {
-		return proxyAiOnboardingAction(event, '/ai/onboarding/assets/suggest/');
-	},
-	aiAssetCommit: async (event) => {
-		return proxyAiOnboardingAction(event, '/ai/onboarding/assets/commit/');
-	},
-	aiAppliedControlSuggest: async (event) => {
-		return proxyAiOnboardingAction(event, '/ai/onboarding/applied-controls/suggest/');
-	},
-	aiAppliedControlCommit: async (event) => {
-		return proxyAiOnboardingAction(event, '/ai/onboarding/applied-controls/commit/');
-	},
-	aiEvidenceFindingSuggest: async (event) => {
-		return proxyAiOnboardingAction(event, '/ai/onboarding/evidence-findings/suggest/');
-	},
-	aiEvidenceFindingCommit: async (event) => {
-		return proxyAiOnboardingAction(event, '/ai/onboarding/evidence-findings/commit/');
-	},
-	aiRemediationActionSuggest: async (event) => {
-		return proxyAiOnboardingAction(event, '/ai/onboarding/remediation-actions/suggest/');
-	},
-	aiRemediationActionCommit: async (event) => {
-		return proxyAiOnboardingAction(event, '/ai/onboarding/remediation-actions/commit/');
-	},
-	aiFrameworkControlMappingSuggest: async (event) => {
-		return proxyAiOnboardingAction(event, '/ai/onboarding/framework-control-mappings/suggest/');
-	},
-	aiFrameworkControlMappingCommit: async (event) => {
-		return proxyAiOnboardingAction(event, '/ai/onboarding/framework-control-mappings/commit/');
-	},
-	aiRiskScenarioSuggest: async (event) => {
-		return proxyAiOnboardingAction(event, '/ai/onboarding/risk-scenarios/suggest/');
-	},
-	aiRiskScenarioCommit: async (event) => {
-		return proxyAiOnboardingAction(event, '/ai/onboarding/risk-scenarios/commit/');
-	},
-	aiControlEffectivenessSuggest: async (event) => {
-		return proxyAiOnboardingAction(event, '/ai/onboarding/control-effectiveness/suggest/');
-	},
-	aiControlEffectivenessCommit: async (event) => {
-		return proxyAiOnboardingAction(event, '/ai/onboarding/control-effectiveness/commit/');
-	},
-	aiAuditReadinessSuggest: async (event) => {
-		return proxyAiOnboardingAction(event, '/ai/onboarding/audit-readiness/suggest/');
-	},
-	aiAuditReadinessCommit: async (event) => {
-		return proxyAiOnboardingAction(event, '/ai/onboarding/audit-readiness/commit/');
-	},
-	aiAuditReportSuggest: async (event) => {
-		return proxyAiOnboardingAction(event, '/ai/onboarding/audit-report/suggest/');
-	},
-	aiAuditReportCommit: async (event) => {
-		return proxyAiOnboardingAction(event, '/ai/onboarding/audit-report/commit/');
-	},
-	aiFinalReviewSuggest: async (event) => {
-		return proxyAiOnboardingAction(event, '/ai/onboarding/final-review/suggest/');
-	},
-	aiFinalReviewCommit: async (event) => {
-		return proxyAiOnboardingAction(event, '/ai/onboarding/final-review/commit/');
-	},
+	...aiOnboardingActions,
 	create: async (event) => {
 		const redirectToWrittenObject = Boolean(
 			event.params.model === 'entity-assessments' ||

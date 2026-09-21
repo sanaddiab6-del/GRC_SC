@@ -1,30 +1,13 @@
+import {
+	AI_ONBOARDING_SESSION_EXPIRED,
+	fetchAiOnboardingBackend,
+	hasAiOnboardingSession
+} from '$lib/utils/aiOnboardingProxy';
+import { aiOnboardingEndpoint } from '$lib/utils/aiOnboardingActions';
 import { BASE_API_URL } from '$lib/utils/constants';
 import { getModelInfo } from '$lib/utils/crud';
 import { error, type NumericRange, type RequestEvent } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-
-const aiOnboardingActionEndpoints: Record<string, string> = {
-	aiAssetSuggest: '/ai/onboarding/assets/suggest/',
-	aiAssetCommit: '/ai/onboarding/assets/commit/',
-	aiAppliedControlSuggest: '/ai/onboarding/applied-controls/suggest/',
-	aiAppliedControlCommit: '/ai/onboarding/applied-controls/commit/',
-	aiEvidenceFindingSuggest: '/ai/onboarding/evidence-findings/suggest/',
-	aiEvidenceFindingCommit: '/ai/onboarding/evidence-findings/commit/',
-	aiRemediationActionSuggest: '/ai/onboarding/remediation-actions/suggest/',
-	aiRemediationActionCommit: '/ai/onboarding/remediation-actions/commit/',
-	aiFrameworkControlMappingSuggest: '/ai/onboarding/framework-control-mappings/suggest/',
-	aiFrameworkControlMappingCommit: '/ai/onboarding/framework-control-mappings/commit/',
-	aiRiskScenarioSuggest: '/ai/onboarding/risk-scenarios/suggest/',
-	aiRiskScenarioCommit: '/ai/onboarding/risk-scenarios/commit/',
-	aiControlEffectivenessSuggest: '/ai/onboarding/control-effectiveness/suggest/',
-	aiControlEffectivenessCommit: '/ai/onboarding/control-effectiveness/commit/',
-	aiAuditReadinessSuggest: '/ai/onboarding/audit-readiness/suggest/',
-	aiAuditReadinessCommit: '/ai/onboarding/audit-readiness/commit/',
-	aiAuditReportSuggest: '/ai/onboarding/audit-report/suggest/',
-	aiAuditReportCommit: '/ai/onboarding/audit-report/commit/',
-	aiFinalReviewSuggest: '/ai/onboarding/final-review/suggest/',
-	aiFinalReviewCommit: '/ai/onboarding/final-review/commit/'
-};
 
 function getNamedAction(url: URL) {
 	if (url.search.startsWith('?/')) {
@@ -78,6 +61,17 @@ async function readResponseBody(response: Response) {
 }
 
 async function proxyAiOnboardingAction(event: RequestEvent, endpoint: string) {
+	// This endpoint is not covered by the (app) layout session guard, so it must refuse an
+	// unauthenticated caller itself instead of proxying the request anonymously.
+	if (!hasAiOnboardingSession(event)) {
+		return new Response(JSON.stringify(AI_ONBOARDING_SESSION_EXPIRED), {
+			status: 401,
+			headers: {
+				'Content-Type': 'application/json'
+			}
+		});
+	}
+
 	const payload = await readAiPayload(event.request);
 	if (!payload) {
 		return new Response(JSON.stringify({ detail: 'Invalid AI request payload.' }), {
@@ -88,11 +82,7 @@ async function proxyAiOnboardingAction(event: RequestEvent, endpoint: string) {
 		});
 	}
 
-	const response = await event.fetch(`${BASE_API_URL}${endpoint}`, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify(payload)
-	});
+	const response = await fetchAiOnboardingBackend(event, endpoint, payload);
 	const responseBody = await readResponseBody(response);
 
 	return new Response(responseBody === null ? '' : JSON.stringify(responseBody), {
@@ -125,7 +115,7 @@ export const GET: RequestHandler = async ({ fetch, params, url }) => {
 
 export const POST: RequestHandler = async (event) => {
 	const action = getNamedAction(event.url);
-	const endpoint = action ? aiOnboardingActionEndpoints[action] : null;
+	const endpoint = aiOnboardingEndpoint(action);
 
 	if (event.params.model !== 'assets' || !endpoint) {
 		return new Response(JSON.stringify({ detail: 'POST method not allowed' }), {

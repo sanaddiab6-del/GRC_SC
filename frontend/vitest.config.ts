@@ -12,7 +12,13 @@ export default defineConfig({
 	},
 	resolve: {
 		alias: {
-			$lib: path.resolve(__dirname, 'src/lib')
+			$lib: path.resolve(__dirname, 'src/lib'),
+			// The SvelteKit Vite plugin is not loaded here, so its virtual modules have to be
+			// resolved explicitly. Without them any test that imports `$lib/utils/constants`
+			// — which every AI onboarding proxy does — fails to collect.
+			'$env/dynamic/public': path.resolve(__dirname, 'src/tests/stubs/env-dynamic-public.ts'),
+			'$app/environment': path.resolve(__dirname, 'src/tests/stubs/app-environment.ts'),
+			$paraglide: path.resolve(__dirname, 'src/paraglide')
 		}
 	}
 });
