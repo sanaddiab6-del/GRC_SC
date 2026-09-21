@@ -617,6 +617,29 @@ def test_finding_and_asset_linkage_is_applied(authenticated_client, setup_contex
 
 
 @pytest.mark.django_db
+def test_asset_linkage_resolves_the_asset_id_step6a_hands_over(authenticated_client, setup_context):
+    # Step 6A passes the asset id it was given, with no title; an asset without a ref_id
+    # used to be unresolvable, so the remediation control was written without its asset.
+    asset = setup_context["asset"]
+    payload = _action_payload(linked_asset_reference=str(asset.id), linked_asset_title="")
+
+    response = _post(
+        authenticated_client,
+        _request_payload(
+            setup_context, dry_run=False, approved=True, decisions=[_decision(payload=payload)]
+        ),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    record = body["created_records"][0]
+    assert record["linked_asset_ids"] == [str(asset.id)]
+    created = AppliedControl.objects.get(id=record["record_id"])
+    assert list(created.assets.values_list("id", flat=True)) == [asset.id]
+    assert "asset_linkage_not_applied" not in [warning["code"] for warning in body.get("warnings", [])]
+
+
+@pytest.mark.django_db
 def test_unresolvable_linkage_warns_instead_of_inventing(authenticated_client, setup_context):
     payload = _action_payload(
         linked_finding_reference="FND-DOES-NOT-EXIST",

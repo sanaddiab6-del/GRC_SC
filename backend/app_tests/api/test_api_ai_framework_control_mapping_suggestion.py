@@ -1189,6 +1189,40 @@ def test_csv_loader_reads_the_repository_export_read_only():
         assert any(term in haystack for term in CSV_CONTEXT_TERMS)
 
 
+def test_provider_payload_offers_the_candidates_most_relevant_to_the_case():
+    """Discovery returns requirements in document order; the model must still be offered the
+    ones about the case's weaknesses rather than only a framework's opening clauses."""
+    from ai_onboarding.framework_control_mapping_suggestion_service import (
+        MAX_PROVIDER_CANDIDATES,
+        _build_provider_payload,
+    )
+
+    governance = [
+        {
+            "reference": f"urn:test:gov-{index}",
+            "code": f"GOV-{index}",
+            "title": f"GOV-{index}",
+            "description": "The board should approve the governance charter and committee mandate.",
+        }
+        for index in range(40)
+    ]
+    mfa = {
+        "reference": "urn:test:mfa",
+        "code": "IAM-7",
+        "title": "IAM-7",
+        "description": "Multi-factor authentication should be enforced for privileged administrator access.",
+    }
+
+    payload = _build_provider_payload(
+        {"known_weaknesses": ["Back-office administrators log in without multi-factor authentication"]},
+        [*governance, mfa],
+    )
+
+    offered = [candidate["reference"] for candidate in payload["candidate_framework_controls"]]
+    assert len(offered) == MAX_PROVIDER_CANDIDATES
+    assert offered[0] == "urn:test:mfa"
+
+
 @pytest.mark.django_db
 def test_read_only_discovery_uses_existing_framework_requirements(authenticated_client):
     """With no supplied candidates, Step 7A may read existing framework controls only."""

@@ -23,10 +23,20 @@ from ai_onboarding.case_intake_service import build_case_intake_fallback_draft
 from ai_onboarding.llm_config import (
     CAPABILITY_APPLIED_CONTROL_SUGGESTION,
     CAPABILITY_ASSET_SUGGESTION,
+    CAPABILITY_AUDIT_REPORT_SUGGESTION,
     CAPABILITY_CASE_INTAKE,
+    CAPABILITY_EVIDENCE_FINDING_SUGGESTION,
+    CAPABILITY_RISK_SCENARIO_SUGGESTION,
+    SUPPORTED_CAPABILITIES,
     resolve_advisory_capability_config,
 )
-from ai_onboarding.llm_provider import LocalAiProvider
+from ai_onboarding.llm_prompts import get_system_prompt
+from ai_onboarding.llm_errors import AiProviderExecutionError
+from ai_onboarding.llm_provider import (
+    PROMPT_CHARS_PER_TOKEN,
+    LocalAiProvider,
+    _build_ollama_prompt,
+)
 from core import startup as core_startup
 from core.models import (
     AppliedControl,
@@ -514,6 +524,239 @@ def test_step1_configured_local_provider_path_and_no_write(authenticated_client,
     assert calls[0]["url"].endswith("/api/generate")
     assert calls[0]["body"]["model"] == "qwen3:4b-instruct"
     assert before == after
+
+
+# The shape the local model actually returns for Step 1: real findings, but plain strings and
+# flat objects instead of the full explainable contract.
+OFF_CONTRACT_STEP1_OUTPUT = {
+    "draft_type": "AiCaseIntakeDraft",
+    "overall_confidence": 0.5,
+    "needs_human_review": True,
+    "blocking_questions": ["Which administrators still sign in without MFA?"],
+    "case_context": {"organization": "Al-Rawasi Fintech"},
+    "vulnerability_drafts": [
+        {
+            "description": "Privileged users sign in without multi-factor authentication",
+            "severity": "High",
+            "impact": "Account takeover of administrator sessions",
+            "mitigation": "Enforce MFA for all privileged accounts",
+        }
+    ],
+    "human_review_checklist": ["Confirm the list of privileged administrators."],
+}
+
+
+@pytest.mark.django_db
+def test_step1_keeps_off_contract_provider_findings_and_does_not_write(
+    authenticated_client, monkeypatch
+):
+    _configure_local_provider_env(monkeypatch)
+    _install_mock_ollama_urlopen(
+        monkeypatch,
+        lambda request, timeout, body: {
+            "model": body["model"],
+            "response": json.dumps(OFF_CONTRACT_STEP1_OUTPUT),
+            "done": True,
+        },
+    )
+
+    before = _counts_snapshot()
+    response = authenticated_client.post(reverse("ai-case-intake"), _step1_payload(), format="json")
+    after = _counts_snapshot()
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["source_summary"]["provider_mode"] == "configured_local_provider"
+    assert [item["name"] for item in body["vulnerability_drafts"]] == [
+        "Privileged users sign in without multi-factor authentication"
+    ]
+    vulnerability = body["vulnerability_drafts"][0]
+    assert vulnerability["platform_entity"] == "Vulnerability"
+    assert vulnerability["needs_review"] is True
+    assert "Enforce MFA for all privileged accounts" in vulnerability["rationale"]
+    assert "Which administrators still sign in without MFA?" in [
+        question["question_text"] for question in body["blocking_questions"]
+    ]
+    assert "Confirm the list of privileged administrators." in [
+        item["label"] for item in body["human_review_checklist"]
+    ]
+    warning = next(
+        item for item in body["warnings"] if item["code"] == "configured_local_provider_shape_normalized"
+    )
+    assert "vulnerability_drafts" in warning["affected_fields"]
+    assert before == after
+
+
+@pytest.mark.django_db
+def test_step1_labels_unusable_provider_output_as_discarded(authenticated_client, monkeypatch):
+    _configure_local_provider_env(monkeypatch)
+    _install_mock_ollama_urlopen(
+        monkeypatch,
+        lambda request, timeout, body: {
+            "model": body["model"],
+            "response": json.dumps(
+                {"draft_type": "AiCaseIntakeDraft", "overall_confidence": 0.5, "needs_human_review": True}
+            ),
+            "done": True,
+        },
+    )
+
+    response = authenticated_client.post(reverse("ai-case-intake"), _step1_payload(), format="json")
+
+    assert response.status_code == 200
+    body = response.json()
+    # Deterministic text must never be presented as a local AI result.
+    assert body["source_summary"]["provider_mode"] == "configured_local_provider_output_discarded"
+    assert any(item["code"] == "configured_local_provider_output_discarded" for item in body["warnings"])
+    assert body["vulnerability_drafts"] == []
+
+
+@pytest.mark.django_db(transaction=True)
+def test_suggestion_does_not_hold_the_sqlite_write_lock_during_the_model_call(
+    authenticated_client, monkeypatch
+):
+    # A suggestion used to hold BEGIN IMMEDIATE for the whole model call, so any concurrent
+    # write (the auth token refresh) failed with "database is locked" and the UI logged out.
+    import sqlite3
+
+    from django.db import connection
+
+    if connection.vendor != "sqlite":
+        pytest.skip("The write lock only exists on SQLite.")
+
+    _configure_local_provider_env(monkeypatch)
+    draft = build_case_intake_fallback_draft(_step1_payload())
+    concurrent_writes = []
+
+    def _handler(request, timeout, body):
+        probe = sqlite3.connect(str(connection.settings_dict["NAME"]), timeout=1)
+        try:
+            probe.execute("CREATE TABLE IF NOT EXISTS ai_lock_probe (id INTEGER)")
+            probe.execute("DROP TABLE ai_lock_probe")
+            probe.commit()
+            concurrent_writes.append("ok")
+        except sqlite3.OperationalError as exc:
+            concurrent_writes.append(str(exc))
+        finally:
+            probe.close()
+        return {"model": body["model"], "response": json.dumps(draft, default=str), "done": True}
+
+    _install_mock_ollama_urlopen(monkeypatch, _handler)
+
+    before = _counts_snapshot()
+    response = authenticated_client.post(reverse("ai-case-intake"), _step1_payload(), format="json")
+
+    assert response.status_code == 200
+    assert concurrent_writes == ["ok"]
+    assert _counts_snapshot() == before
+
+
+@pytest.mark.parametrize("capability", sorted(SUPPORTED_CAPABILITIES))
+def test_every_capability_prompt_forbids_echoing_the_instruction_envelope(capability):
+    # A small local model given the instruction envelope without this rule returned the
+    # envelope itself (capability/schema_name/input/output_contract) instead of an answer.
+    prompt = _build_ollama_prompt(
+        capability=capability,
+        system_prompt="system",
+        user_payload={"request": {}},
+        json_schema={"required": []},
+        schema_name="schema",
+    )
+
+    assert "Do not echo this instruction" in prompt
+    for wrapper_key in ("capability", "schema_name", "input", "output_contract"):
+        assert wrapper_key in prompt.split("Do not echo this instruction", 1)[1].split("\n", 1)[0]
+
+
+_GENERATE_KWARGS = dict(
+    capability=CAPABILITY_CASE_INTAKE,
+    model="qwen3:4b-instruct",
+    system_prompt="system",
+    json_schema={"required": []},
+    timeout_seconds=60,
+    max_output_tokens=2000,
+    temperature=0.1,
+    schema_name="schema",
+)
+
+
+def test_local_provider_sizes_the_context_window_only_when_the_prompt_needs_it(monkeypatch):
+    # Ollama's default window silently truncated the Step 7A prompt (9189 tokens to 2050),
+    # dropping the system prompt and most of the candidate list.
+    bodies = []
+    _install_mock_ollama_urlopen(
+        monkeypatch,
+        lambda request, timeout, body: bodies.append(body)
+        or {"model": body["model"], "response": "{}", "done": True},
+    )
+    provider = LocalAiProvider(
+        base_url="http://127.0.0.1:11434", base_url_safe=True, base_url_warning=None
+    )
+
+    provider.generate_structured(user_payload={"request": {"note": "short"}}, **_GENERATE_KWARGS)
+    provider.generate_structured(
+        user_payload={"request": {"note": "x" * 30000}}, **_GENERATE_KWARGS
+    )
+
+    assert "num_ctx" not in bodies[0]["options"]
+    large = bodies[1]
+    assert large["options"]["num_ctx"] > 4096
+    room_for_prompt = large["options"]["num_ctx"] - large["options"]["num_predict"]
+    assert room_for_prompt * PROMPT_CHARS_PER_TOKEN >= len(large["prompt"])
+
+
+def test_local_provider_refuses_a_prompt_larger_than_the_context_limit(monkeypatch):
+    calls = []
+    _install_mock_ollama_urlopen(
+        monkeypatch, lambda request, timeout, body: calls.append(body) or {"response": "{}"}
+    )
+    provider = LocalAiProvider(
+        base_url="http://127.0.0.1:11434",
+        base_url_safe=True,
+        base_url_warning=None,
+        context_window_max=8192,
+    )
+
+    with pytest.raises(AiProviderExecutionError) as excinfo:
+        provider.generate_structured(
+            user_payload={"request": {"note": "x" * 60000}}, **_GENERATE_KWARGS
+        )
+
+    assert excinfo.value.error_code == "local_ai_prompt_exceeds_context"
+    assert calls == []
+
+
+def test_step11a_prompt_keeps_the_response_within_the_output_budget():
+    # Up to 20 prose sections filled the whole output budget (done_reason "length"), so the
+    # report JSON was cut off and Step 11A was rejected, after a generation longer than the proxy allows.
+    prompt = get_system_prompt(CAPABILITY_AUDIT_REPORT_SUGGESTION)
+
+    assert "Return at most 10 sections" in prompt
+    assert "Keep each section's content to at most two short sentences." in prompt
+    # The guardrails require recommended_next_steps; the model left it out when only the
+    # schema's shorter required list named the top-level fields.
+    assert "recommended_next_steps must be an array of at most 5 short strings." in prompt
+    assert "Keep the whole response short so it is a single complete JSON object." in prompt
+
+
+def test_step8a_prompt_keeps_the_response_within_the_output_budget():
+    # Five verbose scenarios filled the whole output budget (done_reason "length"), so the
+    # JSON was cut off and Step 8A was rejected, after a generation longer than the proxy allows.
+    prompt = get_system_prompt(CAPABILITY_RISK_SCENARIO_SUGGESTION)
+
+    assert "Return at most 3 risk scenarios" in prompt
+    assert "recommended_next_steps must be an array of at most 2 short strings." in prompt
+    assert "Keep the whole response short so it is a single complete JSON object." in prompt
+
+
+def test_step5a_prompt_keeps_the_response_within_the_output_budget():
+    # Without an item cap and the compact-reference rule, the local model filled the whole
+    # output budget and its JSON was cut off (done_reason "length"), so Step 5A was blocked.
+    prompt = get_system_prompt(CAPABILITY_EVIDENCE_FINDING_SUGGESTION)
+
+    assert "Return at most 3 evidence_requests, at most 3 audit_questions" in prompt
+    assert "must be arrays of the provided id strings only" in prompt
+    assert "Keep the whole response short so it is a single complete JSON object." in prompt
 
 
 @pytest.mark.django_db
