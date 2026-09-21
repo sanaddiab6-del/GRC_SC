@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -14,6 +15,14 @@ from .remediation_action_commit_guardrails import (
     RemediationActionCommitValidationError,
     validate_remediation_action_commit_guardrails,
 )
+
+
+def _is_uuid(value: Any) -> bool:
+    try:
+        uuid.UUID(str(value))
+    except (TypeError, ValueError, AttributeError):
+        return False
+    return True
 
 
 # Step 6B writes remediation actions to core.AppliedControl, the platform model for
@@ -531,6 +540,12 @@ class AiRemediationActionCommitService:
 
     def _lookup_in_folder(self, model, folder: Folder, reference, title):
         if reference:
+            # Step 6A carries the asset and control references it was given, which are the
+            # record ids themselves; a record without a ref_id can only be found this way.
+            if _is_uuid(reference):
+                instance = model.objects.filter(folder=folder, pk=reference).first()
+                if instance is not None:
+                    return instance
             instance = model.objects.filter(folder=folder, ref_id__iexact=reference).first()
             if instance is not None:
                 return instance

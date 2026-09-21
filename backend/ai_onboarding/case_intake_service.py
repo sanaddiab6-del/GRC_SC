@@ -14,10 +14,22 @@ from .case_intake_provider import (
     CaseIntakeProviderError,
     get_case_intake_provider,
 )
-from .case_intake_serializers import AiCaseIntakeDraftSerializer, DEFAULT_USER_LOCALE
+from .case_intake_serializers import (
+    AiCaseIntakeDraftSerializer,
+    BlockingQuestionSerializer,
+    DEFAULT_USER_LOCALE,
+    HumanReviewChecklistItemSerializer,
+    VulnerabilityDraftSerializer,
+)
 
 
 FRAMEWORK_RE = re.compile(r"\b[A-Z]{2,}(?:-\d(?::\d{4})?)\b")
+
+CONFIGURED_LOCAL_PROVIDER = "configured_local_provider"
+# The provider answered, but nothing in its answer could be kept: the draft is the fallback.
+PROVIDER_OUTPUT_DISCARDED = "configured_local_provider_output_discarded"
+PROVIDER_ITEM_TEXT_LIMIT = 500
+PROVIDER_ITEM_DEFAULT_CONFIDENCE = 0.6
 
 
 class AiCaseIntakeService:
@@ -45,14 +57,15 @@ class AiCaseIntakeService:
         else:
             try:
                 provider_draft = provider.build_case_intake_draft(normalized)
+                provider_mode = CONFIGURED_LOCAL_PROVIDER
                 if isinstance(provider, AdvisoryCaseIntakeProvider):
-                    draft = _normalize_provider_draft(provider_draft, normalized)
+                    draft, provider_mode = _normalize_provider_draft(provider_draft, normalized)
                 else:
                     draft = provider_draft
                 _annotate_provider_mode(
                     draft,
-                    provider_mode="configured_local_provider",
-                    parser_note="provider_mode: configured_local_provider",
+                    provider_mode=provider_mode,
+                    parser_note=f"provider_mode: {provider_mode}",
                 )
             except CaseIntakeProviderError as exc:
                 if not exc.allow_fallback:
@@ -354,31 +367,171 @@ def _annotate_provider_mode(
 def _normalize_provider_draft(
     provider_draft: dict[str, Any],
     normalized_request: dict[str, Any],
-) -> dict[str, Any]:
+) -> tuple[dict[str, Any], str]:
+    """Return the draft to validate and the provider mode that truthfully describes it.
+
+    A small local model rarely reproduces the full Step 1 contract, so an off-contract answer is
+    rebuilt on the deterministic contract-safe draft. The model's own findings are kept wherever
+    they map onto a contract item that validates on its own; when nothing can be kept, the draft
+    is labelled as discarded provider output so the UI never presents deterministic text as a
+    local AI result.
+    """
     if not isinstance(provider_draft, dict):
-        return build_case_intake_fallback_draft(normalized_request)
+        return build_case_intake_fallback_draft(normalized_request), PROVIDER_OUTPUT_DISCARDED
 
     serializer = AiCaseIntakeDraftSerializer(data=provider_draft)
     if serializer.is_valid():
-        return provider_draft
+        return provider_draft, CONFIGURED_LOCAL_PROVIDER
 
     draft = build_case_intake_fallback_draft(normalized_request)
     overall_confidence = provider_draft.get("overall_confidence")
     if isinstance(overall_confidence, (int, float)):
         draft["overall_confidence"] = max(0.0, min(1.0, float(overall_confidence)))
 
-    _annotate_provider_mode(
-        draft,
-        provider_mode="configured_local_provider",
-        parser_note="provider_mode: configured_local_provider_shape_normalized",
-        warning={
+    kept_sections = _merge_provider_findings(
+        draft, provider_draft, normalized_request.get("scenario_text", "")
+    )
+    if kept_sections:
+        provider_mode = CONFIGURED_LOCAL_PROVIDER
+        warning = {
             "code": "configured_local_provider_shape_normalized",
-            "message": "The local AI provider response was normalized to the Step 1 contract-safe draft shape.",
+            "message": (
+                "The local AI provider response was normalized to the Step 1 contract-safe draft "
+                f"shape. Kept from the local AI response: {', '.join(kept_sections)}. Every other "
+                "section is the deterministic draft."
+            ),
+            "affected_fields": ["source_summary", "warnings", *kept_sections],
+            "needs_review": True,
+        }
+    else:
+        provider_mode = PROVIDER_OUTPUT_DISCARDED
+        warning = {
+            "code": PROVIDER_OUTPUT_DISCARDED,
+            "message": (
+                "The local AI provider response did not match the Step 1 contract and none of it "
+                "could be kept, so this draft is the deterministic fallback."
+            ),
             "affected_fields": ["source_summary", "warnings"],
             "needs_review": True,
-        },
+        }
+
+    _annotate_provider_mode(
+        draft,
+        provider_mode=provider_mode,
+        parser_note="provider_mode: configured_local_provider_shape_normalized",
+        warning=warning,
     )
-    return draft
+    return draft, provider_mode
+
+
+def _provider_text(value: Any) -> str:
+    return value.strip()[:PROVIDER_ITEM_TEXT_LIMIT] if isinstance(value, str) else ""
+
+
+def _merge_provider_findings(
+    draft: dict[str, Any],
+    provider_draft: dict[str, Any],
+    scenario_text: str,
+) -> list[str]:
+    """Add the provider items that validate as contract items; return the sections they went to."""
+    kept_sections: list[str] = []
+
+    known_questions = {question["question_text"].lower() for question in draft["blocking_questions"]}
+    questions = [
+        question
+        for question in _provider_blocking_questions(provider_draft.get("blocking_questions"))
+        if question["question_text"].lower() not in known_questions
+    ]
+    if questions:
+        draft["blocking_questions"].extend(questions)
+        kept_sections.append("blocking_questions")
+
+    vulnerabilities = _provider_vulnerability_drafts(
+        provider_draft.get("vulnerability_drafts"), scenario_text
+    )
+    if vulnerabilities:
+        draft["vulnerability_drafts"] = [*draft.get("vulnerability_drafts", []), *vulnerabilities]
+        kept_sections.append("vulnerability_drafts")
+
+    checklist = _provider_checklist_items(provider_draft.get("human_review_checklist"))
+    if checklist:
+        draft["human_review_checklist"].extend(checklist)
+        kept_sections.append("human_review_checklist")
+
+    return kept_sections
+
+
+def _provider_blocking_questions(items: Any) -> list[dict[str, Any]]:
+    questions: list[dict[str, Any]] = []
+    for index, item in enumerate(items if isinstance(items, list) else []):
+        if isinstance(item, dict):
+            text = _provider_text(item.get("question_text") or item.get("question"))
+            reason = _provider_text(item.get("reason"))
+        else:
+            text, reason = _provider_text(item), ""
+        candidate = {
+            "question_id": f"ai-question-{index + 1}",
+            "question_text": text,
+            "reason": reason
+            or "Raised by the local AI review of the scenario; a human must answer it before setup.",
+            "affected_fields": ["case_context"],
+            "severity": "blocking",
+        }
+        if text and BlockingQuestionSerializer(data=candidate).is_valid():
+            questions.append(candidate)
+    return questions
+
+
+def _provider_vulnerability_drafts(items: Any, scenario_text: str) -> list[dict[str, Any]]:
+    vulnerabilities: list[dict[str, Any]] = []
+    for index, item in enumerate(items if isinstance(items, list) else []):
+        if isinstance(item, str):
+            item = {"description": item}
+        if not isinstance(item, dict):
+            continue
+        name = _provider_text(item.get("name") or item.get("description") or item.get("title"))
+        confidence = item.get("confidence")
+        if isinstance(confidence, bool) or not isinstance(confidence, (int, float)) or not 0 <= confidence <= 1:
+            confidence = PROVIDER_ITEM_DEFAULT_CONFIDENCE
+        rationale = " ".join(
+            part
+            for part in (
+                _provider_text(item.get("rationale") or item.get("impact")),
+                f"Suggested mitigation: {_provider_text(item.get('mitigation'))}"
+                if _provider_text(item.get("mitigation"))
+                else "",
+            )
+            if part
+        )
+        candidate = {
+            "confidence": float(confidence),
+            "rationale": rationale or "Weakness identified by the local AI review of the scenario text.",
+            "source_text_refs": [_build_source_ref(scenario_text, name, f"V{index + 1}")],
+            "needs_review": True,
+            "platform_entity": "Vulnerability",
+            "name": name,
+            "severity": _provider_text(item.get("severity")).lower() or None,
+            "linked_asset_refs": [],
+            "suggested_action": "defer_until_human_review",
+        }
+        if name and VulnerabilityDraftSerializer(data=candidate).is_valid():
+            vulnerabilities.append(candidate)
+    return vulnerabilities
+
+
+def _provider_checklist_items(items: Any) -> list[dict[str, Any]]:
+    checklist: list[dict[str, Any]] = []
+    for index, item in enumerate(items if isinstance(items, list) else []):
+        label = _provider_text(item.get("label") if isinstance(item, dict) else item)
+        candidate = {
+            "check_id": f"ai-check-{index + 1}",
+            "label": label,
+            "required": True,
+            "related_sections": ["vulnerability_drafts", "blocking_questions"],
+        }
+        if label and HumanReviewChecklistItemSerializer(data=candidate).is_valid():
+            checklist.append(candidate)
+    return checklist
 
 
 def _extract_organization_name(scenario_text: str) -> str | None:
