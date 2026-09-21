@@ -59,6 +59,9 @@ DEFAULT_MODEL = ""
 DEFAULT_TIMEOUT_SECONDS = 60
 DEFAULT_MAX_OUTPUT_TOKENS = 1200
 DEFAULT_TEMPERATURE = 0.1
+# Largest context window a request may ask the local runtime for. Bigger windows cost memory,
+# so a request that would need more is refused instead of being silently truncated.
+DEFAULT_CONTEXT_WINDOW_MAX = 16384
 
 BLOCKED_CLOUD_AI_HOST_SUFFIXES = (
     "openai.com",
@@ -120,6 +123,7 @@ class AdvisoryCapabilityConfig:
     local_base_url: str
     local_base_url_safe: bool
     local_base_url_warning: str | None
+    context_window_max: int = DEFAULT_CONTEXT_WINDOW_MAX
 
 
 def _read_positive_int(env_var_name: str, default: int) -> int:
@@ -175,6 +179,7 @@ def resolve_advisory_capability_config(capability: str) -> AdvisoryCapabilityCon
     model = _resolve_model(capability)
     timeout_seconds = _read_positive_int("LOCAL_AI_TIMEOUT_SECONDS", DEFAULT_TIMEOUT_SECONDS)
     max_output_tokens = _read_positive_int("LOCAL_AI_MAX_OUTPUT_TOKENS", DEFAULT_MAX_OUTPUT_TOKENS)
+    context_window_max = _read_positive_int("LOCAL_AI_NUM_CTX_MAX", DEFAULT_CONTEXT_WINDOW_MAX)
     temperature = _read_temperature(DEFAULT_TEMPERATURE)
     local_base_url = os.environ.get("LOCAL_AI_BASE_URL", "").strip()
     local_base_url_safe, local_base_url_warning = validate_local_base_url(local_base_url)
@@ -190,6 +195,7 @@ def resolve_advisory_capability_config(capability: str) -> AdvisoryCapabilityCon
         local_base_url=local_base_url,
         local_base_url_safe=local_base_url_safe,
         local_base_url_warning=local_base_url_warning,
+        context_window_max=context_window_max,
     )
 
 

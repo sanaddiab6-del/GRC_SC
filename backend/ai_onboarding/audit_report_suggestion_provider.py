@@ -25,7 +25,14 @@ SCHEMA_NAME = "audit_report_suggestion_draft"
 PROVIDER_OUTPUT_JSON_SCHEMA: dict[str, Any] = {
     "type": "object",
     "additionalProperties": True,
-    "required": ["report_title", "report_sections", "executive_summary", "limitations"],
+    # Matches the Step 11A guardrails, which reject a draft without recommended_next_steps.
+    "required": [
+        "report_title",
+        "report_sections",
+        "executive_summary",
+        "limitations",
+        "recommended_next_steps",
+    ],
     "properties": {
         "report_title": {"type": "string"},
         "executive_summary": {"type": "string"},

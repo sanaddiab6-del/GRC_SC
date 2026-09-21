@@ -33,11 +33,14 @@ from .framework_control_mapping_suggestion_serializers import (
 # flags. Every mapping stays at review_status 'pending_review'.
 REVIEW_STATUS = "pending_review"
 
-# Safe read-only discovery caps. Discovery only ever reads; it never writes.
-MAX_DISCOVERED_CANDIDATES = 200
-# Only a slice of the candidate set is handed to the local model so the JSON answer stays
-# small; the full set is still what the guardrails validate against.
-MAX_PROVIDER_CANDIDATES = 50
+# Safe read-only discovery caps. Discovery only ever reads; it never writes. The cap covers a
+# whole framework (SAMA CSF has 250 assessable requirements) so the relevance ranking below can
+# reach clauses that sit late in the document, such as the third-party clauses.
+MAX_DISCOVERED_CANDIDATES = 500
+# Only a slice of the candidate set is handed to the local model so the prompt fits a small
+# context window and the JSON answer stays small. The slice is the candidates most relevant to
+# the case; the full set is still what the guardrails validate against.
+MAX_PROVIDER_CANDIDATES = 20
 
 # Read-only export of the framework libraries kept at the repository root. It is the last
 # resort for candidate controls when the database holds no assessable requirement nodes.
@@ -896,13 +899,56 @@ def _normalize_request_data(request_data: dict[str, Any]) -> dict[str, Any]:
     return normalized
 
 
+# Case items whose text says what the audit is about; candidates are ranked against them.
+_CASE_CONTEXT_ITEM_FIELDS = (
+    "applied_controls",
+    "remediation_actions",
+    "evidence_requests",
+    "audit_questions",
+    "preliminary_findings",
+    "assets",
+)
+
+
+def _case_context_tokens(request_data: dict[str, Any]) -> set[str]:
+    parts = [str(weakness) for weakness in request_data.get("known_weaknesses") or []]
+    parts.append(str(request_data.get("case_summary") or ""))
+    for field in _CASE_CONTEXT_ITEM_FIELDS:
+        for item in request_data.get(field) or []:
+            if isinstance(item, dict):
+                parts.extend(str(item.get(key) or "") for key in ("title", "description"))
+    return _expand_tokens(_tokens(" ".join(parts)))
+
+
+def _order_by_case_relevance(
+    request_data: dict[str, Any], candidates: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Put the candidates that share the most terms with the case first.
+
+    Discovery reads requirements in document order, so without this the model only ever saw a
+    framework's opening clauses (for SAMA, governance) and never the ones the case is about.
+    The sort is stable, so candidates with the same overlap keep document order.
+    """
+    context = _case_context_tokens(request_data)
+    if not context:
+        return list(candidates)
+
+    def overlap(candidate: dict[str, Any]) -> int:
+        text = " ".join(str(candidate.get(field) or "") for field in ("title", "description"))
+        return len(context & _expand_tokens(_tokens(text)))
+
+    return sorted(candidates, key=lambda candidate: -overlap(candidate))
+
+
 def _build_provider_payload(
     request_data: dict[str, Any], candidates: list[dict[str, Any]]
 ) -> dict[str, Any]:
     payload = dict(request_data)
     payload["candidate_framework_controls"] = [
         _shrink_candidate_for_provider(candidate)
-        for candidate in candidates[:MAX_PROVIDER_CANDIDATES]
+        for candidate in _order_by_case_relevance(request_data, candidates)[
+            :MAX_PROVIDER_CANDIDATES
+        ]
     ]
     payload["max_framework_control_mappings"] = MAX_MAPPINGS
     return payload
@@ -1063,6 +1109,11 @@ def _restore_candidate_text(draft: dict[str, Any], registry: dict[str, dict[str,
         mapping["framework_control_description"] = candidate.get("description") or ""
         if candidate.get("code"):
             mapping["framework_control_code"] = candidate["code"]
+        # A mapping also resolves through its code or title, so a provider that mistypes the
+        # reference still passes the guardrails and would hand Step 7B an identifier that
+        # matches no requirement node. The candidate's own reference is authoritative.
+        if candidate.get("reference"):
+            mapping["framework_control_reference"] = candidate["reference"]
 
 
 def _normalize_mapping(

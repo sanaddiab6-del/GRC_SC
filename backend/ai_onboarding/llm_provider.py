@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -10,6 +11,7 @@ from .llm_config import (
     CAPABILITY_APPLIED_CONTROL_SUGGESTION,
     CAPABILITY_ASSET_SUGGESTION,
     CAPABILITY_CASE_INTAKE,
+    DEFAULT_CONTEXT_WINDOW_MAX,
     LOCAL_AI_STYLE_OLLAMA,
     LOCAL_PROVIDER,
     AdvisoryCapabilityConfig,
@@ -41,6 +43,25 @@ class AdvisoryProviderSelection:
     config: AdvisoryCapabilityConfig
 
 
+# Ollama silently drops the start of a prompt that does not fit its context window, which
+# removes the system prompt and rules and leaves the model guessing. The window is therefore
+# sized to each request; small requests keep the runtime default so the model is not reloaded.
+OLLAMA_DEFAULT_CONTEXT_WINDOW = 4096
+# Conservative for this JSON-heavy payload: ids and punctuation tokenize densely.
+PROMPT_CHARS_PER_TOKEN = 3.2
+CONTEXT_WINDOW_MARGIN_TOKENS = 256
+CONTEXT_WINDOW_STEP = 1024
+
+
+def required_context_window(prompt: str, max_output_tokens: int) -> int:
+    estimated_tokens = (
+        math.ceil(len(prompt) / PROMPT_CHARS_PER_TOKEN)
+        + max_output_tokens
+        + CONTEXT_WINDOW_MARGIN_TOKENS
+    )
+    return math.ceil(estimated_tokens / CONTEXT_WINDOW_STEP) * CONTEXT_WINDOW_STEP
+
+
 class LocalAiProvider:
     def __init__(
         self,
@@ -48,10 +69,12 @@ class LocalAiProvider:
         base_url: str,
         base_url_safe: bool,
         base_url_warning: str | None,
+        context_window_max: int = DEFAULT_CONTEXT_WINDOW_MAX,
     ):
         self.base_url = base_url.rstrip("/")
         self.base_url_safe = base_url_safe
         self.base_url_warning = base_url_warning
+        self.context_window_max = context_window_max
 
     def generate_structured(
         self,
@@ -81,15 +104,27 @@ class LocalAiProvider:
             schema_name=schema_name,
         )
 
+        context_window = required_context_window(prompt, max_output_tokens)
+        if context_window > self.context_window_max:
+            raise AiProviderExecutionError(
+                "local_ai_prompt_exceeds_context",
+                "The request is larger than the configured local AI context window "
+                "(LOCAL_AI_NUM_CTX_MAX), so it was not sent instead of being silently truncated.",
+            )
+
+        options: dict[str, Any] = {
+            "temperature": temperature,
+            "num_predict": max_output_tokens,
+        }
+        if context_window > OLLAMA_DEFAULT_CONTEXT_WINDOW:
+            options["num_ctx"] = context_window
+
         body = {
             "model": model,
             "prompt": prompt,
             "stream": False,
             "format": "json",
-            "options": {
-                "temperature": temperature,
-                "num_predict": max_output_tokens,
-            },
+            "options": options,
         }
 
         request = urllib.request.Request(
@@ -289,6 +324,9 @@ def _build_ollama_prompt(
         [
             system_prompt.strip(),
             "Return one JSON object only. Do not return markdown or explanatory text.",
+            # Without this, the local model sometimes returns the envelope below instead of an answer.
+            "Do not echo this instruction: never return the wrapper keys capability, schema_name, "
+            "input, or output_contract. Return only the answer object that output_contract describes.",
             json.dumps(instruction, ensure_ascii=False, default=str),
         ]
     )
@@ -355,5 +393,6 @@ def get_advisory_provider_selection(config: AdvisoryCapabilityConfig) -> Advisor
         base_url=config.local_base_url,
         base_url_safe=config.local_base_url_safe,
         base_url_warning=config.local_base_url_warning,
+        context_window_max=config.context_window_max,
     )
     return AdvisoryProviderSelection(provider=provider, config=config)

@@ -115,6 +115,18 @@ Flag ambiguity with ambiguity_flags instead of forcing a wrong classification.
 review_status must be pending_review for every suggestion.
 needs_human_review must be true.
 Include confidence, rationale, linked asset references, and linked applied control references.
+Return at most 3 evidence_requests, at most 3 audit_questions, and at most 3 preliminary_findings: the strongest ones only.
+Every evidence request must include temporary_id, title, description, linked_asset_ids,
+linked_applied_control_ids, rationale, confidence, and review_status.
+Every audit question must include temporary_id, question_text, linked_asset_ids,
+linked_applied_control_ids, rationale, confidence, and review_status.
+Every preliminary finding must include temporary_id, title, summary, severity, related_weaknesses,
+linked_asset_ids, linked_applied_control_ids, rationale, confidence, and review_status.
+linked_asset_ids and linked_applied_control_ids must be arrays of the provided id strings only;
+do not repeat the names or other details of linked records.
+confidence must be a number between 0 and 1.
+Keep each rationale, description, and summary to one short sentence.
+Keep the whole response short so it is a single complete JSON object.
 """.strip()
 
 
@@ -221,9 +233,10 @@ review_status must be pending_review for every risk scenario.
 Every risk scenario must include temporary_id, title, description, threat, vulnerability,
 impact_description, likelihood, impact, risk_level, rationale, recommended_next_steps,
 confidence, and review_status.
-recommended_next_steps must be an array of short strings.
+recommended_next_steps must be an array of at most 2 short strings.
 confidence must be a number between 0 and 1.
-Return at most 5 risk scenarios: the strongest ones only.
+Return at most 3 risk scenarios: the strongest ones only.
+Keep description, threat, vulnerability, impact_description, and rationale to one short sentence each.
 Risk scenarios are advisory drafts for human review and are never automatically approved.
 Keep the whole response short so it is a single complete JSON object.
 """.strip()
@@ -337,7 +350,12 @@ is used.
 review_status must be pending_review.
 Every section must include heading, content, source_items, and confidence.
 confidence must be a number between 0 and 1.
-Return at most 20 sections.
+Return at most 10 sections: follow the order above and stop once 10 are written.
+Keep each section's content to at most two short sentences.
+source_items must contain at most 3 short item titles per section.
+Always include the top-level fields report_title, executive_summary, report_sections, limitations,
+recommended_next_steps, and review_status.
+recommended_next_steps must be an array of at most 5 short strings.
 The report is a draft for human review and is never a final audit product.
 Keep the whole response short so it is a single complete JSON object.
 """.strip()

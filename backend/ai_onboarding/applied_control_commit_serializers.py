@@ -14,6 +14,7 @@ APPLIED_CONTROL_CATEGORY_CHOICES = (
 	"physical",
 	"procedure",
 )
+
 APPLIED_CONTROL_STATUS_CHOICES = (
 	"to_do",
 	"in_progress",
