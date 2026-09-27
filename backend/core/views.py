@@ -129,6 +129,22 @@ except Exception:
     HTML = None
 
 from core.helpers import *
+from ai_onboarding.advisory_transaction import advisory_rollback_transaction
+from ai_onboarding.evidence_freshness_review_guardrails import (
+    EvidenceFreshnessReviewValidationError,
+    validate_evidence_freshness_review_request_guardrails,
+)
+from ai_onboarding.evidence_freshness_review_provider import (
+    EvidenceFreshnessReviewProviderError,
+)
+from ai_onboarding.evidence_freshness_review_serializers import (
+    AiEvidenceFreshnessReviewBatchInputSerializer,
+    AiEvidenceFreshnessReviewInputSerializer,
+)
+from ai_onboarding.evidence_freshness_review_service import (
+    review_evidence_freshness,
+    review_evidence_freshness_batch,
+)
 from ai_onboarding.service import build_onboarding_recommendations
 from core.models import (
     AppliedControl,
@@ -9080,6 +9096,11 @@ class EvidenceViewSet(BaseModelViewSet):
     API endpoint that allows evidences to be viewed or edited.
     """
 
+    permission_overrides = {
+        "ai_freshness_review": "view_evidence",
+        "ai_freshness_review_batch": "view_evidence",
+    }
+
     model = Evidence
     filterset_fields = [
         "folder",
@@ -9143,6 +9164,82 @@ class EvidenceViewSet(BaseModelViewSet):
     @action(detail=False, name="Get status choices")
     def status(self, request):
         return Response(dict(Evidence.Status.choices))
+
+    @action(methods=["post"], detail=True, url_path="ai-freshness-review")
+    def ai_freshness_review(self, request, pk):
+        """Advisory, read-only AI review of whether this evidence still looks current.
+
+        Uses the same local AI provider infrastructure as AI onboarding. Never writes to
+        Evidence, EvidenceRevision, or any linked record: the human reviewing the result
+        decides what, if anything, to do next.
+        """
+        request_guardrail_errors = validate_evidence_freshness_review_request_guardrails(
+            request.data if isinstance(request.data, dict) else {}
+        )
+        if request_guardrail_errors:
+            return Response(request_guardrail_errors, status=400)
+
+        serializer = AiEvidenceFreshnessReviewInputSerializer(data=request.data or {})
+        serializer.is_valid(raise_exception=True)
+
+        # get_object() applies the same folder/RBAC-scoped queryset and object permission
+        # check (permission_overrides -> view_evidence) as reading this Evidence normally.
+        evidence = self.get_object()
+
+        try:
+            with advisory_rollback_transaction():
+                result = review_evidence_freshness(evidence)
+                transaction.set_rollback(True)
+        except (
+            EvidenceFreshnessReviewValidationError,
+            EvidenceFreshnessReviewProviderError,
+        ) as exc:
+            return Response(exc.to_response(), status=exc.status_code)
+
+        return Response(result)
+
+    @action(methods=["post"], detail=False, url_path="ai-freshness-review-batch")
+    def ai_freshness_review_batch(self, request):
+        """Advisory, read-only AI freshness review for several evidence items at once.
+
+        Only evidence ids the requesting user can already view are reviewed; any other id
+        in the request is silently dropped (not reported as forbidden), so this endpoint
+        cannot be used to probe which evidence ids exist outside the caller's scope.
+        """
+        request_guardrail_errors = validate_evidence_freshness_review_request_guardrails(
+            request.data if isinstance(request.data, dict) else {}
+        )
+        if request_guardrail_errors:
+            return Response(request_guardrail_errors, status=400)
+
+        serializer = AiEvidenceFreshnessReviewBatchInputSerializer(data=request.data or {})
+        serializer.is_valid(raise_exception=True)
+        requested_ids = serializer.validated_data["evidence_ids"]
+
+        accessible_evidences = list(
+            self.get_queryset().filter(id__in=requested_ids)
+        )
+        requested_count = len(requested_ids)
+        skipped_count = requested_count - len(accessible_evidences)
+
+        try:
+            with advisory_rollback_transaction():
+                batch_result = review_evidence_freshness_batch(accessible_evidences)
+                transaction.set_rollback(True)
+        except (
+            EvidenceFreshnessReviewValidationError,
+            EvidenceFreshnessReviewProviderError,
+        ) as exc:
+            return Response(exc.to_response(), status=exc.status_code)
+
+        return Response(
+            {
+                "results": batch_result["results"],
+                "requested_count": requested_count,
+                "reviewed_count": batch_result["reviewed_count"],
+                "skipped_count": skipped_count,
+            }
+        )
 
 
 class EvidenceRevisionViewSet(BaseModelViewSet):
