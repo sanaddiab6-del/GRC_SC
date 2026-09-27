@@ -31,6 +31,15 @@ django-allauth = { version = "^65.14.1", extras = [
   "headless",
 ] }
 python-magic = "^0.4.27"
+# python-magic has no bundled libmagic on Windows and, on this platform, falls back to
+# whatever DLL matching its candidate names it finds on PATH. On a machine with Git for
+# Windows installed, that resolves to Git's own MSYS2-linked usr/bin/msys-magic-1.dll, which
+# loads without error via ctypes.CDLL() but is not ABI-compatible with a plain Win32 Python
+# process and segfaults the first time it is actually used. python-magic-bin bundles a real
+# Windows-native libmagic.dll built for exactly this use case. Windows-only: production and
+# CI run on Linux, where libmagic1 is installed via apt (see Dockerfile) and this never
+# applies.
+python-magic-bin = { version = "^0.4.14", markers = "sys_platform == 'win32'" }
 pytz = "^2025.2"
 fido2 = "^2.1.1"
 humanize = "^4.15.0"
