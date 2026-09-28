@@ -4,6 +4,9 @@ from typing import Any
 
 from django.utils import timezone
 
+from core.models import AppliedControl, Finding, RequirementAssessment
+from iam.models import Folder, RoleAssignment
+
 from .evidence_freshness_review_guardrails import (
     EvidenceFreshnessReviewValidationError,
     validate_provider_output_guardrails,
@@ -31,12 +34,29 @@ def _truncate(value: Any, *, max_length: int = MAX_TEXT_FIELD_LENGTH) -> str | N
     return text if len(text) <= max_length else f"{text[: max_length - 1]}…"
 
 
-def build_evidence_context(evidence) -> dict[str, Any]:
-    """Build the AI-facing context for one Evidence, reading only what is already on the
-    object (and its directly-linked relations) through the normal Evidence relations.
+def _visible(related_manager, model, user):
+    """Linked objects of `model` the requesting user can actually view.
 
-    Nothing here is trusted from client input, and nothing outside this evidence's own
-    linked objects is read, so context from another tenant/folder cannot enter the prompt.
+    Evidence is commonly linked to controls, requirement assessments, and findings that live
+    in a different folder than the Evidence itself (a control shared across domains, a
+    requirement assessment in a compliance-only folder, and so on). The user being authorized
+    to view this Evidence does not by itself authorize them to see those linked objects' names,
+    statuses, or observations, so every linked relation is intersected with the user's own
+    RBAC-accessible object ids (the same engine BaseModelViewSet.get_queryset() uses for the
+    Evidence itself) before anything is read into the prompt.
+    """
+    viewable_ids = RoleAssignment.get_accessible_object_ids(Folder.get_root_folder(), user, model)[0]
+    return related_manager.filter(id__in=viewable_ids)
+
+
+def build_evidence_context(evidence, user) -> dict[str, Any]:
+    """Build the AI-facing context for one Evidence, reading only what is already on the
+    object and only the linked relations `user` is independently authorized to view.
+
+    Nothing here is trusted from client input. Nothing outside this evidence's own linked
+    objects is read, and nothing the requesting user cannot themselves view is read either, so
+    context from another tenant/folder — whether the Evidence's own folder or a linked object's
+    folder — cannot enter the prompt.
     """
     now = timezone.now()
     last_revision = evidence.last_revision
@@ -65,13 +85,17 @@ def build_evidence_context(evidence) -> dict[str, Any]:
             "revision_age_days": revision_age_days,
         }
 
-    applied_controls = list(evidence.applied_controls.all()[:MAX_LINKED_ITEMS_PER_RELATION])
+    visible_applied_controls = _visible(evidence.applied_controls, AppliedControl, user)
+    visible_requirement_assessments = _visible(
+        evidence.requirement_assessments, RequirementAssessment, user
+    ).select_related("requirement", "compliance_assessment", "compliance_assessment__framework")
+    visible_findings = _visible(evidence.findings, Finding, user)
+
+    applied_controls = list(visible_applied_controls[:MAX_LINKED_ITEMS_PER_RELATION])
     requirement_assessments = list(
-        evidence.requirement_assessments.select_related(
-            "requirement", "compliance_assessment", "compliance_assessment__framework"
-        )[:MAX_LINKED_ITEMS_PER_RELATION]
+        visible_requirement_assessments[:MAX_LINKED_ITEMS_PER_RELATION]
     )
-    findings = list(evidence.findings.all()[:MAX_LINKED_ITEMS_PER_RELATION])
+    findings = list(visible_findings[:MAX_LINKED_ITEMS_PER_RELATION])
 
     return {
         "evidence": {
@@ -109,9 +133,11 @@ def build_evidence_context(evidence) -> dict[str, Any]:
             for finding in findings
         ],
         "counts": {
-            "linked_applied_controls": evidence.applied_controls.count(),
-            "linked_requirement_assessments": evidence.requirement_assessments.count(),
-            "linked_findings": evidence.findings.count(),
+            # Counts of what `user` can see, not the true totals: a count of hidden linked
+            # objects would itself disclose that they exist.
+            "linked_applied_controls": visible_applied_controls.count(),
+            "linked_requirement_assessments": visible_requirement_assessments.count(),
+            "linked_findings": visible_findings.count(),
         },
     }
 
@@ -200,14 +226,19 @@ def _judge_evidence_context(
     return validated_judgement, provider_mode, warnings
 
 
-def review_evidence_freshness(evidence, *, provider=None) -> dict[str, Any]:
+def review_evidence_freshness(evidence, user, *, provider=None) -> dict[str, Any]:
     """Advisory, read-only freshness review of one existing Evidence.
+
+    `user` is required, not optional: it is the sole basis for deciding which linked controls,
+    requirement assessments, and findings may enter the prompt (see `_visible`). There is no
+    "no user" fallback that reads everything — every caller must supply the real requesting
+    user, exactly like the equivalent parameter on `suggest_risk_treatment`.
 
     Never writes to Evidence, EvidenceRevision, or any linked record. Returns the final,
     schema-validated result; evidence_id/evidence_name/counts/reviewed_at are attached by
     this function from the real object, never taken from the model's output.
     """
-    evidence_context = build_evidence_context(evidence)
+    evidence_context = build_evidence_context(evidence, user)
     judgement, provider_mode, warnings = _judge_evidence_context(
         evidence_context, provider=provider
     )
@@ -245,13 +276,17 @@ def review_evidence_freshness(evidence, *, provider=None) -> dict[str, Any]:
     return serializer.data
 
 
-def review_evidence_freshness_batch(evidences, *, provider=None) -> dict[str, Any]:
+def review_evidence_freshness_batch(evidences, user, *, provider=None) -> dict[str, Any]:
     """Advisory, read-only freshness review of a bounded list of Evidence.
 
     One local-model call per evidence item (never one prompt for the whole batch), so each
     item stays inside the local model's context window and each result stays traceable to
     the evidence it came from. `evidences` must already be filtered to what the requesting
-    user may access; nothing outside that queryset is reviewed.
+    user may access; nothing outside that queryset is reviewed. `user` is passed through to
+    `review_evidence_freshness` for each item, so linked-object visibility is enforced exactly
+    the same way as the single-item action.
     """
-    results = [review_evidence_freshness(evidence, provider=provider) for evidence in evidences]
+    results = [
+        review_evidence_freshness(evidence, user, provider=provider) for evidence in evidences
+    ]
     return {"results": results, "reviewed_count": len(results)}

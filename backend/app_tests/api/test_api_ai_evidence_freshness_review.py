@@ -730,6 +730,251 @@ def test_other_tenants_evidence_is_not_sent_to_the_model(authenticated_client, m
 
 
 # ---------------------------------------------------------------------------
+# 6b. A LINKED object the caller cannot view must not enter the prompt, even though the
+# Evidence that links it is fully accessible. Every case is proven by capturing the actual
+# provider input (the prompt string sent to the model), not by inspecting the HTTP response.
+# ---------------------------------------------------------------------------
+
+
+def _make_control_in_folder(*, folder: Folder, name: str) -> AppliedControl:
+    return AppliedControl.objects.create(name=name, folder=folder)
+
+
+def _make_requirement_assessment_in_folder(*, folder: Folder, name: str) -> RequirementAssessment:
+    framework = Framework.objects.create(name=f"{name} framework", folder=folder)
+    requirement = RequirementNode.objects.create(
+        name=name, framework=framework, folder=folder, assessable=True
+    )
+    compliance_assessment = ComplianceAssessment.objects.create(
+        name=f"{name} assessment", framework=framework, folder=folder
+    )
+    return RequirementAssessment.objects.create(
+        compliance_assessment=compliance_assessment,
+        requirement=requirement,
+        folder=folder,
+        result=RequirementAssessment.Result.PARTIALLY_COMPLIANT,
+        status=RequirementAssessment.Status.IN_PROGRESS,
+    )
+
+
+def _capture_prompt(monkeypatch, client, evidence_id) -> tuple[object, str]:
+    """POSTs the freshness review and returns (response, prompt_text) for the one call made."""
+    _configure_local_provider_env(monkeypatch)
+    captured_bodies: list = []
+
+    def _handler(request, timeout, body):
+        captured_bodies.append(body)
+        return {"model": body["model"], "response": json.dumps(_valid_judgement()), "done": True}
+
+    _install_mock_ollama_urlopen(monkeypatch, _handler)
+    response = client.post(_freshness_url(evidence_id), {}, format="json")
+    assert len(captured_bodies) == 1, "expected exactly one provider call"
+    return response, captured_bodies[0]["prompt"]
+
+
+@pytest.mark.django_db
+def test_linked_control_in_an_inaccessible_folder_is_excluded_from_the_prompt(monkeypatch):
+    """Test A: Evidence is fully viewable, but it links a control that lives in a folder the
+    caller has no permission on at all. That control's name must never reach the model."""
+    folder_a = _make_domain_folder("acme")
+    folder_b = _make_domain_folder("vault")
+    evidence = Evidence.objects.create(name="Backup export", folder=folder_a)
+    hidden_control = _make_control_in_folder(
+        folder=folder_b, name="INACCESSIBLE_CONTROL_SECRET_MARKER"
+    )
+    evidence.applied_controls.add(hidden_control)
+    EvidenceRevision.objects.create(evidence=evidence, version=1, observation="Initial upload.")
+
+    scoped_client, _user = _make_scoped_client(folder=folder_a)
+    response, prompt = _capture_prompt(monkeypatch, scoped_client, evidence.id)
+
+    assert response.status_code == 200
+    assert "INACCESSIBLE_CONTROL_SECRET_MARKER" not in prompt
+
+
+@pytest.mark.django_db
+def test_linked_control_in_an_accessible_folder_is_included_in_the_prompt(monkeypatch):
+    """Test B (positive control): the same setup, but the caller can also view the control's
+    folder. This proves the fix filters by visibility, not by simply dropping every link."""
+    folder_a = _make_domain_folder("acme")
+    evidence = Evidence.objects.create(name="Backup export", folder=folder_a)
+    visible_control = _make_control_in_folder(
+        folder=folder_a, name="ACCESSIBLE_CONTROL_MARKER"
+    )
+    evidence.applied_controls.add(visible_control)
+    EvidenceRevision.objects.create(evidence=evidence, version=1, observation="Initial upload.")
+
+    scoped_client, user = _make_scoped_client(folder=folder_a)
+    role = Role.objects.get(roleassignment__user=user)
+    role.permissions.add(Permission.objects.get(codename="view_appliedcontrol"))
+
+    response, prompt = _capture_prompt(monkeypatch, scoped_client, evidence.id)
+
+    assert response.status_code == 200
+    assert "ACCESSIBLE_CONTROL_MARKER" in prompt
+
+
+@pytest.mark.django_db
+def test_linked_requirement_assessment_in_an_inaccessible_folder_is_excluded_from_the_prompt(
+    monkeypatch,
+):
+    """Test C: same principle for a linked RequirementAssessment (and the Requirement name and
+    ComplianceAssessment name carried in its display text)."""
+    folder_a = _make_domain_folder("acme")
+    folder_b = _make_domain_folder("vault")
+    evidence = Evidence.objects.create(name="Backup export", folder=folder_a)
+    hidden_ra = _make_requirement_assessment_in_folder(
+        folder=folder_b, name="INACCESSIBLE_REQUIREMENT_SECRET_MARKER"
+    )
+    evidence.requirement_assessments.add(hidden_ra)
+    EvidenceRevision.objects.create(evidence=evidence, version=1, observation="Initial upload.")
+
+    scoped_client, _user = _make_scoped_client(folder=folder_a)
+    response, prompt = _capture_prompt(monkeypatch, scoped_client, evidence.id)
+
+    assert response.status_code == 200
+    assert "INACCESSIBLE_REQUIREMENT_SECRET_MARKER" not in prompt
+
+
+@pytest.mark.django_db
+def test_linked_requirement_assessment_in_an_accessible_folder_is_included_in_the_prompt(
+    monkeypatch,
+):
+    """Test D (positive control) for RequirementAssessment."""
+    folder_a = _make_domain_folder("acme")
+    evidence = Evidence.objects.create(name="Backup export", folder=folder_a)
+    visible_ra = _make_requirement_assessment_in_folder(
+        folder=folder_a, name="ACCESSIBLE_REQUIREMENT_MARKER"
+    )
+    evidence.requirement_assessments.add(visible_ra)
+    EvidenceRevision.objects.create(evidence=evidence, version=1, observation="Initial upload.")
+
+    scoped_client, user = _make_scoped_client(folder=folder_a)
+    role = Role.objects.get(roleassignment__user=user)
+    role.permissions.add(Permission.objects.get(codename="view_requirementassessment"))
+
+    response, prompt = _capture_prompt(monkeypatch, scoped_client, evidence.id)
+
+    assert response.status_code == 200
+    assert "ACCESSIBLE_REQUIREMENT_MARKER" in prompt
+
+
+@pytest.mark.django_db
+def test_mixed_visibility_prompt_contains_only_the_visible_linked_objects(monkeypatch):
+    """Test E: one visible and one hidden control, one visible and one hidden requirement
+    assessment, all linked to the same Evidence. The prompt must contain only what the caller
+    is actually authorized to see."""
+    folder_a = _make_domain_folder("acme")
+    folder_b = _make_domain_folder("vault")
+    evidence = Evidence.objects.create(name="Backup export", folder=folder_a)
+
+    visible_control = _make_control_in_folder(folder=folder_a, name="VISIBLE_CONTROL_MARKER")
+    hidden_control = _make_control_in_folder(folder=folder_b, name="HIDDEN_CONTROL_MARKER")
+    visible_ra = _make_requirement_assessment_in_folder(
+        folder=folder_a, name="VISIBLE_REQUIREMENT_MARKER"
+    )
+    hidden_ra = _make_requirement_assessment_in_folder(
+        folder=folder_b, name="HIDDEN_REQUIREMENT_MARKER"
+    )
+    evidence.applied_controls.add(visible_control, hidden_control)
+    evidence.requirement_assessments.add(visible_ra, hidden_ra)
+    EvidenceRevision.objects.create(evidence=evidence, version=1, observation="Initial upload.")
+
+    scoped_client, user = _make_scoped_client(folder=folder_a)
+    role = Role.objects.get(roleassignment__user=user)
+    role.permissions.add(
+        Permission.objects.get(codename="view_appliedcontrol"),
+        Permission.objects.get(codename="view_requirementassessment"),
+    )
+
+    response, prompt = _capture_prompt(monkeypatch, scoped_client, evidence.id)
+
+    assert response.status_code == 200
+    assert "VISIBLE_CONTROL_MARKER" in prompt
+    assert "VISIBLE_REQUIREMENT_MARKER" in prompt
+    assert "HIDDEN_CONTROL_MARKER" not in prompt
+    assert "HIDDEN_REQUIREMENT_MARKER" not in prompt
+
+
+@pytest.mark.django_db
+def test_hidden_linked_objects_are_not_counted_either(monkeypatch):
+    """Test F: no enumeration side channel through the counts either. The response's own
+    linked_*_count fields (and the counts handed to the model) must reflect only what the
+    caller can see, not the true total."""
+    folder_a = _make_domain_folder("acme")
+    folder_b = _make_domain_folder("vault")
+    evidence = Evidence.objects.create(name="Backup export", folder=folder_a)
+    evidence.applied_controls.add(_make_control_in_folder(folder=folder_a, name="Visible control"))
+    evidence.applied_controls.add(_make_control_in_folder(folder=folder_b, name="Hidden control"))
+    EvidenceRevision.objects.create(evidence=evidence, version=1, observation="Initial upload.")
+
+    scoped_client, user = _make_scoped_client(folder=folder_a)
+    role = Role.objects.get(roleassignment__user=user)
+    role.permissions.add(Permission.objects.get(codename="view_appliedcontrol"))
+
+    response, prompt = _capture_prompt(monkeypatch, scoped_client, evidence.id)
+
+    assert response.status_code == 200
+    assert response.json()["linked_applied_controls_count"] == 1
+    assert '"linked_applied_controls": 2' not in prompt
+    assert '"linked_applied_controls": 1' in prompt or "\"counts\"" in prompt
+
+
+@pytest.mark.django_db
+def test_visibility_filtered_review_still_never_writes_grc_data(monkeypatch):
+    """Test G: the visibility fix must not change the advisory, read-only nature of the call."""
+    folder_a = _make_domain_folder("acme")
+    folder_b = _make_domain_folder("vault")
+    evidence = Evidence.objects.create(name="Backup export", folder=folder_a)
+    hidden_control = _make_control_in_folder(folder=folder_b, name="Hidden control")
+    evidence.applied_controls.add(hidden_control)
+    EvidenceRevision.objects.create(evidence=evidence, version=1, observation="Initial upload.")
+    scoped_client, _user = _make_scoped_client(folder=folder_a)
+    before = _counts_snapshot()
+
+    response, _prompt = _capture_prompt(monkeypatch, scoped_client, evidence.id)
+
+    assert response.status_code == 200
+    assert _counts_snapshot() == before
+    hidden_control.refresh_from_db()
+    evidence.refresh_from_db()
+    assert hidden_control.name == "Hidden control"
+    assert evidence.applied_controls.count() == 1
+
+
+@pytest.mark.django_db
+def test_batch_review_also_filters_linked_context_by_visibility(monkeypatch):
+    """The batch action shares build_evidence_context with the single-item action; prove the
+    fix applies there too instead of assuming it from a shared code path."""
+    folder_a = _make_domain_folder("acme")
+    folder_b = _make_domain_folder("vault")
+    evidence = Evidence.objects.create(name="Backup export", folder=folder_a)
+    hidden_control = _make_control_in_folder(
+        folder=folder_b, name="BATCH_INACCESSIBLE_CONTROL_MARKER"
+    )
+    evidence.applied_controls.add(hidden_control)
+    EvidenceRevision.objects.create(evidence=evidence, version=1, observation="Initial upload.")
+
+    scoped_client, _user = _make_scoped_client(folder=folder_a)
+    _configure_local_provider_env(monkeypatch)
+    captured_bodies: list = []
+
+    def _handler(request, timeout, body):
+        captured_bodies.append(body)
+        return {"model": body["model"], "response": json.dumps(_valid_judgement()), "done": True}
+
+    _install_mock_ollama_urlopen(monkeypatch, _handler)
+
+    response = scoped_client.post(
+        _batch_url(), {"evidence_ids": [str(evidence.id)]}, format="json"
+    )
+
+    assert response.status_code == 200
+    assert len(captured_bodies) == 1
+    assert "BATCH_INACCESSIBLE_CONTROL_MARKER" not in captured_bodies[0]["prompt"]
+
+
+# ---------------------------------------------------------------------------
 # 7. Batch endpoint
 # ---------------------------------------------------------------------------
 

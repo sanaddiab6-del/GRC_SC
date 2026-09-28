@@ -9238,7 +9238,7 @@ class EvidenceViewSet(BaseModelViewSet):
 
         try:
             with advisory_rollback_transaction():
-                result = review_evidence_freshness(evidence)
+                result = review_evidence_freshness(evidence, request.user)
                 transaction.set_rollback(True)
         except (
             EvidenceFreshnessReviewValidationError,
@@ -9274,7 +9274,9 @@ class EvidenceViewSet(BaseModelViewSet):
 
         try:
             with advisory_rollback_transaction():
-                batch_result = review_evidence_freshness_batch(accessible_evidences)
+                batch_result = review_evidence_freshness_batch(
+                    accessible_evidences, request.user
+                )
                 transaction.set_rollback(True)
         except (
             EvidenceFreshnessReviewValidationError,
