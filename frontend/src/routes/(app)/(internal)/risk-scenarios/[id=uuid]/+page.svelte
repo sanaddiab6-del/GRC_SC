@@ -27,6 +27,7 @@
 	} from '$lib/components/Modals/stores';
 	import { Progress } from '@skeletonlabs/skeleton-svelte';
 	import SyncToActionsRiskModal from '$lib/components/Modals/SyncToActionsRiskModal.svelte';
+	import RiskTreatmentSuggestion from '$lib/components/RiskScenario/RiskTreatmentSuggestion.svelte';
 	import { defaults } from 'sveltekit-superforms';
 	import { zod } from 'sveltekit-superforms/adapters';
 	import z from 'zod';
@@ -545,4 +546,8 @@
 			</div>
 		{/if}
 	</div>
+	<RiskTreatmentSuggestion
+		riskScenarioId={data.scenario.id}
+		editHref={canEditObject ? `/risk-scenarios/${data.scenario.id}/edit` : null}
+	/>
 </div>

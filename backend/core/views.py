@@ -145,6 +145,17 @@ from ai_onboarding.evidence_freshness_review_service import (
     review_evidence_freshness,
     review_evidence_freshness_batch,
 )
+from ai_onboarding.risk_treatment_suggestion_guardrails import (
+    RiskTreatmentSuggestionValidationError,
+    validate_risk_treatment_request_guardrails,
+)
+from ai_onboarding.risk_treatment_suggestion_provider import (
+    RiskTreatmentSuggestionProviderError,
+)
+from ai_onboarding.risk_treatment_suggestion_serializers import (
+    AiRiskTreatmentSuggestionInputSerializer,
+)
+from ai_onboarding.risk_treatment_suggestion_service import suggest_risk_treatment
 from ai_onboarding.service import build_onboarding_recommendations
 from core.models import (
     AppliedControl,
@@ -5937,6 +5948,12 @@ class RiskScenarioViewSet(ExportMixin, BaseModelViewSet):
     API endpoint that allows risk scenarios to be viewed or edited.
     """
 
+    # Advisory and read-like: gated by the same permission as reading the scenario, not by
+    # add_riskscenario, even though it is a POST.
+    permission_overrides = {
+        "ai_treatment_suggestion": "view_riskscenario",
+    }
+
     model = RiskScenario
     filterset_class = RiskScenarioFilter
     ordering = ["ref_id"]
@@ -6220,6 +6237,39 @@ class RiskScenarioViewSet(ExportMixin, BaseModelViewSet):
         return Response(
             {"changes": AppliedControlReadSerializer(changes, many=True).data}
         )
+
+    @action(methods=["post"], detail=True, url_path="ai-treatment-suggestion")
+    def ai_treatment_suggestion(self, request, pk):
+        """Advisory, read-only AI suggestion of a treatment for this risk scenario.
+
+        Uses the same local AI provider infrastructure as AI onboarding. Never changes the
+        scenario, its treatment or ratings, or any control or remediation: the human reviewing
+        the suggestion decides what, if anything, to change through the normal edit workflow.
+        """
+        request_guardrail_errors = validate_risk_treatment_request_guardrails(
+            request.data if isinstance(request.data, dict) else {}
+        )
+        if request_guardrail_errors:
+            return Response(request_guardrail_errors, status=400)
+
+        serializer = AiRiskTreatmentSuggestionInputSerializer(data=request.data or {})
+        serializer.is_valid(raise_exception=True)
+
+        # get_object() applies the folder/RBAC-scoped queryset and the object permission check
+        # (permission_overrides -> view_riskscenario), exactly as reading the scenario does.
+        risk_scenario = self.get_object()
+
+        try:
+            with advisory_rollback_transaction():
+                result = suggest_risk_treatment(risk_scenario, request.user)
+                transaction.set_rollback(True)
+        except (
+            RiskTreatmentSuggestionValidationError,
+            RiskTreatmentSuggestionProviderError,
+        ) as exc:
+            return Response(exc.to_response(), status=exc.status_code)
+
+        return Response(result)
 
 
 class RiskAcceptanceFilterSet(GenericFilterSet):
