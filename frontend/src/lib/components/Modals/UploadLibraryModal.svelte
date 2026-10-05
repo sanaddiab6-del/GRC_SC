@@ -5,8 +5,8 @@
 	import { page } from '$app/state';
 	import FileInput from '$lib/components/Forms/FileInput.svelte';
 	import SuperForm from '$lib/components/Forms/Form.svelte';
-	import { superValidate } from 'sveltekit-superforms';
-	import { zod } from 'sveltekit-superforms/adapters';
+	import { superForm, superValidate } from 'sveltekit-superforms';
+	import { zod4 } from 'sveltekit-superforms/adapters';
 	import { tableHandlers } from '$lib/utils/stores';
 	import { getModalStore } from './stores';
 
@@ -41,15 +41,14 @@
 		</div>
 		<p class="text-sm text-gray-500">{m.libraryAddHelpText()}</p>
 		<hr class="border-gray-200" />
-		{#await superValidate(zod(LibraryUploadSchema))}
+		{#await superValidate(zod4(LibraryUploadSchema))}
 			<p class="text-gray-500">{m.loadingLibraryUploadButton()}...</p>
 		{:then form}
 			<SuperForm
 				class="flex flex-col space-y-4"
-				dataType="form"
 				enctype="multipart/form-data"
-				data={form}
-				validators={zod(LibraryUploadSchema)}
+				_form={superForm(form, { dataType: 'form', validators: zod4(LibraryUploadSchema) })}
+				validators={zod4(LibraryUploadSchema)}
 				action="?/upload"
 				useFocusTrap={false}
 				onSubmit={() => {

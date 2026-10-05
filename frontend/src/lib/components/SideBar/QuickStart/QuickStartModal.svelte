@@ -5,7 +5,7 @@
 	import { goto } from '$lib/utils/breadcrumbs';
 	import { getSecureRedirect } from '$lib/utils/helpers';
 	import { defaults, superForm, type SuperValidated } from 'sveltekit-superforms';
-	import { zod } from 'sveltekit-superforms/adapters';
+	import { zod4 } from 'sveltekit-superforms/adapters';
  	import type { ActionResult } from '@sveltejs/kit';
 
 	import * as m from '$paraglide/messages';
@@ -114,7 +114,7 @@
 			audit_name: `Quick start audit ${new Date().toLocaleTimeString(getLocale(), { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`,
 			risk_assessment_name: `Quick start risk assessment ${new Date().toLocaleTimeString(getLocale(), { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`
 		},
-		zod(quickStartSchema)
+		zod4(quickStartSchema)
 	);
 
 	const _form = superForm(form, {
@@ -122,7 +122,7 @@
 		invalidateAll,
 		applyAction: rest.applyAction ?? true,
 		resetForm: rest.resetForm ?? false,
-		validators: zod(quickStartSchema),
+		validators: zod4(quickStartSchema),
 		taintedMessage: m.taintedFormMessage(),
 		validationMethod: 'auto',
 		onUpdated: async ({ form }) => {
@@ -399,10 +399,9 @@
 			class="flex flex-col space-y-3"
 			dataType="json"
 			enctype="application/x-www-form-urlencoded"
-			data={form}
 			{_form}
 			{invalidateAll}
-			validators={zod(quickStartSchema)}
+			validators={zod4(quickStartSchema)}
 			action={formAction}
 			{...rest}
 		>

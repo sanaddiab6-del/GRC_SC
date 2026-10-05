@@ -1,5 +1,9 @@
 // schema for the validation of forms
 import { z, type AnyZodObject } from 'zod';
+// Real Zod 4, used only by quickStartSchema/LibraryUploadSchema below: their SuperForm call sites
+// use the Superforms `zod4` adapter to avoid the proven TypeScript OOM in the `zod` (v3) adapter's
+// type declarations (see git history). Every other schema in this file stays on the `z` (v3) import.
+import { z as z4 } from 'zod4';
 import * as m from '$paraglide/messages';
 
 const toArrayPreprocessor = (value: unknown) => {
@@ -27,13 +31,13 @@ const jsonSchema: z.ZodType<Json> = z.lazy(() =>
 	z.union([literalSchema, z.array(jsonSchema), z.record(jsonSchema)])
 );
 
-export const quickStartSchema = z.object({
-	folder: z.string().uuid().optional(),
-	audit_name: z.string().nonempty(),
-	framework: z.string().url(),
-	create_risk_assessment: z.boolean().default(true),
-	risk_matrix: z.string().url().optional(),
-	risk_assessment_name: z.string().optional()
+export const quickStartSchema = z4.object({
+	folder: z4.string().uuid().optional(),
+	audit_name: z4.string().nonempty(),
+	framework: z4.string().url(),
+	create_risk_assessment: z4.boolean().default(true),
+	risk_matrix: z4.string().url().optional(),
+	risk_assessment_name: z4.string().optional()
 });
 
 export const loginSchema = z
@@ -137,8 +141,8 @@ export const RiskMatrixSchema = z.object({
 	is_enabled: z.boolean()
 });
 
-export const LibraryUploadSchema = z.object({
-	file: z.instanceof(File).optional()
+export const LibraryUploadSchema = z4.object({
+	file: z4.instanceof(File).optional()
 });
 
 export const RiskAssessmentSchema = z.object({

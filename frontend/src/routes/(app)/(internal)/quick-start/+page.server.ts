@@ -7,7 +7,7 @@ import { BASE_API_URL } from '$lib/utils/constants';
 import { quickStartSchema } from '$lib/utils/schemas';
 import { fail as kitFail, type Actions, type RequestEvent } from '@sveltejs/kit';
 import { fail, message, setError, superValidate } from 'sveltekit-superforms';
-import { zod } from 'sveltekit-superforms/adapters';
+import { zod4 } from 'sveltekit-superforms/adapters';
 
 async function readAiPayload(event: RequestEvent) {
 	const contentType = event.request.headers.get('content-type')?.toLowerCase() ?? '';
@@ -76,7 +76,7 @@ export const actions: Actions = {
 			return fail(400, { form: null });
 		}
 
-		const form = await superValidate(formData, zod(quickStartSchema));
+		const form = await superValidate(formData, zod4(quickStartSchema));
 
 		const requestInitOptions: RequestInit = {
 			method: 'POST',

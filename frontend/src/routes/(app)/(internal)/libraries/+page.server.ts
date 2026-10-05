@@ -8,8 +8,8 @@ import { m } from '$paraglide/messages';
 import { fail, type Actions } from '@sveltejs/kit';
 import { setFlash } from 'sveltekit-flash-message/server';
 import { superValidate } from 'sveltekit-superforms';
-import { zod } from 'sveltekit-superforms/adapters';
-import { z } from 'zod';
+import { zod4 } from 'sveltekit-superforms/adapters';
+import { z } from 'zod4';
 import type { PageServerLoad } from './$types';
 
 export const load = (async ({ fetch }) => {
@@ -43,8 +43,8 @@ export const load = (async ({ fetch }) => {
 	};
 
 	const schema = z.object({ id: z.string() });
-	const deleteForm = await superValidate(zod(schema));
-	const uploadForm = await superValidate({}, zod(LibraryUploadSchema), { errors: false });
+	const deleteForm = await superValidate(zod4(schema));
+	const uploadForm = await superValidate({}, zod4(LibraryUploadSchema), { errors: false });
 
 	return {
 		storedLibrariesTable,
@@ -57,7 +57,7 @@ export const load = (async ({ fetch }) => {
 export const actions: Actions = {
 	upload: async (event) => {
 		const formData = await event.request.formData();
-		const form = await superValidate(formData, zod(LibraryUploadSchema));
+		const form = await superValidate(formData, zod4(LibraryUploadSchema));
 		const locale = event.locals.user?.preferences?.lang;
 
 		if (formData.has('file')) {
