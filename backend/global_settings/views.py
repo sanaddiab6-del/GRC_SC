@@ -8,6 +8,7 @@ from rest_framework.decorators import action
 from core.serializers import SerializerFactory
 from iam.sso.models import SSOSettings
 from integrations.models import IntegrationProvider
+from iam.models import Folder, RoleAssignment
 from core.serializers import SerializerFactory
 from django.conf import settings
 from .serializers import (
@@ -160,8 +161,13 @@ class GeneralSettingsViewSet(viewsets.ModelViewSet):
             settings.value = updated_value
             settings.save()
 
+        viewable_integrations, _, _ = RoleAssignment.get_accessible_object_ids(
+            Folder.get_root_folder(), request.user, IntegrationProvider
+        )
         enabled_integrations = (
-            IntegrationProvider.objects.filter(is_active=True)
+            IntegrationProvider.objects.filter(
+                is_active=True, id__in=viewable_integrations
+            )
             .distinct()
             .values("id", "provider_type", "name", "configurations")
         )

@@ -8800,7 +8800,7 @@ class FrameworkViewSet(BaseModelViewSet):
 
     @action(detail=True, methods=["get"])
     def tree(self, request, pk):
-        _framework = Framework.objects.get(id=pk)
+        _framework = self.get_object()
         return Response(
             get_sorted_requirement_nodes(
                 RequirementNode.objects.filter(framework=_framework).all(),
@@ -8838,7 +8838,7 @@ class FrameworkViewSet(BaseModelViewSet):
     def mapping_stats(self, request, pk):
         from core.mappings.engine import engine
 
-        framework_urn = Framework.objects.filter(id=pk).values_list("urn")[0][0]
+        framework_urn = self.get_object().urn
         res = engine.paths_and_coverages(framework_urn)
         return Response({"response": res})
 
@@ -8865,7 +8865,7 @@ class FrameworkViewSet(BaseModelViewSet):
 
     @action(detail=True, methods=["get"], name="Framework as an Excel template")
     def excel_template(self, request, pk):
-        fwk = Framework.objects.get(id=pk)
+        fwk = self.get_object()
         req_nodes = RequirementNode.objects.filter(framework=fwk).order_by("urn")
         has_questions = any(rn.questions for rn in req_nodes)
         entries = []
@@ -11270,10 +11270,11 @@ class ComplianceAssessmentViewSet(BaseModelViewSet):
 
     @action(detail=True, methods=["get"], url_path="progress_ts")
     def progress_ts(self, request, pk):
+        compliance_assessment = self.get_object()
         try:
             raw = (
                 HistoricalMetric.objects.filter(
-                    model="ComplianceAssessment", object_id=pk
+                    model="ComplianceAssessment", object_id=compliance_assessment.id
                 )
                 .annotate(progress=F("data__reqs__progress_perc"))
                 .values("date", "progress")
@@ -12328,7 +12329,10 @@ class RequirementMappingSetViewSet(BaseModelViewSet):
 
     @action(detail=True, methods=["get"], url_path="graph_data")
     def graph_data(self, request, pk=None):
-        obj = StoredLibrary.objects.get(id=pk)
+        obj = self.get_object()
+        viewable_libraries, _, _ = RoleAssignment.get_accessible_object_ids(
+            Folder.get_root_folder(), request.user, StoredLibrary
+        )
 
         mapping_set = obj.content.get(
             "requirement_mapping_sets",
@@ -12336,6 +12340,7 @@ class RequirementMappingSetViewSet(BaseModelViewSet):
         )[0]
 
         source_framework_lib = StoredLibrary.objects.filter(
+            id__in=viewable_libraries,
             content__framework__urn=mapping_set["source_framework_urn"],
             content__framework__isnull=False,
             content__requirement_mapping_set__isnull=True,
@@ -12345,6 +12350,7 @@ class RequirementMappingSetViewSet(BaseModelViewSet):
             raise NotFound("Source framework library not found")
 
         target_framework_lib = StoredLibrary.objects.filter(
+            id__in=viewable_libraries,
             content__framework__urn=mapping_set["target_framework_urn"],
             content__framework__isnull=False,
             content__requirement_mapping_set__isnull=True,
