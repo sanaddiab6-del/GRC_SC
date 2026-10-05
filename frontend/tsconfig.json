@@ -10,9 +10,26 @@
 		"sourceMap": true,
 		"strict": true,
 		"noEmit": true
-	}
+	},
 	// Path aliases are handled by https://kit.svelte.dev/docs/configuration#alias
 	//
 	// If you want to overwrite includes/excludes, make sure to copy over the relevant includes/excludes
 	// from the referenced tsconfig.json - TypeScript does not merge them in
+	"exclude": [
+		"node_modules/**",
+		"src/service-worker.js",
+		"src/service-worker/**/*.js",
+		"src/service-worker.ts",
+		"src/service-worker/**/*.ts",
+		"src/service-worker.d.ts",
+		"src/service-worker/**/*.d.ts",
+		// Compiled Paraglide i18n output (see src/paraglide/README.md and its own
+		// gitignore: this whole folder is generated from project.inlang, never hand-written).
+		// Its per-locale message bundles alone total 20+MB, which used to push this project's
+		// non-.ts file size over svelte-check's internal safety threshold and silently disable
+		// checking for every real source file (see git history for the writeup); excluding this
+		// generated folder, the same way node_modules and .svelte-kit/output already are, fixes
+		// that without touching anything hand-written.
+		"src/paraglide/**"
+	]
 }

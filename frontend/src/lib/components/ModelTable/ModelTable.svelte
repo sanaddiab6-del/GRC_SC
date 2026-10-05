@@ -20,7 +20,7 @@
 	import SuperForm from '$lib/components/Forms/Form.svelte';
 	import type { TableSource } from '$lib/components/ModelTable/types';
 	import type { ListViewFilterConfig, BatchActionConfig } from '$lib/utils/table';
-	import { goto, breadcrumbs } from '$lib/utils/breadcrumbs';
+	import { goto } from '$lib/utils/breadcrumbs';
 	import { formatDateOrDateTime } from '$lib/utils/datetime';
 	import { isDark } from '$lib/utils/helpers';
 	import { contextMenuActions, listViewFields, getBatchActions } from '$lib/utils/table';
@@ -31,9 +31,9 @@
 	import { getLocale } from '$paraglide/runtime';
 	import type { SvelteEvent } from '@skeletonlabs/skeleton-svelte';
 	import { DataHandler, type State } from '@vincjo/datatables/remote';
-	import { defaults, superForm, type SuperValidated } from 'sveltekit-superforms';
-	import { zod } from 'sveltekit-superforms/adapters';
-	import { z, type AnyZodObject } from 'zod';
+	import type { SuperValidated } from 'sveltekit-superforms';
+	import type { AnyZodObject } from 'zod';
+	import { createFilterFormState } from './filterFormState.svelte';
 	import { loadTableData } from './handler';
 	import Pagination from './Pagination.svelte';
 	import RowCount from './RowCount.svelte';
@@ -306,74 +306,21 @@
 	let contextMenuOpenRow: TableSource | undefined = $state(undefined);
 
 	const filters = source?.filters ?? tableFilters;
-	const filteredFields = Object.keys(filters);
-	const filterValues: { [key: string]: any } = $state(
-		Object.fromEntries(
-			filteredFields.map((field: string) => {
-				const urlValues = page.url.searchParams.getAll(field).map((value) => ({ value }));
-				const defaultValue = defaultFilters[field] || [];
-				return [field, urlValues.length > 0 ? urlValues : defaultValue];
-			})
-		)
-	);
-	$effect(() => onFilterChange(filterValues));
+	const filterForm = createFilterFormState({
+		filters,
+		defaultFilters,
+		overrideFilters,
+		handler,
+		URLModel,
+		onFilterChange
+	});
+	const filteredFields = filterForm.filteredFields;
+	const filterValues = filterForm.filterValues;
+	const _form = filterForm.form;
+	const filterFormValidators = filterForm.noopValidators;
 
 	run(() => {
 		hideFilters = hideFilters || !Object.entries(filters).some(([_, filter]) => !filter.hide);
-	});
-
-	$effect(() => {
-		for (const field of filteredFields) {
-			const filterValue = filterValues[field];
-			const overrideFilterValue = overrideFilters[field];
-			const finalFilterValue = overrideFilterValue || filterValue;
-
-			const fieldFilterParams = finalFilterValue
-				? finalFilterValue.map((v: Record<string, any>) => v.value)
-				: [];
-			handler.filter(fieldFilterParams, field);
-			page.url.searchParams.delete(field);
-			if (finalFilterValue) {
-				finalFilterValue.forEach(({ value }) => page.url.searchParams.append(field, value));
-			}
-
-			const hrefPattern = new RegExp(`^/${URLModel}(\\?.*)?$`);
-			const fullPath = page.url.pathname + page.url.search;
-			if (hrefPattern.test(fullPath)) {
-				breadcrumbs.updateCrumb(hrefPattern, { href: fullPath });
-			}
-		}
-		history.replaceState(history.state, '', page.url.pathname + page.url.search);
-		setTimeout(() => {
-			handler.invalidate();
-		}, 10);
-	});
-
-	const filterInitialData: Record<string, string[]> = {};
-	// convert URL search params and default filters to filter initial data
-	for (const [key, value] of page.url.searchParams) {
-		filterInitialData[key] ??= [];
-		filterInitialData[key].push(value);
-	}
-	// Add default filter values if no URL params exist for that field
-	for (const field of filteredFields) {
-		if (!filterInitialData[field] && filterValues[field]?.length > 0) {
-			filterInitialData[field] = filterValues[field].map((v: Record<string, any>) => v.value);
-		}
-	}
-	const zodFiltersObject = {};
-	Object.keys(filters).forEach((k) => {
-		zodFiltersObject[k] = z.array(z.string()).optional().nullable();
-	});
-	const _form = superForm(defaults(filterInitialData, zod(z.object(zodFiltersObject))), {
-		SPA: true,
-		validators: zod(z.object(zodFiltersObject)),
-		dataType: 'json',
-		invalidateAll: false,
-		applyAction: false,
-		resetForm: false,
-		taintedMessage: false,
-		validationMethod: 'auto'
 	});
 
 	$effect(() => {
@@ -512,9 +459,7 @@
 		modalStore.trigger(modal);
 	}
 
-	let filterCount = $derived(
-		filteredFields?.reduce((acc, field) => acc + filterValues?.[field]?.length, 0)
-	);
+	let filterCount = $derived(filterForm.filterCount);
 
 	let classesHexBackgroundText = $derived((backgroundHexColor: string) => {
 		return isDark(backgroundHexColor) ? 'text-white' : '';
@@ -650,7 +595,7 @@
 						<Popover.Content
 							class="card p-2 bg-white max-w-lg shadow-lg space-y-2 border border-surface-200"
 						>
-							<SuperForm {_form} validators={zod(z.object({}))}>
+							<SuperForm {_form} validators={filterFormValidators}>
 								{#snippet children({ form })}
 									{#each filteredFields as field}
 										{#if filters[field]?.component}
