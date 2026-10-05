@@ -253,9 +253,14 @@ class ProcessingViewSet(ExportMixin, BaseModelViewSet):
 
     @action(detail=False, name="Get all processing assigned_to actors")
     def assigned_to(self, request):
+        viewable_processings, _, _ = RoleAssignment.get_accessible_object_ids(
+            Folder.get_root_folder(), request.user, Processing
+        )
         return Response(
             ActorReadSerializer(
-                Actor.objects.filter(assigned_processings__isnull=False).distinct(),
+                Actor.objects.filter(
+                    assigned_processings__in=viewable_processings
+                ).distinct(),
                 many=True,
             ).data
         )
@@ -495,9 +500,14 @@ class RightRequestViewSet(BaseModelViewSet):
 
     @action(detail=False, name="Get all right request owners")
     def owner(self, request):
+        viewable_right_requests, _, _ = RoleAssignment.get_accessible_object_ids(
+            Folder.get_root_folder(), request.user, RightRequest
+        )
         return Response(
             ActorReadSerializer(
-                Actor.objects.filter(assigned_right_requests__isnull=False).distinct(),
+                Actor.objects.filter(
+                    assigned_right_requests__in=viewable_right_requests
+                ).distinct(),
                 many=True,
             ).data
         )

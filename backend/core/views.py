@@ -4855,9 +4855,14 @@ class AppliedControlViewSet(ExportMixin, BaseModelViewSet):
 
     @action(detail=False, name="Get all applied controls owners")
     def owner(self, request):
+        viewable_applied_controls, _, _ = RoleAssignment.get_accessible_object_ids(
+            Folder.get_root_folder(), request.user, AppliedControl
+        )
         return Response(
             ActorReadSerializer(
-                Actor.objects.filter(applied_controls__isnull=False).distinct(),
+                Actor.objects.filter(
+                    applied_controls__in=viewable_applied_controls
+                ).distinct(),
                 many=True,
             ).data
         )
@@ -9171,9 +9176,12 @@ class EvidenceViewSet(BaseModelViewSet):
 
     @action(detail=False, name="Get all evidences owners")
     def owner(self, request):
+        viewable_evidences, _, _ = RoleAssignment.get_accessible_object_ids(
+            Folder.get_root_folder(), request.user, Evidence
+        )
         return Response(
             ActorReadSerializer(
-                Actor.objects.filter(evidences__isnull=False).distinct(),
+                Actor.objects.filter(evidences__in=viewable_evidences).distinct(),
                 many=True,
             ).data
         )
@@ -9800,7 +9808,7 @@ class ComplianceAssessmentViewSet(BaseModelViewSet):
         name="Get target frameworks mapping options with compliance distribution",
     )
     def frameworks(self, request, pk):
-        audit = ComplianceAssessment.objects.get(id=pk)
+        audit = self.get_object()
         from core.mappings.engine import engine
 
         audit_from_results = engine.load_audit_fields(audit)
@@ -13347,9 +13355,12 @@ class FindingViewSet(BaseModelViewSet):
 
     @action(detail=False, name="Get all findings owners")
     def owner(self, request):
+        viewable_findings, _, _ = RoleAssignment.get_accessible_object_ids(
+            Folder.get_root_folder(), request.user, Finding
+        )
         return Response(
             ActorReadSerializer(
-                Actor.objects.filter(findings__isnull=False).distinct(),
+                Actor.objects.filter(findings__in=viewable_findings).distinct(),
                 many=True,
             ).data
         )
@@ -14743,9 +14754,14 @@ class TaskTemplateViewSet(ExportMixin, BaseModelViewSet):
 
     @action(detail=False, name="Get all task template assigned_to actors")
     def assigned_to(self, request):
+        viewable_task_templates, _, _ = RoleAssignment.get_accessible_object_ids(
+            Folder.get_root_folder(), request.user, TaskTemplate
+        )
         return Response(
             ActorReadSerializer(
-                Actor.objects.filter(assigned_task_templates__isnull=False).distinct(),
+                Actor.objects.filter(
+                    assigned_task_templates__in=viewable_task_templates
+                ).distinct(),
                 many=True,
             ).data
         )
@@ -14910,6 +14926,12 @@ class TaskNodeViewSet(BaseModelViewSet):
     search_fields = ["observation"]
     ordering = ["due_date"]
 
+    # This is a write (it mutates the evidence relationship), so it is gated by
+    # change_tasknode rather than the POST default of add_tasknode.
+    permission_overrides = {
+        "remove_evidence": "change_tasknode",
+    }
+
     @method_decorator(cache_page(60 * LONG_CACHE_TTL))
     @action(detail=False, name="Get Task Node status choices")
     def status(srlf, request):
@@ -14919,10 +14941,21 @@ class TaskNodeViewSet(BaseModelViewSet):
         detail=True, name="Remove/Move evidence to expected evidence", methods=["post"]
     )
     def remove_evidence(self, request, pk):
-        task_node = TaskNode.objects.get(id=pk)
+        task_node = self.get_object()
         evidence_id = request.data.get("evidence_id")
         to_move = request.data.get("move", False)
-        evidence = Evidence.objects.get(id=evidence_id)
+        viewable_evidence_ids, _, _ = RoleAssignment.get_accessible_object_ids(
+            Folder.get_root_folder(), request.user, Evidence
+        )
+        try:
+            evidence = Evidence.objects.get(id=evidence_id)
+        except Evidence.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        # The evidence being detached/moved must be independently visible to the
+        # requester too, not just the task node — otherwise this endpoint could be used
+        # to link an evidence the user cannot see into a template they can access.
+        if evidence.id not in viewable_evidence_ids:
+            return Response(status=status.HTTP_404_NOT_FOUND)
         task_node.evidences.remove(evidence)
         if to_move:
             task_node.task_template.evidences.add(evidence)
