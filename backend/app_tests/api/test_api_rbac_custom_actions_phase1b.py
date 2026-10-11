@@ -201,14 +201,6 @@ class TestFrameworkMappingStats:
 
 
 @pytest.mark.django_db
-@pytest.mark.xfail(
-    reason=(
-        "Unrelated defect: core/views.py FrameworkViewSet.names calls "
-        "framework.get_name_translated() but it is a property, so every request 500s "
-        "before returning data. RBAC exposure cannot be demonstrated until that is fixed."
-    ),
-    strict=False,
-)
 class TestFrameworkNames:
     """Candidate: FrameworkViewSet.names — Framework.objects.filter(id__in=...) with no RBAC."""
 

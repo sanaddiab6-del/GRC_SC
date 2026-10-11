@@ -1895,10 +1895,15 @@ class AssetViewSet(ExportMixin, BaseModelViewSet):
     @action(detail=False, name="Get asset class choices")
     def asset_class(self, request):
         # This endpoint is exclusively for filters.
+        viewable_ids, _, _ = RoleAssignment.get_accessible_object_ids(
+            Folder.get_root_folder(), request.user, AssetClass
+        )
         return Response(
             [
                 {"id": ac.id, "name": ac.full_path}
-                for ac in AssetClass.objects.filter(assets__isnull=False).distinct()
+                for ac in AssetClass.objects.filter(
+                    assets__isnull=False, id__in=viewable_ids
+                ).distinct()
             ]
         )
 
@@ -2363,7 +2368,10 @@ class AssetClassViewSet(BaseModelViewSet):
 
     @action(detail=False, name="Get Asset Class Tree")
     def tree(self, request):
-        return Response(AssetClass.build_tree())
+        viewable_ids, _, _ = RoleAssignment.get_accessible_object_ids(
+            Folder.get_root_folder(), request.user, AssetClass
+        )
+        return Response(AssetClass.build_tree(viewable_ids))
 
 
 class ReferenceControlViewSet(BaseModelViewSet):
@@ -5024,7 +5032,10 @@ class AppliedControlViewSet(ExportMixin, BaseModelViewSet):
 
     @action(detail=False, name="Get priority chart data")
     def priority_chart_data(self, request):
-        qs = AppliedControl.objects.exclude(status="active")
+        viewable_ids, _, _ = RoleAssignment.get_accessible_object_ids(
+            Folder.get_root_folder(), request.user, AppliedControl
+        )
+        qs = AppliedControl.objects.filter(id__in=viewable_ids).exclude(status="active")
 
         data = {
             "--": [],
@@ -8795,11 +8806,14 @@ class FrameworkViewSet(BaseModelViewSet):
     @action(detail=False, methods=["get"])
     def names(self, request):
         uuid_list = request.query_params.getlist("id[]", [])
-        queryset = Framework.objects.filter(id__in=uuid_list)
+        viewable_ids, _, _ = RoleAssignment.get_accessible_object_ids(
+            Folder.get_root_folder(), request.user, Framework
+        )
+        queryset = Framework.objects.filter(id__in=uuid_list).filter(id__in=viewable_ids)
 
         return Response(
             {
-                str(framework.id): framework.get_name_translated()
+                str(framework.id): framework.get_name_translated
                 for framework in queryset
             }
         )
