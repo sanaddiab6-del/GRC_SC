@@ -10,6 +10,7 @@ from core.models import AppliedControl, Asset, ComplianceAssessment, Framework, 
 from core.serializers import AppliedControlWriteSerializer
 from iam.models import Folder, RoleAssignment
 
+from .rbac_context import filter_visible
 from .applied_control_commit_guardrails import (
 	AppliedControlCommitValidationError,
 	validate_applied_control_commit_guardrails,
@@ -618,21 +619,8 @@ class AiAppliedControlCommitService:
 		}
 
 	def _visible_folder_controls(self, folder: Folder) -> list[AppliedControl]:
-		accessible_ids = self._visible_applied_control_ids()
 		queryset = AppliedControl.objects.filter(folder=folder).select_related("folder").prefetch_related("assets")
-		if accessible_ids is not None:
-			queryset = queryset.filter(id__in=accessible_ids)
-		return list(queryset)
-
-	def _visible_applied_control_ids(self):
-		try:
-			return RoleAssignment.get_accessible_object_ids(
-				folder=Folder.get_root_folder(),
-				user=self.user,
-				object_type=AppliedControl,
-			)[0]
-		except Exception:
-			return None
+		return list(filter_visible(queryset, AppliedControl, self.user))
 
 	def _check_add_permission(self, folder: Folder, codename: str, field: str) -> None:
 		permission = Permission.objects.get(codename=codename)

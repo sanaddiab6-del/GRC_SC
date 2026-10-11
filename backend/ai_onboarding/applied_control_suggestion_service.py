@@ -5,7 +5,9 @@ from pathlib import Path
 from typing import Any
 
 from core.models import AppliedControl, Asset, ComplianceAssessment, Framework, Perimeter, RiskAssessment
-from iam.models import Folder, RoleAssignment
+from iam.models import Folder
+
+from .rbac_context import get_viewable_ids, is_visible_to_user
 
 from .applied_control_suggestion_guardrails import (
     AppliedControlSuggestionDraftValidationError,
@@ -352,17 +354,7 @@ def _get_object_or_error(model_class, object_id, field_name: str):
 
 
 def _assert_visible_to_user(user, instance, field_name: str) -> None:
-    if not getattr(user, "is_authenticated", False):
-        return
-    try:
-        visible_ids = RoleAssignment.get_accessible_object_ids(
-            folder=Folder.get_root_folder(),
-            user=user,
-            object_type=instance.__class__,
-        )[0]
-    except Exception:
-        return
-    if str(instance.id) not in {str(item_id) for item_id in visible_ids}:
+    if not is_visible_to_user(user, instance):
         raise AppliedControlSuggestionDraftValidationError(
             "ai_applied_control_suggestion_permission_denied",
             f"{field_name} is not visible to the current user.",
@@ -874,16 +866,7 @@ def _apply_duplicate_detection(draft: dict[str, Any], user, folder: Folder) -> N
 
 
 def _get_visible_applied_control_ids(user):
-    if not getattr(user, "is_authenticated", False):
-        return None
-    try:
-        return RoleAssignment.get_accessible_object_ids(
-            folder=Folder.get_root_folder(),
-            user=user,
-            object_type=AppliedControl,
-        )[0]
-    except Exception:
-        return None
+    return get_viewable_ids(user, AppliedControl)
 
 
 def _find_candidate_matches(

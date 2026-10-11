@@ -11,7 +11,9 @@ from core.models import (
     Perimeter,
     RiskAssessment,
 )
-from iam.models import Folder, RoleAssignment
+from iam.models import Folder
+
+from .rbac_context import is_visible_to_user
 
 from .evidence_finding_suggestion_guardrails import (
     EvidenceFindingSuggestionDraftValidationError,
@@ -450,17 +452,7 @@ def _get_object_or_error(model_class, object_id, field_name: str):
 
 
 def _assert_visible_to_user(user, instance, field_name: str) -> None:
-    if not getattr(user, "is_authenticated", False):
-        return
-    try:
-        visible_ids = RoleAssignment.get_accessible_object_ids(
-            folder=Folder.get_root_folder(),
-            user=user,
-            object_type=instance.__class__,
-        )[0]
-    except Exception:
-        return
-    if str(instance.id) not in {str(item_id) for item_id in visible_ids}:
+    if not is_visible_to_user(user, instance):
         raise EvidenceFindingSuggestionDraftValidationError(
             "ai_evidence_finding_suggestion_permission_denied",
             f"{field_name} is not visible to the current user.",

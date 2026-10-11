@@ -5,8 +5,8 @@ from typing import Any
 from django.utils import timezone
 
 from core.models import AppliedControl, Finding, RequirementAssessment
-from iam.models import Folder, RoleAssignment
 
+from .rbac_context import filter_visible
 from .evidence_freshness_review_guardrails import (
     EvidenceFreshnessReviewValidationError,
     validate_provider_output_guardrails,
@@ -45,8 +45,7 @@ def _visible(related_manager, model, user):
     RBAC-accessible object ids (the same engine BaseModelViewSet.get_queryset() uses for the
     Evidence itself) before anything is read into the prompt.
     """
-    viewable_ids = RoleAssignment.get_accessible_object_ids(Folder.get_root_folder(), user, model)[0]
-    return related_manager.filter(id__in=viewable_ids)
+    return filter_visible(related_manager, model, user)
 
 
 def build_evidence_context(evidence, user) -> dict[str, Any]:

@@ -5,8 +5,8 @@ from typing import Any
 from django.utils import timezone
 
 from core.models import AppliedControl, Asset, Threat, Vulnerability
-from iam.models import Folder, RoleAssignment
 
+from .rbac_context import filter_visible
 from .risk_treatment_suggestion_guardrails import (
     RiskTreatmentSuggestionValidationError,
     validate_provider_output_guardrails,
@@ -48,10 +48,7 @@ def _visible(related_manager, model, user):
     for a user who cannot see them, and the prompt must not reveal them either, so every linked
     relation is intersected with the user's own accessible ids before anything is read.
     """
-    viewable_ids = RoleAssignment.get_accessible_object_ids(
-        Folder.get_root_folder(), user, model
-    )[0]
-    return related_manager.filter(id__in=viewable_ids).order_by("name")
+    return filter_visible(related_manager, model, user).order_by("name")
 
 
 def build_risk_context(risk_scenario, user) -> dict[str, Any]:

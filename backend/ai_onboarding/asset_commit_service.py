@@ -12,6 +12,7 @@ from core.models import Actor, Asset, ComplianceAssessment, Framework, Perimeter
 from core.serializers import AssetWriteSerializer
 from iam.models import Folder, RoleAssignment
 
+from .rbac_context import filter_visible
 from .asset_commit_guardrails import AssetCommitValidationError, validate_asset_commit_guardrails
 
 
@@ -453,21 +454,8 @@ class AiAssetCommitService:
         return {"action": "create", "source_temporary_id": temporary_id, "create_payload": create_payload}
 
     def _visible_folder_assets(self, folder: Folder) -> list[Asset]:
-        accessible_ids = self._visible_asset_ids()
         queryset = Asset.objects.filter(folder=folder).select_related("folder")
-        if accessible_ids is not None:
-            queryset = queryset.filter(id__in=accessible_ids)
-        return list(queryset)
-
-    def _visible_asset_ids(self):
-        try:
-            return RoleAssignment.get_accessible_object_ids(
-                folder=Folder.get_root_folder(),
-                user=self.user,
-                object_type=Asset,
-            )[0]
-        except Exception:
-            return None
+        return list(filter_visible(queryset, Asset, self.user))
 
     def _check_add_permission(self, folder: Folder, codename: str, field: str) -> None:
         permission = Permission.objects.get(codename=codename)

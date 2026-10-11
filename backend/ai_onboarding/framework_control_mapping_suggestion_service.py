@@ -8,7 +8,7 @@ from typing import Any
 from django.core.exceptions import ValidationError as DjangoValidationError
 
 from core.models import Framework, LoadedLibrary, RequirementNode
-from iam.models import Folder, RoleAssignment
+from .rbac_context import is_visible_to_user
 
 from .framework_control_mapping_suggestion_guardrails import (
     FrameworkControlMappingSuggestionDraftValidationError,
@@ -522,18 +522,7 @@ def _first_or_none(queryset):
 
 
 def _is_visible_to_user(user, instance) -> bool:
-    if not getattr(user, "is_authenticated", False):
-        return False
-    try:
-        visible_ids = RoleAssignment.get_accessible_object_ids(
-            folder=Folder.get_root_folder(),
-            user=user,
-            object_type=instance.__class__,
-        )[0]
-    except Exception:
-        # Visibility could not be evaluated: treat the object as not discoverable.
-        return False
-    return str(instance.id) in {str(item_id) for item_id in visible_ids}
+    return is_visible_to_user(user, instance)
 
 
 # ---- Read-only CSV export fallback ---------------------------------------------------
