@@ -4132,7 +4132,10 @@ class RiskAssessmentViewSet(BaseModelViewSet):
         if dry_run == "false":
             dry_run = False
         reset_residual = request.data.get("reset_residual", False)
-        risk_assessment = RiskAssessment.objects.get(id=pk)
+        try:
+            risk_assessment = RiskAssessment.objects.get(id=pk)
+        except RiskAssessment.DoesNotExist:
+            return Response(status=status.HTTP_403_FORBIDDEN)
 
         if not RoleAssignment.is_access_allowed(
             user=request.user,
@@ -6227,7 +6230,10 @@ class RiskScenarioViewSet(ExportMixin, BaseModelViewSet):
         if dry_run == "false":
             dry_run = False
         reset_residual = request.data.get("reset_residual", False)
-        risk_scenario = RiskScenario.objects.get(id=pk)
+        try:
+            risk_scenario = RiskScenario.objects.get(id=pk)
+        except RiskScenario.DoesNotExist:
+            return Response(status=status.HTTP_403_FORBIDDEN)
 
         if not RoleAssignment.is_access_allowed(
             user=request.user,
@@ -11218,7 +11224,10 @@ class ComplianceAssessmentViewSet(BaseModelViewSet):
     @api_view(["GET", "POST"])
     @renderer_classes([JSONRenderer])
     def create_suggested_applied_controls(request, pk):
-        compliance_assessment = ComplianceAssessment.objects.get(id=pk)
+        try:
+            compliance_assessment = ComplianceAssessment.objects.get(id=pk)
+        except ComplianceAssessment.DoesNotExist:
+            return Response(status=status.HTTP_403_FORBIDDEN)
         dry_run = str(request.query_params.get("dry_run", "false")).lower() in {
             "true",
             "1",
@@ -11256,7 +11265,10 @@ class ComplianceAssessmentViewSet(BaseModelViewSet):
         dry_run = request.query_params.get("dry_run", True)
         if dry_run == "false":
             dry_run = False
-        compliance_assessment = ComplianceAssessment.objects.get(id=pk)
+        try:
+            compliance_assessment = ComplianceAssessment.objects.get(id=pk)
+        except ComplianceAssessment.DoesNotExist:
+            return Response(status=status.HTTP_403_FORBIDDEN)
 
         if not RoleAssignment.is_access_allowed(
             user=request.user,
@@ -12125,7 +12137,10 @@ class RequirementAssessmentViewSet(BaseModelViewSet):
     @api_view(["GET", "POST"])
     @renderer_classes([JSONRenderer])
     def create_suggested_applied_controls(request, pk):
-        requirement_assessment = RequirementAssessment.objects.get(id=pk)
+        try:
+            requirement_assessment = RequirementAssessment.objects.get(id=pk)
+        except RequirementAssessment.DoesNotExist:
+            return Response(status=status.HTTP_403_FORBIDDEN)
         dry_run = str(request.query_params.get("dry_run", "false")).lower() in {
             "true",
             "1",
