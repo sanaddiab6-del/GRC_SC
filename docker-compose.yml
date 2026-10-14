@@ -117,3 +117,5 @@ services:
 
 volumes:
   postgres_data:
+    external: true
+    name: sanadcom_postgres_data
