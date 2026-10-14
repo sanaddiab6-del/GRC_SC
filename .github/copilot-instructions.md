@@ -1,30 +1,32 @@
-# SICO GRC Platform - AI Agent Guide
+# Sanadcom GRC Platform - AI Agent Guide
+
+This repository is a customised fork of [CISO Assistant](README.md): a Django/DRF API in [backend](backend) and a SvelteKit 2 / Svelte 5 UI in [frontend](frontend), backed by PostgreSQL (SQLite by default in dev) and a Huey task worker. There is no `src/`, FastAPI, Next.js, Makefile or LangChain layer — do not invent them.
 
 ## Architecture & Responsibilities
-- Full stack spans FastAPI backend, Next.js 14 frontend, and LangChain-based RAG; backend entrypoint [src/backend/main.py](src/backend/main.py) wires controls, evidence, reporting, and AI routers under /api/v1.
-- Runtime settings live in [src/backend/core/config.py](src/backend/core/config.py); .env co-located with backend sets DATABASE_URL, Redis, vector DB, and CORS, so load settings through pydantic BaseSettings instead of manual env parsing.
-- Async SQLAlchemy infrastructure in [src/backend/core/database.py](src/backend/core/database.py) converts sync DSNs to asyncpg, exposes AsyncSession dependency, and auto-creates tables during startup lifespan; keep new models inheriting from Base to participate.
-- Compliance domains are modularised: [src/backend/controls](src/backend/controls), [src/backend/evidence](src/backend/evidence), and [src/backend/reporting](src/backend/reporting) share a consistent trio of models, schemas, and routers.
+- Django project config lives in [backend/ciso_assistant/settings.py](backend/ciso_assistant/settings.py) (env-driven via `os.environ`/python-dotenv; `POSTGRES_NAME`/`DB_HOST` switch from SQLite to PostgreSQL) and routes in [backend/ciso_assistant/urls.py](backend/ciso_assistant/urls.py); the REST API is served under `/api/` with OpenAPI from drf-spectacular.
+- Domain logic is split into Django apps listed in `INSTALLED_APPS`: [core](backend/core) (frameworks, assessments, risks, controls, evidences), [iam](backend/iam) (users, folders, roles), [library](backend/library) (framework/library import), plus feature apps such as [ebios_rm](backend/ebios_rm), [tprm](backend/tprm), [privacy](backend/privacy), [resilience](backend/resilience), [crq](backend/crq), [metrology](backend/metrology), [integrations](backend/integrations), [webhooks](backend/webhooks) and [notifications](backend/notifications). Each app follows the `models.py` / `serializers.py` / `views.py` / `urls.py` layout.
+- Background jobs run through Huey (`python manage.py run_huey`), see [backend/core/tasks.py](backend/core/tasks.py); the full stack (postgres, backend, huey, frontend, caddy) is defined in [docker-compose.yml](docker-compose.yml).
 
 ## Backend Conventions
-- Bilingual payloads are mandatory; follow the *_en/*_ar pattern and bilingual error payloads demonstrated in [src/backend/controls/router.py](src/backend/controls/router.py) and [src/backend/evidence/router.py](src/backend/evidence/router.py).
-- Control identifiers must respect enums in [src/backend/controls/models.py](src/backend/controls/models.py), with framework stored as FrameworkType and statuses as ControlStatus; evidence rows reference controls via control_id.
-- List endpoints implement offset/limit pagination with default 50 and optional filters; reuse the pattern in [src/backend/controls/router.py](src/backend/controls/router.py#L20-L66) to keep count queries and Query params aligned.
-- Evidence creation computes expiry from retention days and stamps collection timestamps (see [src/backend/evidence/router.py](src/backend/evidence/router.py#L60-L119)); prefer server-side timestamps rather than trusting clients.
-- Reporting dashboards in [src/backend/reporting/router.py](src/backend/reporting/router.py#L20-L160) aggregate SQL counts per framework and domain, so extend using SQLAlchemy queries before post-processing in Python.
+- Models inherit from `AbstractBaseModel` / `NameDescriptionMixin` in [backend/core/base_models.py](backend/core/base_models.py) (UUID `id`, `created_at`, `updated_at`, `is_published`) and usually `FolderMixin` from [backend/iam/models.py](backend/iam/models.py) so every object is scoped to a `Folder` (root folder = global scope).
+- Access control is RBAC over folders: never query `Model.objects.all()` in API views; scope with `RoleAssignment.get_accessible_object_ids(Folder.get_root_folder(), user, Model)` as done in `BaseModelViewSet.get_queryset` in [backend/core/views.py](backend/core/views.py).
+- New endpoints subclass `BaseModelViewSet` (sets `model`, `filterset_fields`, `search_fields`) and are registered with the DRF router in the app's `urls.py` (e.g. [backend/core/urls.py](backend/core/urls.py)). Serializers are resolved by name through `SerializerFactory` in [backend/core/serializers.py](backend/core/serializers.py): define `<Model>ReadSerializer` and `<Model>WriteSerializer`.
+- Pagination is handled centrally in [backend/core/pagination.py](backend/core/pagination.py); reuse it rather than hand-rolling offset logic.
+- User-facing backend strings use `gettext_lazy as _`; compiled catalogs live in [backend/locale](backend/locale) and [backend/core/locale](backend/core/locale).
+- Schema changes need migrations: `poetry run python manage.py makemigrations` then `migrate`; never edit existing migration files.
 
-## AI/RAG Layer
-- Retrieval lives in [ai/rag/bilingual_retriever.py](ai/rag/bilingual_retriever.py); it instantiates HuggingFace embeddings and Chroma, returning bilingual metadata plus citations—avoid creating new retrievers per request.
-- Document preparation uses [ai/rag/chunker.py](ai/rag/chunker.py) to build multi-section Document chunks mixing Arabic and English text; preserve control_id, framework, and section metadata when generating new chunks.
-- Tests in [tests/ai/test_rag.py](tests/ai/test_rag.py) assert chunk metadata and mark vector-store-dependent tests with pytest.skip; mirror that gating for heavy integrations.
+## Frameworks & Libraries
+- Compliance frameworks (including Saudi ones such as [ecc-1.yaml](backend/library/libraries/ecc-1.yaml), [nca-ccc-1.yaml](backend/library/libraries/nca-ccc-1.yaml), [sama-csf-1.0.yaml](backend/library/libraries/sama-csf-1.0.yaml)) are YAML libraries in [backend/library/libraries](backend/library/libraries), loaded by [backend/library/utils.py](backend/library/utils.py). Objects are identified by `urn`, and localisation is stored in per-object `translations` dicts (e.g. `translations.ar`).
+- Build new libraries from Excel with the scripts in [tools](tools) (see [tools/README.md](tools/README.md), `convert_library_v2.py`, `prepare_mapping_v2.py`) instead of hand-writing YAML.
 
 ## Frontend Patterns
-- App Router is locale-aware via [src/frontend/app/[locale]/layout.tsx](src/frontend/app/%5Blocale%5D/layout.tsx); every page receives locale and sets dir rtl/ltr, so new routes belong under [src/frontend/app/[locale]](src/frontend/app/%5Blocale%5D).
-- UI strings come from [src/frontend/messages/en.json](src/frontend/messages/en.json) and [src/frontend/messages/ar.json](src/frontend/messages/ar.json); fetch translations with next-intl hooks instead of hardcoding.
-- API access is centralised in [src/frontend/lib/api-client.ts](src/frontend/lib/api-client.ts) using axios with interceptors and NEXT_PUBLIC_API_URL; when adding data hooks use the shared client or SWR fetcher like [src/frontend/app/[locale]/controls/page.tsx](src/frontend/app/%5Blocale%5D/controls/page.tsx).
+- Routes live in [frontend/src/routes](frontend/src/routes): authenticated pages under `(app)/(internal)`, auditee views under `(app)/(third-party)`, auth flows under `(authentication)`. Most CRUD pages are generic via `[model=urlmodel]`, driven by `URL_MODEL_MAP` in [frontend/src/lib/utils/crud.ts](frontend/src/lib/utils/crud.ts) and zod schemas in `SCHEMA_MAP` in [frontend/src/lib/utils/schemas.ts](frontend/src/lib/utils/schemas.ts) — adding a model usually means updating both plus the form components in [frontend/src/lib/components/Forms](frontend/src/lib/components/Forms).
+- Backend calls are made server-side (`+page.server.ts`, `+server.ts`, [frontend/src/lib/utils/load.ts](frontend/src/lib/utils/load.ts)) against `BASE_API_URL` from [frontend/src/lib/utils/constants.ts](frontend/src/lib/utils/constants.ts) (`PUBLIC_BACKEND_API_URL`); forms use sveltekit-superforms with the zod schemas.
+- UI strings are paraglide messages: add keys to [frontend/messages/en.json](frontend/messages/en.json) and [frontend/messages/ar.json](frontend/messages/ar.json) (other locales optional) and use `import { m } from '$paraglide/messages'` / `m.key()`; never hardcode text. Use [tools/check_missing_i18n_keys.py](tools/check_missing_i18n_keys.py) to find gaps.
+- RTL is set in [frontend/src/hooks.server.ts](frontend/src/hooks.server.ts) (`ar`, `he`, `fa`, `ur` → `dir="rtl"` injected into [frontend/src/app.html](frontend/src/app.html)); prefer logical Tailwind utilities (`ms-`/`me-`, `ps-`/`pe-`, `start`/`end`) so layouts mirror correctly in Arabic.
 
-## Workflows & Tooling
-- Make targets orchestrate common tasks: make install installs backend/frontend/AI deps, make docker-up starts the stack defined in [deployment/docker-compose.yml](deployment/docker-compose.yml), make test runs pytest then frontend npm tests.
-- Backend tests under [tests/backend](tests/backend) rely on httpx.AsyncClient against the FastAPI app; ensure new routes expose predictable bilingual JSON to satisfy assertions.
-- Seed data and utilities reside in [scripts](scripts); for example [scripts/load_sample_data.py](scripts/load_sample_data.py) populates baseline controls, so keep schema changes compatible.
-- Security automation commands live in the Makefile (make security, make security-deps, make security-sast); align new tooling with the existing targets.
+## Workflows & Testing
+- Backend: from [backend](backend) run `poetry install`, `poetry run python manage.py migrate`, `poetry run python manage.py runserver`; tests with `poetry run pytest` (config in [backend/pytest.ini](backend/pytest.ini)). API tests in [backend/app_tests/api](backend/app_tests/api) use DRF `APIClient` with helpers from [test_utils.py](backend/app_tests/api/test_utils.py); unit tests sit beside apps (e.g. [backend/core/tests](backend/core/tests)).
+- Frontend: from [frontend](frontend) run `pnpm install`, `pnpm run dev`, `pnpm run check`, `pnpm run lint`, `pnpm test` (vitest, e.g. [RiskMatrix/utils.test.ts](frontend/src/lib/components/RiskMatrix/utils.test.ts)); Playwright e2e lives in [frontend/tests/functional](frontend/tests/functional).
+- Formatting: ruff-format for backend and prettier for frontend via [.pre-commit-config.yaml](.pre-commit-config.yaml).
+- Root-level `fill_ar_*.py`, `translate_ar*.py` and `check_*.py` are ad-hoc Arabic translation/inspection scripts; database dumps (`*.dump`, `*.csv`) at the root are data snapshots — do not modify or depend on them in application code.
