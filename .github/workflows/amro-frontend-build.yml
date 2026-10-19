@@ -1,9 +1,10 @@
-﻿name: Build Amro Frontend
+name: Build Amro Frontend
 
 on:
   push:
     branches:
       - test/amro-cloud-build
+      - feature/sico-ai-audit-risk-v1
 
 jobs:
   build:

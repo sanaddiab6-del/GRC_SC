@@ -1,0 +1,247 @@
+<script lang="ts">
+	import type { ActionData } from './$types';
+
+	let { form }: { form: ActionData | null } = $props();
+	let showTechnical = $state(false);
+	const draft = $derived((form && 'draft' in form ? form.draft : null) as any);
+	const error = $derived(form && 'error' in form ? form.error : null);
+	const provider = $derived(draft?.source_summary?.provider_mode || 'not verified');
+
+	const sections = [
+		{
+			name: 'Case initiation',
+			items: [
+				{ title: 'Frameworks & libraries', href: '/frameworks', detail: 'Verify loaded regulatory frameworks' },
+				{ title: 'Domains & organization', href: '/folders', detail: 'Use the existing organizational domain' },
+				{ title: 'Perimeters & scope', href: '/perimeters', detail: 'Define included systems and boundaries' },
+				{ title: 'Compliance assessments', href: '/compliance-assessments', detail: 'Create an assessment after setup approval' }
+			]
+		},
+		{
+			name: 'Assets & security posture',
+			items: [
+				{ title: 'Assets', href: '/assets', detail: 'Inventory in-scope information assets' },
+				{ title: 'Applied controls', href: '/applied-controls', detail: 'Existing safeguards and planned controls' },
+				{ title: 'Vulnerabilities', href: '/vulnerabilities', detail: 'Document verified weaknesses' },
+				{ title: 'Policies', href: '/policies', detail: 'Review governing policies' }
+			]
+		},
+		{
+			name: 'Assessment & assurance',
+			items: [
+				{ title: 'Risk assessments', href: '/risk-assessments', detail: 'Risk matrix and assessment scope' },
+				{ title: 'Risk scenarios', href: '/risk-scenarios', detail: 'Threats, controls, inherent/current/residual risk' },
+				{ title: 'Evidences', href: '/evidences', detail: 'Actual supporting documents and revisions' },
+				{ title: 'Findings & follow-up', href: '/findings-assessments', detail: 'Review findings, remediation and approvals' }
+			]
+		},
+		{
+			name: 'Extended GRC capabilities',
+			items: [
+				{ title: 'Third-party risk', href: '/entity-assessments', detail: 'Supplier and entity assessments' },
+				{ title: 'Business impact analysis', href: '/business-impact-analysis', detail: 'Critical services and business impacts' },
+				{ title: 'Incidents', href: '/incidents', detail: 'Incident lifecycle and controls' },
+				{ title: 'Reports', href: '/reports', detail: 'Audit and executive deliverables' }
+			]
+		}
+	];
+</script>
+
+<svelte:head>
+	<title>SICO AI Workspace — GRC Consultant</title>
+	<meta name="description" content="SICO AI GRC assignment workspace: framework, organization, scope, assessment and full-platform capability navigation." />
+</svelte:head>
+
+<div class="mx-auto max-w-7xl space-y-6 p-4 text-surface-950 md:p-8">
+	<header class="rounded-2xl bg-slate-900 p-6 text-white shadow-lg md:p-8">
+		<div class="mb-3 flex flex-wrap items-center gap-2 text-xs font-semibold tracking-wide text-teal-200">
+			<span class="rounded-full border border-teal-400/40 bg-teal-500/20 px-3 py-1">SICO AI WORKSPACE</span>
+			<span class="rounded-full border border-white/20 px-3 py-1">Implementation V1 · Read-only</span>
+		</div>
+		<h1 class="text-3xl font-bold md:text-4xl">Your AI GRC Consultant & Analyst</h1>
+		<p class="mt-3 max-w-3xl text-sm leading-relaxed text-slate-200">
+			Start with a real assignment. SICO will prepare the proposed framework, organizational domain,
+			assessment scope and setup for your review. All existing GRC functions remain available below.
+		</p>
+	</header>
+
+	<section class="grid gap-3 md:grid-cols-4" aria-label="New case preparation sequence">
+		{#each [
+			{ num: '01', label: 'Framework selection', description: 'Confirm the correct standard' },
+			{ num: '02', label: 'Organization / domain', description: 'Reuse or propose a domain' },
+			{ num: '03', label: 'Perimeter / scope', description: 'Define assessment boundaries' },
+			{ num: '04', label: 'Assessment setup', description: 'Create only after approval' }
+		] as step}
+			<div class="rounded-xl border border-surface-300 bg-surface-50 p-4 shadow-sm">
+				<div class="text-sm font-bold text-teal-700">{step.num}</div>
+				<div class="mt-2 font-semibold">{step.label}</div>
+				<div class="mt-1 text-xs text-surface-600">{step.description}</div>
+			</div>
+		{/each}
+	</section>
+
+	<div class="grid items-start gap-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)]">
+		<section class="rounded-xl border border-surface-300 bg-surface-50 p-5 shadow-sm md:p-6">
+			<h2 class="text-xl font-bold">Start a GRC assignment</h2>
+			<p class="mt-1 text-sm text-surface-600">This action calls the existing authenticated AI Case Intake service. It does not write any GRC records.</p>
+
+			<form method="POST" action="?/intake" class="mt-5 space-y-4">
+				<label class="block space-y-1 text-sm font-semibold">
+					<span>Describe the assignment</span>
+					<textarea name="scenario_text" rows="5" required minlength="20" maxlength="12000"
+						class="textarea w-full" placeholder="Describe the organization, assessment objective, systems, issues and deadline...">Al-Rawasi Fintech is preparing for its Q4 2026 NCA ECC-1:2018 cybersecurity compliance assessment. Assess user access management for the core banking platform. Previous reviews found missing access reviews, no MFA on remote access, and weak privileged access management.</textarea>
+				</label>
+				<div class="grid gap-4 md:grid-cols-2">
+					<label class="block space-y-1 text-sm font-semibold">
+						<span>Preferred framework</span>
+						<input name="preferred_framework" class="input w-full" value="NCA ECC-1:2018" />
+					</label>
+					<label class="block space-y-1 text-sm font-semibold">
+						<span>Organization</span>
+						<input name="organization_hint" class="input w-full" value="Al-Rawasi Fintech" />
+					</label>
+				</div>
+				<label class="block space-y-1 text-sm font-semibold">
+					<span>Scope / systems under assessment</span>
+					<input name="scope_hint" class="input w-full" value="Core banking platform — user access management" />
+				</label>
+				<div class="grid gap-4 md:grid-cols-2">
+					<label class="block space-y-1 text-sm font-semibold">
+						<span>Assessment period</span>
+						<input name="assessment_period" class="input w-full" value="Q4 2026" />
+					</label>
+					<label class="block space-y-1 text-sm font-semibold">
+						<span>Known deadline (optional)</span>
+						<input name="known_deadline" type="date" class="input w-full" />
+					</label>
+				</div>
+				<label class="block space-y-1 text-sm font-semibold">
+					<span>Known trigger (optional)</span>
+					<input name="known_trigger" class="input w-full" value="Annual regulatory assessment; previous access review gaps" />
+				</label>
+				<button type="submit" class="btn preset-filled-primary-500 w-full font-semibold">
+					Generate real AI case intake proposal
+				</button>
+				<p class="text-xs text-surface-600">The model may take a minute on a cold start. This is a draft, not an audit conclusion or compliance determination.</p>
+			</form>
+		</section>
+
+		<aside class="rounded-xl border border-surface-300 bg-surface-50 p-5 shadow-sm md:p-6">
+			<h2 class="text-lg font-bold">Full GRC work programme</h2>
+			<p class="mt-2 text-sm text-surface-600">The workspace begins with case foundations. Subsequent specialist work is part of the same overall programme—not limited to a short onboarding wizard.</p>
+			<ol class="mt-4 space-y-2 text-sm">
+				{#each [
+					'Framework, business context and scope',
+					'Domain, perimeter and assessment setup',
+					'Assets, existing controls and vulnerabilities',
+					'Risk scenarios and inherent risk',
+					'Existing controls, current and residual risks',
+					'Control-by-control evidence assessment',
+					'Findings, nonconformities and remediation',
+					'Independent review and audit support',
+					'Risk treatment, approvals and closure',
+					'Third parties, privacy, resilience and reporting'
+				] as label, i}
+					<li class="flex items-start gap-3"><span class="rounded bg-teal-100 px-2 py-0.5 text-xs font-bold text-teal-900">{i + 1}</span> {label}</li>
+				{/each}
+			</ol>
+			<p class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+				Only the initial case-intake operation is connected in this screen. Later activities are not claimed as automated yet.
+			</p>
+		</aside>
+	</div>
+
+	{#if error}
+		<section role="alert" class="rounded-xl border border-red-300 bg-red-50 p-5 text-sm text-red-900">
+			<h2 class="font-bold">Case intake could not complete</h2>
+			<p class="mt-2">{error}</p>
+		</section>
+	{/if}
+
+	{#if draft}
+		<section class="space-y-4 rounded-xl border-2 border-teal-500 bg-surface-50 p-5 shadow-sm md:p-6">
+			<div class="flex flex-wrap items-center justify-between gap-3">
+				<div>
+					<h2 class="text-xl font-bold">Your case initiation proposal</h2>
+					<p class="text-sm text-surface-600">Review the proposed framework, domain and perimeter. Nothing has been created.</p>
+				</div>
+				<span class="rounded-full px-3 py-1 text-xs font-semibold {provider === 'configured_local_provider' ? 'bg-teal-100 text-teal-900' : 'bg-amber-100 text-amber-900'}">
+					Provider: {provider}
+				</span>
+			</div>
+			{#if provider !== 'configured_local_provider'}
+				<p class="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+					The provider did not report verified local model inference. Some or all of this proposal may come from deterministic fallback rules.
+				</p>
+			{/if}
+			<div class="grid gap-3 md:grid-cols-2">
+				{#each [
+					{label:'01 · Framework',value:draft.framework_resolution?.canonical_framework_name || draft.framework_resolution?.requested_framework_name,description:'Verify this exact framework is available in the platform',href:'/frameworks'},
+					{label:'02 · Organizational domain',value:draft.case_setup_draft?.folder_domain_draft?.name,description:'Check for an existing domain before creating a duplicate',href:'/folders'},
+					{label:'03 · Perimeter / scope',value:draft.case_setup_draft?.perimeter_draft?.name,description:draft.case_setup_draft?.perimeter_draft?.description || 'Confirm in-scope systems',href:'/perimeters'},
+					{label:'04 · Assessment',value:draft.case_setup_draft?.compliance_assessment_draft?.name,description:'Create only after framework and scope have been approved',href:'/compliance-assessments'}
+				] as item}
+					<div class="rounded-lg border border-surface-300 bg-surface-100 p-4">
+						<div class="text-xs font-bold uppercase tracking-wide text-teal-700">{item.label}</div>
+						<div class="mt-2 font-semibold">{item.value || 'Not resolved yet'}</div>
+						<div class="mt-2 text-xs text-surface-600">{item.description}</div>
+						<a class="mt-3 inline-block text-sm font-semibold text-teal-700 underline" href={item.href}>Review in the platform →</a>
+					</div>
+				{/each}
+			</div>
+			{#if draft.blocking_questions?.length}
+				<div class="rounded-lg border border-amber-300 bg-amber-50 p-4">
+					<h3 class="font-bold text-amber-900">Questions to resolve before creation</h3>
+					<ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-900">
+						{#each draft.blocking_questions as question}
+							<li>{question.question_text || question.question || 'Review the unresolved prerequisite.'}</li>
+						{/each}
+					</ul>
+				</div>
+			{/if}
+			{#if draft.warnings?.length}
+				<details class="rounded border border-surface-300 p-3">
+					<summary class="cursor-pointer font-semibold">AI warnings ({draft.warnings.length})</summary>
+					<ul class="mt-2 list-disc space-y-1 pl-5 text-sm">
+						{#each draft.warnings as warning}
+							<li>{warning.message || warning.code}</li>
+						{/each}
+					</ul>
+				</details>
+			{/if}
+			<div class="rounded border border-surface-300 p-4 text-sm">
+				<p class="font-semibold">Next: validate and approve the actual case setup</p>
+				<p class="mt-1 text-surface-600">Use <strong>Get Started → Local AI Case Onboarding</strong> to run the existing Step 2 dry-run and approval flow. This workspace does not bypass its permission checks or create records silently.</p>
+			</div>
+			<button class="btn preset-tonal-primary" type="button" onclick={() => (showTechnical = !showTechnical)}>
+				{showTechnical ? 'Hide' : 'Show'} structured proposal JSON
+			</button>
+			{#if showTechnical}
+				<pre class="max-h-96 overflow-auto rounded-lg bg-slate-900 p-4 text-xs text-slate-100">{JSON.stringify(draft, null, 2)}</pre>
+			{/if}
+		</section>
+	{/if}
+
+	<section class="space-y-3 rounded-xl border border-surface-300 bg-surface-50 p-5 shadow-sm md:p-6">
+		<div class="flex flex-wrap items-center justify-between gap-3">
+			<h2 class="text-xl font-bold">Existing GRC modules</h2>
+			<span class="text-xs text-surface-600">Links to your actual platform screens</span>
+		</div>
+		<p class="text-sm text-surface-600">Use existing functions rather than duplicating them. Every module needs its own AI capability and acceptance tests before we claim automation.</p>
+		<div class="grid gap-4 md:grid-cols-2">
+			{#each sections as section}
+				<div class="rounded-lg border border-surface-300 bg-surface-100 p-4">
+					<h3 class="font-bold">{section.name}</h3>
+					<div class="mt-3 divide-y divide-surface-300">
+						{#each section.items as item}
+							<a href={item.href} class="flex items-center justify-between gap-3 py-2 hover:text-teal-700">
+								<span><span class="block text-sm font-semibold">{item.title}</span><span class="text-xs text-surface-600">{item.detail}</span></span>
+								<span aria-hidden="true">↗</span>
+							</a>
+						{/each}
+					</div>
+				</div>
+			{/each}
+		</div>
+	</section>
+</div>

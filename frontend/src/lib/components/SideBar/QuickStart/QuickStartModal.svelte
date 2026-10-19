@@ -381,7 +381,12 @@
 				<i class="fa-solid fa-xmark"></i>
 			</div>
 		</div>
-		<div class="inline-flex overflow-hidden rounded-md border bg-white text-sm">
+		<div class="rounded-lg border border-teal-300 bg-teal-50 p-3 text-sm">
+    <div class="font-semibold text-teal-950">SICO AI Workspace</div>
+    <p class="mt-1 text-xs text-teal-900">Start with the framework, organization, perimeter and assessment scope before any record creation.</p>
+    <a href="/sico-ai" class="mt-2 inline-block rounded-md bg-teal-700 px-3 py-2 font-semibold text-white hover:bg-teal-800">Open SICO AI Workspace â†’</a>
+</div>
+<div class="inline-flex overflow-hidden rounded-md border bg-white text-sm">
 			<button
 				type="button"
 				class="px-3 py-2 {mode === 'manual' ? 'preset-filled-primary-500' : ''}"
