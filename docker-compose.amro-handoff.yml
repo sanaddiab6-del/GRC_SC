@@ -1,0 +1,119 @@
+services:
+  postgres:
+    container_name: amro-postgres
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      - POSTGRES_DB=ciso-assistant
+      - POSTGRES_USER=ciso-assistantuser
+      - POSTGRES_PASSWORD=${SICO_DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ciso-assistantuser -d ciso-assistant"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    container_name: amro-backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: grc-amro-backend:test
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - ALLOWED_HOSTS=backend,localhost
+      - CISO_ASSISTANT_URL=https://localhost:9443
+      - DJANGO_DEBUG=True
+      - AUTH_TOKEN_TTL=7200
+      - POSTGRES_NAME=ciso-assistant
+      - POSTGRES_USER=ciso-assistantuser
+      - POSTGRES_PASSWORD=${SICO_DB_PASSWORD}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+    volumes:
+      - ./amro_test_storage/db:/code/db
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://backend:8000/api/health/ || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 150s
+
+  huey:
+    container_name: amro-huey
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: grc-amro-huey:test
+    depends_on:
+      postgres:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    restart: always
+    environment:
+      - ALLOWED_HOSTS=backend,localhost
+      - CISO_ASSISTANT_URL=https://localhost:9443
+      - DJANGO_DEBUG=False
+      - AUTH_TOKEN_TTL=7200
+      - POSTGRES_NAME=ciso-assistant
+      - POSTGRES_USER=ciso-assistantuser
+      - POSTGRES_PASSWORD=${SICO_DB_PASSWORD}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+    volumes:
+      - ./amro_test_storage/db:/code/db
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        poetry run python manage.py run_huey -w 2 --scheduler-interval 60
+
+  frontend:
+    container_name: amro-frontend
+    environment:
+      - PUBLIC_BACKEND_API_URL=http://backend:8000/api
+      - PUBLIC_BACKEND_API_EXPOSED_URL=https://localhost:9443/api
+      - PROTOCOL_HEADER=x-forwarded-proto
+      - HOST_HEADER=x-forwarded-host
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: grc-amro-frontend:test
+    volumes:
+      - ./frontend/static/favicon.svg:/app/build/client/favicon.svg:ro
+      - ./frontend/static/favicon.ico:/app/build/client/favicon.ico:ro
+    restart: always
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  caddy:
+    container_name: amro-caddy
+    image: caddy:2.10.0
+    environment:
+      - CISO_ASSISTANT_URL=https://localhost:9443
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9443:9443"
+    volumes:
+      - ./amro_test_storage/caddy_data:/data
+    command: |
+      sh -c 'echo $$CISO_ASSISTANT_URL "{
+      @en path_regexp en ^/en(/.*)?$$
+      redir @en {re.en.1} 302
+      reverse_proxy /api/* backend:8000
+      reverse_proxy /* frontend:3000
+      tls internal
+      }" > Caddyfile && caddy run'
+
+volumes:
+  postgres_data:
