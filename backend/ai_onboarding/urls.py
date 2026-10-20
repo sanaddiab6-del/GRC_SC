@@ -26,6 +26,10 @@ from .views import (
 )
 
 
+from .audit_risk_preview_views import AiAssessmentAuditPreviewView, AiRiskMatrixPreviewView
+
+from .workforce_discovery_views import AiWorkforceDiscoveryView
+
 urlpatterns = [
     path("onboarding/case-intake/", AiCaseIntakeView.as_view(), name="ai-case-intake"),
     path("onboarding/case-setup/", AiCaseSetupView.as_view(), name="ai-case-setup"),
@@ -122,3 +126,14 @@ urlpatterns = [
         name="ai-final-review-commit",
     ),
 ]
+# SICO AI Workforce V1: read-only auditing and existing-matrix risk scoring.
+urlpatterns += [
+    path("workforce/audit-preview/", AiAssessmentAuditPreviewView.as_view(), name="sico-ai-audit-preview"),
+    path("workforce/risk-score-preview/", AiRiskMatrixPreviewView.as_view(), name="sico-ai-risk-score-preview"),
+]
+# SICO AI Workforce: strictly read-only grounded database discovery.
+urlpatterns += [path('workforce/discover/', AiWorkforceDiscoveryView.as_view(), name='sico-ai-workforce-discover')]
+
+# SICO AI workforce V3: authenticated preflight ONLY; no create actions.
+from .workforce_case_plan_views import AiWorkforceNewCasePlanView
+urlpatterns += [path('workforce/new-case-plan/', AiWorkforceNewCasePlanView.as_view(), name='sico-ai-workforce-new-case-plan')]
