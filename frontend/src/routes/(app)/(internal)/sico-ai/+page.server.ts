@@ -27,6 +27,30 @@ function errorDetail(value: unknown): string {
 }
 
 export const actions: Actions = {
+	discover: async (event) => {
+		if (!hasAiOnboardingSession(event)) {
+			return fail(401, { error: errorDetail(AI_ONBOARDING_SESSION_EXPIRED) });
+		}
+		const data = await event.request.formData();
+		const organization = field(data, 'organization_hint');
+		const frameworkHint = field(data, 'preferred_framework');
+		const selectedFolderId = field(data, 'selected_folder_id', 36);
+		if (organization.length < 3) {
+			return fail(400, { error: 'Please enter the organization name (at least 3 characters).' });
+		}
+		try {
+			const response = await fetchAiOnboardingBackend(event, '/ai/workforce/discover/', {
+				organization,
+				framework_hint: frameworkHint,
+				...(selectedFolderId ? { selected_folder_id: selectedFolderId } : {})
+			});
+			const result = await response.json().catch(() => ({ detail: 'Invalid backend response.' }));
+			if (!response.ok) return fail(response.status, { error: errorDetail(result) });
+			return { discovery: result, message: 'Real platform records checked. No changes made.' };
+		} catch (error) {
+			return fail(502, { error: errorDetail(error) });
+		}
+	},
 	intake: async (event) => {
 		if (!hasAiOnboardingSession(event)) {
 			return fail(401, { error: errorDetail(AI_ONBOARDING_SESSION_EXPIRED) });

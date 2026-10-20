@@ -3,6 +3,7 @@
 
 	let { form }: { form: ActionData | null } = $props();
 	let showTechnical = $state(false);
+	const discovery = $derived((form && 'discovery' in form ? form.discovery : null) as any);
 	const draft = $derived((form && 'draft' in form ? form.draft : null) as any);
 	const error = $derived(form && 'error' in form ? form.error : null);
 	const provider = $derived(draft?.source_summary?.provider_mode || 'not verified');
@@ -119,9 +120,15 @@
 					<span>Known trigger (optional)</span>
 					<input name="known_trigger" class="input w-full" value="Annual regulatory assessment; previous access review gaps" />
 				</label>
-				<button type="submit" class="btn preset-filled-primary-500 w-full font-semibold">
-					Generate real AI case intake proposal
-				</button>
+				<div class="space-y-2">
+					<button type="submit" formaction="?/discover" class="btn preset-filled-primary-500 w-full font-semibold">
+						Investigate real GRC records (no AI model required)
+					</button>
+					<p class="text-xs text-surface-600">Looks up permitted existing frameworks, organizational folders, assets, policies, controls and assessments in the live database. Makes no changes.</p>
+					<button type="submit" formaction="?/intake" class="btn preset-tonal-primary w-full font-semibold">
+						Generate advisory case intake proposal
+					</button>
+				</div>
 				<p class="text-xs text-surface-600">The model may take a minute on a cold start. This is a draft, not an audit conclusion or compliance determination.</p>
 			</form>
 		</section>
@@ -155,6 +162,100 @@
 		<section role="alert" class="rounded-xl border border-red-300 bg-red-50 p-5 text-sm text-red-900">
 			<h2 class="font-bold">Case intake could not complete</h2>
 			<p class="mt-2">{error}</p>
+		</section>
+	{/if}
+
+	{#if discovery}
+		<section class="space-y-4 rounded-xl border-2 border-teal-500 bg-surface-50 p-5 shadow-sm md:p-6" aria-live="polite">
+			<div>
+				<h2 class="text-xl font-bold">Live GRC record investigation</h2>
+				<p class="mt-1 text-sm text-surface-600">Results are from your actual database, filtered by your account's read permissions. This check used no AI model, did not read documents, and made no changes.</p>
+			</div>
+			<div class="grid gap-3 md:grid-cols-2">
+				<div class="rounded-lg border border-surface-300 bg-surface-100 p-4">
+					<h3 class="font-bold">Existing organization / domain</h3>
+					<p class="mt-2 text-sm">Status: <strong>{discovery.domain_status}</strong></p>
+					{#if discovery.selected_domain}
+						<p class="mt-2 text-sm">Selected from platform: <strong>{discovery.selected_domain.name}</strong></p>
+					{:else}
+						<p class="mt-2 text-sm">No unambiguous exact domain was selected. A new one should not be created until candidates are reviewed.</p>
+					{/if}
+					{#each discovery.domain_candidates || [] as item}
+						<p class="mt-2 text-sm">{item.name} — {item.match} match</p>
+					{/each}
+				</div>
+				<div class="rounded-lg border border-surface-300 bg-surface-100 p-4">
+					<h3 class="font-bold">Real framework candidates</h3>
+					{#if !discovery.framework_candidates?.length}
+						<p class="mt-2 text-sm">No readable candidate was found using this framework hint. That does not prove the framework is absent.</p>
+					{:else}
+						{#each discovery.framework_candidates as item}
+							<div class="mt-2 border-b border-surface-300 pb-2 text-sm">
+								<strong>{item.name}</strong> {#if item.reference}({item.reference}){/if}
+								<div class="text-xs text-surface-600">Assessable requirements: {item.assessable_requirements} · Exact name match: {item.match === 'exact' ? 'yes' : 'not verified'}</div>
+							</div>
+						{/each}
+					{/if}
+				</div>
+			</div>
+			{#if !discovery.selected_domain && discovery.domain_candidates?.length}
+				<div class="rounded-lg border border-amber-300 bg-amber-50 p-4">
+					<h3 class="font-bold text-amber-900">Select a matching organizational domain to inspect its records</h3>
+					<p class="mt-1 text-sm text-amber-900">Only domains your account can read are listed. Selection is read-only and is not approval to create anything.</p>
+					{#each discovery.domain_candidates as item}
+						<form method="POST" action="?/discover" class="mt-2 flex items-center justify-between gap-4 rounded border border-amber-200 p-2">
+							<input type="hidden" name="organization_hint" value={discovery.organization_requested} />
+							<input type="hidden" name="preferred_framework" value={discovery.framework_requested} />
+							<input type="hidden" name="selected_folder_id" value={item.id} />
+							<span class="text-sm">{item.name} ({item.match})</span>
+							<button class="btn preset-tonal-primary" type="submit">Inspect</button>
+						</form>
+					{/each}
+				</div>
+			{/if}
+			{#if discovery.selected_domain}
+				<div>
+					<h3 class="font-bold">Records in the selected domain (not child domains)</h3>
+					<div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+						{#each [
+							{label:'Perimeters / scopes',key:'perimeters',href:'/perimeters'},
+							{label:'Assets',key:'assets',href:'/assets'},
+							{label:'Applied controls',key:'applied_controls',href:'/applied-controls'},
+							{label:'Policies',key:'policies',href:'/policies'},
+							{label:'Vulnerabilities',key:'vulnerabilities',href:'/vulnerabilities'},
+							{label:'Evidences',key:'evidences',href:'/evidences'},
+							{label:'Risk assessments',key:'risk_assessments',href:'/risk-assessments'},
+							{label:'Compliance assessments',key:'compliance_assessments',href:'/compliance-assessments'}
+						] as category}
+							<div class="rounded-lg border border-surface-300 bg-surface-100 p-3">
+								<div class="flex items-center justify-between gap-3"><strong>{category.label}</strong><a href={category.href} class="text-sm text-teal-700 underline">Open</a></div>
+							<p class="mt-1 text-xs text-surface-600">Up to {discovery.records_by_category?.[category.key]?.length || 0} visible matches shown</p>
+							{#each discovery.records_by_category?.[category.key] || [] as record}
+								<p class="mt-1 text-sm">{record.name}</p>
+							{/each}
+						</div>
+						{/each}
+					</div>
+				</div>
+			{/if}
+			{#if discovery.next_checks?.length}
+				<div class="rounded-lg border border-surface-300 bg-surface-100 p-4">
+					<h3 class="font-bold">Recommended next investigation checks</h3>
+					<p class="mt-1 text-xs text-surface-600">These checks come from identified database facts and gaps. They are not AI compliance findings.</p>
+					<ul class="mt-2 list-disc space-y-2 pl-5 text-sm">
+						{#each discovery.next_checks as check}
+							<li><strong>{check.topic}:</strong> {check.message}</li>
+						{/each}
+					</ul>
+				</div>
+			{/if}
+			{#if discovery.warnings?.length}
+				<div class="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+					<strong>Items to review</strong>
+					<ul class="mt-2 list-disc pl-5">{#each discovery.warnings as warning}<li>{warning}</li>{/each}</ul>
+				</div>
+			{/if}
+			<p class="text-xs text-surface-600">This is a source-backed starting inventory, not a completed audit. It does not verify evidence or determine compliance. It cannot conclude that records are absent outside the readable, scanned domain.</p>
 		</section>
 	{/if}
 
