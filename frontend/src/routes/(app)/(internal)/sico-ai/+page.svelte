@@ -4,6 +4,7 @@
 	let { form }: { form: ActionData | null } = $props();
 	let showTechnical = $state(false);
 	const discovery = $derived((form && 'discovery' in form ? form.discovery : null) as any);
+	const casePlan = $derived((form && 'case_plan' in form ? form.case_plan : null) as any);
 	const draft = $derived((form && 'draft' in form ? form.draft : null) as any);
 	const error = $derived(form && 'error' in form ? form.error : null);
 	const provider = $derived(draft?.source_summary?.provider_mode || 'not verified');
@@ -57,7 +58,7 @@
 	<header class="rounded-2xl bg-slate-900 p-6 text-white shadow-lg md:p-8">
 		<div class="mb-3 flex flex-wrap items-center gap-2 text-xs font-semibold tracking-wide text-teal-200">
 			<span class="rounded-full border border-teal-400/40 bg-teal-500/20 px-3 py-1">SICO AI WORKSPACE</span>
-			<span class="rounded-full border border-white/20 px-3 py-1">Implementation V1 · Read-only</span>
+			<span class="rounded-full border border-white/20 px-3 py-1">Implementation V3 · Case preflight · No writes</span>
 		</div>
 		<h1 class="text-3xl font-bold md:text-4xl">Your AI GRC Consultant & Analyst</h1>
 		<p class="mt-3 max-w-3xl text-sm leading-relaxed text-slate-200">
@@ -153,7 +154,7 @@
 				{/each}
 			</ol>
 			<p class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-				Only the initial case-intake operation is connected in this screen. Later activities are not claimed as automated yet.
+				Case intake, real-record investigation and new-case preflight are connected. Record creation, evidence audits, and risk automation are not connected here yet.
 			</p>
 		</aside>
 	</div>
@@ -258,6 +259,112 @@
 			<p class="text-xs text-surface-600">This is a source-backed starting inventory, not a completed audit. It does not verify evidence or determine compliance. It cannot conclude that records are absent outside the readable, scanned domain.</p>
 		</section>
 	{/if}
+
+{#if discovery}
+    <section class="space-y-4 rounded-xl border border-surface-300 bg-surface-50 p-5 shadow-sm md:p-6" aria-label="Prepare new case from discovered records">
+        <div>
+            <h2 class="text-xl font-bold">Prepare a new GRC case using real records</h2>
+            <p class="mt-1 text-sm text-surface-600">Step 3: choose the exact framework, then tell SICO whether to create a new organizational domain or reuse an existing one. This performs a permission and duplicate preflight, not record creation.</p>
+        </div>
+        {#if discovery.framework_candidates?.length}
+            {#if discovery.new_domain_parent_options?.length}
+                <form method="POST" action="?/casePlan" class="space-y-3 rounded-lg border border-surface-300 p-4">
+                    <h3 class="font-semibold">Option A — Start a completely new company/domain case</h3>
+                    <input type="hidden" name="organization_hint" value={discovery.organization_requested} />
+                    <input type="hidden" name="preferred_framework" value={discovery.framework_requested} />
+                    <input type="hidden" name="domain_strategy" value="create" />
+                    <label class="block space-y-1 text-sm font-semibold"><span>Exact framework from the database</span>
+                        <select name="framework_id" class="select w-full" required>
+                            <option value="" disabled selected>Choose the correct regulation and edition</option>
+                            {#each discovery.framework_candidates as candidate}
+                                <option value={candidate.id}>{candidate.name} ({candidate.assessable_requirements} assessable requirements)</option>
+                            {/each}
+                        </select>
+                    </label>
+                    <label class="block space-y-1 text-sm font-semibold"><span>Parent organizational folder</span>
+                        <select name="parent_folder_id" class="select w-full" required>
+                            <option value="" disabled selected>Choose the allowed parent</option>
+                            {#each discovery.new_domain_parent_options as parent}
+                                <option value={parent.id}>{parent.name}</option>
+                            {/each}
+                        </select>
+                    </label>
+                    <label class="block space-y-1 text-sm font-semibold"><span>Assessment scope / system</span>
+                        <input name="scope_hint" class="input w-full" required minlength="5" maxlength="500" value={discovery.case_context?.scope || ''} placeholder="e.g. Core banking platform — access management" />
+                    </label>
+                    <label class="flex items-start gap-2 text-sm"><input type="checkbox" name="framework_review_confirmed" class="checkbox mt-1" />
+                        <span>I have reviewed the selected framework's applicability and edition. This is my confirmation, not an AI verification.</span>
+                    </label>
+                    <button type="submit" class="btn preset-filled-primary-500 w-full">Prepare new-case plan and check blockers (no writes)</button>
+                </form>
+            {:else}
+                <p class="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">No permitted top-level parent folder is available for new-domain creation. Ask an administrator to check domain-creation permissions; SICO will not bypass them.</p>
+            {/if}
+            {#if discovery.domain_candidates?.length}
+                <form method="POST" action="?/casePlan" class="space-y-3 rounded-lg border border-surface-300 p-4">
+                    <h3 class="font-semibold">Option B — Start a new assessment in an existing organizational domain</h3>
+                    <input type="hidden" name="organization_hint" value={discovery.organization_requested} />
+                    <input type="hidden" name="preferred_framework" value={discovery.framework_requested} />
+                    <input type="hidden" name="domain_strategy" value="reuse" />
+                    <label class="block space-y-1 text-sm font-semibold"><span>Exact framework</span>
+                        <select name="framework_id" class="select w-full" required>
+                            <option value="" disabled selected>Choose a framework</option>
+                            {#each discovery.framework_candidates as candidate}
+                                <option value={candidate.id}>{candidate.name} ({candidate.assessable_requirements} requirements)</option>
+                            {/each}
+                        </select>
+                    </label>
+                    <label class="block space-y-1 text-sm font-semibold"><span>Existing domain to reuse</span>
+                        <select name="selected_folder_id" class="select w-full" required>
+                            <option value="" disabled selected>Choose the existing domain</option>
+                            {#each discovery.domain_candidates as domain}
+                                <option value={domain.id}>{domain.name} ({domain.match} match)</option>
+                            {/each}
+                        </select>
+                    </label>
+                    <label class="block space-y-1 text-sm font-semibold"><span>Assessment scope / system</span>
+                        <input name="scope_hint" class="input w-full" required minlength="5" maxlength="500" value={discovery.case_context?.scope || ''} />
+                    </label>
+                    <label class="flex items-start gap-2 text-sm"><input type="checkbox" name="framework_review_confirmed" class="checkbox mt-1" />
+                        <span>I reviewed the framework applicability and edition.</span>
+                    </label>
+                    <button type="submit" class="btn preset-tonal-primary w-full">Prepare plan using this domain (no writes)</button>
+                </form>
+            {/if}
+        {:else}
+            <p class="text-sm text-surface-600">First resolve a readable framework in the investigation above, then return here.</p>
+        {/if}
+    </section>
+{/if}
+
+{#if casePlan}
+    <section class="space-y-4 rounded-xl border-2 border-teal-500 bg-surface-50 p-5 shadow-sm md:p-6" aria-live="polite">
+        <h2 class="text-xl font-bold">New GRC case — real preflight results</h2>
+        <p class="text-sm">Status: <strong>{casePlan.status === 'blocked' ? 'Blocked: review the issues below' : 'Ready for human review and protected case-setup dry-run'}</strong></p>
+        <p class="text-xs text-surface-600">Checked framework: {casePlan.framework?.name}, {casePlan.framework?.assessable_requirements} assessable requirements. Framework edition and regulatory applicability are NOT independently verified.</p>
+        <div class="space-y-2">
+            {#each casePlan.planned_actions || [] as action, index}
+                <div class="flex gap-3 rounded-lg border border-surface-300 bg-surface-100 p-3 text-sm">
+                    <strong>{index + 1}.</strong>
+                    <span><strong>{action.entity} — {action.operation}:</strong> {action.name}<span class="block text-xs text-surface-600">{action.status}</span></span>
+                </div>
+            {/each}
+        </div>
+        {#if casePlan.blocking_checks?.length}
+            <div class="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+                <strong>Problems to resolve</strong>
+                <ul class="mt-2 list-disc space-y-1 pl-5">{#each casePlan.blocking_checks as blocker}<li>{blocker.message}</li>{/each}</ul>
+            </div>
+        {/if}
+        {#if casePlan.limitations?.length}
+            <details class="rounded-lg border border-surface-300 p-4 text-sm">
+                <summary class="cursor-pointer font-semibold">What this preflight cannot guarantee</summary>
+                <ul class="mt-2 list-disc space-y-1 pl-5">{#each casePlan.limitations as limitation}<li>{limitation}</li>{/each}</ul>
+            </details>
+        {/if}
+        <p class="rounded-lg border border-surface-300 p-4 text-sm">No records were created. After reviewing this plan, a separate existing <strong>Get Started → Local AI Case Onboarding → Step 2 dry-run</strong> must validate the final creation payload. Do not approve or create until the dry-run and permissions pass.</p>
+    </section>
+{/if}
 
 	{#if draft}
 		<section class="space-y-4 rounded-xl border-2 border-teal-500 bg-surface-50 p-5 shadow-sm md:p-6">

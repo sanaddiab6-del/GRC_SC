@@ -27,6 +27,41 @@ function errorDetail(value: unknown): string {
 }
 
 export const actions: Actions = {
+casePlan: async (event) => {
+    if (!hasAiOnboardingSession(event)) {
+        return fail(401, { error: errorDetail(AI_ONBOARDING_SESSION_EXPIRED) });
+    }
+    const data = await event.request.formData();
+    const organization = field(data, 'organization_hint', 150);
+    const frameworkHint = field(data, 'preferred_framework', 150);
+    const scope = field(data, 'scope_hint', 500);
+    const frameworkId = field(data, 'framework_id', 36);
+    const strategy = field(data, 'domain_strategy', 10);
+    const existingFolder = field(data, 'selected_folder_id', 36);
+    const parentFolder = field(data, 'parent_folder_id', 36);
+    if (!organization || !scope || !frameworkId || !['create', 'reuse'].includes(strategy)) {
+        return fail(400, { error: 'Choose the organization, exact framework, scope, and domain decision.' });
+    }
+    try {
+        // Refresh the read-only snapshot; never trust a browser-submitted discovery result.
+        const discoveryResponse = await fetchAiOnboardingBackend(event, '/ai/workforce/discover/', {
+            organization, framework_hint: frameworkHint,
+            ...(strategy === 'reuse' && existingFolder ? { selected_folder_id: existingFolder } : {})
+        });
+        const discovered = await discoveryResponse.json().catch(() => ({}));
+        if (!discoveryResponse.ok) return fail(discoveryResponse.status, { error: errorDetail(discovered) });
+        const response = await fetchAiOnboardingBackend(event, '/ai/workforce/new-case-plan/', {
+            organization, scope, framework_id: frameworkId, domain_strategy: strategy,
+            ...(strategy === 'reuse' ? {selected_folder_id: existingFolder} : {parent_folder_id: parentFolder}),
+            framework_review_confirmed: data.get('framework_review_confirmed') === 'on'
+        });
+        const planned = await response.json().catch(() => ({}));
+        if (!response.ok) return fail(response.status, { error: errorDetail(planned) });
+        return { case_plan: planned, discovery: { ...discovered, case_context: { scope } }, message: 'New-case plan checked against real records. No changes made.' };
+    } catch (error) {
+        return fail(502, { error: errorDetail(error) });
+    }
+},
 	discover: async (event) => {
 		if (!hasAiOnboardingSession(event)) {
 			return fail(401, { error: errorDetail(AI_ONBOARDING_SESSION_EXPIRED) });
@@ -46,7 +81,7 @@ export const actions: Actions = {
 			});
 			const result = await response.json().catch(() => ({ detail: 'Invalid backend response.' }));
 			if (!response.ok) return fail(response.status, { error: errorDetail(result) });
-			return { discovery: result, message: 'Real platform records checked. No changes made.' };
+			return { discovery: { ...result, case_context: { scope: field(data, 'scope_hint', 500) || 'Access management', period: field(data, 'assessment_period', 100) } }, message: 'Real platform records checked. No changes made.' };
 		} catch (error) {
 			return fail(502, { error: errorDetail(error) });
 		}
