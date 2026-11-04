@@ -11,9 +11,20 @@
     const riskDraft = $derived((form && 'risk_draft' in form ? form.risk_draft : null) as any);
     const riskDiscovery = $derived((form && 'risk_discovery' in form ? form.risk_discovery : null) as any);
     const riskReview = $derived((form && 'risk_review' in form ? form.risk_review : null) as any);
+    const riskFullContext = $derived((form && 'risk_full_context' in form ? form.risk_full_context : null) as any);
+    const fullRiskLists = [
+        { key: 'asset_references', cat: 'assets', label: 'Affected assets' },
+        { key: 'owner_references', cat: 'owners', label: 'Assigned to (authorized actor)' },
+        { key: 'existing_control_references', cat: 'existing_controls', label: 'Implemented existing controls' },
+        { key: 'extra_control_references', cat: 'extra_controls', label: 'Proposed additional controls' },
+        { key: 'antecedent_references', cat: 'antecedents', label: 'Antecedent risk scenarios' },
+        { key: 'qualification_references', cat: 'qualifications', label: 'Qualifications' },
+        { key: 'exception_references', cat: 'exceptions', label: 'Existing security exceptions' },
+        { key: 'label_references', cat: 'labels', label: 'Labels' }
+    ];
     const riskDryRun = $derived((form && 'risk_dry_run' in form ? form.risk_dry_run : null) as any);
     const riskResult = $derived((form && 'risk_result' in form ? form.risk_result : null) as any);
-    const riskCanSave = $derived(riskDryRun && (!riskDryRun.blocking_errors || riskDryRun.blocking_errors.length === 0)
+    const riskCanSave = $derived(riskReview?.full_reviewed === true && riskDryRun && (!riskDryRun.blocking_errors || riskDryRun.blocking_errors.length === 0)
         && riskDryRun.planned_actions?.some((a: any) => a.status === 'planned' && a.decision === 'create'));
 
 
@@ -488,6 +499,8 @@ Employees have not completed phishing awareness training</textarea>
                         <h4 class="font-bold">Scenario {index + 1}: {scenario.title}</h4>
                         <p class="text-xs text-surface-600">AI confidence (not a compliance score): {scenario.confidence} · Advisory risk level: {scenario.risk_level}</p>
                         <input type="hidden" name="temporary_id" value={scenario.temporary_id} />
+                        <input type="hidden" name="asset_title" value={scenario.asset_title || ''} />
+                        <input type="hidden" name="linked_applied_control_title" value={scenario.linked_applied_control_title || ''} />
                         <input type="hidden" name="confidence" value={scenario.confidence} />
                         {#if riskDiscovery?.selected_domain?.id && riskDiscovery.records_by_category?.risk_assessments?.length}
                             <p class="text-sm">Selected existing domain: <strong>{riskDiscovery.selected_domain.name}</strong></p>
@@ -552,12 +565,120 @@ Employees have not completed phishing awareness training</textarea>
             </div>
         {/if}
 
+        {#if riskReview && riskFullContext}
+            <section class="space-y-4 rounded-xl border-2 border-teal-300 bg-surface-50 p-4" aria-label="Full risk scenario field review">
+                <h3 class="text-lg font-bold">Complete risk form — actual GRC fields</h3>
+                <p class="text-sm">SICO AI loaded existing authorized records for <strong>{riskFullContext.folder?.name}</strong> / <strong>{riskFullContext.assessment?.name}</strong>. It does not create or invent assets, owners, controls or evidence. Select only applicable records and review matrix values.</p>
+                {#if riskFullContext.existing_risk}<p class="rounded bg-teal-50 p-2 text-sm">Existing risk found: <strong>{riskFullContext.existing_risk.label}</strong>. Nonempty manual values will not be overwritten.</p>{/if}
+                {#each riskFullContext.warnings || [] as warning}<p class="text-xs text-amber-900">{warning}</p>{/each}
+                <form method="POST" action="?/riskDryRun" class="space-y-4">
+                    <input type="hidden" name="full_review_ready" value="yes" />
+                    <input type="hidden" name="folder_reference" value={riskReview.folder_reference} />
+                    <input type="hidden" name="assessment_reference" value={riskReview.assessment_reference} />
+                    <input type="hidden" name="temporary_id" value={riskReview.scenario.temporary_id} />
+                    <input type="hidden" name="title" value={riskReview.scenario.title} />
+                    <input type="hidden" name="description" value={riskReview.scenario.description || ''} />
+                    <input type="hidden" name="asset_title" value={riskReview.scenario.asset_title || ''} />
+                    <input type="hidden" name="linked_applied_control_title" value={riskReview.scenario.linked_applied_control_title || ''} />
+                    <input type="hidden" name="threat" value={riskReview.scenario.threat || ''} />
+                    <input type="hidden" name="vulnerability" value={riskReview.scenario.vulnerability || ''} />
+                    <input type="hidden" name="impact_description" value={riskReview.scenario.impact_description || ''} />
+                    <input type="hidden" name="likelihood" value={riskReview.scenario.likelihood} />
+                    <input type="hidden" name="impact" value={riskReview.scenario.impact} />
+                    <input type="hidden" name="risk_level" value={riskReview.scenario.risk_level} />
+                    <input type="hidden" name="rationale" value={riskReview.scenario.rationale || ''} />
+                    <input type="hidden" name="recommended_next_steps" value={(riskReview.scenario.recommended_next_steps || []).join('\n')} />
+                    <input type="hidden" name="confidence" value={riskReview.scenario.confidence} />
+                    <div class="grid gap-3 md:grid-cols-2">
+                        {#each fullRiskLists as entry}
+                            <label class="block space-y-1 text-sm font-semibold">
+                                <span>{entry.label}</span>
+                                <select name={entry.key} class="select w-full" multiple size="3">
+                                    {#each riskFullContext.catalogs?.[entry.cat] || [] as option}
+                                        <option value={option.reference} selected={(riskReview.scenario.reviewed_fields?.[entry.key] || riskFullContext.suggestions?.[entry.key] || []).includes(option.reference)}>{option.label}</option>
+                                    {/each}
+                                </select>
+                                <span class="block text-xs font-normal text-surface-600">{riskFullContext.catalogs?.[entry.cat]?.length ? 'Choose only verified, applicable records. Ctrl+click to select multiple.' : 'No permitted records available; this field stays empty.'}</span>
+                            </label>
+                        {/each}
+                    </div>
+                    <div class="grid gap-3 md:grid-cols-3">
+                        <label class="space-y-1 text-sm font-semibold"><span>Risk origin</span>
+                            <select name="risk_origin_reference" class="select w-full">
+                                <option value="">Unknown / not established</option>
+                                {#each riskFullContext.catalogs?.risk_origins || [] as option}
+                                    <option value={option.reference} selected={riskReview.scenario.reviewed_fields?.risk_origin_reference === option.reference}>{option.label}</option>
+                                {/each}
+                            </select>
+                        </label>
+                        <label class="space-y-1 text-sm font-semibold"><span>Treatment decision</span>
+                            <select name="reviewed_treatment" class="select w-full">
+                                {#each ['open', 'mitigate', 'avoid', 'transfer'] as choice}<option value={choice} selected={(riskReview.scenario.reviewed_fields?.reviewed_treatment || 'open') === choice}>{choice}</option>{/each}
+                            </select>
+                            <span class="block text-xs font-normal text-surface-600">Risk acceptance requires a separate approval. Default is Open.</span>
+                        </label>
+                        <label class="space-y-1 text-sm font-semibold"><span>Strength of knowledge</span>
+                            <select name="strength_of_knowledge" class="select w-full">
+                                {#each [{v:-1,t:'Unknown'}, {v:0,t:'Low'}, {v:1,t:'Medium'}, {v:2,t:'High'}] as opt}
+                                    <option value={opt.v} selected={(riskReview.scenario.reviewed_fields?.strength_of_knowledge ?? -1) === opt.v}>{opt.t}</option>
+                                {/each}
+                            </select>
+                        </label>
+                    </div>
+                    <label class="block space-y-1 text-sm font-semibold"><span>EBIOS operational scenario (where available)</span>
+                        <select name="operational_scenario_reference" class="select w-full">
+                            <option value="">None / not linked</option>
+                            {#each riskFullContext.catalogs?.operational_scenarios || [] as option}
+                                <option value={option.reference} selected={riskReview.scenario.reviewed_fields?.operational_scenario_reference === option.reference}>{option.label}</option>
+                            {/each}
+                        </select>
+                    </label>
+                    <label class="block space-y-1 text-sm font-semibold"><span>Existing controls context (text; only if documented)</span>
+                        <textarea name="existing_controls" rows="2" maxlength="2000" class="textarea w-full" placeholder="Documented existing measures; not AI assumptions">{riskReview.scenario.reviewed_fields?.existing_controls || ''}</textarea>
+                    </label>
+                    <label class="block space-y-1 text-sm font-semibold"><span>Evidence-based justification</span>
+                        <textarea name="justification" rows="3" maxlength="2000" class="textarea w-full" placeholder="Reference the specific documented source for risk rating decisions">{riskReview.scenario.reviewed_fields?.justification || ''}</textarea>
+                    </label>
+                    <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-3">
+                        <h4 class="font-bold text-sm text-amber-950">Official risk matrix ratings — only where justified by evidence</h4>
+                        <p class="text-xs text-amber-900">The AI's advisory high/medium labels are not scores. Select ordinal values from the assessment's actual matrix only after examining the supporting evidence. Otherwise leave Unrated.</p>
+                        {#each ['inherent', 'current', 'residual'] as stage}
+                            <div class="grid grid-cols-2 gap-3">
+                                {#each [{suffix:'proba',label:'Probability'}, {suffix:'impact',label:'Impact'}] as dimension}
+                                    <label class="space-y-1 text-sm font-semibold"><span>{stage} — {dimension.label}</span>
+                                        <select name={`${stage}_${dimension.suffix}`} class="select w-full">
+                                            <option value="-1">Unrated / unknown</option>
+                                            {#each riskFullContext.matrix?.[dimension.suffix === 'proba' ? 'probability' : 'impact'] || [] as option}
+                                                <option value={option.value} selected={riskReview.scenario.reviewed_fields?.[`${stage}_${dimension.suffix}`] === option.value}>{option.label}</option>
+                                            {/each}
+                                        </select>
+                                    </label>
+                                {/each}
+                            </div>
+                        {/each}
+                        <label class="flex items-start gap-2 text-sm"><input name="reviewer_evidence_confirmed" type="checkbox" class="checkbox mt-1" checked={riskReview.scenario.reviewed_fields?.reviewer_evidence_confirmed === true} />
+                            <span>I personally reviewed the supporting evidence and the justification above for any official numeric risk ratings selected.</span>
+                        </label>
+                    </div>
+                    <button type="submit" class="btn preset-filled-primary-500">Check complete Risk Scenario (dry-run, no writes)</button>
+                </form>
+            </section>
+        {/if}
+
         {#if riskDryRun}
             <div class="space-y-3 rounded-lg border border-surface-300 p-4" aria-live="polite">
                 <h3 class="font-bold">Permission and duplicate checks — no writes</h3>
                 <p class="text-sm">Status: <strong>{riskDryRun.commit_status || 'unknown'}</strong></p>
                 {#each riskDryRun.planned_actions || [] as item}
-                    <p class="text-sm"><strong>{item.status}:</strong> {item.detail}</p>
+                    <div class="space-y-1 text-sm">
+                        <p><strong>{item.status}:</strong> {item.detail}</p>
+                        {#if item.related_threat_name}
+                            <p class="rounded bg-surface-100 p-2"><strong>Threat to link:</strong> {item.related_threat_name}</p>
+                        {/if}
+                        {#if item.related_vulnerability_name}
+                            <p class="rounded bg-surface-100 p-2"><strong>Vulnerability to link:</strong> {item.related_vulnerability_name}</p>
+                        {/if}
+                    </div>
                 {/each}
                 {#each riskDryRun.blocking_errors || [] as item}
                     <p class="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-900"><strong>Blocked:</strong> {item.detail || item.code}</p>
@@ -567,11 +688,11 @@ Employees have not completed phishing awareness training</textarea>
                 {/each}
                 {#if riskReview && riskCanSave}
                     <form method="POST" action="?/riskCommit" class="space-y-3 rounded border border-teal-300 p-4">
-                        <p class="font-semibold">Reviewed action: save <strong>{riskReview.scenario.title}</strong> and its proposed Threat/Vulnerability links under the existing assessment.</p>
-                        <p class="text-xs text-surface-600">A final dry-run is repeated server-side. The reviewed threat and vulnerability will be linked to exact-name records in this folder, or saved as unpublished, unverified drafts and linked. If this is an eligible previously AI-created risk, only its missing links are added. Existing manual records are not changed. No risk rating, treatment, acceptance or closure is approved.</p>
+                        <p class="font-semibold">Reviewed action: save or complete <strong>{riskReview.scenario.title}</strong>, including the real fields and links shown above under the correct assessment.</p>
+                        <p class="text-xs text-surface-600">A final dry-run is repeated server-side. All chosen records are checked against current access and company folder. Existing nonempty manual fields are preserved. Official matrix ratings are stored only when you explicitly confirmed evidence and supplied justification; unverified ratings stay empty. Acceptance and closure are excluded.</p>
                         <input type="hidden" name="review_json" value={JSON.stringify(riskReview)} />
                         <label class="flex items-start gap-2 text-sm font-semibold"><input name="approved_by_reviewer" type="checkbox" class="checkbox mt-1" required />
-                            <span>I reviewed the contents and destination. I approve creating this draft risk or completing missing links on this previously AI-created risk, and creating or reusing its draft Threat and Vulnerability records.</span>
+                            <span>I reviewed the complete Risk Scenario fields, authorized record links, rating evidence and destination, and approve the proposed changes.</span>
                         </label>
                         <button type="submit" class="btn preset-filled-primary-500">Approve and save real risk scenario</button>
                     </form>
@@ -589,7 +710,7 @@ Employees have not completed phishing awareness training</textarea>
                     <p class="text-sm">Reused existing record without modification: <strong>{record.name}</strong>.</p>
                 {/each}
                 {#each riskResult.updated_records || [] as record}
-                    <p class="text-sm">Completed missing links on a previously AI-created risk: <strong>{record.name}</strong>. Linked threats: {record.linked_threat_ids?.length || 0}; vulnerabilities: {record.linked_vulnerability_ids?.length || 0}. No risk rating was set.</p>
+                    <p class="text-sm">Completed missing links on a previously AI-created risk: <strong>{record.name}</strong>. Linked threats: {record.linked_threat_ids?.length || 0}; vulnerabilities: {record.linked_vulnerability_ids?.length || 0}. Official rating recorded: {record.risk_rating_recorded ? 'yes' : 'no'}.</p>
                 {/each}
                 {#each riskResult.blocking_errors || [] as item}
                     <p class="text-sm text-red-800">Blocked: {item.detail || item.code}</p>

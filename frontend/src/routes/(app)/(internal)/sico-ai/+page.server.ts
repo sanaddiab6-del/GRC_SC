@@ -31,6 +31,87 @@ function errorDetail(value: unknown): string {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const RISK_LEVELS = new Set(['low', 'medium', 'high', 'critical']);
 
+// These are the real RiskScenario fields; IDs must come from the backend's
+// company-scoped, permission-filtered catalog. AI guesses are not trusted.
+const FULL_LISTS = [
+    'asset_references', 'owner_references', 'existing_control_references',
+    'extra_control_references', 'antecedent_references', 'qualification_references',
+    'exception_references', 'label_references'
+];
+const FULL_RATINGS = [
+    'inherent_proba', 'inherent_impact', 'current_proba', 'current_impact',
+    'residual_proba', 'residual_impact'
+];
+function reviewFieldsFromForm(data: FormData): Record<string, unknown> {
+    const fields: Record<string, unknown> = {};
+    for (const name of FULL_LISTS) {
+        fields[name] = data.getAll(name).filter((v): v is string =>
+            typeof v === 'string' && UUID.test(v)).slice(0, 30);
+    }
+    for (const key of ['risk_origin_reference', 'operational_scenario_reference']) {
+        const reference = field(data, key, 36);
+        if (UUID.test(reference)) fields[key] = reference;
+    }
+    fields.justification = field(data, 'justification', 2000);
+    fields.existing_controls = field(data, 'existing_controls', 2000);
+    fields.reviewed_treatment = field(data, 'reviewed_treatment', 20) || 'open';
+    fields.strength_of_knowledge = Number(field(data, 'strength_of_knowledge', 4) || '-1');
+    fields.reviewer_evidence_confirmed = data.get('reviewer_evidence_confirmed') === 'on';
+    for (const key of FULL_RATINGS) {
+        const raw = field(data, key, 3);
+        fields[key] = /^-?\d+$/.test(raw) ? Number(raw) : -1;
+    }
+    return fields;
+}
+function normalizeReviewedFields(input: unknown): Record<string, unknown> | null {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+    const data = input as Record<string, unknown>;
+    const allowed = new Set([
+        ...FULL_LISTS, ...FULL_RATINGS, 'risk_origin_reference', 'justification',
+        'existing_controls', 'reviewed_treatment', 'strength_of_knowledge', 'operational_scenario_reference',
+        'reviewer_evidence_confirmed'
+    ]);
+    if (Object.keys(data).some(key => !allowed.has(key))) return null;
+    const normalized: Record<string, unknown> = {};
+    for (const key of FULL_LISTS) {
+        if (key in data) {
+            const value = data[key];
+            if (!Array.isArray(value) || value.length > 30 || value.some(item =>
+                typeof item !== 'string' || !UUID.test(item))) return null;
+            normalized[key] = value;
+        }
+    }
+    for (const key of FULL_RATINGS) {
+        if (key in data) {
+            const value = data[key];
+            if (!Number.isInteger(value) || (value as number) < -1 || (value as number) > 20) return null;
+            normalized[key] = value;
+        }
+    }
+    for (const key of ['risk_origin_reference', 'operational_scenario_reference']) {
+        const value = data[key];
+        if (typeof value === 'string' && UUID.test(value)) normalized[key] = value;
+    }
+    for (const key of ['justification', 'existing_controls']) {
+        if (key in data) {
+            if (typeof data[key] !== 'string' || (data[key] as string).length > 2000) return null;
+            normalized[key] = data[key];
+        }
+    }
+    const treatment = data.reviewed_treatment;
+    if (treatment !== undefined) {
+        if (typeof treatment !== 'string' || !['open', 'mitigate', 'avoid', 'transfer'].includes(treatment)) return null;
+        normalized.reviewed_treatment = treatment;
+    }
+    if ('strength_of_knowledge' in data) {
+        const value = data.strength_of_knowledge;
+        if (!Number.isInteger(value) || (value as number) < -1 || (value as number) > 2) return null;
+        normalized.strength_of_knowledge = value;
+    }
+    normalized.reviewer_evidence_confirmed = data.reviewer_evidence_confirmed === true;
+    return normalized;
+}
+
 function reviewedScenario(raw: unknown): Record<string, unknown> | null {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
     const item = raw as Record<string, unknown>;
@@ -47,6 +128,8 @@ function reviewedScenario(raw: unknown): Record<string, unknown> | null {
         return null;
     }
     const optional = (key: string, maximum: number) => requiredText(key, maximum);
+    const full = item.reviewed_fields ? normalizeReviewedFields(item.reviewed_fields) : null;
+    if (item.reviewed_fields && !full) return null;
     const steps = Array.isArray(item.recommended_next_steps)
         ? item.recommended_next_steps.filter((step): step is string => typeof step === 'string')
             .slice(0, 10).map(step => step.trim().slice(0, 500)).filter(Boolean)
@@ -62,6 +145,10 @@ function reviewedScenario(raw: unknown): Record<string, unknown> | null {
         rationale: optional('rationale', 3000),
         recommended_next_steps: steps,
         confidence,
+        ...(full ? { reviewed_fields: full } : {}),
+        // Existing suggestion metadata can help the exact-match catalog lookup.
+        asset_title: optional('asset_title', 500),
+        linked_applied_control_title: optional('linked_applied_control_title', 500),
         review_status: 'pending_review'
     };
 }
@@ -88,6 +175,8 @@ function reviewFromForm(data: FormData) {
         temporary_id: field(data, 'temporary_id', 64),
         title: field(data, 'title', 200),
         description: field(data, 'description', 5000),
+        asset_title: field(data, 'asset_title', 500),
+        linked_applied_control_title: field(data, 'linked_applied_control_title', 500),
         threat: field(data, 'threat', 500),
         vulnerability: field(data, 'vulnerability', 500),
         impact_description: field(data, 'impact_description', 3000),
@@ -99,7 +188,9 @@ function reviewFromForm(data: FormData) {
         confidence: field(data, 'confidence', 20)
     });
     if (!UUID.test(folder_reference) || !UUID.test(assessment_reference) || !candidate) return null;
-    return { folder_reference, assessment_reference, scenario: candidate };
+    const full_reviewed = data.get('full_review_ready') === 'yes';
+    if (full_reviewed) candidate.reviewed_fields = reviewFieldsFromForm(data);
+    return { folder_reference, assessment_reference, scenario: candidate, full_reviewed };
 }
 
 function reviewFromJson(value: string) {
@@ -112,7 +203,8 @@ function reviewFromJson(value: string) {
         const scenario = reviewedScenario(candidate.scenario);
         if (typeof folder_reference !== 'string' || typeof assessment_reference !== 'string' ||
             !UUID.test(folder_reference) || !UUID.test(assessment_reference) || !scenario) return null;
-        return { folder_reference, assessment_reference, scenario };
+        return { folder_reference, assessment_reference, scenario,
+            full_reviewed: candidate.full_reviewed === true };
     } catch {
         return null;
     }
@@ -162,14 +254,29 @@ export const actions: Actions = {
         const review = reviewFromForm(data);
         if (!review) return fail(400, { error: 'Select a valid existing folder and risk assessment and review the scenario fields.' });
         try {
+            // Read the current organization-scoped catalog automatically as part of
+            // the SAME risk review. No extra matching screen or copied risk URL.
+            const ctxResponse = await fetchAiOnboardingBackend(event, '/ai/onboarding/risk-scenarios/full-context/', {
+                folder_reference: review.folder_reference,
+                assessment_reference: review.assessment_reference,
+                scenario_title: String(review.scenario.title || ''),
+                asset_title: String(review.scenario.asset_title || ''),
+                linked_applied_control_title: String(review.scenario.linked_applied_control_title || '')
+            });
+            const risk_full_context = await ctxResponse.json().catch(() => ({}));
+            if (!ctxResponse.ok) return fail(ctxResponse.status, {
+                risk_review: review, error: 'Full risk record discovery failed: ' + errorDetail(risk_full_context)
+            });
             const response = await fetchAiOnboardingBackend(event, '/ai/onboarding/risk-scenarios/commit/',
                 riskCommitPayload(review.folder_reference, review.assessment_reference, review.scenario, true));
             const result = await response.json().catch(() => ({}));
-            if (!response.ok) return fail(response.status, { risk_review: review, risk_dry_run: result,
-                error: errorDetail(result) });
-            return { risk_review: review, risk_dry_run: result,
+            if (!response.ok) return fail(response.status, {
+                risk_review: review, risk_dry_run: result, risk_full_context, error: errorDetail(result)
+            });
+            return { risk_review: review, risk_dry_run: result, risk_full_context,
                 message: hasBlockers(result) ? 'The dry-run found blockers. No data was saved.' :
-                    'Dry-run passed. Review the planned action, then explicitly approve the save.' };
+                    review.full_reviewed ? 'Complete review passed. You may approve the reviewed fields.' :
+                    'Existing GRC records loaded. Review ALL applicable fields below and run the complete dry-run.' };
         } catch (error) {
             return fail(502, { risk_review: review, error: errorDetail(error) });
         }
@@ -181,7 +288,9 @@ export const actions: Actions = {
             return fail(400, { error: 'Explicit reviewer approval is required before saving.' });
         }
         const review = reviewFromJson(field(data, 'review_json', 16000));
-        if (!review) return fail(400, { error: 'Reviewed scenario is missing or invalid. Run the dry-run again.' });
+        if (!review || !review.full_reviewed || !review.scenario.reviewed_fields) {
+            return fail(400, { error: 'A complete reviewed-fields dry-run is required before saving.' });
+        }
         try {
             // Do not trust a browser-submitted dry-run status; recheck authorization and scope.
             const checkResponse = await fetchAiOnboardingBackend(event, '/ai/onboarding/risk-scenarios/commit/',
@@ -201,9 +310,9 @@ export const actions: Actions = {
             });
             return { risk_result: result,
                 message: Array.isArray(result.created_records) && result.created_records.length
-                    ? 'Risk scenario and reviewed threat/vulnerability links saved. Open Risk Scenarios to inspect them.'
+                    ? 'Risk scenario and authorized reviewed fields saved. Open Risk Scenarios to inspect the result.'
                     : Array.isArray(result.updated_records) && result.updated_records.length
-                        ? 'Missing threat/vulnerability links were added to the previously AI-created risk. Open Risk Scenarios to inspect them.'
+                        ? 'Missing reviewed fields were added to the previously AI-created risk. Open Risk Scenarios to verify.'
                         : 'No new record or link was saved. Review the returned status.' };
         } catch (error) {
             return fail(502, { error: errorDetail(error) });

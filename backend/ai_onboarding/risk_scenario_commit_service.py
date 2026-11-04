@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import re
 from typing import Any
 
 from django.contrib.auth.models import Permission
@@ -9,6 +10,9 @@ from django.db import transaction
 from core.models import (Asset, AppliedControl, Assessment, RiskAssessment, RiskScenario, Threat, Vulnerability)
 from iam.models import Folder, RoleAssignment
 
+from .risk_scenario_full_fields import (
+    FullFieldValidationError, resolve_full_fields, apply_full_fields, FullFieldPlan,
+)
 from .risk_scenario_commit_guardrails import (
     RiskScenarioCommitValidationError,
     validate_risk_scenario_commit_guardrails,
@@ -45,6 +49,9 @@ class PlannedScenarioAction:
     detail: str
     record_type: str = RECORD_TYPE
     target_name: str | None = None
+    related_threat_name: str | None = None
+    related_vulnerability_name: str | None = None
+    full_field_preview: dict[str, Any] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
         payload = {
@@ -56,6 +63,14 @@ class PlannedScenarioAction:
         }
         if self.target_name:
             payload["target_name"] = self.target_name
+        # Show the actual records to be created/linked BEFORE approval. For a
+        # previously AI-created risk, these come from its SAVED description.
+        if self.related_threat_name:
+            payload["related_threat_name"] = self.related_threat_name
+        if self.related_vulnerability_name:
+            payload["related_vulnerability_name"] = self.related_vulnerability_name
+        if self.full_field_preview:
+            payload["full_field_preview"] = self.full_field_preview
         return payload
 
 
@@ -78,6 +93,10 @@ class WritePlan:
     applied_controls: list[Any] = field(default_factory=list)
     proposed_threat: RelatedRecordPlan | None = None
     proposed_vulnerability: RelatedRecordPlan | None = None
+    # Prevent a concurrent/manual edit to the saved description after dry-run.
+    origin_description: str | None = None
+    reviewed_fields: dict[str, Any] = field(default_factory=dict)
+    full_field_preview: dict[str, Any] = field(default_factory=dict)
 
 
 class AiRiskScenarioCommitService:
@@ -120,6 +139,11 @@ class AiRiskScenarioCommitService:
                 self._execute_write_plan(plans)
         except RiskScenarioCommitValidationError:
             raise
+        except FullFieldValidationError as exc:
+            raise RiskScenarioCommitValidationError(
+                exc.code, str(exc), status_code=422,
+                blocking_errors=[{"code": exc.code, "detail": str(exc), "field": "reviewed_fields"}],
+            )
         except Exception as exc:  # noqa: BLE001 - surfaced as a rolled-back commit
             self.created_records = []
             self.reused_records = []
@@ -358,22 +382,26 @@ class AiRiskScenarioCommitService:
                     f"{field_prefix}.payload.title", temporary_id, "create",
                 )
                 return
-            # The first SICO release saved reviewed threat/vulnerability text only
-            # into the description. On a REPEATED explicitly approved save we may
-            # add only missing links, and only to a previously AI-created risk
-            # whose saved advisory text exactly matches the reviewed inputs.
-            # Unrelated historical/human-authored records are NEVER modified.
-            if str(existing.folder_id) == str(folder.id) and self._eligible_ai_backfill(existing, payload):
-                # Never plan creation of a relation that a person already linked.
+            # Legacy SICO AI-created records stored reviewed Threat and
+            # Vulnerability advice in the description without linking records.
+            # For an existing risk, the ORIGINAL SAVED text is authoritative:
+            # never make up a new relationship from a later AI suggestion.
+            # This path cannot alter unrelated/human-authored scenarios.
+            saved_advice = self._saved_ai_advice(existing) if str(existing.folder_id) == str(folder.id) else {}
+            if saved_advice:
                 missing_threat = (
-                    self._plan_related(field_prefix, "threat", payload, folder)
+                    self._plan_related(field_prefix, "threat", saved_advice, folder)
                     if not existing.threats.exists() else None
                 )
                 missing_vuln = (
-                    self._plan_related(field_prefix, "vulnerability", payload, folder)
+                    self._plan_related(field_prefix, "vulnerability", saved_advice, folder)
                     if not existing.vulnerabilities.exists() else None
                 )
-                if missing_threat or missing_vuln:
+                reviewed_fields = payload.get("reviewed_fields") or {}
+                full_plan = self._validate_full_fields(
+                    field_prefix, reviewed_fields, folder, risk_assessment, existing
+                )
+                if missing_threat or missing_vuln or (full_plan and full_plan.has_changes()):
                     planned_names.add(label.lower())
                     plans.append(WritePlan(
                         source_temporary_id=temporary_id,
@@ -383,14 +411,19 @@ class AiRiskScenarioCommitService:
                         existing_instance=existing,
                         proposed_threat=missing_threat,
                         proposed_vulnerability=missing_vuln,
+                        reviewed_fields=reviewed_fields,
+                        full_field_preview=full_plan.preview() if full_plan else {},
+                        origin_description=existing.description,
                     ))
                     self.planned_actions.append(PlannedScenarioAction(
                         temporary_id, "create", "planned",
-                        "Previously AI-created risk will be kept unchanged except "
-                        "for missing Threat/Vulnerability relationships; "
-                        "reviewed records will be reused by exact name or saved "
-                        "as unpublished drafts in the same folder.",
+                        "The original AI risk will be completed with reviewed missing fields. "
+                        "Original description and existing manual values and links stay unchanged. "
+                        "Risk ratings require separately confirmed evidence and exact matrix values.",
                         target_name=existing.name,
+                        related_threat_name=missing_threat.name if missing_threat else None,
+                        related_vulnerability_name=missing_vuln.name if missing_vuln else None,
+                        full_field_preview=full_plan.preview() if full_plan else {},
                     ))
                     return
             self.warnings.append({
@@ -428,8 +461,14 @@ class AiRiskScenarioCommitService:
         applied_controls = self._resolve_applied_controls(field_prefix, payload, folder)
         proposed_threat = self._plan_related(field_prefix, "threat", payload, folder)
         proposed_vulnerability = self._plan_related(field_prefix, "vulnerability", payload, folder)
+        reviewed_fields = payload.get("reviewed_fields") or {}
+        full_plan = self._validate_full_fields(
+            field_prefix, reviewed_fields, folder, risk_assessment
+        )
 
-        self._warn_unrated_advisory_context(field_prefix)
+        if not full_plan or not any(field in full_plan.scalars for field in (
+                "inherent_proba", "current_proba", "residual_proba")):
+            self._warn_unrated_advisory_context(field_prefix)
 
         planned_names.add(label.lower())
         plans.append(
@@ -443,33 +482,83 @@ class AiRiskScenarioCommitService:
                 applied_controls=applied_controls,
                 proposed_threat=proposed_threat,
                 proposed_vulnerability=proposed_vulnerability,
+                reviewed_fields=reviewed_fields,
+                full_field_preview=full_plan.preview() if full_plan else {},
             )
         )
         self.planned_actions.append(
             PlannedScenarioAction(
                 temporary_id, "create", "planned",
-                "RiskScenario would be created unrated; reviewed Threat and "
-                "Vulnerability text would become same-folder exact-match links or "
-                "new unpublished draft records. No risk treatment or acceptance.",
+                (
+                    "RiskScenario would be created with human-reviewed, evidence-confirmed "
+                    "matrix values; the platform calculates risk levels. "
+                    if full_plan and any(full_plan.scalars.get(k, -1) >= 0 for k in (
+                        "inherent_proba", "current_proba", "residual_proba"
+                    )) else "RiskScenario would be created unrated. "
+                ) + "Reviewed Threat/Vulnerability text would be linked to same-folder "
+                "existing records or saved as unpublished unverified drafts. "
+                "No risk acceptance or closure.",
                 target_name=label,
+                related_threat_name=proposed_threat.name if proposed_threat else None,
+                related_vulnerability_name=proposed_vulnerability.name if proposed_vulnerability else None,
+                full_field_preview=full_plan.preview() if full_plan else {},
             )
         )
 
     # ---- resolution helpers ------------------------------------------------
 
-    def _eligible_ai_backfill(self, instance: RiskScenario, payload: dict[str, Any]) -> bool:
-        """Only complete missing links on an AI-origin record with identical advice.
+    def _validate_full_fields(self, prefix, fields, folder, assessment, existing=None):
+        try:
+            return resolve_full_fields(self.user, fields, folder, assessment, existing)
+        except FullFieldValidationError as exc:
+            self.blocking_errors.append({
+                "code": exc.code,
+                "detail": str(exc),
+                "field": prefix + ".payload.reviewed_fields",
+            })
+            return None
 
-        Never overwrite a description or alter existing manual relationships.
+    @staticmethod
+    def _saved_ai_advice(instance: RiskScenario) -> dict[str, str]:
+        """Extract only explicit original AI advice from an unchanged legacy record.
+
+        The earlier SICO commit used double-newline separated paragraphs and a
+        fixed closing provenance sentence. Accept Windows line endings, but do
+        not use a later AI proposal to silently change the meaning of the risk.
+        Fail closed for absent, ambiguous or edited provenance/content.
         """
-        text = instance.description or ""
-        if AI_ORIGIN_MARKER not in text:
-            return False
-        for label, key in (("Threat", "threat"), ("Vulnerability", "vulnerability")):
-            value = (payload.get(key) or "").strip()
-            if value and f"{label}: {value}" not in text.split("\n\n"):
-                return False
-        return True
+        text = (instance.description or "").replace("\r\n", "\n").replace("\r", "\n")
+        paragraphs = [part.strip() for part in re.split(r"\n[ \t]*\n+", text) if part.strip()]
+        allowed_closings = {
+            AI_ORIGIN_MARKER +
+            " No risk rating, risk treatment, or risk acceptance was set by this step.",
+            AI_ORIGIN_MARKER +
+            " Official matrix scores were entered by the human reviewer and calculated by "
+            "the platform; no risk acceptance or closure was performed.",
+            AI_ORIGIN_MARKER +
+            " Only reviewer-selected values were saved through platform fields. "
+            "No risk acceptance or closure was performed.",
+        }
+        if not paragraphs or paragraphs[-1] not in allowed_closings:
+            return {}
+        advice: dict[str, str] = {}
+        for kind, label in (("threat", "Threat: "), ("vulnerability", "Vulnerability: ")):
+            matches = [part[len(label):].strip() for part in paragraphs
+                       if part.startswith(label)]
+            if len(matches) > 1:
+                return {}  # Ambiguous descriptions must never auto-create links.
+            if matches and "\n" not in matches[0] and matches[0]:
+                advice[kind] = matches[0]
+        return advice
+
+    def _eligible_ai_backfill(self, instance: RiskScenario, payload: dict[str, Any]) -> bool:
+        """Compatibility guard: accept only saved original advice, never new advice."""
+        saved = self._saved_ai_advice(instance)
+        return bool(saved) and all(
+            not (payload.get(kind) or "").strip()
+            or (payload.get(kind) or "").strip() == saved.get(kind)
+            for kind in ("threat", "vulnerability")
+        )
 
     def _plan_related(
         self, field_prefix: str, kind: str, payload: dict[str, Any], folder: Folder
@@ -817,11 +906,12 @@ class AiRiskScenarioCommitService:
                 instance = RiskScenario.objects.select_for_update().get(
                     id=plan.existing_instance.id, risk_assessment=plan.risk_assessment
                 )
-                if not RoleAssignment.is_object_readable(self.user, RiskScenario, instance.id) or \
-                        not self._eligible_ai_backfill(instance, {
+                if (not RoleAssignment.is_object_readable(self.user, RiskScenario, instance.id)
+                        or instance.description != plan.origin_description
+                        or not self._eligible_ai_backfill(instance, {
                             "threat": plan.proposed_threat.name if plan.proposed_threat else "",
                             "vulnerability": plan.proposed_vulnerability.name if plan.proposed_vulnerability else "",
-                        }):
+                        })):
                     raise RiskScenarioCommitValidationError(
                         "changed_since_dry_run",
                         "Saved risk is no longer eligible for relationship-only completion.",
@@ -835,7 +925,14 @@ class AiRiskScenarioCommitService:
                         "Risk relationships changed since review; run the dry-run again.",
                         status_code=422,
                     )
+                # Re-resolve inside the database transaction in case the scope,
+                # permissions or reviewed linked records changed after dry-run.
+                full_plan = resolve_full_fields(
+                    self.user, plan.reviewed_fields, current_assessment.folder,
+                    current_assessment, instance
+                )
                 self._link_reviewed_relations(instance, plan)
+                apply_full_fields(instance, full_plan)
                 self.updated_records.append(self._record_summary(instance, plan, "linked_existing_ai"))
                 continue
             # If a concurrent save already created the same scenario, abort and
@@ -854,10 +951,18 @@ class AiRiskScenarioCommitService:
                 description=plan.description,
                 ref_id=RiskScenario.get_default_ref_id(plan.risk_assessment),
             )
-            if plan.assets:
-                instance.assets.add(*plan.assets)
-            if plan.applied_controls:
-                instance.applied_controls.add(*plan.applied_controls)
+            # The complete review uses the proper, separately selected relation
+            # fields. Never sneak Step 8A legacy hints into a different category.
+            if not plan.reviewed_fields:
+                if plan.assets:
+                    instance.assets.add(*plan.assets)
+                if plan.applied_controls:
+                    instance.applied_controls.add(*plan.applied_controls)
+            full_plan = resolve_full_fields(
+                self.user, plan.reviewed_fields, current_assessment.folder,
+                current_assessment, None
+            )
+            apply_full_fields(instance, full_plan)
             self._link_reviewed_relations(instance, plan)
             self.created_records.append(self._record_summary(instance, plan, "create"))
 
@@ -873,12 +978,13 @@ class AiRiskScenarioCommitService:
             "ref_id": instance.ref_id,
             "linked_threat_ids": list(map(str, instance.threats.values_list("id", flat=True))),
             "linked_vulnerability_ids": list(map(str, instance.vulnerabilities.values_list("id", flat=True))),
-            "linked_asset_ids": [str(asset.id) for asset in plan.assets],
-            "linked_applied_control_ids": [
-                str(control.id) for control in plan.applied_controls
-            ],
-            # Recorded unrated on purpose: Step 8B never sets a platform risk rating.
-            "risk_rating_recorded": False,
+            "linked_asset_ids": list(map(str, instance.assets.values_list("id", flat=True))),
+            "linked_applied_control_ids": list(map(str, instance.applied_controls.values_list("id", flat=True))),
+            "linked_existing_control_ids": list(map(str, instance.existing_applied_controls.values_list("id", flat=True))),
+            "risk_rating_recorded": any(getattr(instance, key) >= 0 for key in (
+                "inherent_level", "current_level", "residual_level"
+            )),
+            "full_field_values": plan.full_field_preview,
         }
 
     # ---- response ----------------------------------------------------------
@@ -970,7 +1076,8 @@ def _build_description(payload: dict[str, Any]) -> str:
 
     lines.append(
         "Recorded from the AI onboarding Step 8A advisory suggestion after human review. "
-        "No risk rating, risk treatment, or risk acceptance was set by this step."
+        "Only reviewer-selected values were saved through platform fields. "
+        "No risk acceptance or closure was performed."
     )
     return "\n\n".join(lines)
 

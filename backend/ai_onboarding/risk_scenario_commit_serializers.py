@@ -53,6 +53,49 @@ def _optional_uuid(value, field_name: str) -> str | None:
     return _normalized_uuid(candidate, field_name)
 
 
+# Human-reviewed actual platform fields. Unknown fields and identifiers fail closed.
+# Score pairs are validated against the SELECTED assessment's risk matrix by
+# the deterministic commit service, never by the AI's advisory label.
+class ReviewedRiskFieldsSerializer(StrictSerializer):
+    asset_references = serializers.ListField(child=serializers.UUIDField(), required=False, max_length=30)
+    owner_references = serializers.ListField(child=serializers.UUIDField(), required=False, max_length=30)
+    existing_control_references = serializers.ListField(child=serializers.UUIDField(), required=False, max_length=30)
+    extra_control_references = serializers.ListField(child=serializers.UUIDField(), required=False, max_length=30)
+    antecedent_references = serializers.ListField(child=serializers.UUIDField(), required=False, max_length=30)
+    qualification_references = serializers.ListField(child=serializers.UUIDField(), required=False, max_length=30)
+    exception_references = serializers.ListField(child=serializers.UUIDField(), required=False, max_length=30)
+    label_references = serializers.ListField(child=serializers.UUIDField(), required=False, max_length=30)
+    risk_origin_reference = serializers.UUIDField(required=False, allow_null=True)
+    operational_scenario_reference = serializers.UUIDField(required=False, allow_null=True)
+    justification = serializers.CharField(required=False, allow_blank=True, max_length=2000)
+    existing_controls = serializers.CharField(required=False, allow_blank=True, max_length=2000)
+    reviewed_treatment = serializers.ChoiceField(required=False, choices=["open", "mitigate", "avoid", "transfer"])
+    strength_of_knowledge = serializers.IntegerField(required=False, min_value=-1, max_value=2)
+    reviewer_evidence_confirmed = serializers.BooleanField(required=False, default=False)
+    inherent_proba = serializers.IntegerField(required=False, min_value=-1, max_value=20)
+    inherent_impact = serializers.IntegerField(required=False, min_value=-1, max_value=20)
+    current_proba = serializers.IntegerField(required=False, min_value=-1, max_value=20)
+    current_impact = serializers.IntegerField(required=False, min_value=-1, max_value=20)
+    residual_proba = serializers.IntegerField(required=False, min_value=-1, max_value=20)
+    residual_impact = serializers.IntegerField(required=False, min_value=-1, max_value=20)
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        # DRF's UUIDField returns UUID objects; normalize to text for JSON
+        # responses and for the service's immutable reference contract.
+        for field in (
+            "asset_references", "owner_references", "existing_control_references",
+            "extra_control_references", "antecedent_references",
+            "qualification_references", "exception_references", "label_references",
+        ):
+            if field in attrs:
+                attrs[field] = [str(item) for item in attrs[field]]
+        for key in ("risk_origin_reference", "operational_scenario_reference"):
+            if attrs.get(key):
+                attrs[key] = str(attrs[key])
+        return attrs
+
+
 class RiskScenarioPayloadSerializer(StrictSerializer):
     """The reviewed Step 8A risk scenario carried into the deterministic write.
 
@@ -62,6 +105,7 @@ class RiskScenarioPayloadSerializer(StrictSerializer):
     """
 
     temporary_id = serializers.CharField(max_length=64)
+    reviewed_fields = ReviewedRiskFieldsSerializer(required=False)
     title = serializers.CharField(max_length=500)
     description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     asset_reference = serializers.CharField(
