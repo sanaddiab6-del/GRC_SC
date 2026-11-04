@@ -137,3 +137,7 @@ urlpatterns += [path('workforce/discover/', AiWorkforceDiscoveryView.as_view(), 
 # SICO AI workforce V3: authenticated preflight ONLY; no create actions.
 from .workforce_case_plan_views import AiWorkforceNewCasePlanView
 urlpatterns += [path('workforce/new-case-plan/', AiWorkforceNewCasePlanView.as_view(), name='sico-ai-workforce-new-case-plan')]
+
+# SICO AI Phase 2A: strictly read-only, folder-scoped relationship discovery.
+from .risk_relationship_preview_views import AiRiskRelationshipPreviewView
+urlpatterns += [path('onboarding/risk-scenarios/relationship-preview/', AiRiskRelationshipPreviewView.as_view(), name='ai-risk-relationship-preview')]

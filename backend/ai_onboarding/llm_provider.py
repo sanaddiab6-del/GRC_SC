@@ -157,7 +157,19 @@ class LocalAiProvider:
                 "The local AI provider returned an unreadable response payload.",
             )
 
-        return _parse_single_json_object(extracted)
+        parsed = _parse_single_json_object(extracted)
+
+        from jsonschema import Draft202012Validator, ValidationError
+
+        try:
+            Draft202012Validator(json_schema).validate(parsed)
+        except ValidationError as exc:
+            raise AiProviderExecutionError(
+                "local_ai_provider_schema_mismatch",
+                "The AI response does not match the required output schema.",
+            ) from exc
+
+        return parsed
 
 
 def _build_ollama_prompt(
