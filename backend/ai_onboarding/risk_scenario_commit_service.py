@@ -6,7 +6,7 @@ from typing import Any
 from django.contrib.auth.models import Permission
 from django.db import transaction
 
-from core.models import Asset, AppliedControl, Assessment, RiskAssessment, RiskScenario
+from core.models import (Asset, AppliedControl, Assessment, RiskAssessment, RiskScenario, Threat, Vulnerability)
 from iam.models import Folder, RoleAssignment
 
 from .risk_scenario_commit_guardrails import (
@@ -30,6 +30,11 @@ MAX_NAME_LENGTH = 200
 # own "not rated" default) and the advisory ratings are preserved as readable text in the
 # new record's description instead.
 UNRATED_ADVISORY_FIELDS = ("likelihood", "impact", "risk_level")
+# Threat and Vulnerability are actual platform records; the text of the reviewed
+# suggestion is not evidence. New objects remain local unpublished drafts.
+AI_ORIGIN_MARKER = "Recorded from the AI onboarding Step 8A advisory suggestion after human review."
+MAX_RELATED_NAME_LENGTH = 200
+
 
 
 @dataclass
@@ -55,6 +60,13 @@ class PlannedScenarioAction:
 
 
 @dataclass
+class RelatedRecordPlan:
+    kind: str
+    name: str
+    existing_instance: Any = None
+
+
+@dataclass
 class WritePlan:
     source_temporary_id: str
     decision: str
@@ -64,6 +76,8 @@ class WritePlan:
     description: str = ""
     assets: list[Any] = field(default_factory=list)
     applied_controls: list[Any] = field(default_factory=list)
+    proposed_threat: RelatedRecordPlan | None = None
+    proposed_vulnerability: RelatedRecordPlan | None = None
 
 
 class AiRiskScenarioCommitService:
@@ -76,6 +90,7 @@ class AiRiskScenarioCommitService:
         self.planned_actions: list[PlannedScenarioAction] = []
         self.created_records: list[dict[str, Any]] = []
         self.reused_records: list[dict[str, Any]] = []
+        self.updated_records: list[dict[str, Any]] = []
         self.rejected_records: list[dict[str, Any]] = []
         self.deferred_records: list[dict[str, Any]] = []
         self.skipped_records: list[dict[str, Any]] = []
@@ -336,33 +351,67 @@ class AiRiskScenarioCommitService:
         ).first()
 
         if existing is not None:
-            self.warnings.append(
-                {
-                    "code": "duplicate_reused",
-                    "detail": (
-                        f"An existing RiskScenario named '{label}' was found in the selected "
-                        "risk assessment and will be reused without mutation."
-                    ),
-                    "field": f"{field_prefix}.payload.title",
-                }
-            )
+            if not RoleAssignment.is_object_readable(self.user, RiskScenario, existing.id):
+                self._block(
+                    "permission_denied",
+                    "You cannot use a risk scenario in this scope.",
+                    f"{field_prefix}.payload.title", temporary_id, "create",
+                )
+                return
+            # The first SICO release saved reviewed threat/vulnerability text only
+            # into the description. On a REPEATED explicitly approved save we may
+            # add only missing links, and only to a previously AI-created risk
+            # whose saved advisory text exactly matches the reviewed inputs.
+            # Unrelated historical/human-authored records are NEVER modified.
+            if str(existing.folder_id) == str(folder.id) and self._eligible_ai_backfill(existing, payload):
+                # Never plan creation of a relation that a person already linked.
+                missing_threat = (
+                    self._plan_related(field_prefix, "threat", payload, folder)
+                    if not existing.threats.exists() else None
+                )
+                missing_vuln = (
+                    self._plan_related(field_prefix, "vulnerability", payload, folder)
+                    if not existing.vulnerabilities.exists() else None
+                )
+                if missing_threat or missing_vuln:
+                    planned_names.add(label.lower())
+                    plans.append(WritePlan(
+                        source_temporary_id=temporary_id,
+                        decision="link_existing_ai",
+                        target_name=existing.name,
+                        risk_assessment=risk_assessment,
+                        existing_instance=existing,
+                        proposed_threat=missing_threat,
+                        proposed_vulnerability=missing_vuln,
+                    ))
+                    self.planned_actions.append(PlannedScenarioAction(
+                        temporary_id, "create", "planned",
+                        "Previously AI-created risk will be kept unchanged except "
+                        "for missing Threat/Vulnerability relationships; "
+                        "reviewed records will be reused by exact name or saved "
+                        "as unpublished drafts in the same folder.",
+                        target_name=existing.name,
+                    ))
+                    return
+            self.warnings.append({
+                "code": "duplicate_reused",
+                "detail": (
+                    "Existing RiskScenario will be reused without mutation. "
+                    "It is not eligible for an automatically approved relationship backfill."
+                ),
+                "field": f"{field_prefix}.payload.title",
+            })
             planned_names.add(label.lower())
-            plans.append(
-                WritePlan(
-                    source_temporary_id=temporary_id,
-                    decision="reuse",
-                    target_name=existing.name,
-                    risk_assessment=risk_assessment,
-                    existing_instance=existing,
-                )
-            )
-            self.planned_actions.append(
-                PlannedScenarioAction(
-                    temporary_id, "reuse", "planned",
-                    "An existing RiskScenario with the same title would be reused.",
-                    target_name=existing.name,
-                )
-            )
+            plans.append(WritePlan(
+                source_temporary_id=temporary_id,
+                decision="reuse", target_name=existing.name,
+                risk_assessment=risk_assessment, existing_instance=existing,
+            ))
+            self.planned_actions.append(PlannedScenarioAction(
+                temporary_id, "reuse", "planned",
+                "An existing RiskScenario with the same title would be reused unchanged.",
+                target_name=existing.name,
+            ))
             return
 
         if not self._check_add_permission(risk_assessment):
@@ -377,6 +426,8 @@ class AiRiskScenarioCommitService:
 
         assets = self._resolve_assets(field_prefix, payload, folder)
         applied_controls = self._resolve_applied_controls(field_prefix, payload, folder)
+        proposed_threat = self._plan_related(field_prefix, "threat", payload, folder)
+        proposed_vulnerability = self._plan_related(field_prefix, "vulnerability", payload, folder)
 
         self._warn_unrated_advisory_context(field_prefix)
 
@@ -390,18 +441,76 @@ class AiRiskScenarioCommitService:
                 description=_build_description(payload),
                 assets=assets,
                 applied_controls=applied_controls,
+                proposed_threat=proposed_threat,
+                proposed_vulnerability=proposed_vulnerability,
             )
         )
         self.planned_actions.append(
             PlannedScenarioAction(
                 temporary_id, "create", "planned",
-                "RiskScenario would be created unrated under the selected risk assessment; "
-                "no risk treatment and no risk acceptance is recorded.",
+                "RiskScenario would be created unrated; reviewed Threat and "
+                "Vulnerability text would become same-folder exact-match links or "
+                "new unpublished draft records. No risk treatment or acceptance.",
                 target_name=label,
             )
         )
 
     # ---- resolution helpers ------------------------------------------------
+
+    def _eligible_ai_backfill(self, instance: RiskScenario, payload: dict[str, Any]) -> bool:
+        """Only complete missing links on an AI-origin record with identical advice.
+
+        Never overwrite a description or alter existing manual relationships.
+        """
+        text = instance.description or ""
+        if AI_ORIGIN_MARKER not in text:
+            return False
+        for label, key in (("Threat", "threat"), ("Vulnerability", "vulnerability")):
+            value = (payload.get(key) or "").strip()
+            if value and f"{label}: {value}" not in text.split("\n\n"):
+                return False
+        return True
+
+    def _plan_related(
+        self, field_prefix: str, kind: str, payload: dict[str, Any], folder: Folder
+    ) -> RelatedRecordPlan | None:
+        """Exact-name matching only. No uncertain keyword matches are auto-linked."""
+        name = (payload.get(kind) or "").strip()
+        if not name:
+            return None
+        if len(name) > MAX_RELATED_NAME_LENGTH:
+            self.blocking_errors.append({
+                "code": "related_name_too_long",
+                "detail": f"Reviewed {kind} is too long for its platform record name "
+                          f"(maximum {MAX_RELATED_NAME_LENGTH} characters). Shorten it first.",
+                "field": f"{field_prefix}.payload.{kind}",
+            })
+            return None
+        model = Threat if kind == "threat" else Vulnerability
+        existing = model.objects.filter(folder_id=folder.id, name__iexact=name).first()
+        if existing is not None:
+            if not RoleAssignment.is_object_readable(self.user, model, existing.id):
+                self.blocking_errors.append({
+                    "code": "permission_denied",
+                    "detail": f"Cannot safely use the selected {kind} record in this scope.",
+                    "field": f"{field_prefix}.payload.{kind}",
+                })
+                return None
+            return RelatedRecordPlan(kind=kind, name=name, existing_instance=existing)
+        if not self._has_permission(f"add_{kind}", folder):
+            self.blocking_errors.append({
+                "code": "permission_denied",
+                "detail": f"You cannot create a draft {kind} in this organization.",
+                "field": f"{field_prefix}.payload.{kind}",
+            })
+            return None
+        self.warnings.append({
+            "code": f"ai_proposed_{kind}_unverified",
+            "detail": f"The reviewed {kind} text will be saved as an unpublished draft "
+                      "in this folder. It is not a verified security finding.",
+            "field": f"{field_prefix}.payload.{kind}",
+        })
+        return RelatedRecordPlan(kind=kind, name=name)
 
     def _resolve_folder(self) -> Folder | None:
         folder = Folder.objects.filter(id=self.payload["folder_reference"]).first()
@@ -638,18 +747,107 @@ class AiRiskScenarioCommitService:
 
     # ---- write phase -------------------------------------------------------
 
+    def _link_reviewed_relations(self, instance: RiskScenario, plan: WritePlan) -> None:
+        folder = plan.risk_assessment.folder
+        for relation in (plan.proposed_threat, plan.proposed_vulnerability):
+            if relation is None:
+                continue
+            model = Threat if relation.kind == "threat" else Vulnerability
+            # Recheck exact-folder match inside the transaction. Never match by
+            # keyword, cross a folder, or mutate existing catalog entries.
+            target = model.objects.filter(
+                folder_id=folder.id, name__iexact=relation.name
+            ).first()
+            if target is not None:
+                if not RoleAssignment.is_object_readable(self.user, model, target.id):
+                    raise RiskScenarioCommitValidationError(
+                        "related_permission_denied",
+                        "A reviewed related record is no longer readable. No changes saved.",
+                        status_code=403,
+                    )
+            else:
+                if not self._has_permission(f"add_{relation.kind}", folder):
+                    raise RiskScenarioCommitValidationError(
+                        "related_permission_denied",
+                        "Permission to create a related draft is missing. No changes saved.",
+                        status_code=403,
+                    )
+                note = (
+                    "AI-proposed draft from a human-reviewed risk scenario. "
+                    "Not verified by independent evidence; validate before treating as confirmed."
+                )
+                kwargs = dict(folder=folder, name=relation.name,
+                              description=note, is_published=False)
+                if relation.kind == "vulnerability":
+                    kwargs["status"] = Vulnerability.Status.POTENTIAL
+                target = model.objects.create(**kwargs)
+            getattr(instance, "threats" if relation.kind == "threat" else "vulnerabilities").add(target)
+
     def _execute_write_plan(self, plans: list[WritePlan]) -> None:
         for plan in plans:
             if plan.decision == "reuse":
-                # Reuse never mutates the existing record; it is only reported.
                 self.reused_records.append(
                     self._record_summary(plan.existing_instance, plan, "reuse")
                 )
                 continue
-
-            # No proba/impact/level is set: the platform's own "not rated" defaults apply, so
-            # Step 8B records no risk rating. treatment keeps its "open" default, so no risk
-            # is accepted, transferred, avoided, or closed here.
+            # Serialize concurrent AI saves against the same assessment. Every
+            # saved draft and relation is committed or rolled back as one unit.
+            current_assessment = (RiskAssessment.objects.select_for_update()
+                                  .get(id=plan.risk_assessment.id))
+            if (current_assessment.is_locked or
+                    current_assessment.status == Assessment.Status.IN_REVIEW):
+                raise RiskScenarioCommitValidationError(
+                    "changed_since_dry_run",
+                    "Assessment is now locked or in review. No changes saved.",
+                    status_code=422,
+                )
+            if not self._has_permission("change_riskscenario", current_assessment.folder):
+                raise RiskScenarioCommitValidationError(
+                    "permission_denied", "Risk change permission is missing.",
+                    status_code=403,
+                )
+            if plan.decision == "create" and not self._has_permission(
+                "add_riskscenario", current_assessment.folder
+            ):
+                raise RiskScenarioCommitValidationError(
+                    "permission_denied", "Risk creation permission is missing.",
+                    status_code=403,
+                )
+            if plan.decision == "link_existing_ai":
+                instance = RiskScenario.objects.select_for_update().get(
+                    id=plan.existing_instance.id, risk_assessment=plan.risk_assessment
+                )
+                if not RoleAssignment.is_object_readable(self.user, RiskScenario, instance.id) or \
+                        not self._eligible_ai_backfill(instance, {
+                            "threat": plan.proposed_threat.name if plan.proposed_threat else "",
+                            "vulnerability": plan.proposed_vulnerability.name if plan.proposed_vulnerability else "",
+                        }):
+                    raise RiskScenarioCommitValidationError(
+                        "changed_since_dry_run",
+                        "Saved risk is no longer eligible for relationship-only completion.",
+                        status_code=422,
+                    )
+                if (plan.proposed_threat and instance.threats.exists()) or (
+                    plan.proposed_vulnerability and instance.vulnerabilities.exists()
+                ):
+                    raise RiskScenarioCommitValidationError(
+                        "changed_since_dry_run",
+                        "Risk relationships changed since review; run the dry-run again.",
+                        status_code=422,
+                    )
+                self._link_reviewed_relations(instance, plan)
+                self.updated_records.append(self._record_summary(instance, plan, "linked_existing_ai"))
+                continue
+            # If a concurrent save already created the same scenario, abort and
+            # ask for a fresh dry-run instead of creating a duplicate record.
+            if RiskScenario.objects.filter(risk_assessment=plan.risk_assessment,
+                                            name__iexact=plan.target_name).exists():
+                raise RiskScenarioCommitValidationError(
+                    "changed_since_dry_run",
+                    "A risk with this name now exists. Run a new dry-run before saving.",
+                    status_code=422,
+                )
+            # Create an unrated scenario; no treatment or risk acceptance.
             instance = RiskScenario.objects.create(
                 risk_assessment=plan.risk_assessment,
                 name=plan.target_name,
@@ -660,7 +858,7 @@ class AiRiskScenarioCommitService:
                 instance.assets.add(*plan.assets)
             if plan.applied_controls:
                 instance.applied_controls.add(*plan.applied_controls)
-
+            self._link_reviewed_relations(instance, plan)
             self.created_records.append(self._record_summary(instance, plan, "create"))
 
     def _record_summary(self, instance, plan: WritePlan, action: str) -> dict[str, Any]:
@@ -673,6 +871,8 @@ class AiRiskScenarioCommitService:
             "source_temporary_id": plan.source_temporary_id,
             "risk_assessment_id": str(instance.risk_assessment_id),
             "ref_id": instance.ref_id,
+            "linked_threat_ids": list(map(str, instance.threats.values_list("id", flat=True))),
+            "linked_vulnerability_ids": list(map(str, instance.vulnerabilities.values_list("id", flat=True))),
             "linked_asset_ids": [str(asset.id) for asset in plan.assets],
             "linked_applied_control_ids": [
                 str(control.id) for control in plan.applied_controls
@@ -695,6 +895,8 @@ class AiRiskScenarioCommitService:
             return "completed_with_warnings"
         if self.created_records:
             return "created"
+        if self.updated_records:
+            return "linked_existing_ai"
         if self.reused_records:
             return "reused_only"
         return "completed"
@@ -722,6 +924,7 @@ class AiRiskScenarioCommitService:
             # A dry-run never writes, so created/reused stay empty until the approved commit.
             "created_records": [] if dry_run else self.created_records,
             "reused_records": [] if dry_run else self.reused_records,
+            "updated_records": [] if dry_run else self.updated_records,
             "rejected_records": self.rejected_records,
             "deferred_records": self.deferred_records,
             "skipped_records": self.skipped_records,

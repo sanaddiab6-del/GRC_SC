@@ -12,7 +12,6 @@
     const riskDiscovery = $derived((form && 'risk_discovery' in form ? form.risk_discovery : null) as any);
     const riskReview = $derived((form && 'risk_review' in form ? form.risk_review : null) as any);
     const riskDryRun = $derived((form && 'risk_dry_run' in form ? form.risk_dry_run : null) as any);
-    const riskLinkPreview = $derived((form && 'risk_link_preview' in form ? form.risk_link_preview : null) as any);
     const riskResult = $derived((form && 'risk_result' in form ? form.risk_result : null) as any);
     const riskCanSave = $derived(riskDryRun && (!riskDryRun.blocking_errors || riskDryRun.blocking_errors.length === 0)
         && riskDryRun.planned_actions?.some((a: any) => a.status === 'planned' && a.decision === 'create'));
@@ -526,6 +525,7 @@ Employees have not completed phishing awareness training</textarea>
                                 <input name="vulnerability" class="input w-full" maxlength="500" value={scenario.vulnerability || ''} />
                             </label>
                         </div>
+                        <p class="text-xs text-amber-900">Threat and vulnerability are AI proposals, not verified findings. After approval, SICO AI will save them as proper same-folder record links, reusing exact matches or creating unpublished drafts. Edit these values before dry-run if necessary.</p>
                         <label class="block space-y-1 text-sm font-semibold"><span>Potential business impact</span>
                             <textarea name="impact_description" rows="3" maxlength="3000" class="textarea w-full">{scenario.impact_description || ''}</textarea>
                         </label>
@@ -567,11 +567,11 @@ Employees have not completed phishing awareness training</textarea>
                 {/each}
                 {#if riskReview && riskCanSave}
                     <form method="POST" action="?/riskCommit" class="space-y-3 rounded border border-teal-300 p-4">
-                        <p class="font-semibold">Reviewed action: create <strong>{riskReview.scenario.title}</strong> under the existing assessment.</p>
-                        <p class="text-xs text-surface-600">A final dry-run will be repeated server-side before saving. Any duplicate may be reused without modification. The record is created unrated; no treatment, acceptance, or closure is approved.</p>
+                        <p class="font-semibold">Reviewed action: save <strong>{riskReview.scenario.title}</strong> and its proposed Threat/Vulnerability links under the existing assessment.</p>
+                        <p class="text-xs text-surface-600">A final dry-run is repeated server-side. The reviewed threat and vulnerability will be linked to exact-name records in this folder, or saved as unpublished, unverified drafts and linked. If this is an eligible previously AI-created risk, only its missing links are added. Existing manual records are not changed. No risk rating, treatment, acceptance or closure is approved.</p>
                         <input type="hidden" name="review_json" value={JSON.stringify(riskReview)} />
                         <label class="flex items-start gap-2 text-sm font-semibold"><input name="approved_by_reviewer" type="checkbox" class="checkbox mt-1" required />
-                            <span>I reviewed the contents, confirmed the correct organization and assessment, and authorize creating this draft risk scenario.</span>
+                            <span>I reviewed the contents and destination. I approve creating this draft risk or completing missing links on this previously AI-created risk, and creating or reusing its draft Threat and Vulnerability records.</span>
                         </label>
                         <button type="submit" class="btn preset-filled-primary-500">Approve and save real risk scenario</button>
                     </form>
@@ -583,77 +583,22 @@ Employees have not completed phishing awareness training</textarea>
                 <h3 class="font-bold">Protected GRC commit result</h3>
                 <p class="text-sm">Status: <strong>{riskResult.commit_status || 'unknown'}</strong></p>
                 {#each riskResult.created_records || [] as record}
-                    <p class="text-sm">Created: <strong>{record.name}</strong> (record ID: {record.record_id}). Risk rating recorded: {record.risk_rating_recorded ? 'yes' : 'no'}.</p>
+                    <p class="text-sm">Created: <strong>{record.name}</strong> (record ID: {record.record_id}). Linked threats: {record.linked_threat_ids?.length || 0}; vulnerabilities: {record.linked_vulnerability_ids?.length || 0}. Risk rating recorded: {record.risk_rating_recorded ? 'yes' : 'no'}.</p>
                 {/each}
                 {#each riskResult.reused_records || [] as record}
                     <p class="text-sm">Reused existing record without modification: <strong>{record.name}</strong>.</p>
                 {/each}
+                {#each riskResult.updated_records || [] as record}
+                    <p class="text-sm">Completed missing links on a previously AI-created risk: <strong>{record.name}</strong>. Linked threats: {record.linked_threat_ids?.length || 0}; vulnerabilities: {record.linked_vulnerability_ids?.length || 0}. No risk rating was set.</p>
+                {/each}
                 {#each riskResult.blocking_errors || [] as item}
                     <p class="text-sm text-red-800">Blocked: {item.detail || item.code}</p>
-                {/each}
-                {#each riskResult.created_records || [] as record}
-                    <form method="POST" action="?/riskLinkPreview" class="pt-2">
-                        <input type="hidden" name="risk_reference_or_url" value={record.record_id} />
-                        <button type="submit" class="btn preset-tonal-primary">Find existing threat and vulnerability links (no writes)</button>
-                    </form>
                 {/each}
                 <a href="/risk-scenarios" class="inline-block text-sm font-semibold text-teal-700 underline">Open Risk Scenarios in the manual platform</a>
             </div>
         {/if}
     </section>
 
-    <!-- Phase 2A: read-only, permission-filtered links preview. Not a write workflow. -->
-    <section id="risk-relationship-preview" class="space-y-4 rounded-xl border-2 border-teal-400 bg-surface-50 p-5 shadow-sm md:p-6">
-        <h2 class="text-xl font-bold">Complete an existing risk — threat and vulnerability matching</h2>
-        <p class="text-sm text-surface-600">Paste the address of a saved risk scenario page. SICO AI checks only existing readable records in that risk's folder. No AI call, new record, link, risk rating, or treatment is performed.</p>
-        <form method="POST" action="?/riskLinkPreview" class="space-y-3">
-            <label class="block space-y-1 text-sm font-semibold">
-                <span>Saved risk scenario page link</span>
-                <input type="text" name="risk_reference_or_url" class="input w-full" maxlength="1000" required placeholder="Paste the URL of the saved risk scenario you opened" />
-            </label>
-            <button type="submit" class="btn preset-filled-primary-500">Find existing threat and vulnerability links (no changes)</button>
-        </form>
-        {#if riskLinkPreview}
-            <div class="space-y-3 rounded-lg border border-surface-300 bg-surface-100 p-4" aria-live="polite">
-                <h3 class="font-bold">Read-only matching result: {riskLinkPreview.scenario?.name}</h3>
-                <p class="text-sm">Organization: <strong>{riskLinkPreview.scope?.folder_name}</strong> · Assessment: <strong>{riskLinkPreview.scope?.assessment_name}</strong></p>
-                <div class="grid gap-4 md:grid-cols-2">
-                    <div class="rounded border border-surface-300 p-3 space-y-2">
-                        <h4 class="font-semibold">Threats</h4>
-                        <p class="text-xs text-surface-600">Saved advisory: {riskLinkPreview.advisory?.threat || 'No specific threat in the description'}</p>
-                        <p class="text-sm">Already linked: {(riskLinkPreview.linked?.threats || []).map((x) => x.name).join(', ') || 'None'}</p>
-                        {#if !riskLinkPreview.suggestions?.threats?.length}
-                            <p class="text-sm text-amber-800">No readable candidate with matching words was found in this folder. No new threat has been created.</p>
-                        {/if}
-                        {#each riskLinkPreview.suggestions?.threats || [] as item}
-                            <div class="rounded border border-teal-200 p-2 text-sm">
-                                <strong>{item.name}</strong> {#if item.reference}({item.reference}){/if}
-                                <p class="text-xs text-surface-600">Overlapping words: {(item.matching_words || []).join(', ') || 'None'} · Human review required</p>
-                            </div>
-                        {/each}
-                    </div>
-                    <div class="rounded border border-surface-300 p-3 space-y-2">
-                        <h4 class="font-semibold">Vulnerabilities</h4>
-                        <p class="text-xs text-surface-600">Saved advisory: {riskLinkPreview.advisory?.vulnerability || 'No specific vulnerability in the description'}</p>
-                        <p class="text-sm">Already linked: {(riskLinkPreview.linked?.vulnerabilities || []).map((x) => x.name).join(', ') || 'None'}</p>
-                        {#if !riskLinkPreview.suggestions?.vulnerabilities?.length}
-                            <p class="text-sm text-amber-800">No readable candidate with matching words was found in this folder. No new vulnerability has been created.</p>
-                        {/if}
-                        {#each riskLinkPreview.suggestions?.vulnerabilities || [] as item}
-                            <div class="rounded border border-teal-200 p-2 text-sm">
-                                <strong>{item.name}</strong> {#if item.reference}({item.reference}){/if}
-                                <p class="text-xs text-surface-600">Overlapping words: {(item.matching_words || []).join(', ') || 'None'} · Human review required</p>
-                            </div>
-                        {/each}
-                    </div>
-                </div>
-                <p class="rounded border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">This is keyword matching, not evidence verification. Do not assume that a proposed link is correct. Human-approved linking and guarded record creation are separate development steps.</p>
-                {#each riskLinkPreview.limitations || [] as limitation}
-                    <p class="text-xs text-surface-600">{limitation}</p>
-                {/each}
-            </div>
-        {/if}
-    </section>
 
 	<section class="space-y-3 rounded-xl border border-surface-300 bg-surface-50 p-5 shadow-sm md:p-6">
 		<div class="flex flex-wrap items-center justify-between gap-3">

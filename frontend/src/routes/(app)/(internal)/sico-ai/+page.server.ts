@@ -125,41 +125,6 @@ function hasBlockers(result: any): boolean {
 }
 
 export const actions: Actions = {
-    riskLinkPreview: async (event) => {
-        if (!hasAiOnboardingSession(event)) {
-            return fail(401, { error: errorDetail(AI_ONBOARDING_SESSION_EXPIRED) });
-        }
-        const data = await event.request.formData();
-        const entered = field(data, 'risk_reference_or_url', 1000);
-        let scenario_reference = '';
-        if (UUID.test(entered)) {
-            scenario_reference = entered;
-        } else {
-            try {
-                const address = new URL(entered);
-                if (address.origin !== event.url.origin ||
-                    !address.pathname.includes('/risk-scenarios/')) {
-                    return fail(400, { error: 'Paste a Risk Scenario page link from this same SICO AI website.' });
-                }
-                const segments = address.pathname.split('/').filter(Boolean);
-                const last = segments[segments.length - 1] || '';
-                if (UUID.test(last)) scenario_reference = last;
-            } catch { /* Reject malformed URLs below. */ }
-        }
-        if (!scenario_reference) {
-            return fail(400, { error: 'Paste the link of the existing risk scenario, or its record UUID.' });
-        }
-        try {
-            const response = await fetchAiOnboardingBackend(event,
-                '/ai/onboarding/risk-scenarios/relationship-preview/', { scenario_reference });
-            const result = await response.json().catch(() => ({}));
-            if (!response.ok) return fail(response.status, { error: errorDetail(result) });
-            return { risk_link_preview: result,
-                message: 'Existing threat and vulnerability candidates found. No links or records were changed.' };
-        } catch (error) {
-            return fail(502, { error: errorDetail(error) });
-        }
-    },
     riskSuggest: async (event) => {
         if (!hasAiOnboardingSession(event)) return fail(401, { error: errorDetail(AI_ONBOARDING_SESSION_EXPIRED) });
         const data = await event.request.formData();
@@ -236,8 +201,10 @@ export const actions: Actions = {
             });
             return { risk_result: result,
                 message: Array.isArray(result.created_records) && result.created_records.length
-                    ? 'A real risk scenario was created. Open Risk Scenarios to review/edit it.'
-                    : 'No new scenario was created. Review the returned status and any reused record.' };
+                    ? 'Risk scenario and reviewed threat/vulnerability links saved. Open Risk Scenarios to inspect them.'
+                    : Array.isArray(result.updated_records) && result.updated_records.length
+                        ? 'Missing threat/vulnerability links were added to the previously AI-created risk. Open Risk Scenarios to inspect them.'
+                        : 'No new record or link was saved. Review the returned status.' };
         } catch (error) {
             return fail(502, { error: errorDetail(error) });
         }
