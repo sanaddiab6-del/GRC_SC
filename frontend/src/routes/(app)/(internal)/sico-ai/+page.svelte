@@ -571,6 +571,21 @@ Employees have not completed phishing awareness training</textarea>
                 <p class="text-sm">SICO AI loaded existing authorized records for <strong>{riskFullContext.folder?.name}</strong> / <strong>{riskFullContext.assessment?.name}</strong>. It does not create or invent assets, owners, controls or evidence. Select only applicable records and review matrix values.</p>
                 {#if riskFullContext.existing_risk}<p class="rounded bg-teal-50 p-2 text-sm">Existing risk found: <strong>{riskFullContext.existing_risk.label}</strong>. Nonempty manual values will not be overwritten.</p>{/if}
                 {#each riskFullContext.warnings || [] as warning}<p class="text-xs text-amber-900">{warning}</p>{/each}
+                {#if riskFullContext.auto_investigation}
+                    <div class="space-y-2 rounded-lg border border-surface-300 bg-surface-100 p-3" aria-label="SICO AI investigation summary">
+                        <h4 class="text-sm font-bold">SICO AI investigation — suggestions from existing records</h4>
+                        <p class="text-xs">SICO AI checked readable records in this organization. A literal name match is only a proposal, not evidence that an asset is in scope or a control works.</p>
+                        {#if riskFullContext.auto_investigation.candidate_mentions?.assets?.length}
+                            <p class="text-xs"><strong>Assets mentioned in the scenario:</strong> {riskFullContext.auto_investigation.candidate_mentions.assets.map((x: any) => x.label).join(', ')} — confirm the correct asset before saving.</p>
+                        {/if}
+                        {#if riskFullContext.auto_investigation.candidate_mentions?.existing_controls?.length}
+                            <p class="text-xs"><strong>Existing control candidates (not selected):</strong> {riskFullContext.auto_investigation.candidate_mentions.existing_controls.map((x: any) => x.label).join(', ')}</p>
+                        {/if}
+                        <details class="text-xs"><summary class="cursor-pointer font-semibold">What SICO AI cannot verify yet</summary>
+                            <ul class="mt-2 list-disc space-y-1 pl-5">{#each riskFullContext.auto_investigation.gaps || [] as gap}<li>{gap}</li>{/each}</ul>
+                        </details>
+                    </div>
+                {/if}
                 <form method="POST" action="?/riskDryRun" class="space-y-4">
                     <input type="hidden" name="full_review_ready" value="yes" />
                     <input type="hidden" name="folder_reference" value={riskReview.folder_reference} />
@@ -637,7 +652,7 @@ Employees have not completed phishing awareness training</textarea>
                         <textarea name="existing_controls" rows="2" maxlength="2000" class="textarea w-full" placeholder="Documented existing measures; not AI assumptions">{riskReview.scenario.reviewed_fields?.existing_controls || ''}</textarea>
                     </label>
                     <label class="block space-y-1 text-sm font-semibold"><span>Evidence-based justification</span>
-                        <textarea name="justification" rows="3" maxlength="2000" class="textarea w-full" placeholder="Reference the specific documented source for risk rating decisions">{riskReview.scenario.reviewed_fields?.justification || ''}</textarea>
+                        <textarea name="justification" rows="3" maxlength="2000" class="textarea w-full" placeholder="Reference the specific documented source for risk rating decisions">{riskReview.scenario.reviewed_fields ? (riskReview.scenario.reviewed_fields.justification ?? '') : (riskFullContext.auto_investigation?.review_drafts?.justification || '')}</textarea>
                     </label>
                     <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-3">
                         <h4 class="font-bold text-sm text-amber-950">Official risk matrix ratings — only where justified by evidence</h4>

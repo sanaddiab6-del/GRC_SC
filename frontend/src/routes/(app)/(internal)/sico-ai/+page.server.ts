@@ -261,7 +261,11 @@ export const actions: Actions = {
                 assessment_reference: review.assessment_reference,
                 scenario_title: String(review.scenario.title || ''),
                 asset_title: String(review.scenario.asset_title || ''),
-                linked_applied_control_title: String(review.scenario.linked_applied_control_title || '')
+                linked_applied_control_title: String(review.scenario.linked_applied_control_title || ''),
+                scenario_description: String(review.scenario.description || ''),
+                scenario_threat: String(review.scenario.threat || ''),
+                scenario_vulnerability: String(review.scenario.vulnerability || ''),
+                scenario_rationale: String(review.scenario.rationale || '')
             });
             const risk_full_context = await ctxResponse.json().catch(() => ({}));
             if (!ctxResponse.ok) return fail(ctxResponse.status, {

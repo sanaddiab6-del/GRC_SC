@@ -15,6 +15,7 @@ from core.models import (
 from iam.models import Folder, RoleAssignment
 
 from .risk_scenario_full_fields import safe_label
+from .risk_scenario_auto_investigation import inspect_risk_context
 
 
 def _as_uuid(value):
@@ -62,6 +63,8 @@ class AiRiskFullContextView(APIView):
         if not isinstance(data, dict) or set(data) - {
             "folder_reference", "assessment_reference", "scenario_title",
             "asset_title", "linked_applied_control_title",
+            "scenario_description", "scenario_threat", "scenario_vulnerability",
+            "scenario_rationale",
         }:
             return Response({"detail": "Only approved lookup fields are allowed."}, status=400)
         folder_ref = _as_uuid(data.get("folder_reference"))
@@ -74,8 +77,8 @@ class AiRiskFullContextView(APIView):
             id=assessment_ref, folder_id=folder_ref
         ).select_related("risk_matrix").first()
         if (folder is None or assessment is None
-                or not RoleAssignment.is_object_readable(request.user, Folder, folder_ref)
-                or not RoleAssignment.is_object_readable(request.user, RiskAssessment, assessment_ref)):
+                or not RoleAssignment.is_object_readable(request.user, Folder, folder.id)
+                or not RoleAssignment.is_object_readable(request.user, RiskAssessment, assessment.id)):
             # Keep missing and unauthorized indistinguishable.
             return Response({"detail": "The selected assessment is not accessible."}, status=404)
 
@@ -125,11 +128,23 @@ class AiRiskFullContextView(APIView):
             found = [opt["reference"] for opt in options if title and opt["label"].casefold() == title.casefold()]
             return found[:1]
 
+        # The reviewer sees deterministic suggestions from the *already authorized*
+        # company-scoped records. Never derive risk scores or actual implementation.
+        scenario_text = {}
+        for field in (
+            "scenario_title", "scenario_description", "scenario_threat",
+            "scenario_vulnerability", "scenario_rationale", "asset_title",
+            "linked_applied_control_title",
+        ):
+            value = data.get(field, "")
+            if not isinstance(value, str) or len(value) > 5000:
+                return Response({"detail": "Invalid scenario context."}, status=400)
+            scenario_text[field] = value
+        auto = inspect_risk_context(catalogs, scenario_text)
         suggestions = {
-            "asset_references": exact_match(catalogs["assets"], str(data.get("asset_title") or "").strip()),
-            "existing_control_references": exact_match(
-                catalogs["existing_controls"], str(data.get("linked_applied_control_title") or "").strip()
-            ),
+            "asset_references": auto["suggestions"].get("asset_references", []),
+            # A control title is not evidence of implementation; no automatic link.
+            "existing_control_references": [],
         }
         matrix = selected_assessment.risk_matrix.parse_json()
         return Response({
@@ -138,12 +153,13 @@ class AiRiskFullContextView(APIView):
             "existing_risk": existing_display,
             "catalogs": catalogs,
             "suggestions": suggestions,
+            "auto_investigation": auto,
             "matrix": {
                 "probability": _matrix_choices(matrix.get("probability", [])),
                 "impact": _matrix_choices(matrix.get("impact", [])),
             },
             "warnings": [
-                "Automatic links require exact existing names. Other matches need human review.",
+                "Asset suggestions are literal name matches, not proof of scope; review before saving.",
                 "Proposed AI risk labels are not official matrix scores. Unverified scores stay unrated.",
                 "Owners are restricted to the current user's Actor; other assignments need an authorized company-aware workflow.",
             ],
