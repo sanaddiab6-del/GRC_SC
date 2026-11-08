@@ -144,3 +144,22 @@ urlpatterns += [path('onboarding/risk-scenarios/relationship-preview/', AiRiskRe
 # SICO AI full Risk Scenario review: read-only, exact-folder catalog.
 from .risk_scenario_full_context_views import AiRiskFullContextView
 urlpatterns += [path('onboarding/risk-scenarios/full-context/', AiRiskFullContextView.as_view(), name='ai-risk-full-context')]
+
+# SICO AI engagement coordination: durable execution receipts and protected reuse
+# of existing multi-module GRC services. No legacy /onboarding routes changed.
+from .engagement_views import (
+    AiEngagementListCreateView, AiEngagementDetailView, AiEngagementOperationView,
+)
+urlpatterns += [
+    path('workforce/engagements/', AiEngagementListCreateView.as_view(), name='sico-engagements'),
+    path('workforce/engagements/<uuid:engagement_id>/', AiEngagementDetailView.as_view(), name='sico-engagement-detail'),
+    path('workforce/engagements/<uuid:engagement_id>/operation/', AiEngagementOperationView.as_view(), name='sico-engagement-operation'),
+]
+from .engagement_views import AiEngagementPlanView
+urlpatterns += [
+    path('workforce/engagements/<uuid:engagement_id>/plan/', AiEngagementPlanView.as_view(), name='sico-engagement-plan'),
+]
+
+# SICO multi-module resume: read-only POST for the existing frontend proxy.
+from .engagement_views import AiEngagementResumeView
+urlpatterns += [path('workforce/engagements/resume/', AiEngagementResumeView.as_view(), name='sico-engagement-resume')]

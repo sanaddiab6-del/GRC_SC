@@ -217,6 +217,65 @@ function hasBlockers(result: any): boolean {
 }
 
 export const actions: Actions = {
+    engagementResume: async (event) => {
+        if (!hasAiOnboardingSession(event)) return fail(401, { error: errorDetail(AI_ONBOARDING_SESSION_EXPIRED) });
+        const data = await event.request.formData();
+        const engagement_id = field(data, 'engagement_id', 36);
+        if (engagement_id && !UUID.test(engagement_id)) return fail(400, { error: 'Invalid engagement.' });
+        try {
+            const response = await fetchAiOnboardingBackend(event, '/ai/workforce/engagements/resume/',
+                engagement_id ? { engagement_id } : {});
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) return fail(response.status, { error: errorDetail(result) });
+            return {
+                engagements: result.engagements || [],
+                engagement: result.engagement || null,
+                message: 'Existing engagement opened from the protected database ledger. No GRC records changed.'
+            };
+        } catch (error) {
+            return fail(502, { error: errorDetail(error) });
+        }
+    },
+    engagementCreate: async (event) => {
+        if (!hasAiOnboardingSession(event)) return fail(401, { error: errorDetail(AI_ONBOARDING_SESSION_EXPIRED) });
+        const data = await event.request.formData();
+        const folder_id = field(data, 'folder_id', 36);
+        const title = field(data, 'title', 200);
+        const objective = field(data, 'objective', 4000);
+        if (!UUID.test(folder_id) || title.length < 4 || objective.length < 20) {
+            return fail(400, { error: 'Choose an existing permitted organization and describe the real engagement.' });
+        }
+        try {
+            const response = await fetchAiOnboardingBackend(event, '/ai/workforce/engagements/', {
+                folder_id, title, objective
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) return fail(response.status, { error: errorDetail(result) });
+            return { engagement: result, message: 'A durable engagement workspace was created. No assessment or client record was changed.' };
+        } catch (error) {
+            return fail(502, { error: errorDetail(error) });
+        }
+    },
+    engagementPlan: async (event) => {
+        if (!hasAiOnboardingSession(event)) return fail(401, { error: errorDetail(AI_ONBOARDING_SESSION_EXPIRED) });
+        const data = await event.request.formData();
+        const engagement_id = field(data, 'engagement_id', 36);
+        if (!UUID.test(engagement_id)) return fail(400, { error: 'Select an existing engagement.' });
+        try {
+            const response = await fetchAiOnboardingBackend(event,
+                `/ai/workforce/engagements/${engagement_id}/plan/`,
+                { use_local_ai: data.get('use_local_ai') === 'on' });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) return fail(response.status, { error: errorDetail(result) });
+            return {
+                engagement: { id: engagement_id, title: field(data, 'engagement_title', 200) },
+                engagement_plan: result,
+                message: 'The authorized organization inventory and full engagement backlog were recorded. This is not a compliance verdict.'
+            };
+        } catch (error) {
+            return fail(502, { error: errorDetail(error) });
+        }
+    },
     riskSuggest: async (event) => {
         if (!hasAiOnboardingSession(event)) return fail(401, { error: errorDetail(AI_ONBOARDING_SESSION_EXPIRED) });
         const data = await event.request.formData();
@@ -225,7 +284,7 @@ export const actions: Actions = {
         const known_weaknesses = field(data, 'known_weaknesses', 2500).split(/\r?\n/)
             .map(item => item.trim()).filter(Boolean).slice(0, 10);
         if (case_summary.length < 20 || !known_weaknesses.length) {
-            return fail(400, { error: 'Describe the scope and at least one known weakness. Fictional test data is recommended.' });
+            return fail(400, { error: 'Describe the scope and at least one weakness supported by the available records.' });
         }
         try {
             const response = await fetchAiOnboardingBackend(event, '/ai/onboarding/risk-scenarios/suggest/', {
@@ -377,7 +436,7 @@ casePlan: async (event) => {
 			});
 			const result = await response.json().catch(() => ({ detail: 'Invalid backend response.' }));
 			if (!response.ok) return fail(response.status, { error: errorDetail(result) });
-			return { discovery: { ...result, case_context: { scope: field(data, 'scope_hint', 500) || 'Access management', period: field(data, 'assessment_period', 100) } }, message: 'Real platform records checked. No changes made.' };
+			return { discovery: { ...result, case_context: { scope: field(data, 'scope_hint', 500), objective: field(data, 'scenario_text', 4000), period: field(data, 'assessment_period', 100) } }, message: 'Real platform records checked. No changes made.' };
 		} catch (error) {
 			return fail(502, { error: errorDetail(error) });
 		}

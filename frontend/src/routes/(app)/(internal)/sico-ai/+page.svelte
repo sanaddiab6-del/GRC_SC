@@ -3,6 +3,9 @@
 
 	let { form }: { form: ActionData | null } = $props();
 	let showTechnical = $state(false);
+	const engagement = $derived((form && 'engagement' in form ? form.engagement : null) as any);
+	const engagements = $derived((form && 'engagements' in form ? form.engagements : null) as any);
+	const engagementPlan = $derived((form && 'engagement_plan' in form ? form.engagement_plan : null) as any);
 	const discovery = $derived((form && 'discovery' in form ? form.discovery : null) as any);
 	const casePlan = $derived((form && 'case_plan' in form ? form.case_plan : null) as any);
 	const draft = $derived((form && 'draft' in form ? form.draft : null) as any);
@@ -110,26 +113,26 @@
 				<label class="block space-y-1 text-sm font-semibold">
 					<span>Describe the assignment</span>
 					<textarea name="scenario_text" rows="5" required minlength="20" maxlength="12000"
-						class="textarea w-full" placeholder="Describe the organization, assessment objective, systems, issues and deadline...">Al-Rawasi Fintech is preparing for its Q4 2026 NCA ECC-1:2018 cybersecurity compliance assessment. Assess user access management for the core banking platform. Previous reviews found missing access reviews, no MFA on remote access, and weak privileged access management.</textarea>
+						class="textarea w-full" placeholder="Describe the organization, assessment objective, systems, issues and deadline..."></textarea>
 				</label>
 				<div class="grid gap-4 md:grid-cols-2">
 					<label class="block space-y-1 text-sm font-semibold">
 						<span>Preferred framework</span>
-						<input name="preferred_framework" class="input w-full" value="NCA ECC-1:2018" />
+						<input name="preferred_framework" class="input w-full"  />
 					</label>
 					<label class="block space-y-1 text-sm font-semibold">
 						<span>Organization</span>
-						<input name="organization_hint" class="input w-full" value="Al-Rawasi Fintech" />
+						<input name="organization_hint" class="input w-full"  />
 					</label>
 				</div>
 				<label class="block space-y-1 text-sm font-semibold">
 					<span>Scope / systems under assessment</span>
-					<input name="scope_hint" class="input w-full" value="Core banking platform — user access management" />
+					<input name="scope_hint" class="input w-full"  />
 				</label>
 				<div class="grid gap-4 md:grid-cols-2">
 					<label class="block space-y-1 text-sm font-semibold">
 						<span>Assessment period</span>
-						<input name="assessment_period" class="input w-full" value="Q4 2026" />
+						<input name="assessment_period" class="input w-full"  />
 					</label>
 					<label class="block space-y-1 text-sm font-semibold">
 						<span>Known deadline (optional)</span>
@@ -138,7 +141,7 @@
 				</div>
 				<label class="block space-y-1 text-sm font-semibold">
 					<span>Known trigger (optional)</span>
-					<input name="known_trigger" class="input w-full" value="Annual regulatory assessment; previous access review gaps" />
+					<input name="known_trigger" class="input w-full"  />
 				</label>
 				<div class="space-y-2">
 					<button type="submit" formaction="?/discover" class="btn preset-filled-primary-500 w-full font-semibold">
@@ -177,6 +180,95 @@
 			</p>
 		</aside>
 	</div>
+
+
+    <section class="rounded-xl border border-surface-300 p-4" aria-label="Resume a GRC engagement">
+        <h2 class="text-lg font-bold">Resume an existing GRC engagement</h2>
+        <p class="mt-1 text-sm">Reopen progress stored in PostgreSQL. You will only see engagements you created and are still authorized to access.</p>
+        <form method="POST" action="?/engagementResume" class="mt-3">
+            <button type="submit" class="btn preset-tonal-primary-500">Find my saved engagements</button>
+        </form>
+        {#if engagements?.length}
+            <div class="mt-3 space-y-2">
+                {#each engagements as saved}
+                    <form method="POST" action="?/engagementResume" class="flex flex-wrap items-center justify-between gap-2 rounded border border-surface-300 p-3">
+                        <input type="hidden" name="engagement_id" value={saved.id} />
+                        <span class="text-sm">{saved.title} · {saved.status.replaceAll('_', ' ')}</span>
+                        <button type="submit" class="btn preset-tonal-primary-500 btn-sm">Open engagement</button>
+                    </form>
+                {/each}
+            </div>
+        {:else if engagements}
+            <p class="mt-2 text-sm">No saved engagements are currently accessible.</p>
+        {/if}
+    </section>
+
+    {#if discovery?.selected_domain}
+        <section class="rounded-xl border-2 border-teal-500 bg-surface-50 p-5 shadow-sm md:p-6" aria-label="Create a persistent GRC engagement">
+            <h2 class="text-xl font-bold">Continue as one real GRC engagement</h2>
+            <p class="mt-2 text-sm text-surface-600">The organization below comes from your permitted database records, not from an AI guess. This step creates only SICO coordination metadata and preserves every existing GRC record.</p>
+            <form method="POST" action="?/engagementCreate" class="mt-4 space-y-4">
+                <input type="hidden" name="folder_id" value={discovery.selected_domain.id} />
+                <p class="text-sm">Selected organization: <strong>{discovery.selected_domain.name}</strong></p>
+                <label class="block space-y-1 text-sm font-semibold">
+                    <span>Engagement title</span>
+                    <input name="title" required minlength="4" maxlength="200" class="input w-full" value={`Internal GRC engagement — ${discovery.selected_domain.name}`} />
+                </label>
+                <label class="block space-y-1 text-sm font-semibold">
+                    <span>Real assessment objective</span>
+                    <textarea name="objective" required minlength="20" maxlength="4000" rows="3" class="textarea w-full" placeholder="Describe actual objectives, scope and known systems. No fictional information.">{discovery.case_context?.objective || ''}</textarea>
+                </label>
+                <button type="submit" class="btn preset-filled-primary-500">Create persistent GRC engagement</button>
+            </form>
+        </section>
+    {/if}
+
+    {#if engagement?.id}
+        <section class="rounded-xl border-2 border-teal-500 bg-surface-50 p-5 shadow-sm md:p-6" aria-label="SICO engagement work programme">
+            <h2 class="text-xl font-bold">Engagement workspace</h2>
+            <p class="mt-1 text-sm">{engagement.title || 'Existing engagement'} · Stored in the SICO engagement ledger</p>
+            <form method="POST" action="?/engagementPlan" class="mt-4 space-y-3">
+                <input type="hidden" name="engagement_id" value={engagement.id} />
+                <input type="hidden" name="engagement_title" value={engagement.title || ''} />
+                <label class="flex items-start gap-2 text-sm">
+                    <input type="checkbox" name="use_local_ai" class="checkbox mt-1" />
+                    <span>Use local Qwen for an additional advisory intake analysis. Record discovery and the work programme work without the model.</span>
+                </label>
+                <button type="submit" class="btn preset-filled-primary-500">Investigate and prepare full GRC work programme</button>
+            </form>
+            {#if engagementPlan}
+                <div class="mt-5 space-y-4" aria-live="polite">
+                    <p class="text-sm font-semibold">Authorized scope: {engagementPlan.organization?.name || 'not confirmed'}</p>
+                    <p class="text-xs text-surface-600">This is a real-record backlog, not an evidence-based compliance conclusion. Each execution must pass the original service's permission checks, dry-run and approval requirements.</p>
+                    <div class="grid gap-3 md:grid-cols-2">
+                        {#each engagementPlan.stages || [] as task}
+                            <div class="rounded border border-surface-300 p-3">
+                                <p class="text-sm font-semibold">{task.stage.replaceAll('_', ' ')}</p>
+                                <p class="mt-1 text-xs text-surface-600">{task.state.replaceAll('_', ' ')}</p>
+                                {#if task.dependencies?.length}<p class="mt-1 text-xs">Depends on: {task.dependencies.join(', ').replaceAll('_', ' ')}</p>{/if}
+                            </div>
+                        {/each}
+                    </div>
+                    {#if engagementPlan.additional_workstreams?.length}
+                        <h3 class="text-sm font-semibold">Other GRC functions still requiring integration or an applicability decision</h3>
+                        <div class="grid gap-2 md:grid-cols-2">
+                            {#each engagementPlan.additional_workstreams as stream}
+                                <div class="rounded border border-surface-300 p-3 text-sm">
+                                    <p class="font-semibold">{stream.area.replaceAll('_', ' ')}</p>
+                                    <p class="text-xs">{stream.note}</p>
+                                    <p class="text-xs text-surface-600">{stream.state.replaceAll('_', ' ')}</p>
+                                    {#if stream.manual_route}<a class="text-xs underline" href={stream.manual_route}>Open manual module</a>{/if}
+                                </div>
+                            {/each}
+                        </div>
+                    {/if}
+                    {#each engagementPlan.evidence_and_scope_gaps || [] as issue}
+                        <p class="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{issue}</p>
+                    {/each}
+                </div>
+            {/if}
+        </section>
+    {/if}
 
 	{#if error}
 		<section role="alert" class="rounded-xl border border-red-300 bg-red-50 p-5 text-sm text-red-900">
@@ -460,9 +552,9 @@
         </div>
         <form method="POST" action="?/riskSuggest" class="space-y-3 rounded-lg border border-surface-300 p-4">
             <label class="block space-y-1 text-sm font-semibold">
-                <span>Assessment scope / fictional example</span>
+                <span>Assessment scope / verified context</span>
                 <textarea name="case_summary" class="textarea w-full" rows="3" minlength="20" maxlength="4000" required
-                    placeholder="Describe the scope, affected system and assessment objective.">Fictional Test Bank: review remote access and phishing risks to its internal banking environment.</textarea>
+                    placeholder="Describe the scope, affected system and assessment objective."></textarea>
             </label>
             <label class="block space-y-1 text-sm font-semibold">
                 <span>Existing organization name (optional, for permitted assessment lookup)</span>
