@@ -163,3 +163,15 @@ urlpatterns += [
 # SICO multi-module resume: read-only POST for the existing frontend proxy.
 from .engagement_views import AiEngagementResumeView
 urlpatterns += [path('workforce/engagements/resume/', AiEngagementResumeView.as_view(), name='sico-engagement-resume')]
+
+
+# SICO AI: authenticated, review-only full-platform capability selection.
+from .engagement_capability_views import AiEngagementCapabilitiesView
+
+urlpatterns += [
+    path(
+        'workforce/engagements/<uuid:engagement_id>/capabilities/',
+        AiEngagementCapabilitiesView.as_view(),
+        name='sico-engagement-capabilities',
+    ),
+]
