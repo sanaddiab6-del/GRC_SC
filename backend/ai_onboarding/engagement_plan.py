@@ -19,6 +19,7 @@ from .case_intake_serializers import AiCaseIntakeInputSerializer
 from .case_intake_service import build_case_intake_draft
 from .engagement_service import authorized_engagement
 from .engagement_rules import STAGES
+from .capability_registry import capability_catalog, validate_registry
 
 MAX_SCAN = 120
 MAX_SHOW = 10
@@ -168,6 +169,7 @@ def prepare_engagement_plan(request, engagement_id, *, use_local_ai=False):
         'organization': context['organization'],
         'framework': context['framework'],
         'inventory': context['inventory'],
+        'capabilities': capability_catalog() if validate_registry() else [],
         'stages': tasks,
         'additional_workstreams': additional_workstreams,
         'evidence_and_scope_gaps': gaps,
