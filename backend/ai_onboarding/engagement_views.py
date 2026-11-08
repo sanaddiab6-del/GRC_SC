@@ -115,6 +115,21 @@ class AiEngagementOperationView(APIView):
         form = EngagementOperationInput(data=request.data)
         form.is_valid(raise_exception=True)
         args = form.validated_data
+
+        # SICO AI engagement commits require independent, server-recorded
+        # human authorization. Caller-supplied approval flags are not proof.
+        # Keep preparation available while that workflow is implemented.
+        if args['mode'] == 'commit':
+            return Response(
+                {
+                    'detail': (
+                        'SICO AI engagement commits are disabled until '
+                        'independent human approval is implemented.'
+                    )
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         try:
             result = execute_stage(
                 request, engagement_id, stage=args['stage'], batch_key=args['batch_key'],
