@@ -123,7 +123,7 @@ class LocalAiProvider:
             "model": model,
             "prompt": prompt,
             "stream": False,
-            "format": "json",
+            "format": _ollama_output_format(schema_name, json_schema),
             "options": options,
         }
 
@@ -172,6 +172,15 @@ class LocalAiProvider:
         return parsed
 
 
+def _ollama_output_format(schema_name: str, json_schema: dict[str, Any]):
+    """Constrain only SICO capability-selection output to its schema."""
+    if schema_name in {
+        "sico_capability_selection_v1",
+        "sico_capability_batch_v1",
+    }:
+        return json_schema
+    return "json"
+
 def _build_ollama_prompt(
     *,
     capability: str,
@@ -191,10 +200,21 @@ def _build_ollama_prompt(
         },
     }
 
+    # Internal routing identifiers are not candidate GRC capabilities.
+    # Never encourage the model to copy them into its selection.
+    if schema_name in {
+        "sico_capability_selection_v1",
+        "sico_capability_batch_v1",
+    }:
+        instruction.pop("capability", None)
+
     if capability != CAPABILITY_APPLIED_CONTROL_SUGGESTION:
         instruction["output_contract"]["required_top_level_keys"] = sorted(json_schema.get("required", []))
 
-    if capability == CAPABILITY_CASE_INTAKE:
+    if capability == CAPABILITY_CASE_INTAKE and schema_name not in {
+        "sico_capability_selection_v1",
+        "sico_capability_batch_v1",
+    }:
         instruction["output_contract"]["step1_compact_skeleton"] = {
             "draft_type": "AiCaseIntakeDraft",
             "schema_version": "0.2.0",

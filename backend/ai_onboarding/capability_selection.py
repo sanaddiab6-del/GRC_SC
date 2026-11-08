@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from .capability_registry import capability_catalog, validate_registry
 from .llm_config import (
-    CAPABILITY_CASE_INTAKE,
+    CAPABILITY_GRC_CAPABILITY_SELECTION,
     resolve_advisory_capability_config,
 )
 from .llm_provider import get_advisory_provider_selection
@@ -162,7 +162,7 @@ def suggest_engagement_capabilities(objective: str):
     validate_registry()
 
     config = resolve_advisory_capability_config(
-        CAPABILITY_CASE_INTAKE
+        CAPABILITY_GRC_CAPABILITY_SELECTION
     )
     selection = get_advisory_provider_selection(config)
     if selection.provider is None:
@@ -184,7 +184,7 @@ def suggest_engagement_capabilities(objective: str):
         permitted = {item["id"] for item in batch}
 
         response = selection.provider.generate_structured(
-            capability=CAPABILITY_CASE_INTAKE,
+            capability=CAPABILITY_GRC_CAPABILITY_SELECTION,
             model=config.model,
             system_prompt=(
                 SYSTEM_PROMPT
