@@ -175,3 +175,14 @@ urlpatterns += [
         name='sico-engagement-capabilities',
     ),
 ]
+
+# SICO AI case-setup preparation: no commit or approval endpoint.
+from .sico_case_setup_views import SicoCaseSetupPrepareView
+
+urlpatterns += [
+    path(
+        'workforce/engagements/<uuid:engagement_id>/case-setup/prepare/',
+        SicoCaseSetupPrepareView.as_view(),
+        name='sico-engagement-case-setup-prepare',
+    ),
+]
