@@ -109,7 +109,25 @@ class CapabilitySelectionTests(unittest.TestCase):
             temperature=0.1,
         )
         provider = Mock()
-        provider.generate_structured.return_value = valid_response()
+        def batch_response(**kwargs):
+            batch = kwargs["user_payload"]
+            if batch["batch_number"] > 2:
+                return {
+                    "selected_capabilities": [],
+                    "clarifying_questions": [],
+                }
+
+            item = batch["allowed_capabilities"][0]
+            return {
+                "selected_capabilities": [{
+                    "id": item["id"],
+                    "reason": "Relevant to the engagement.",
+                    "priority": "high",
+                }],
+                "clarifying_questions": [],
+            }
+
+        provider.generate_structured.side_effect = batch_response
 
         resolve_config.return_value = config
         select_provider.return_value = SimpleNamespace(
@@ -123,7 +141,7 @@ class CapabilitySelectionTests(unittest.TestCase):
         self.assertEqual(
             len(result["selected_capabilities"]), 2
         )
-        provider.generate_structured.assert_called_once()
+        self.assertEqual(provider.generate_structured.call_count, 5)
         self.assertFalse(result["execution_performed"])
 
     @patch(

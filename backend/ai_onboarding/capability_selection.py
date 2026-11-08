@@ -140,17 +140,20 @@ def validate_capability_selection(response):
     }
 
 
-def suggest_engagement_capabilities(objective: str):
-    """Use the existing local AI provider for review-only selection.
+BATCH_SIZE = 5
+BATCH_OUTPUT_TOKENS = 512
+BATCH_TIMEOUT_SECONDS = 120
 
-    Caller must authorize access before supplying an engagement objective.
-    This function is not a public API endpoint.
+
+def suggest_engagement_capabilities(objective: str):
+    """Select relevant capabilities in bounded, review-only batches.
+
+    Every batch must succeed. No partial response is accepted as complete.
     """
     if not isinstance(objective, str):
         raise CapabilitySelectionError("Invalid engagement objective.")
 
     objective = objective.strip()
-
     if not objective or len(objective) > 4000:
         raise CapabilitySelectionError(
             "Objective must contain 1 to 4000 characters."
@@ -158,44 +161,125 @@ def suggest_engagement_capabilities(objective: str):
 
     validate_registry()
 
-    # Reuse the already-supported local provider configuration.
-    # No new network endpoint or independent provider is introduced.
     config = resolve_advisory_capability_config(
         CAPABILITY_CASE_INTAKE
     )
     selection = get_advisory_provider_selection(config)
-
     if selection.provider is None:
         raise CapabilitySelectionError(
             "Local AI provider is not configured."
         )
 
-    catalogue = [
-        {
-            "id": item["id"],
-            "name": item["name"],
-            "module": item["module"],
-            "integration_status": item["integration_status"],
-        }
-        for item in capability_catalog()
+    catalogue = capability_catalog()
+    batches = [
+        catalogue[i:i + BATCH_SIZE]
+        for i in range(0, len(catalogue), BATCH_SIZE)
     ]
 
-    response = selection.provider.generate_structured(
-        capability=CAPABILITY_CASE_INTAKE,
-        model=config.model,
-        system_prompt=SYSTEM_PROMPT,
-        user_payload={
-            "engagement_objective": objective,
-            "allowed_capabilities": catalogue,
-        },
-        json_schema=OUTPUT_SCHEMA,
-        timeout_seconds=config.timeout_seconds,
-        max_output_tokens=config.max_output_tokens,
-        temperature=config.temperature,
-        schema_name="sico_capability_selection_v1",
-    )
+    selected = []
+    questions = []
+    seen = set()
 
-    result = validate_capability_selection(response)
+    for index, batch in enumerate(batches, start=1):
+        permitted = {item["id"] for item in batch}
+
+        response = selection.provider.generate_structured(
+            capability=CAPABILITY_CASE_INTAKE,
+            model=config.model,
+            system_prompt=(
+                SYSTEM_PROMPT
+                + "\nThis is one portion of the full platform catalogue. "
+                + "Evaluate every listed capability for applicability. "
+                + "Select only relevant entries from THIS portion. "
+                + "An empty selected_capabilities list is allowed. "
+                + "Keep reasons short (maximum 100 characters). "
+                + "Return at most two concise clarifying questions. "
+                + "Do not infer that other platform capabilities are absent."
+            ),
+            user_payload={
+                "engagement_objective": objective,
+                "batch_number": index,
+                "total_batches": len(batches),
+                "allowed_capabilities": [
+                    {
+                        "id": item["id"],
+                        "name": item["name"],
+                    }
+                    for item in batch
+                ],
+            },
+            json_schema=OUTPUT_SCHEMA,
+            timeout_seconds=min(
+                config.timeout_seconds, BATCH_TIMEOUT_SECONDS
+            ),
+            max_output_tokens=min(
+                config.max_output_tokens, BATCH_OUTPUT_TOKENS
+            ),
+            temperature=config.temperature,
+            schema_name="sico_capability_batch_v1",
+        )
+
+        if not isinstance(response, dict):
+            raise CapabilitySelectionError(
+                "Invalid response from capability batch."
+            )
+
+        entries = response.get("selected_capabilities")
+        batch_questions = response.get("clarifying_questions")
+
+        if not isinstance(entries, list):
+            raise CapabilitySelectionError(
+                "Invalid selected capabilities in batch."
+            )
+        if not isinstance(batch_questions, list):
+            raise CapabilitySelectionError(
+                "Invalid clarifying questions in batch."
+            )
+        if len(entries) > len(batch) or len(batch_questions) > 2:
+            raise CapabilitySelectionError(
+                "AI batch exceeded its limits."
+            )
+
+        for entry in entries:
+            if not isinstance(entry, dict):
+                raise CapabilitySelectionError(
+                    "Invalid capability selection item."
+                )
+
+            capability_id = entry.get("id")
+            if not isinstance(capability_id, str):
+                raise CapabilitySelectionError(
+                    "Invalid capability identifier."
+                )
+            if capability_id not in permitted:
+                raise CapabilitySelectionError(
+                    "AI selected a capability outside its batch."
+                )
+            if capability_id in seen:
+                raise CapabilitySelectionError(
+                    "Duplicate AI capability selection."
+                )
+
+            seen.add(capability_id)
+            selected.append(entry)
+
+        for question in batch_questions:
+            if not isinstance(question, str):
+                raise CapabilitySelectionError(
+                    "Invalid clarifying question."
+                )
+            if not question.strip() or len(question) > 500:
+                raise CapabilitySelectionError(
+                    "Invalid clarifying question length."
+                )
+            if question not in questions and len(questions) < 10:
+                questions.append(question)
+
+    result = validate_capability_selection({
+        "selected_capabilities": selected,
+        "clarifying_questions": questions,
+    })
     result["provider_mode"] = "configured_local_provider"
-
+    result["batches_processed"] = len(batches)
+    result["total_catalogued_capabilities"] = len(catalogue)
     return result
