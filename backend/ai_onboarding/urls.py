@@ -186,3 +186,14 @@ urlpatterns += [
         name='sico-engagement-case-setup-prepare',
     ),
 ]
+# Automatic case-setup preparation from an authorized engagement.
+# No AI approval or commit route is provided.
+from .sico_case_setup_views import SicoCaseSetupAutoPrepareView
+
+urlpatterns += [
+    path(
+        'workforce/engagements/<uuid:engagement_id>/case-setup/auto-prepare/',
+        SicoCaseSetupAutoPrepareView.as_view(),
+        name='sico-engagement-case-setup-auto-prepare',
+    ),
+]
