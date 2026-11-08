@@ -42,6 +42,11 @@ def build_case_setup_proposal(engagement, folder, framework):
     if not objective or len(objective) > 4000:
         raise SicoProposalError("Invalid engagement objective.")
 
+    if getattr(folder, "content_type", None) != Folder.ContentType.DOMAIN:
+        raise SicoProposalError(
+            "Case setup requires an authorized organizational domain folder."
+        )
+
     organization = str(folder.name or "").strip()
     if not organization:
         raise SicoProposalError("The selected folder has no name.")

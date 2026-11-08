@@ -3,6 +3,8 @@ from types import SimpleNamespace
 from unittest.mock import patch
 from uuid import uuid4
 
+from iam.models import Folder
+
 from ai_onboarding.sico_case_setup_proposal import (
     SicoProposalError,
     build_case_setup_proposal,
@@ -15,6 +17,7 @@ class SicoCaseSetupProposalTests(unittest.TestCase):
 
     def setUp(self):
         self.folder = SimpleNamespace(
+            content_type=Folder.ContentType.DOMAIN,
             pk=uuid4(),
             name="Example Test Organization",
         )
@@ -87,6 +90,11 @@ class SicoCaseSetupProposalTests(unittest.TestCase):
             first["source_step1_draft_hash"],
             second["source_step1_draft_hash"],
         )
+
+    def test_non_domain_folder_fails_closed(self):
+        self.folder.content_type = "not_a_domain"
+        with self.assertRaises(SicoProposalError):
+            self.build()
 
     def test_missing_framework_fails_closed(self):
         self.engagement.framework_id = None
