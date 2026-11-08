@@ -217,6 +217,73 @@ class SicoCaseSetupDatabaseIntegrationTests(unittest.TestCase):
                     1,
                 )
 
+                # An engagement must not import a framework
+                # from a different organization's folder.
+                foreign_framework = Framework.objects.create(
+                    name="SICO foreign framework " + marker,
+                    urn="urn:sico:foreign:" + marker,
+                    ref_id="FOREIGN-" + marker,
+                    folder=other_folder,
+                )
+
+                foreign_engagement = Engagement.objects.create(
+                    folder_id=authorized_folder.pk,
+                    created_by_id=str(owner.pk),
+                    title="Cross-company framework rejection",
+                    objective="Assess cybersecurity compliance controls",
+                    framework_id=foreign_framework.pk,
+                )
+
+                foreign_route = reverse(
+                    "sico-engagement-case-setup-auto-prepare",
+                    kwargs={"engagement_id": foreign_engagement.pk},
+                )
+                foreign_request = factory.post(
+                    foreign_route,
+                    {"batch_key": "foreign_framework"},
+                    format="json",
+                )
+                force_authenticate(foreign_request, user=owner)
+
+                foreign_response = SicoCaseSetupAutoPrepareView.as_view()(
+                    foreign_request,
+                    engagement_id=foreign_engagement.pk,
+                )
+
+                self.assertEqual(foreign_response.status_code, 404)
+                self.assertFalse(
+                    EngagementExecution.objects.filter(
+                        engagement=foreign_engagement
+                    ).exists()
+                )
+
+                # Removing the user's actual folder assignment
+                # must invalidate access, even when a preparation
+                # receipt was previously created.
+                owner_assignment.delete()
+
+                revoked_response = post_as(
+                    owner,
+                    {"batch_key": "after_revocation"},
+                )
+
+                self.assertEqual(revoked_response.status_code, 404)
+
+                self.assertEqual(
+                    EngagementExecution.objects.filter(
+                        engagement=engagement
+                    ).count(),
+                    1,
+                )
+
+                print(
+                    "CROSS-COMPANY FRAMEWORK ACCESS: DENIED",
+                    flush=True,
+                )
+                print(
+                    "REVOKED FOLDER ACCESS: DENIED",
+                    flush=True,
+                )
                 self.assertEqual(
                     Perimeter.objects.filter(
                         folder=authorized_folder
