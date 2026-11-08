@@ -88,5 +88,85 @@ class SicoEngagementCommitLockTests(unittest.TestCase):
         )
 
 
+class SicoCoordinatorCommitLockTests(unittest.TestCase):
+    """Direct coordinator calls must not bypass the API security lock."""
+
+    def make_request(self):
+        return SimpleNamespace(
+            user=SimpleNamespace(
+                pk=uuid4(),
+                is_authenticated=True,
+            )
+        )
+
+    @patch("ai_onboarding.engagement_service._validate_payload")
+    def test_direct_commit_with_approval_flags_is_blocked(self, validator):
+        from ai_onboarding.engagement_service import (
+            EngagementBlocked,
+            execute_stage,
+        )
+
+        with self.assertRaises(EngagementBlocked) as caught:
+            execute_stage(
+                self.make_request(),
+                uuid4(),
+                stage="case_setup",
+                batch_key="direct_approval_bypass",
+                mode="commit",
+                payload={
+                    "dry_run": False,
+                    "approved_by_user": True,
+                    "human_approved": True,
+                },
+                explicitly_approved=True,
+            )
+
+        self.assertEqual(caught.exception.http_status, 403)
+        validator.assert_not_called()
+
+    @patch("ai_onboarding.engagement_service._validate_payload")
+    def test_direct_commit_without_approval_is_blocked(self, validator):
+        from ai_onboarding.engagement_service import (
+            EngagementBlocked,
+            execute_stage,
+        )
+
+        with self.assertRaises(EngagementBlocked) as caught:
+            execute_stage(
+                self.make_request(),
+                uuid4(),
+                stage="case_setup",
+                batch_key="direct_commit_without_approval",
+                mode="commit",
+                payload={"dry_run": False},
+                explicitly_approved=False,
+            )
+
+        self.assertEqual(caught.exception.http_status, 403)
+        validator.assert_not_called()
+
+    @patch(
+        "ai_onboarding.engagement_service._validate_payload",
+        side_effect=RuntimeError("dry-run validation reached"),
+    )
+    def test_direct_dry_run_still_reaches_validation(self, validator):
+        from ai_onboarding.engagement_service import execute_stage
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "dry-run validation reached",
+        ):
+            execute_stage(
+                self.make_request(),
+                uuid4(),
+                stage="case_setup",
+                batch_key="direct_dry_run",
+                mode="dry_run",
+                payload={"dry_run": True},
+                explicitly_approved=False,
+            )
+
+        validator.assert_called_once()
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -160,6 +160,14 @@ def execute_stage(request, engagement_id, *, stage, batch_key, mode,
         raise EngagementBlocked('Unknown or unsupported GRC stage.', http_status=400)
     if not isinstance(payload, dict) or mode not in {'dry_run', 'commit'}:
         raise EngagementBlocked('Invalid operation.', http_status=400)
+    # Fail closed: caller-supplied flags are not independent human approval.
+    # Keep all SICO engagement commits disabled until the server verifies
+    # a separately recorded approval for the exact prepared operation.
+    if mode == 'commit':
+        raise EngagementBlocked(
+            'SICO AI engagement commits require independently verified human approval.',
+            http_status=403,
+        )
     if payload.get('dry_run') is not (mode == 'dry_run'):
         raise EngagementBlocked('The existing service dry_run must agree with the operation mode.', http_status=400)
     if mode == 'dry_run' and explicitly_approved:
