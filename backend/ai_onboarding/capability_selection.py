@@ -76,7 +76,7 @@ def validate_capability_selection(response):
     if len(selected) > len(allowed):
         raise CapabilitySelectionError("Too many selected capabilities.")
 
-    if not isinstance(questions, list) or len(questions) > 10:
+    if not isinstance(questions, list) or len(questions) > 50:
         raise CapabilitySelectionError("Invalid questions.")
 
     clean_questions = []
@@ -272,7 +272,7 @@ def suggest_engagement_capabilities(objective: str):
                 raise CapabilitySelectionError(
                     "Invalid clarifying question length."
                 )
-            if question not in questions and len(questions) < 10:
+            if question not in questions:
                 questions.append(question)
 
     result = validate_capability_selection({
