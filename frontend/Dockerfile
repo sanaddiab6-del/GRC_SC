@@ -20,7 +20,7 @@ RUN pnpm exec svelte-kit sync
 RUN pnpm exec vite build
 RUN pnpm prune --prod --ignore-scripts
 
-FROM node:24-slim
+FROM node:22-slim
 WORKDIR /app
 COPY --from=builder /app/build build/
 COPY --from=builder /app/server server/
