@@ -1,4 +1,5 @@
 FROM node:24-slim AS builder
+ARG NODE_OPTIONS
 ENV NODE_OPTIONS="--max-old-space-size=6144"
 ENV CI=true
 WORKDIR /app
@@ -14,6 +15,7 @@ RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # Copy source
 COPY . .
+RUN pnpm exec paraglide-js compile --project ./project.inlang --outdir ./src/paraglide
 RUN pnpm exec svelte-kit sync
 RUN pnpm exec vite build
 RUN pnpm prune --prod --ignore-scripts
