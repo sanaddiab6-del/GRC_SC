@@ -10,6 +10,7 @@
 
     const result = $derived(form as Record<string, any> | null);
     const run = $derived(result?.sico_run as Record<string, any> | undefined);
+    const plan = $derived(result?.sico_plan as Record<string, any> | undefined);
     const discovery = $derived(result?.discovery ?? result?.records ?? null);
     const advisory = $derived(result?.draft ?? result?.case_plan ?? result?.case_intake ?? null);
     const providerMode = $derived(String(advisory?.source_summary?.provider_mode ?? 'unknown'));
@@ -140,9 +141,9 @@
             <textarea id="sico-instruction" name="scenario_text" bind:value={instruction} rows="5" required minlength="20" maxlength="12000" placeholder="Example: Assess Demo Bank in Saudi Arabia against NCA ECC. Identify the scope, permitted records, missing information, and the next steps for review."></textarea>
             <div class="context-row">
                 <div>
-                    <label for="sico-organization">Organization to look up</label>
-                    <input id="sico-organization" name="organization_hint" bind:value={organization} placeholder="Exact existing organization / domain name" autocomplete="off" />
-                    <span class="help">Required by the current record-discovery service. Choose an organization you are authorized to access.</span>
+                    <label for="sico-organization">Organization (optional)</label>
+                    <input id="sico-organization" name="organization_hint" bind:value={organization} placeholder="Optional organization name" autocomplete="off" />
+                    <span class="help">Optional for planning. Leave blank for a new organization or general GRC request. No company records will be accessed in this step.</span>
                 </div>
             </div>
             <input type="hidden" name="preferred_framework" value="" />
@@ -151,7 +152,7 @@
             <input type="hidden" name="known_deadline" value="" />
             <input type="hidden" name="known_trigger" value="" />
             <div class="prompt-footer">
-                <span>Read-only discovery · Advisory intake · No GRC commits</span>
+                <span>AI workflow planning · No GRC records changed</span>
                 <button type="submit" disabled={busy || instruction.trim().length < 20}>
                     {#if busy}Preparing…{:else}Run SICO AI ↗{/if}
                 </button>
@@ -170,13 +171,48 @@
         {/if}
 
         {#if busy}
-            <div class="message" role="status">Checking accessible records and preparing the advisory response…</div>
+            <div class="message" role="status">Asking the local AI to plan the permitted GRC workflow…</div>
         {/if}
         {#if result?.error}
             <div class="message error" role="alert"><strong>We couldn't complete this request.</strong><p>{String(result.error)}</p></div>
         {/if}
 
-        {#if run}
+        {#if plan}
+            <section class="report" aria-live="polite">
+                <div class="report-head">
+                    <div>
+                        <p class="eyebrow">SICO AI COORDINATOR · LIVE MODEL PLAN</p>
+                        <h2>GRC workflow plan</h2>
+                    </div>
+                    <span class="status-pill">No GRC records changed</span>
+                </div>
+                <p class="report-intro">{String(plan.summary ?? '')}</p>
+                <p class="footnote">Model: {String(plan.model ?? 'unavailable')} · {Array.isArray(plan.steps) ? plan.steps.length : 0} registered stages selected · AI-generated plan, not executed work.</p>
+                <div class="report-grid">
+                    {#each (Array.isArray(plan.steps) ? plan.steps : []) as step, i}
+                        <article class="report-card">
+                            <h3>{i + 1}. {String(step.title)}</h3>
+                            <p>{String(step.purpose)}</p>
+                            <p class="footnote">Stage: {String(step.stage)} · Awaiting human approval and execution integration</p>
+                        </article>
+                    {/each}
+                </div>
+                {#if Array.isArray(plan.questions) && plan.questions.length}
+                    <article class="report-card" style="margin-top:14px">
+                        <h3>Information to confirm</h3>
+                        <ul class="notes">{#each plan.questions as question}<li>{String(question)}</li>{/each}</ul>
+                    </article>
+                {/if}
+                {#if Array.isArray(plan.limitations) && plan.limitations.length}
+                    <details class="technical">
+                        <summary>Current limits and safeguards</summary>
+                        <ul class="notes">{#each plan.limitations as note}<li>{String(note)}</li>{/each}</ul>
+                    </details>
+                {/if}
+            </section>
+        {/if}
+
+        {#if run && !plan}
             <section class="report" aria-live="polite">
                 <div class="report-head">
                     <div>
@@ -265,7 +301,7 @@
                 </details>
             </section>
         {/if}
-        <footer>SICO AI Next · Advisory only · No GRC business records written by this page</footer>
+        <footer>SICO AI Next · AI planning only · No GRC business records written by this page</footer>
     </div>
 </div>
 

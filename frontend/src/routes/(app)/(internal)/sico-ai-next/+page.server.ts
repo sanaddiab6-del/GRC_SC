@@ -1,101 +1,58 @@
-/**
- * SICO AI Next â€” one-request advisory workflow.
- *
- * This route deliberately reuses the existing authenticated intake and
- * read-only discovery handlers. It does not expose the legacy commit actions,
- * introduce its own authorization, or write GRC business records.
- */
+/** SICO AI Next: authenticated, organization-optional, read-only GRC coordinator. */
 import { fail } from '@sveltejs/kit';
 import type { Actions } from './$types';
-import { actions as existingActions } from '../sico-ai/+page.server';
+import {
+    AI_ONBOARDING_SESSION_EXPIRED,
+    fetchAiOnboardingBackend,
+    hasAiOnboardingSession
+} from '$lib/utils/aiOnboardingProxy';
 
-type RecordValue = Record<string, unknown>;
-
-function isRecord(value: unknown): value is RecordValue {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isFailure(value: unknown): value is { status: number; data: unknown } {
-    return isRecord(value) && typeof value.status === 'number' &&
-        value.status >= 400 && 'data' in value;
-}
-
-function failureMessage(value: { status: number; data: unknown }, fallback: string): string {
-    const content = isRecord(value.data) ? value.data : {};
-    const message = content.error ?? content.detail ?? content.message;
-    return typeof message === 'string' && message.trim() ? message.slice(0, 600) : fallback;
+function backendMessage(value: unknown): string {
+    if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+        const data = value as Record<string, unknown>;
+        for (const key of ['detail', 'error', 'message']) {
+            if (typeof data[key] === 'string' && (data[key] as string).trim()) {
+                return (data[key] as string).slice(0, 500);
+            }
+        }
+    }
+    return 'The SICO AI backend could not prepare a workflow plan.';
 }
 
 export const actions = {
     run: async (event) => {
-        // Clone before any handler reads the body. These requests are handled
-        // by the existing SICO auth/RBAC logic; never elevate permissions.
-        const checkRequest = event.request.clone();
-        const discoverRequest = event.request.clone();
-        const intakeRequest = event.request.clone();
-        const body = await checkRequest.formData();
+        if (!hasAiOnboardingSession(event)) {
+            return fail(401, { error: backendMessage(AI_ONBOARDING_SESSION_EXPIRED) });
+        }
+        const body = await event.request.formData();
         const instruction = String(body.get('scenario_text') ?? '').trim();
-
+        const organization_hint = String(body.get('organization_hint') ?? '').trim();
         if (instruction.length < 20 || instruction.length > 12000) {
-            return fail(400, {
-                error: 'Describe your GRC assignment in 20â€“12,000 characters.'
-            });
+            return fail(400, { error: 'Describe the GRC task in 20 to 12,000 characters.' });
         }
-
-        // Both handlers are already used by the existing SICO AI screen.
-        // They are read-only discovery and advisory intake, NOT commit APIs.
-        const discoveryResponse = await existingActions.discover({
-            ...event,
-            request: discoverRequest
-        } as Parameters<typeof existingActions.discover>[0]);
-
-        if (isFailure(discoveryResponse) && [401, 403].includes(discoveryResponse.status)) {
-            return fail(discoveryResponse.status, {
-                error: 'You do not have permission to investigate these GRC records.'
-            });
+        if (organization_hint.length > 150) {
+            return fail(400, { error: 'Organization name is too long.' });
         }
-
-        const intakeResponse = await existingActions.intake({
-            ...event,
-            request: intakeRequest
-        } as Parameters<typeof existingActions.intake>[0]);
-
-        if (isFailure(intakeResponse) && [401, 403].includes(intakeResponse.status)) {
-            return fail(intakeResponse.status, {
-                error: 'You do not have permission to generate this GRC intake.'
+        try {
+            const response = await fetchAiOnboardingBackend(event, '/ai/workforce/assistant/plan/', {
+                instruction,
+                organization_hint
             });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) return fail(response.status, { error: backendMessage(result) });
+            if (!result || !Array.isArray(result.steps) || result.provider_mode !== 'configured_local_provider') {
+                return fail(502, { error: 'SICO AI did not produce a verified model-generated workflow plan.' });
+            }
+            return {
+                sico_plan: result,
+                sico_run: {
+                    planning: 'completed',
+                    advisory_only: true,
+                    grc_business_records_written: false
+                }
+            };
+        } catch {
+            return fail(502, { error: 'Unable to reach the SICO AI planning backend.' });
         }
-
-        const discoveryOk = !isFailure(discoveryResponse) && isRecord(discoveryResponse);
-        const intakeOk = !isFailure(intakeResponse) && isRecord(intakeResponse);
-
-        if (!discoveryOk && !intakeOk) {
-            return fail(422, {
-                error: 'Both the GRC record lookup and advisory intake failed.',
-                discovery_error: isFailure(discoveryResponse)
-                    ? failureMessage(discoveryResponse, 'Record lookup failed') : 'Record lookup unavailable',
-                intake_error: isFailure(intakeResponse)
-                    ? failureMessage(intakeResponse, 'Advisory intake failed') : 'Advisory intake unavailable'
-            });
-        }
-
-        // Keep returned source objects unchanged. Don't manufacture findings,
-        // evidence, compliance verdicts, approval, or records.
-        return {
-            ...(discoveryOk ? discoveryResponse : {}),
-            ...(intakeOk ? intakeResponse : {}),
-            sico_run: {
-                discovery: discoveryOk ? 'completed' : 'unavailable',
-                intake: intakeOk ? 'completed' : 'unavailable',
-                advisory_only: true,
-                grc_business_records_written: false
-            },
-            ...(isFailure(discoveryResponse) ? {
-                discovery_error: failureMessage(discoveryResponse, 'Record lookup failed')
-            } : {}),
-            ...(isFailure(intakeResponse) ? {
-                intake_error: failureMessage(intakeResponse, 'Advisory intake failed')
-            } : {})
-        };
     }
 } satisfies Actions;
