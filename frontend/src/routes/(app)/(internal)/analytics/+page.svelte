@@ -85,6 +85,37 @@
 		goto(page.url);
 	}
 </script>
+<!-- SICO AI: Analytics launch button -->
+<div
+    data-sico-ai-analytics-button
+    style="display:flex;justify-content:flex-end;padding:8px 16px;margin-bottom:8px;"
+>
+    <a
+        href="/sico-ai-next"
+        aria-label="Open SICO AI"
+        title="Open SICO AI"
+        class="transition-transform duration-200 hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300"
+        style="display:inline-flex;align-items:center;gap:9px;min-height:42px;padding:5px 14px 5px 8px;border-radius:999px;border:1px solid #36dce9;background:linear-gradient(110deg,#073b4b,#0b2147 65%,#192761);color:white;text-decoration:none;font-size:14px;font-weight:700;box-shadow:0 0 14px rgba(0,225,228,.42),0 0 25px rgba(55,91,255,.26);"
+    >
+        <svg width="33" height="33" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+            <defs>
+                <linearGradient id="sicoAiAnalyticsGradient" x1="4" y1="4" x2="36" y2="36" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#41FFF1"/>
+                    <stop offset="1" stop-color="#5271FF"/>
+                </linearGradient>
+            </defs>
+            <ellipse cx="20" cy="22" rx="18" ry="7" transform="rotate(-20 20 22)" stroke="#18CBEC" stroke-width="1.5" opacity=".65"/>
+            <path d="M20 3.5L33 9V18.5C33 26.5 28 32.5 20 36.5C12 32.5 7 26.5 7 18.5V9L20 3.5Z" stroke="url(#sicoAiAnalyticsGradient)" stroke-width="2.5"/>
+            <path d="M20 11L22.8 17.2L29 20L22.8 22.8L20 29L17.2 22.8L11 20L17.2 17.2L20 11Z" fill="#F5FFFF"/>
+            <path d="M31 3L32.2 6.8L36 8L32.2 9.2L31 13L29.8 9.2L26 8L29.8 6.8L31 3Z" fill="#8AFFFF"/>
+        </svg>
+        <span>SICO AI</span>
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M6 3L11 8L6 13" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+    </a>
+</div>
+
 
 <Tabs value={group} onValueChange={(e) => handleTabChange(e.value)}>
 	<Tabs.List>
