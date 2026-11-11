@@ -34,20 +34,30 @@ export const actions = {
             return fail(400, { error: 'Organization name is too long.' });
         }
         try {
-            const response = await fetchAiOnboardingBackend(event, '/ai/workforce/assistant/plan/', {
-                instruction,
-                organization_hint
-            });
-            const result = await response.json().catch(() => ({}));
-            if (!response.ok) return fail(response.status, { error: backendMessage(result) });
-            if (!result || !Array.isArray(result.steps) || result.provider_mode !== 'configured_local_provider') {
-                return fail(502, { error: 'SICO AI did not produce a verified model-generated workflow plan.' });
-            }
+            const payload = { instruction, organization_hint };
+            // Independent requests: a planning failure must not discard an execution trace.
+            const [planning, execution] = await Promise.allSettled([
+                fetchAiOnboardingBackend(event, '/ai/workforce/assistant/plan/', payload)
+                    .then(async (response) => ({ ok: response.ok, data: await response.json() })),
+                fetchAiOnboardingBackend(event, '/ai/workforce/assistant/execute/', payload)
+                    .then(async (response) => ({ ok: response.ok, data: await response.json() }))
+            ]);
+            const planResult = planning.status === 'fulfilled' ? planning.value : null;
+            const agentResult = execution.status === 'fulfilled' ? execution.value : null;
+            const validPlan = planResult?.ok && Array.isArray(planResult.data?.steps)
+                && planResult.data.provider_mode === 'configured_local_provider';
+            const validAgent = agentResult?.ok && Array.isArray(agentResult.data?.trace)
+                && agentResult.data.mode === 'model_driven_read_only_agent';
             return {
-                sico_plan: result,
+                sico_plan: validPlan ? planResult?.data : null,
+                sico_agent: validAgent ? agentResult?.data : null,
+                plan_error: validPlan ? null : backendMessage(planResult?.data),
+                agent_error: validAgent ? null : agentResult
+                    ? backendMessage(agentResult.data) : 'Unable to reach the agent execution backend.',
                 sico_run: {
-                    planning: 'completed',
-                    advisory_only: true,
+                    planning: validPlan ? 'completed' : 'failed',
+                    execution: validAgent ? agentResult?.data.status : 'unavailable',
+                    advisory_only: !validAgent,
                     grc_business_records_written: false
                 }
             };

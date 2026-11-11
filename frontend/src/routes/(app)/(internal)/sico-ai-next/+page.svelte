@@ -11,6 +11,7 @@
     const result = $derived(form as Record<string, any> | null);
     const run = $derived(result?.sico_run as Record<string, any> | undefined);
     const plan = $derived(result?.sico_plan as Record<string, any> | undefined);
+    const agent = $derived(result?.sico_agent as Record<string, any> | undefined);
     const discovery = $derived(result?.discovery ?? result?.records ?? null);
     const advisory = $derived(result?.draft ?? result?.case_plan ?? result?.case_intake ?? null);
     const providerMode = $derived(String(advisory?.source_summary?.provider_mode ?? 'unknown'));
@@ -143,7 +144,7 @@
                 <div>
                     <label for="sico-organization">Organization (optional)</label>
                     <input id="sico-organization" name="organization_hint" bind:value={organization} placeholder="Optional organization name" autocomplete="off" />
-                    <span class="help">Optional for planning. Leave blank for a new organization or general GRC request. No company records will be accessed in this step.</span>
+                    <span class="help">Optional for framework lookup. Enter an exact authorized organization name, or use folder focus, to inspect company records.</span>
                 </div>
             </div>
             <input type="hidden" name="preferred_framework" value="" />
@@ -152,7 +153,7 @@
             <input type="hidden" name="known_deadline" value="" />
             <input type="hidden" name="known_trigger" value="" />
             <div class="prompt-footer">
-                <span>AI workflow planning · No GRC records changed</span>
+                <span>AI planning and authorized read-only execution</span>
                 <button type="submit" disabled={busy || instruction.trim().length < 20}>
                     {#if busy}Preparing…{:else}Run SICO AI ↗{/if}
                 </button>
@@ -171,10 +172,68 @@
         {/if}
 
         {#if busy}
-            <div class="message" role="status">Asking the local AI to plan the permitted GRC workflow…</div>
+            <div class="message" role="status">The local AI is planning and choosing authorized read-only GRC tools. A bounded run may take up to five minutes…</div>
         {/if}
         {#if result?.error}
             <div class="message error" role="alert"><strong>We couldn't complete this request.</strong><p>{String(result.error)}</p></div>
+        {/if}
+
+        {#if result?.plan_error}
+            <div class="message error" role="alert">Planning: {String(result.plan_error)}</div>
+        {/if}
+        {#if result?.agent_error}
+            <div class="message error" role="alert">Agent execution: {String(result.agent_error)}</div>
+        {/if}
+        {#if agent}
+            <section class="report" aria-live="polite" aria-label="Agent execution">
+                <div class="report-head">
+                    <div><p class="eyebrow">SICO AI · REAL TOOL EXECUTION</p><h2>Agent execution</h2></div>
+                    <span class="status-pill">{String(agent.status)} · Read only</span>
+                </div>
+                <p class="footnote">Model: {String(agent.model)} · {Number(agent.model_calls)} model decisions requested · No GRC records written</p>
+                {#if agent.model_error_code}<p class="finding-alert">Model failure: {String(agent.model_error_code)}</p>{/if}
+                <div class="report-grid">
+                    {#each (agent.trace ?? []) as step, i}
+                        {@const observation = (agent.observations ?? []).find((item: any) => item.id === step.observation_id)}
+                        <article class="report-card">
+                            <h3>{i + 1}. {String(step.decision?.tool || step.decision?.kind)}</h3>
+                            <p>{String(step.decision?.explanation ?? '')}</p>
+                            <p class="footnote">{String(step.status ?? 'refused')} {observation ? `· ${observation.id}` : ''}</p>
+                            {#if observation?.status === 'succeeded'}
+                                <p>{Number(observation.result?.returned_count ?? 0)} authorized record(s) retrieved{observation.result?.limited ? ' · Results limited' : ''}.</p>
+                                <ul class="records">
+                                    {#each (observation.result?.records ?? []) as record}
+                                        <li>
+                                            <strong>{String(record.name ?? record.requirement_id ?? record.id)}</strong>
+                                            {#if record.reference} · {String(record.reference)}{/if}
+                                            {#if record.status} · Status: {String(record.status)}{/if}
+                                            {#if record.stored_result} · Stored result: {String(record.stored_result)}{/if}
+                                            <small> · Record {String(record.id)}</small>
+                                        </li>
+                                    {/each}
+                                </ul>
+                                <p class="footnote">{String(observation.result?.caveat ?? '')}</p>
+                            {:else if observation?.error}
+                                <p class="finding-alert">{String(observation.error)}</p>
+                            {/if}
+                            {#if agent.trace[i + 1]}
+                                <p class="footnote">Next AI decision: {String(agent.trace[i + 1].decision?.tool || agent.trace[i + 1].decision?.kind)}</p>
+                            {/if}
+                        </article>
+                    {/each}
+                </div>
+                <article class="report-card" style="margin-top:14px">
+                    <h3>Final answer from retrieved records</h3>
+                    <p style="white-space:pre-wrap">{String(agent.final_answer || 'The run stopped before a grounded final answer was available. Review the partial results and unresolved work.')}</p>
+                    {#if agent.citations?.length}<p class="footnote">Sources: {agent.citations.join(', ')}</p>{/if}
+                    <p class="footnote">AI synthesis of the cited stored records; this is not an independent audit or compliance verdict.</p>
+                    {#if agent.unresolved?.length}
+                        <h3>Unresolved work / authorization needed</h3>
+                        <ul class="notes">{#each agent.unresolved as item}<li>{String(item)}</li>{/each}</ul>
+                    {/if}
+                    <p class="footnote">{String(agent.approval_required)}</p>
+                </article>
+            </section>
         {/if}
 
         {#if plan}
@@ -212,7 +271,7 @@
             </section>
         {/if}
 
-        {#if run && !plan}
+        {#if run && !plan && !agent && !result?.agent_error}
             <section class="report" aria-live="polite">
                 <div class="report-head">
                     <div>
