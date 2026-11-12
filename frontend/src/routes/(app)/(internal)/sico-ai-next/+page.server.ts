@@ -65,9 +65,40 @@ export const actions = {
             return fail(502, { error: 'Unable to reach the SICO AI planning backend.' });
         }
     },
+    ai_sixteen_phase: async (event) => {
+        if (!hasAiOnboardingSession(event)) return fail(401, { ai_sixteen_error: 'Sign in again.' });
+        const form = await event.request.formData();
+        const payload = {
+            organization_name: String(form.get('organization_name') ?? '').trim(),
+            framework_name: String(form.get('framework_name') ?? '').trim(),
+            problem: String(form.get('problem') ?? '').trim(),
+            phase: Number(form.get('phase') ?? -1)
+        };
+        if (payload.organization_name.length < 2 || payload.organization_name.length > 150 ||
+            payload.framework_name.length < 2 || payload.framework_name.length > 150 ||
+            payload.problem.length < 20 || payload.problem.length > 4000 ||
+            !Number.isInteger(payload.phase) || payload.phase < 0 || payload.phase > 3) {
+            return fail(400, { ai_sixteen_error: 'Enter the company, framework, problem and a valid generation phase.' });
+        }
+        try {
+            const response = await fetchAiOnboardingBackend(
+                event, '/ai/workforce/assistant/lifecycle/generate-four/', payload
+            );
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) return fail(response.status, { ai_sixteen_error: backendMessage(data) });
+            if (data.generated_by_model !== true || data.phase !== payload.phase ||
+                !Array.isArray(data.activities) || data.activities.length !== 4) {
+                return fail(502, { ai_sixteen_error: 'AI output did not contain four validated activities.' });
+            }
+            return { ai_sixteen_phase: data };
+        } catch {
+            return fail(502, { ai_sixteen_error: 'The Qwen generation request failed. Previously generated activities remain visible.' });
+        }
+    },
     lifecycle_intake: async (event) => {
         if (!hasAiOnboardingSession(event)) return fail(401, { lifecycle_error: 'Sign in again.' });
         const body = await event.request.formData();
+        const skipLegacyGeneration = body.get('skip_legacy_generation') === 'yes';
         const payload = {
             organization_name: String(body.get('organization_name') ?? '').trim(),
             framework_name: String(body.get('framework_name') ?? '').trim(),
@@ -89,11 +120,11 @@ export const actions = {
             }
             if (!data.engagement_id || !data.review?.operation_payload || !data.prepared_digest)
                 return fail(502, { lifecycle_error: 'Could not verify the reviewable GRC case.' });
-            // The original three inputs now trigger REAL local-model generation.
-            // Only the existing authenticated engagement ID is forwarded; the user
-            // never enters a UUID or has to choose a model/tool/stage manually.
+            // The new sixteen-stage generator already ran: do not invoke the old
+            // oversized single-model report again when preparing case records.
             let generated: Record<string, any> | null = null;
             let generationError = '';
+            if (!skipLegacyGeneration) {
             try {
                 const g = await fetchAiOnboardingBackend(
                     event, '/ai/workforce/assistant/lifecycle/generate/',
@@ -105,6 +136,7 @@ export const actions = {
                 else generationError = backendMessage(response);
             } catch {
                 generationError = 'Local AI generation was unavailable; no fabricated response was substituted.';
+            }
             }
             return { workflow_prepared: data, generated_assessment: generated, generation_error: generationError };
         } catch {

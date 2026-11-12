@@ -1,6 +1,6 @@
 <!-- SICO-CLEAR-REPORT-V2: no nested JSON in primary report -->
 <script lang="ts">
-    import { enhance } from '$app/forms';
+    import { enhance, deserialize, applyAction } from '$app/forms';
     import type { ActionData } from './$types';
 
     let { form }: { form: ActionData | null } = $props();
@@ -14,6 +14,11 @@
     let activeEngagement = $state('');
     let generatedAssessment = $state<Record<string, any> | null>(null);
     let generationError = $state('');
+    let generatedSixteen = $state<Record<string, any>[]>([]);
+    let generatedFor = $state('');
+    let sixteenBusy = $state(false);
+    let sixteenError = $state('');
+    let caseSaveNotice = $state('');
     let lifecycleProgress = $state<Record<string, any> | null>(null);
     let lifecycleProposal = $state<Record<string, any> | null>(null);
     let lifecycleApproval = $state<Record<string, any> | null>(null);
@@ -27,6 +32,83 @@
     let proposedPerimeter = $state('SICO cybersecurity assessment perimeter');
     let selectedFramework = $state('');
     let selectedRiskMatrix = $state('');
+    function clearStaleCase() {
+        generatedSixteen = [];
+        generatedFor = '';
+        sixteenError = '';
+        caseSaveNotice = '';
+        preparedWorkflow = null;
+        recordedApproval = null;
+        lifecycleProgress = null;
+        activeEngagement = '';
+    }
+
+    async function sicoPostAction(action: string, data: Record<string, string>) {
+        const payload = new FormData();
+        for (const [key, value] of Object.entries(data)) payload.set(key, value);
+        const res = await fetch(`?/${action}`, {
+            method: 'POST', body: payload, headers: { accept: 'application/json' }
+        });
+        const parsed = deserialize(await res.text());
+        if (parsed.type !== 'success') {
+            const body = parsed.type === 'failure' ? (parsed.data as Record<string, any>) : null;
+            throw new Error(String(body?.ai_sixteen_error ?? body?.lifecycle_error ?? 'The requested operation could not finish.'));
+        }
+        return parsed;
+    }
+
+    async function startGeneratedCase(event: SubmitEvent) {
+        event.preventDefault();
+        if (sixteenBusy || !organization.trim() || !frameworkSearch.trim() || instruction.trim().length < 20) return;
+        sixteenBusy = true;
+        sixteenError = '';
+        caseSaveNotice = '';
+        const submitted = {
+            organization_name: organization.trim(), framework_name: frameworkSearch.trim(), problem: instruction.trim()
+        };
+        const fingerprint = JSON.stringify(submitted);
+        if (fingerprint !== generatedFor) {
+            generatedSixteen = [];
+            generatedFor = fingerprint;
+        }
+        try {
+            // A single click automatically runs all four Qwen requests.
+            for (let phase = 0; phase < 4; phase++) {
+                if (generatedSixteen.length >= (phase + 1) * 4) continue;
+                const response = await sicoPostAction('ai_sixteen_phase', { ...submitted, phase: String(phase) });
+                const batch = (response.data as Record<string, any>)?.ai_sixteen_phase;
+                if (!batch || batch.phase !== phase || !Array.isArray(batch.activities) || batch.activities.length !== 4)
+                    throw new Error(`Phase ${phase + 1} returned invalid AI work products.`);
+                generatedSixteen = [...generatedSixteen.slice(0, phase * 4), ...batch.activities];
+            }
+        } catch (err) {
+            sixteenError = err instanceof Error ? err.message : 'Local Qwen generation stopped unexpectedly.';
+        }
+        // Independently prepare a REAL authorized case whenever this company
+        // already has a permitted domain. A *new* company cannot be silently
+        // provisioned or assigned permissions by AI.
+        try {
+            const response = await sicoPostAction('lifecycle_intake', {
+                ...submitted,
+                selected_framework_id: frameworkConfirmation,
+                selected_organization_id: organizationConfirmation,
+                skip_legacy_generation: 'yes'
+            });
+            const data = response.data as Record<string, any>;
+            if (data?.workflow_prepared || data?.lifecycle_choices) {
+                await applyAction(response);
+                caseSaveNotice = data?.workflow_prepared
+                    ? 'Authorized case operation prepared. Review and approve the proposed GRC records below.'
+                    : 'Confirm the exact framework edition below to prepare the actual saved case.';
+            } else {
+                caseSaveNotice = 'Case preparation returned no verified operation. AI analysis remains a draft.';
+            }
+        } catch {
+            caseSaveNotice = 'AI work products are available. Saving a case requires an authorized organization workspace. If this is a new company, an administrator must provision it first; SICO will not assign it to another tenant.';
+        } finally {
+            sixteenBusy = false;
+        }
+    }
     const latestResponse = $derived(form as Record<string, any> | null);
     $effect(() => {
         if (latestResponse?.sico_run) lastAgentRun = latestResponse;
@@ -192,32 +274,21 @@
 
         <section class="report" aria-label="Build complete GRC case from three inputs" id="start-grc-case">
             <div class="report-head"><h2>Build a GRC case</h2><span class="status-pill">Your organization · Your framework · Your objective</span></div>
-            <form method="POST" action="?/lifecycle_intake" use:enhance={() => {
-                busy = true;
-                return async ({ update }) => {
-                    try {
-                        // SvelteKit normally resets successful enhanced forms, including
-                        // "needs exact selection" responses. Keep all three fields instead.
-                        await update({ reset: false });
-                    } finally {
-                        busy = false;
-                    }
-                };
-            }} class="workflow-form">
+            <form method="POST" action="?/lifecycle_intake" onsubmit={startGeneratedCase} class="workflow-form">
                 <label>1. Organization name
-                    <input name="organization_name" bind:value={organization} oninput={() => organizationConfirmation = ''} placeholder="Enter the exact existing company name" required minlength="2" maxlength="150" />
+                    <input name="organization_name" bind:value={organization} oninput={() => { organizationConfirmation = ''; clearStaleCase(); }} disabled={sixteenBusy} placeholder="Existing or new organization name" required minlength="2" maxlength="150" />
                 </label>
                 <label>2. Framework
-                    <input name="framework_name" bind:value={frameworkSearch} oninput={() => frameworkConfirmation = ''} placeholder="e.g. NCA ECC" required minlength="2" maxlength="150" />
+                    <input name="framework_name" bind:value={frameworkSearch} oninput={() => { frameworkConfirmation = ''; clearStaleCase(); }} disabled={sixteenBusy} placeholder="e.g. NCA ECC" required minlength="2" maxlength="150" />
                     <span class="footnote">The backend checks your loaded GRC library and never silently substitutes another framework.</span>
                 </label>
                 <label>3. What is the problem or assessment objective?
-                    <textarea name="problem" bind:value={instruction} rows="5" required minlength="20" maxlength="4000" placeholder="Describe the problem. SICO coordinates the assessment lifecycle and identifies evidence and decisions it needs."></textarea>
+                    <textarea name="problem" bind:value={instruction} oninput={clearStaleCase} disabled={sixteenBusy} rows="5" required minlength="20" maxlength="4000" placeholder="Describe the problem. SICO coordinates the assessment lifecycle and identifies evidence and decisions it needs."></textarea>
                 </label>
                 <input type="hidden" name="selected_framework_id" value={frameworkConfirmation}/>
                 <input type="hidden" name="selected_organization_id" value={organizationConfirmation}/>
-                <button type="submit" disabled={busy || instruction.trim().length < 20 || !organization.trim() || !frameworkSearch.trim()}>{busy ? 'Checking records…' : 'Build GRC case — prepare for review'}</button>
-                <p class="footnote">The initial case is prepared for your review. Approved GRC writes still require separately enabled, permission-checked services.</p>
+                <button type="submit" disabled={sixteenBusy || instruction.trim().length < 20 || !organization.trim() || !frameworkSearch.trim()}>{sixteenBusy ? `Generating with Qwen (${generatedSixteen.length}/16)…` : 'Generate 16 GRC activities & prepare case'}</button>
+                <p class="footnote">One click generates 16 AI work products in four Qwen batches. Real GRC records save only through existing authorized services and approval.</p>
             {#if latestResponse?.lifecycle_error}
                 <div class="message error" role="alert">{String(latestResponse.lifecycle_error)}</div>
             {/if}
@@ -245,7 +316,7 @@
                             </select>
                         </label>
                     {/if}
-                    <button type="submit" disabled={busy || !frameworkConfirmation || ((latestResponse.lifecycle_choices.organizations ?? []).length > 1 && !organizationConfirmation) || instruction.trim().length < 20 || !organization.trim() || !frameworkSearch.trim()}>
+                    <button type="submit" disabled={sixteenBusy || !frameworkConfirmation || ((latestResponse.lifecycle_choices.organizations ?? []).length > 1 && !organizationConfirmation) || instruction.trim().length < 20 || !organization.trim() || !frameworkSearch.trim()}>
                         {busy ? 'Verifying…' : 'Confirm framework and continue'}
                     </button>
                     <p class="footnote">Your three answers stay filled in. You only need to confirm the exact loaded edition when your framework name matches multiple records. Nothing has been saved yet.</p>
@@ -262,6 +333,41 @@
                 </article>
             {/if}
         </section>
+        {#if generatedSixteen.length > 0 || sixteenBusy || sixteenError || caseSaveNotice}
+            <section class="report" aria-label="Qwen generated sixteen activity results" aria-live="polite">
+                <div class="report-head">
+                    <h2>AI-generated GRC case — 16 activities</h2>
+                    <span class="status-pill">{generatedSixteen.length}/16 generated by Qwen</span>
+                </div>
+                <p class="report-intro">
+                    {organization} · {frameworkSearch}. These are organization-specific AI work products,
+                    not claims of verified implementation or completed audits.
+                </p>
+                {#if sixteenBusy}
+                    <p class="footnote">Qwen is generating four activities per request. Completed batches appear automatically.</p>
+                {/if}
+                {#if sixteenError}
+                    <div class="message error" role="alert">AI stopped after {generatedSixteen.length} of 16 activities: {sixteenError}. Your completed outputs remain visible; click Generate again to resume the missing batches.</div>
+                {/if}
+                {#if caseSaveNotice}
+                    <article class="report-card"><p>{caseSaveNotice}</p></article>
+                {/if}
+                <div class="stage-grid">
+                    {#each generatedSixteen as item (item.code)}
+                        <article class="report-card">
+                            <h3>{Number(item.number)}. {String(item.title)}</h3>
+                            <p><strong>AI analysis:</strong> {String(item.analysis)}</p>
+                            <p><strong>Proposed GRC work:</strong> {String(item.proposed_work)}</p>
+                            <p><strong>Evidence or decision required:</strong> {String(item.evidence_needed)}</p>
+                            <p class="footnote">AI-generated draft, NOT executed or saved in GRC modules.</p>
+                        </article>
+                    {/each}
+                </div>
+                {#if generatedSixteen.length === 16}
+                    <p class="footnote">All 16 draft work products generated. Database execution is separate and must use the authorized GRC writers below.</p>
+                {/if}
+            </section>
+        {/if}
         <details class="technical">
             <summary>Optional: read-only AI discovery and planning</summary>
         <form method="POST" action="?/run" use:enhance={() => {
