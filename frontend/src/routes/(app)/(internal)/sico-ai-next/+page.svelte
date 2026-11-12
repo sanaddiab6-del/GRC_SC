@@ -323,7 +323,7 @@
                     <ul class="notes">{#each generatedAssessment.report.next_actions ?? [] as action}
                         <li>{String(action)}</li>
                     {/each}</ul>
-                    <p class="footnote">AI generation is now visible; the 16-stage platform execution and authorized business-record writes are separate, unfinished integrations. No actions are marked complete by this draft.</p>
+                    <p class="footnote">This is Qwen-generated analysis. The approved case setup writes real Compliance records through existing SICO services. The other activities require their own authorized record operations and supporting evidence; no compliance verdict is inferred.</p>
                 </article>
             </section>
         {:else if generationError}
@@ -543,7 +543,7 @@
             {#if preparedWorkflow}
                 <article class="report-card" style="margin-top:14px">
                     <h3>3. Review the exact prepared operation</h3>
-                    <p class="footnote">Engagement: {String(preparedWorkflow.engagement_id)}</p>
+                    <p class="footnote">Case progress is tracked automatically. You do not need to enter an internal ID.</p>
                     <ul class="notes">
                         {#each (preparedWorkflow.planned_actions ?? []) as action}
                             <li>{String(action.platform_entity)} — {String(action.action)}: {String(action.detail)}</li>
@@ -554,12 +554,14 @@
                         <pre>{JSON.stringify(preparedWorkflow.review?.operation_payload, null, 2)}</pre>
                         <p>Fingerprint: {String(preparedWorkflow.prepared_digest)}</p>
                     </details>
-                    {#if !recordedApproval}
+                    {#if latestResponse?.workflow_committed?.business_records_written === true}
+                        <p class="message" role="status">The approved GRC assessment was saved and verified in your existing Compliance module. SICO will not repeat the case creation on retry.</p>
+                    {:else if !recordedApproval}
                         <form method="POST" action="?/workflow_approve" use:enhance class="workflow-form">
                             <input type="hidden" name="engagement_id" value={String(preparedWorkflow.engagement_id)} />
                             <input type="hidden" name="prepared_digest" value={String(preparedWorkflow.prepared_digest)} />
-                            <label class="confirmation"><input type="checkbox" name="confirm_reviewed" value="yes" required /> I reviewed the target company, framework, perimeter, assessment name and proposed changes.</label>
-                            <button type="submit">Record independent human approval</button>
+                            <label class="confirmation"><input type="checkbox" name="confirm_reviewed" value="yes" required /> I approve creating these exact GRC records for the displayed organization and framework.</label>
+                            <button type="submit">Approve and create the GRC case</button>
                         </form>
                     {:else if recordedApproval.commit_enabled === true}
                         <form method="POST" action="?/workflow_commit" use:enhance class="workflow-form">

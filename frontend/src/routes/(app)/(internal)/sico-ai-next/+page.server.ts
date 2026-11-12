@@ -1,4 +1,4 @@
-/** SICO AI Next: authenticated, organization-optional, read-only GRC coordinator. */
+/** SICO AI Next: authenticated AI generation with approval-gated GRC case execution. */
 import { fail } from '@sveltejs/kit';
 import type { Actions } from './$types';
 import {
@@ -184,7 +184,34 @@ export const actions = {
                 { engagement_id, prepared_digest, confirm_reviewed: true });
             const data = await r.json().catch(() => ({}));
             if (!r.ok) return fail(r.status, { workflow_error: backendMessage(data) });
-            return { workflow_approved: data };
+            // The user explicitly approved creation of these exact records. The
+            // existing case-only writer is now the NEXT operation, not a second
+            // manually navigated wizard. It verifies the stored approval, RBAC,
+            // scope, digest, transaction and idempotency independently.
+            if (data?.approved === true && data?.commit_enabled === true) {
+                try {
+                    const saved = await fetchAiOnboardingBackend(
+                        event, '/ai/workforce/assistant/workflow/commit/',
+                        { engagement_id, prepared_digest, confirm_reviewed: true }
+                    );
+                    const result = await saved.json().catch(() => ({}));
+                    if (!saved.ok || result?.business_records_written !== true ||
+                        !Array.isArray(result?.created_objects)) {
+                        return {
+                            workflow_approved: data,
+                            workflow_error: 'Approval was recorded, but case creation was blocked: ' +
+                                backendMessage(result) + '. No second approval is required.'
+                        };
+                    }
+                    return { workflow_approved: data, workflow_committed: result };
+                } catch {
+                    return { workflow_approved: data, workflow_error: 'Approval was recorded. Case save could not be verified; do not start another case.' };
+                }
+            }
+            return {
+                workflow_approved: data,
+                workflow_error: 'Approval recorded, but the restricted case writer is disabled. No GRC case was saved.'
+            };
         } catch {
             return fail(502, { workflow_error: 'Could not record human approval.' });
         }
