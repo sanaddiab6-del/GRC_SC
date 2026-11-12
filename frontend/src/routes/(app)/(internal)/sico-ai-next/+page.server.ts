@@ -65,6 +65,36 @@ export const actions = {
             return fail(502, { error: 'Unable to reach the SICO AI planning backend.' });
         }
     },
+    requirement_review: async (event) => {
+        if (!hasAiOnboardingSession(event)) return fail(401, { control_error: 'Sign in again.' });
+        const form = await event.request.formData();
+        const action = String(form.get('action') ?? '').trim();
+        const engagement_id = String(form.get('engagement_id') ?? '').trim();
+        if (!['status', 'generate_and_save'].includes(action) ||
+            (engagement_id && !/^[0-9a-fA-F-]{36}$/.test(engagement_id))) {
+            return fail(400, { control_error: 'Invalid saved case reference or action.' });
+        }
+        try {
+            const response = await fetchAiOnboardingBackend(
+                event, '/ai/workforce/assistant/lifecycle/requirements/review/', {
+                    action, ...(engagement_id ? { engagement_id } : {}),
+                    confirm_preliminary_write: action === 'generate_and_save' && form.get('confirm_preliminary_write') === 'true'
+                }
+            );
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) return fail(response.status, { control_error: backendMessage(result) });
+            if (action === 'status') {
+                if (!result?.progress?.case_id || !Array.isArray(result.progress.saved_reviews))
+                    return fail(502, { control_error: 'Saved audit progress could not be verified.' });
+            } else if (result?.business_records_written !== true || result?.verified !== true ||
+                       result?.record?.result !== 'not_assessed') {
+                return fail(502, { control_error: 'The GRC control save could not be verified.' });
+            }
+            return { control_review: result };
+        } catch {
+            return fail(502, { control_error: 'Could not reach the control-review service.' });
+        }
+    },
     ai_sixteen_item: async (event) => {
         if (!hasAiOnboardingSession(event)) return fail(401, { ai_sixteen_error: 'Sign in again.' });
         const form = await event.request.formData();

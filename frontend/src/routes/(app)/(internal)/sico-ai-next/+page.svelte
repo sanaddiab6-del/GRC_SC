@@ -1,6 +1,7 @@
 <!-- SICO-CLEAR-REPORT-V2: no nested JSON in primary report -->
 <script lang="ts">
     import { enhance, deserialize, applyAction } from '$app/forms';
+    import { onMount } from 'svelte';
     import type { ActionData } from './$types';
 
     let { form }: { form: ActionData | null } = $props();
@@ -19,6 +20,11 @@
     let sixteenBusy = $state(false);
     let sixteenError = $state('');
     let caseSaveNotice = $state('');
+    let controlProgress = $state<Record<string, any> | null>(null);
+    let controlBusy = $state(false);
+    let controlError = $state('');
+    let controlNotice = $state('');
+    let lastControlCaseLoaded = '';
     let lifecycleProgress = $state<Record<string, any> | null>(null);
     let lifecycleProposal = $state<Record<string, any> | null>(null);
     let lifecycleApproval = $state<Record<string, any> | null>(null);
@@ -52,10 +58,52 @@
         const parsed = deserialize(await res.text());
         if (parsed.type !== 'success') {
             const body = parsed.type === 'failure' ? (parsed.data as Record<string, any>) : null;
-            throw new Error(String(body?.ai_sixteen_error ?? body?.lifecycle_error ?? 'The requested operation could not finish.'));
+            throw new Error(String(body?.control_error ?? body?.ai_sixteen_error ?? body?.lifecycle_error ?? 'The requested operation could not finish.'));
         }
         return parsed;
     }
+
+    async function loadSavedControlProgress(caseId = '') {
+        try {
+            const response = await sicoPostAction('requirement_review', {
+                action: 'status', engagement_id: caseId || activeEngagement
+            });
+            const progress = (response.data as Record<string, any>)?.control_review?.progress;
+            if (progress?.case_id) {
+                controlProgress = progress;
+                controlError = '';
+            }
+        } catch {
+            // An unprovisioned or not-yet-saved company has no control records.
+            // Do not display a misleading result or ask for manual UUIDs.
+        }
+    }
+
+    async function generateAndSaveNextControl() {
+        if (controlBusy || !controlProgress?.case_id) return;
+        controlBusy = true;
+        controlError = '';
+        controlNotice = '';
+        try {
+            const response = await sicoPostAction('requirement_review', {
+                action: 'generate_and_save', engagement_id: activeEngagement,
+                confirm_preliminary_write: 'true'
+            });
+            const result = (response.data as Record<string, any>)?.control_review;
+            if (result?.business_records_written !== true || result?.verified !== true ||
+                !result?.progress?.case_id || result?.record?.result !== 'not_assessed') {
+                throw new Error('The audit record could not be independently verified as saved.');
+            }
+            controlProgress = result.progress;
+            controlNotice = 'Qwen generated a control-specific review, saved it in the existing audit, and SICO read it back.';
+        } catch (error) {
+            controlError = error instanceof Error ? error.message : 'Control review could not be saved.';
+        } finally {
+            controlBusy = false;
+        }
+    }
+
+    onMount(() => { void loadSavedControlProgress(); });
 
     async function startGeneratedCase(event: SubmitEvent) {
         event.preventDefault();
@@ -138,6 +186,12 @@
                 { commit_enabled: latestResponse.workflow_review.commit_enabled } : null;
         }
         if (latestResponse?.workflow_approved) recordedApproval = latestResponse.workflow_approved;
+        const newlySavedCase = latestResponse?.workflow_committed?.business_records_written === true
+            ? String(preparedWorkflow?.engagement_id ?? activeEngagement) : '';
+        if (newlySavedCase && newlySavedCase !== lastControlCaseLoaded) {
+            lastControlCaseLoaded = newlySavedCase;
+            void loadSavedControlProgress(newlySavedCase);
+        }
         if (latestResponse?.workflow_committed?.workflow) {
             activeEngagement = String(preparedWorkflow?.engagement_id ?? activeEngagement);
             if (latestResponse.workflow_committed.lifecycle)
@@ -711,6 +765,31 @@
                     {/each}
                 </div>
             {/if}
+            <article class="report-card" style="margin-top:22px" aria-label="Actual saved control-level GRC results">
+                <h3>Saved control-by-control AI reviews — Compliance / Audits</h3>
+                <p class="footnote">This section reads real RequirementAssessment records. Qwen generates a specific audit question and evidence request for a requirement, saves it to that existing record, and SICO verifies the write. Until evidence is independently checked, its result stays <strong>Not assessed</strong>.</p>
+                {#if controlProgress?.case_id}
+                    <p><strong>Audit:</strong> {String(controlProgress.case_name)}</p>
+                    <p><strong>Saved and verified initial reviews:</strong> {Number(controlProgress.ai_reviews_saved_and_verified)} / {Number(controlProgress.total_assessable_requirements)} assessable controls</p>
+                    <p class="footnote">Remaining untouched controls: {Number(controlProgress.remaining_blank_to_do)}. Existing human evaluations are never overwritten.</p>
+                    <button type="button" disabled={controlBusy || Number(controlProgress.remaining_blank_to_do) < 1} onclick={generateAndSaveNextControl}>
+                        {controlBusy ? 'Qwen is generating and saving one control review…' : 'Generate and save next control review'}
+                    </button>
+                    {#each (controlProgress.saved_reviews ?? []) as control (control.requirement_assessment_id)}
+                        <div class="technical">
+                            <strong>{String(control.control_id || 'Control')} · {String(control.control_name)}</strong>
+                            <p><strong>Saved result:</strong> {String(control.result).replace(/_/g, ' ')} · <strong>Status:</strong> {String(control.status).replace(/_/g, ' ')}</p>
+                            <p style="white-space:pre-line">{String(control.observation)}</p>
+                            <p class="footnote">Verified in the existing audit record — not a compliance pass/fail conclusion.</p>
+                        </div>
+                    {/each}
+                {:else}
+                    <p class="footnote">No accessible saved audit was found for control-level writes. You can generate drafts for a new company name, but saving its GRC records requires authorized company provisioning and a saved ComplianceAssessment.</p>
+                    <button type="button" disabled={controlBusy} onclick={() => loadSavedControlProgress()}>Check for my latest saved audit automatically</button>
+                {/if}
+                {#if controlNotice}<p class="message" role="status">{controlNotice}</p>{/if}
+                {#if controlError}<p class="message error" role="alert">{controlError}</p>{/if}
+            </article>
             <article class="report-card" style="margin-top:22px" aria-label="Full professional GRC lifecycle">
                 <h3>One instruction · Full GRC assessment lifecycle</h3>
                 <p class="footnote">You select the existing organization and exact framework above. SICO keeps your original instruction across the assessment, prepares the next reviewed module operation with AI, and pauses for required evidence or human approval. Records save only through authorized existing services.</p>
