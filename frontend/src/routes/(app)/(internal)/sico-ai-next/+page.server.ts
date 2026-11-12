@@ -89,7 +89,24 @@ export const actions = {
             }
             if (!data.engagement_id || !data.review?.operation_payload || !data.prepared_digest)
                 return fail(502, { lifecycle_error: 'Could not verify the reviewable GRC case.' });
-            return { workflow_prepared: data };
+            // The original three inputs now trigger REAL local-model generation.
+            // Only the existing authenticated engagement ID is forwarded; the user
+            // never enters a UUID or has to choose a model/tool/stage manually.
+            let generated: Record<string, any> | null = null;
+            let generationError = '';
+            try {
+                const g = await fetchAiOnboardingBackend(
+                    event, '/ai/workforce/assistant/lifecycle/generate/',
+                    { engagement_id: String(data.engagement_id) }
+                );
+                const response = await g.json().catch(() => ({}));
+                if (g.ok && response?.generated_by_model === true && response?.report)
+                    generated = response;
+                else generationError = backendMessage(response);
+            } catch {
+                generationError = 'Local AI generation was unavailable; no fabricated response was substituted.';
+            }
+            return { workflow_prepared: data, generated_assessment: generated, generation_error: generationError };
         } catch {
             return fail(502, { lifecycle_error: 'Could not prepare the case using the loaded GRC records.' });
         }
