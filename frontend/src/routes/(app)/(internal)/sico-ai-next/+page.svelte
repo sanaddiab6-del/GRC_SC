@@ -7,8 +7,59 @@
     let instruction = $state('');
     let organization = $state('');
     let busy = $state(false);
-
-    const result = $derived(form as Record<string, any> | null);
+    let lastAgentRun = $state<Record<string, any> | null>(null);
+    let eligibleOptions = $state<Record<string, any> | null>(null);
+    let preparedWorkflow = $state<Record<string, any> | null>(null);
+    let recordedApproval = $state<Record<string, any> | null>(null);
+    let activeEngagement = $state('');
+    let lifecycleProgress = $state<Record<string, any> | null>(null);
+    let lifecycleProposal = $state<Record<string, any> | null>(null);
+    let lifecycleApproval = $state<Record<string, any> | null>(null);
+    let evidenceContext = $state('');
+    let selectedFolder = $state('');
+    let selectedPerimeter = $state('__new__');
+    let frameworkSearch = $state('NCA ECC');
+    let proposedAssessment = $state('Cybersecurity compliance assessment');
+    let proposedPerimeter = $state('SICO cybersecurity assessment perimeter');
+    let selectedFramework = $state('');
+    let selectedRiskMatrix = $state('');
+    const latestResponse = $derived(form as Record<string, any> | null);
+    $effect(() => {
+        if (latestResponse?.sico_run) lastAgentRun = latestResponse;
+        if (latestResponse?.workflow_options) eligibleOptions = latestResponse.workflow_options;
+        if (latestResponse?.workflow_prepared) {
+            preparedWorkflow = latestResponse.workflow_prepared;
+            activeEngagement = String(preparedWorkflow?.engagement_id ?? '');
+            if (preparedWorkflow?.lifecycle) lifecycleProgress = preparedWorkflow.lifecycle;
+            recordedApproval = null;
+        }
+        if (latestResponse?.workflow_review) {
+            preparedWorkflow = latestResponse.workflow_review;
+            recordedApproval = latestResponse.workflow_review.approved ?
+                { commit_enabled: latestResponse.workflow_review.commit_enabled } : null;
+        }
+        if (latestResponse?.workflow_approved) recordedApproval = latestResponse.workflow_approved;
+        if (latestResponse?.workflow_committed?.workflow) {
+            activeEngagement = String(preparedWorkflow?.engagement_id ?? activeEngagement);
+        }
+        if (latestResponse?.lifecycle_status) {
+            lifecycleProgress = latestResponse.lifecycle_status;
+            activeEngagement = String(latestResponse.lifecycle_status.engagement_id ?? activeEngagement);
+        }
+        if (latestResponse?.lifecycle_next) {
+            lifecycleProposal = latestResponse.lifecycle_next;
+            lifecycleApproval = null;
+            if (lifecycleProposal?.lifecycle) lifecycleProgress = lifecycleProposal.lifecycle;
+        }
+        if (latestResponse?.lifecycle_stage_approved) lifecycleApproval = latestResponse.lifecycle_stage_approved;
+        if (latestResponse?.lifecycle_stage_committed) {
+            if (latestResponse.lifecycle_stage_committed.lifecycle)
+                lifecycleProgress = latestResponse.lifecycle_stage_committed.lifecycle;
+            lifecycleProposal = null;
+            lifecycleApproval = null;
+        }
+    });
+    const result = $derived((latestResponse?.sico_run ? latestResponse : lastAgentRun) as Record<string, any> | null);
     const run = $derived(result?.sico_run as Record<string, any> | undefined);
     const plan = $derived(result?.sico_plan as Record<string, any> | undefined);
     const agent = $derived(result?.sico_agent as Record<string, any> | undefined);
@@ -360,7 +411,225 @@
                 </details>
             </section>
         {/if}
-        <footer>SICO AI Next · AI planning only · No GRC business records written by this page</footer>
+        <section class="report" aria-label="Real GRC workflow" id="real-grc-workflow">
+            <div class="report-head">
+                <div><p class="eyebrow">SICO AI · EXISTING GRC SERVICES</p><h2>Prepare and execute a real GRC workflow</h2></div>
+                <span class="status-pill">Independent approval required</span>
+            </div>
+            <p class="report-intro">The current execution adapter can prepare a perimeter, compliance assessment, linked requirement assessments and (with a selected risk matrix) a risk assessment. The other reviewed GRC stages remain pending verified input and separate approvals. This does not declare any compliance result.</p>
+            {#if latestResponse?.workflow_error}
+                <div class="message error" role="alert">{String(latestResponse.workflow_error)}</div>
+            {/if}
+            <form method="POST" action="?/workflow_options" use:enhance class="workflow-form">
+                <h3>1. Find your authorized organization and framework</h3>
+                <label>Organization search
+                    <input name="organization_query" bind:value={organization} placeholder="Exact company name" />
+                </label>
+                <label>Framework search
+                    <input name="framework_query" bind:value={frameworkSearch} placeholder="NCA ECC" />
+                </label>
+                <label>Organization / scope for perimeter lookup
+                    <select name="folder_id" bind:value={selectedFolder}>
+                        <option value="">Select after loading organizations</option>
+                        {#each (eligibleOptions?.organizations ?? []) as org}
+                            <option value={String(org.id)}>{String(org.name)}</option>
+                        {/each}
+                    </select>
+                </label>
+                <button type="submit">Load verified choices</button>
+                <p class="footnote">If you select an organization, click Load verified choices again to retrieve its permitted perimeters and risk matrices. No GRC business records are written.</p>
+            </form>
+            {#if eligibleOptions}
+                <form method="POST" action="?/workflow_prepare" use:enhance class="workflow-form">
+                    <h3>2. Prepare exact GRC operations from your instruction</h3>
+                    <p class="footnote">Authorized organization, framework and target record IDs are selected here—not invented by the model.</p>
+                    <input type="hidden" name="instruction" value={instruction} />
+                    <label>Organization
+                        <select name="folder_id" bind:value={selectedFolder} required>
+                            <option value="">Select a permitted organization</option>
+                            {#each (eligibleOptions.organizations ?? []) as item}
+                                <option value={String(item.id)}>{String(item.name)}</option>
+                            {/each}
+                        </select>
+                    </label>
+                    <label>Actual loaded framework
+                        <select name="framework_id" bind:value={selectedFramework} required>
+                            <option value="">Select the exact edition/reference</option>
+                            {#each (eligibleOptions.frameworks ?? []) as item}
+                                <option value={String(item.id)}>{String(item.name)} {item.ref_id ? `(${item.ref_id})` : ''}</option>
+                            {/each}
+                        </select>
+                    </label>
+                    <label>Compliance assessment name
+                        <input name="assessment_name" bind:value={proposedAssessment} minlength="4" maxlength="200" required />
+                    </label>
+                    <label>Assessment perimeter
+                        <select bind:value={selectedPerimeter}>
+                            <option value="__new__">Create a new perimeter (requires permission)</option>
+                            {#each (eligibleOptions.perimeters ?? []) as item}
+                                <option value={String(item.id)}>Reuse: {String(item.name)}</option>
+                            {/each}
+                        </select>
+                    </label>
+                    {#if selectedPerimeter === '__new__'}
+                        <label>New perimeter name
+                            <input name="new_perimeter_name" bind:value={proposedPerimeter} minlength="4" maxlength="200" required />
+                        </label>
+                    {:else}
+                        <input type="hidden" name="perimeter_id" value={selectedPerimeter}/>
+                    {/if}
+                    <label>Risk assessment (optional)
+                        <select name="risk_matrix_id" bind:value={selectedRiskMatrix}>
+                            <option value="">Skip risk assessment for now</option>
+                            {#each (eligibleOptions.risk_matrices ?? []) as item}
+                                <option value={String(item.id)}>Create using: {String(item.name)}</option>
+                            {/each}
+                        </select>
+                    </label>
+                    <button type="submit" disabled={instruction.trim().length < 20}>Prepare real GRC operation — no business writes</button>
+                </form>
+            {/if}
+            {#if preparedWorkflow}
+                <article class="report-card" style="margin-top:14px">
+                    <h3>3. Review the exact prepared operation</h3>
+                    <p class="footnote">Engagement: {String(preparedWorkflow.engagement_id)}</p>
+                    <ul class="notes">
+                        {#each (preparedWorkflow.planned_actions ?? []) as action}
+                            <li>{String(action.platform_entity)} — {String(action.action)}: {String(action.detail)}</li>
+                        {/each}
+                    </ul>
+                    <details class="technical">
+                        <summary>View exact scoped IDs and business fields before approving</summary>
+                        <pre>{JSON.stringify(preparedWorkflow.review?.operation_payload, null, 2)}</pre>
+                        <p>Fingerprint: {String(preparedWorkflow.prepared_digest)}</p>
+                    </details>
+                    {#if !recordedApproval}
+                        <form method="POST" action="?/workflow_approve" use:enhance class="workflow-form">
+                            <input type="hidden" name="engagement_id" value={String(preparedWorkflow.engagement_id)} />
+                            <input type="hidden" name="prepared_digest" value={String(preparedWorkflow.prepared_digest)} />
+                            <label class="confirmation"><input type="checkbox" name="confirm_reviewed" value="yes" required /> I reviewed the target company, framework, perimeter, assessment name and proposed changes.</label>
+                            <button type="submit">Record independent human approval</button>
+                        </form>
+                    {:else if recordedApproval.commit_enabled === true}
+                        <form method="POST" action="?/workflow_commit" use:enhance class="workflow-form">
+                            <input type="hidden" name="engagement_id" value={String(preparedWorkflow.engagement_id)} />
+                            <input type="hidden" name="prepared_digest" value={String(preparedWorkflow.prepared_digest)} />
+                            <label class="confirmation"><input type="checkbox" name="confirm_reviewed" value="yes" required /> Final confirmation: save these exact records in the existing GRC modules.</label>
+                            <button type="submit">Save approved GRC records</button>
+                        </form>
+                    {:else}
+                        <p class="finding-alert">Human review recorded. Live business writes are still disabled pending isolated PostgreSQL transaction and tenant-isolation verification. No GRC case has been saved.</p>
+                    {/if}
+                </article>
+            {/if}
+            {#if latestResponse?.workflow_committed}
+                <article class="report-card" style="margin-top:14px">
+                    <h3>Verified records saved in existing GRC modules</h3>
+                    <ul class="notes">
+                        {#each (latestResponse.workflow_committed.created_objects ?? []) as record}
+                            <li>{String(record.platform_entity)}: {String(record.name)} — {String(record.id)}</li>
+                        {/each}
+                    </ul>
+                    <p class="footnote">Linked requirement assessments: {Number(latestResponse.workflow_committed.requirement_assessments_count ?? 0)}. Their compliance results and evidence have not been evaluated.</p>
+                </article>
+            {/if}
+            {#if latestResponse?.workflow_resumed || latestResponse?.workflow_committed?.workflow || preparedWorkflow?.workflow}
+                {@const execution = latestResponse?.workflow_resumed ?? latestResponse?.workflow_committed?.workflow ?? preparedWorkflow?.workflow}
+                <div class="report-grid" style="margin-top:14px">
+                    {#each (execution.workflow ?? []) as step}
+                        <article class="report-card"><h3>{String(step.stage)}</h3><p>{String(step.status)}</p></article>
+                    {/each}
+                </div>
+            {/if}
+            <article class="report-card" style="margin-top:22px" aria-label="Full professional GRC lifecycle">
+                <h3>One instruction · Full GRC assessment lifecycle</h3>
+                <p class="footnote">You select the existing organization and exact framework above. SICO keeps your original instruction across the assessment, prepares the next reviewed module operation with AI, and pauses for required evidence or human approval. Records save only through authorized existing services.</p>
+                <p class="finding-alert"><strong>Important:</strong> A saved module operation is not proof of compliance, control effectiveness or completed audit. Framework selection is never changed automatically.</p>
+                {#if latestResponse?.lifecycle_error}
+                    <div class="message error" role="alert">{String(latestResponse.lifecycle_error)}</div>
+                {/if}
+                <form method="POST" action="?/lifecycle_status" use:enhance class="workflow-form">
+                    <label>Existing SICO engagement ID (also used to resume after refresh)
+                        <input name="engagement_id" bind:value={activeEngagement} placeholder="Engagement UUID" required />
+                    </label>
+                    <button type="submit">Load saved lifecycle progress</button>
+                </form>
+                {#if lifecycleProgress?.lifecycle}
+                    <p class="footnote">Selected framework ID: {String(lifecycleProgress.framework_id)} · Compliance verdict: {String(lifecycleProgress.compliance_verdict)} · Not yet a completed GRC case</p>
+                    <div class="report-grid" style="margin-top:14px">
+                        {#each lifecycleProgress.lifecycle as task, i}
+                            <article class="report-card">
+                                <h3>{i + 1}. {String(task.title)}</h3>
+                                <p>{String(task.state).replace(/_/g, ' ')}</p>
+                                <p class="footnote">{task.stage ? `Existing service: ${task.stage}` : 'Requires separate verified professional record or review'}</p>
+                            </article>
+                        {/each}
+                    </div>
+                    <form method="POST" action="?/lifecycle_next" use:enhance class="workflow-form">
+                        <h3>Continue the same assessment with AI</h3>
+                        <input type="hidden" name="engagement_id" value={activeEngagement} />
+                        <label>Additional verified facts or evidence references (optional)
+                            <input name="human_facts" bind:value={evidenceContext} maxlength="1200"
+                                placeholder="Only supply information you can verify in the GRC platform" />
+                        </label>
+                        <button type="submit" disabled={busy}>Prepare next authorized GRC stage with Qwen</button>
+                        <p class="footnote">AI cannot approve its own proposal or invent evidence. It may stop to request verified inputs.</p>
+                    </form>
+                {/if}
+                {#if lifecycleProposal}
+                    <article class="report-card" style="margin-top:16px">
+                        <h3>AI next-stage result: {String(lifecycleProposal.stage ?? lifecycleProposal.status)}</h3>
+                        {#if lifecycleProposal.reason}<p class="finding-alert">{String(lifecycleProposal.reason)}</p>{/if}
+                        {#if lifecycleProposal.questions?.length}
+                            <ul class="notes">{#each lifecycleProposal.questions as q}<li>{String(q)}</li>{/each}</ul>
+                        {/if}
+                        {#if lifecycleProposal.status === 'prepared_for_human_review' && lifecycleProposal.review?.operation_payload}
+                            <p>Prepared using the existing GRC serializer. <strong>No business record has been written.</strong></p>
+                            <details class="technical" open>
+                                <summary>Review every proposed record, field and exact ID</summary>
+                                <pre>{JSON.stringify(lifecycleProposal.review.operation_payload, null, 2)}</pre>
+                                <p>SHA-256 fingerprint: {String(lifecycleProposal.prepared_digest)}</p>
+                            </details>
+                            {#if !lifecycleApproval}
+                                <form method="POST" action="?/lifecycle_stage_approve" use:enhance class="workflow-form">
+                                    <input type="hidden" name="engagement_id" value={activeEngagement} />
+                                    <input type="hidden" name="stage" value={String(lifecycleProposal.stage)} />
+                                    <input type="hidden" name="prepared_digest" value={String(lifecycleProposal.prepared_digest)} />
+                                    <label class="confirmation"><input type="checkbox" name="confirm_reviewed" value="yes" required /> I have reviewed the exact GRC changes and have authority to approve them.</label>
+                                    <button type="submit">Record human approval for this stage</button>
+                                </form>
+                            {:else if lifecycleApproval.commit_enabled === true}
+                                <form method="POST" action="?/lifecycle_stage_commit" use:enhance class="workflow-form">
+                                    <input type="hidden" name="engagement_id" value={activeEngagement} />
+                                    <input type="hidden" name="stage" value={String(lifecycleProposal.stage)} />
+                                    <input type="hidden" name="prepared_digest" value={String(lifecycleProposal.prepared_digest)} />
+                                    <label class="confirmation"><input type="checkbox" name="confirm_reviewed" value="yes" required /> Final confirmation: save this exact approved stage in SICO GRC.</label>
+                                    <button type="submit">Save stage to existing GRC modules</button>
+                                </form>
+                            {:else}
+                                <p class="finding-alert">Approval recorded, but this writer is not independently enabled for live saves. Further isolated transaction and permission tests are required.</p>
+                            {/if}
+                        {/if}
+                    </article>
+                {/if}
+                {#if latestResponse?.lifecycle_stage_committed}
+                    <p class="message">The existing GRC service reported a committed operation for {String(latestResponse.lifecycle_stage_committed.stage)}. Verify the saved records in the corresponding module before trusting the result.</p>
+                {/if}
+            </article>
+            <form method="POST" action="?/workflow_review" use:enhance class="workflow-form">
+                <label>Restore an existing case-setup review by engagement ID
+                    <input name="engagement_id" value={String(preparedWorkflow?.engagement_id ?? '')} placeholder="Prepared engagement UUID" />
+                </label>
+                <button type="submit">Restore pending approval</button>
+            </form>
+            <form method="POST" action="?/workflow_resume" use:enhance class="workflow-form">
+                <label>Resume an existing SICO engagement (ID)
+                    <input name="engagement_id" value={String(preparedWorkflow?.engagement_id ?? '')} placeholder="Existing engagement UUID" />
+                </label>
+                <button type="submit">Show verified workflow progress</button>
+            </form>
+        </section>
+        <footer>SICO AI Next · Read operations execute automatically when authorized · GRC writes require explicit recorded human approval and an enabled, verified writer.</footer>
     </div>
 </div>
 
@@ -374,4 +643,5 @@
     .message{margin-top:25px;padding:17px;border-radius:12px;border:1px solid #3d6572;color:#cfe6ed;background:#183643}.message.error{border-color:#975c58;background:#3a2226}.message p{margin-bottom:0}.report{margin-top:50px}.report-head{display:flex;justify-content:space-between;align-items:center;gap:18px}.report-head h2{font-size:29px;margin:8px 0}.report-intro{color:#b1c1d3;line-height:1.7;margin:18px 0}.status-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:23px 0}.status-item,.report-card{border:1px solid #33485f;background:#132137;border-radius:13px;padding:19px}.status-item span{display:block;font-size:12px;color:#9eb4c9;margin-bottom:9px}.status-item strong{font-size:15px}.finding-alert{border:1px solid #b58e44;background:#342c1b;color:#f3deaf;border-radius:13px;padding:19px 21px;margin:22px 0}.finding-alert h3{margin:0 0 10px;font-size:17px}.finding-alert p{font-size:14px;line-height:1.6}.finding-alert p:last-child{margin-bottom:0}.finding-alert code{overflow-wrap:anywhere;font-size:12px}
     .report-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.report-card{min-width:0;padding:22px}.report-card h3{font-size:18px;margin:0 0 15px;color:#e9f6f8}.report-card p,.report-card li{font-size:14px;line-height:1.7;color:#bfd1e4;overflow-wrap:anywhere}.report-card strong{color:#edf7ff}.records,.notes{padding-left:20px;margin:0}.records li,.notes li{margin-bottom:11px}.footnote{color:#91aabc!important;font-size:12px!important}.technical{margin-top:22px;border:1px solid #31495c;border-radius:12px;padding:15px;color:#a7bdd1}.technical summary{cursor:pointer}.technical p{font-size:12px}.technical pre{font-size:11px;max-height:340px;white-space:pre-wrap;overflow-wrap:anywhere;overflow:auto;background:#081221;padding:14px;border-radius:8px}footer{border-top:1px solid #304354;color:#839ab1;font-size:12px;margin-top:55px;padding-top:23px}.sr-only{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
     @media(max-width:800px){.shell{padding:23px 16px 50px}.scope-pill{display:none}.hero{margin:50px auto 25px}.example-grid,.report-grid,.status-grid{grid-template-columns:1fr}.report-head{flex-direction:column;align-items:flex-start}.prompt-footer{flex-direction:column;align-items:stretch}.prompt-footer button{width:100%}}
+.workflow-form{margin-top:14px;padding:15px;border:1px solid #314b61;border-radius:12px;display:grid;gap:12px;background:#111e30}.workflow-form h3{margin:0;font-size:15px}.workflow-form label{display:grid;gap:6px;font-size:13px;color:#d2e6ef}.workflow-form input:not([type="checkbox"]),.workflow-form select{min-width:0;width:100%;box-sizing:border-box;padding:10px;background:#0e192b;color:#eef6ff;border:1px solid #46637a;border-radius:8px;font:inherit}.workflow-form button{justify-self:start;border:0;border-radius:9px;padding:11px 16px;font:inherit;font-weight:700;background:#73e2c9;color:#082630;cursor:pointer}.workflow-form button:disabled{opacity:.45;cursor:not-allowed}.workflow-form .confirmation{display:flex;align-items:center;gap:9px}
 </style>
