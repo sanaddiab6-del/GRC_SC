@@ -188,7 +188,18 @@
 
         <section class="report" aria-label="Build complete GRC case from three inputs" id="start-grc-case">
             <div class="report-head"><h2>Build a GRC case</h2><span class="status-pill">Your organization · Your framework · Your objective</span></div>
-            <form method="POST" action="?/lifecycle_intake" use:enhance class="workflow-form">
+            <form method="POST" action="?/lifecycle_intake" use:enhance={() => {
+                busy = true;
+                return async ({ update }) => {
+                    try {
+                        // SvelteKit normally resets successful enhanced forms, including
+                        // "needs exact selection" responses. Keep all three fields instead.
+                        await update({ reset: false });
+                    } finally {
+                        busy = false;
+                    }
+                };
+            }} class="workflow-form">
                 <label>1. Organization name
                     <input name="organization_name" bind:value={organization} oninput={() => organizationConfirmation = ''} placeholder="Enter the exact existing company name" required minlength="2" maxlength="150" />
                 </label>
@@ -201,9 +212,8 @@
                 </label>
                 <input type="hidden" name="selected_framework_id" value={frameworkConfirmation}/>
                 <input type="hidden" name="selected_organization_id" value={organizationConfirmation}/>
-                <button type="submit" disabled={instruction.trim().length < 20 || !organization.trim() || !frameworkSearch.trim()}>Build GRC case — prepare for review</button>
+                <button type="submit" disabled={busy || instruction.trim().length < 20 || !organization.trim() || !frameworkSearch.trim()}>{busy ? 'Checking records…' : 'Build GRC case — prepare for review'}</button>
                 <p class="footnote">The initial case is prepared for your review. Approved GRC writes still require separately enabled, permission-checked services.</p>
-            </form>
             {#if latestResponse?.lifecycle_error}
                 <div class="message error" role="alert">{String(latestResponse.lifecycle_error)}</div>
             {/if}
@@ -231,9 +241,13 @@
                             </select>
                         </label>
                     {/if}
-                    <p class="footnote">After selecting the exact record above, click Build GRC case again. No records were changed.</p>
+                    <button type="submit" disabled={busy || !frameworkConfirmation || ((latestResponse.lifecycle_choices.organizations ?? []).length > 1 && !organizationConfirmation) || instruction.trim().length < 20 || !organization.trim() || !frameworkSearch.trim()}>
+                        {busy ? 'Verifying…' : 'Confirm framework and continue'}
+                    </button>
+                    <p class="footnote">Your three answers stay filled in. You only need to confirm the exact loaded edition when your framework name matches multiple records. Nothing has been saved yet.</p>
                 </article>
             {/if}
+            </form>
             {#if preparedWorkflow?.resolved_from_three_inputs}
                 <article class="report-card" style="margin-top:14px">
                     <h3>Verified scope — ready for approval</h3>
