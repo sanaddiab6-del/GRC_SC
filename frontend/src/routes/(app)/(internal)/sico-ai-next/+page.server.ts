@@ -65,6 +65,35 @@ export const actions = {
             return fail(502, { error: 'Unable to reach the SICO AI planning backend.' });
         }
     },
+    lifecycle_intake: async (event) => {
+        if (!hasAiOnboardingSession(event)) return fail(401, { lifecycle_error: 'Sign in again.' });
+        const body = await event.request.formData();
+        const payload = {
+            organization_name: String(body.get('organization_name') ?? '').trim(),
+            framework_name: String(body.get('framework_name') ?? '').trim(),
+            problem: String(body.get('problem') ?? '').trim(),
+            selected_framework_id: String(body.get('selected_framework_id') ?? '').trim() || undefined,
+            selected_organization_id: String(body.get('selected_organization_id') ?? '').trim() || undefined
+        };
+        if (payload.organization_name.length < 2 || payload.organization_name.length > 150 ||
+            payload.framework_name.length < 2 || payload.framework_name.length > 150 ||
+            payload.problem.length < 20 || payload.problem.length > 4000)
+            return fail(400, { lifecycle_error: 'Enter an existing organization, loaded framework, and a problem of at least 20 characters.' });
+        try {
+            const r = await fetchAiOnboardingBackend(event, '/ai/workforce/assistant/lifecycle/intake/', payload);
+            const data = await r.json().catch(() => ({}));
+            if (!r.ok) {
+                if (data?.status === 'needs_exact_selection' && Array.isArray(data?.frameworks))
+                    return { lifecycle_choices: data };
+                return fail(r.status, { lifecycle_error: backendMessage(data) });
+            }
+            if (!data.engagement_id || !data.review?.operation_payload || !data.prepared_digest)
+                return fail(502, { lifecycle_error: 'Could not verify the reviewable GRC case.' });
+            return { workflow_prepared: data };
+        } catch {
+            return fail(502, { lifecycle_error: 'Could not prepare the case using the loaded GRC records.' });
+        }
+    },
     workflow_options: async (event) => {
         if (!hasAiOnboardingSession(event)) return fail(401, { workflow_error: 'Sign in again to access GRC records.' });
         const body = await event.request.formData();
