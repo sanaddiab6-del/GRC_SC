@@ -72,17 +72,28 @@
             generatedFor = fingerprint;
         }
         try {
-            // A single click automatically runs all four Qwen requests.
-            for (let phase = 0; phase < 4; phase++) {
-                if (generatedSixteen.length >= (phase + 1) * 4) continue;
-                const response = await sicoPostAction('ai_sixteen_phase', { ...submitted, phase: String(phase) });
-                const batch = (response.data as Record<string, any>)?.ai_sixteen_phase;
-                if (!batch || batch.phase !== phase || !Array.isArray(batch.activities) || batch.activities.length !== 4)
-                    throw new Error(`Phase ${phase + 1} returned invalid AI work products.`);
-                generatedSixteen = [...generatedSixteen.slice(0, phase * 4), ...batch.activities];
+            // A single click generates sequentially; each validated result is
+            // displayed immediately and a retry resumes the first missing item.
+            for (let number = generatedSixteen.length + 1; number <= 16; number++) {
+                const response = await sicoPostAction('ai_sixteen_item', {
+                    ...submitted, activity_number: String(number)
+                });
+                const result = (response.data as Record<string, any>)?.ai_sixteen_item;
+                if (!result || result.activity_number !== number ||
+                    !result.activity || result.activity.number !== number ||
+                    typeof result.activity.analysis !== 'string') {
+                    throw new Error(`Activity ${number} returned an invalid Qwen result.`);
+                }
+                generatedSixteen = [...generatedSixteen, result.activity];
             }
         } catch (err) {
             sixteenError = err instanceof Error ? err.message : 'Local Qwen generation stopped unexpectedly.';
+        }
+        // The separate case writer should only be offered after generation
+        // succeeds. If one item fails, retain the completed AI results.
+        if (generatedSixteen.length !== 16) {
+            sixteenBusy = false;
+            return;
         }
         // Independently prepare a REAL authorized case whenever this company
         // already has a permitted domain. A *new* company cannot be silently
@@ -288,7 +299,7 @@
                 <input type="hidden" name="selected_framework_id" value={frameworkConfirmation}/>
                 <input type="hidden" name="selected_organization_id" value={organizationConfirmation}/>
                 <button type="submit" disabled={sixteenBusy || instruction.trim().length < 20 || !organization.trim() || !frameworkSearch.trim()}>{sixteenBusy ? `Generating with Qwen (${generatedSixteen.length}/16)…` : 'Generate 16 GRC activities & prepare case'}</button>
-                <p class="footnote">One click generates 16 AI work products in four Qwen batches. Real GRC records save only through existing authorized services and approval.</p>
+                <p class="footnote">One click generates 16 AI work products, one at a time; completed results appear immediately. Real GRC records save only through existing authorized services and approval.</p>
             {#if latestResponse?.lifecycle_error}
                 <div class="message error" role="alert">{String(latestResponse.lifecycle_error)}</div>
             {/if}
@@ -344,7 +355,7 @@
                     not claims of verified implementation or completed audits.
                 </p>
                 {#if sixteenBusy}
-                    <p class="footnote">Qwen is generating four activities per request. Completed batches appear automatically.</p>
+                    <p class="footnote">Qwen is generating one activity at a time. Each validated result appears immediately; retry resumes where it stopped.</p>
                 {/if}
                 {#if sixteenError}
                     <div class="message error" role="alert">AI stopped after {generatedSixteen.length} of 16 activities: {sixteenError}. Your completed outputs remain visible; click Generate again to resume the missing batches.</div>

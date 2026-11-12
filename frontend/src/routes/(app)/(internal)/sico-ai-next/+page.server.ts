@@ -65,6 +65,37 @@ export const actions = {
             return fail(502, { error: 'Unable to reach the SICO AI planning backend.' });
         }
     },
+    ai_sixteen_item: async (event) => {
+        if (!hasAiOnboardingSession(event)) return fail(401, { ai_sixteen_error: 'Sign in again.' });
+        const form = await event.request.formData();
+        const payload = {
+            organization_name: String(form.get('organization_name') ?? '').trim(),
+            framework_name: String(form.get('framework_name') ?? '').trim(),
+            problem: String(form.get('problem') ?? '').trim(),
+            activity_number: Number(form.get('activity_number') ?? 0)
+        };
+        if (payload.organization_name.length < 2 || payload.organization_name.length > 150 ||
+            payload.framework_name.length < 2 || payload.framework_name.length > 150 ||
+            payload.problem.length < 20 || payload.problem.length > 4000 ||
+            !Number.isInteger(payload.activity_number) || payload.activity_number < 1 || payload.activity_number > 16) {
+            return fail(400, { ai_sixteen_error: 'Enter a valid organization, framework, problem and activity number.' });
+        }
+        try {
+            const response = await fetchAiOnboardingBackend(
+                event, '/ai/workforce/assistant/lifecycle/generate-one/', payload
+            );
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) return fail(response.status, { ai_sixteen_error: backendMessage(data) });
+            if (data.generated_by_model !== true || data.activity_number !== payload.activity_number ||
+                data.activity?.number !== payload.activity_number ||
+                typeof data.activity.analysis !== 'string') {
+                return fail(502, { ai_sixteen_error: 'Qwen did not return the requested validated activity.' });
+            }
+            return { ai_sixteen_item: data };
+        } catch {
+            return fail(502, { ai_sixteen_error: 'Qwen request could not finish. Previously generated activities remain visible.' });
+        }
+    },
     ai_sixteen_phase: async (event) => {
         if (!hasAiOnboardingSession(event)) return fail(401, { ai_sixteen_error: 'Sign in again.' });
         const form = await event.request.formData();
