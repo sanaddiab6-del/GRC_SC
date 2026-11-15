@@ -102,11 +102,13 @@ export const actions = {
             organization_name: String(form.get('organization_name') ?? '').trim(),
             framework_name: String(form.get('framework_name') ?? '').trim(),
             problem: String(form.get('problem') ?? '').trim(),
-            activity_number: Number(form.get('activity_number') ?? 0)
+            activity_number: Number(form.get('activity_number') ?? 0),
+            case_context: String(form.get('case_context') ?? '')
         };
         if (payload.organization_name.length < 2 || payload.organization_name.length > 150 ||
             payload.framework_name.length < 2 || payload.framework_name.length > 150 ||
             payload.problem.length < 20 || payload.problem.length > 4000 ||
+            payload.case_context.length > 5500 ||
             !Number.isInteger(payload.activity_number) || payload.activity_number < 1 || payload.activity_number > 16) {
             return fail(400, { ai_sixteen_error: 'Enter a valid organization, framework, problem and activity number.' });
         }

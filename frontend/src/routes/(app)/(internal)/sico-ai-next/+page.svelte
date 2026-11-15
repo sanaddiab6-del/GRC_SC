@@ -123,8 +123,21 @@
             // A single click generates sequentially; each validated result is
             // displayed immediately and a retry resumes the first missing item.
             for (let number = generatedSixteen.length + 1; number <= 16; number++) {
+                // Prior Qwen work products form the shared, unverified case context.
+                // Only bounded earlier-stage text and proposed objects are forwarded.
+                const keyStages = new Set([2, 4, 6, 7, 9, 11, 12]);
+                const prior = generatedSixteen.filter((item) =>
+                    keyStages.has(Number(item.number)) || Number(item.number) >= number - 2
+                ).map((item) => ({
+                    number: Number(item.number),
+                    analysis: String(item.analysis ?? '').slice(0, 180),
+                    proposed_work: String(item.proposed_work ?? '').slice(0, 180),
+                    case_profile: item.case_profile ?? null,
+                    candidate_assets: item.candidate_assets ?? []
+                }));
                 const response = await sicoPostAction('ai_sixteen_item', {
-                    ...submitted, activity_number: String(number)
+                    ...submitted, activity_number: String(number),
+                    case_context: JSON.stringify(prior)
                 });
                 const result = (response.data as Record<string, any>)?.ai_sixteen_item;
                 if (!result || result.activity_number !== number ||
@@ -137,36 +150,9 @@
         } catch (err) {
             sixteenError = err instanceof Error ? err.message : 'Local Qwen generation stopped unexpectedly.';
         }
-        // The separate case writer should only be offered after generation
-        // succeeds. If one item fails, retain the completed AI results.
-        if (generatedSixteen.length !== 16) {
-            sixteenBusy = false;
-            return;
-        }
-        // Independently prepare a REAL authorized case whenever this company
-        // already has a permitted domain. A *new* company cannot be silently
-        // provisioned or assigned permissions by AI.
-        try {
-            const response = await sicoPostAction('lifecycle_intake', {
-                ...submitted,
-                selected_framework_id: frameworkConfirmation,
-                selected_organization_id: organizationConfirmation,
-                skip_legacy_generation: 'yes'
-            });
-            const data = response.data as Record<string, any>;
-            if (data?.workflow_prepared || data?.lifecycle_choices) {
-                await applyAction(response);
-                caseSaveNotice = data?.workflow_prepared
-                    ? 'Authorized case operation prepared. Review and approve the proposed GRC records below.'
-                    : 'Confirm the exact framework edition below to prepare the actual saved case.';
-            } else {
-                caseSaveNotice = 'Case preparation returned no verified operation. AI analysis remains a draft.';
-            }
-        } catch {
-            caseSaveNotice = 'AI work products are available. Saving a case requires an authorized organization workspace. If this is a new company, an administrator must provision it first; SICO will not assign it to another tenant.';
-        } finally {
-            sixteenBusy = false;
-        }
+        // This phase is GENERATION ONLY by user request. Never try to create,
+        // approve or save an audit or tenant after finishing the 16 drafts.
+        sixteenBusy = false;
     }
     const latestResponse = $derived(form as Record<string, any> | null);
     $effect(() => {
@@ -352,8 +338,8 @@
                 </label>
                 <input type="hidden" name="selected_framework_id" value={frameworkConfirmation}/>
                 <input type="hidden" name="selected_organization_id" value={organizationConfirmation}/>
-                <button type="submit" disabled={sixteenBusy || instruction.trim().length < 20 || !organization.trim() || !frameworkSearch.trim()}>{sixteenBusy ? `Generating with Qwen (${generatedSixteen.length}/16)…` : 'Generate 16 GRC activities & prepare case'}</button>
-                <p class="footnote">One click generates 16 AI work products, one at a time; completed results appear immediately. Real GRC records save only through existing authorized services and approval.</p>
+                <button type="submit" disabled={sixteenBusy || instruction.trim().length < 20 || !organization.trim() || !frameworkSearch.trim()}>{sixteenBusy ? `Generating with Qwen (${generatedSixteen.length}/16)…` : 'Generate connected GRC case with AI'}</button>
+                <p class="footnote">Qwen generates a connected proposed case from these three inputs. It carries the scope and named candidate assets into later activities. Nothing is saved to GRC modules in this generation phase.</p>
             {#if latestResponse?.lifecycle_error}
                 <div class="message error" role="alert">{String(latestResponse.lifecycle_error)}</div>
             {/if}
@@ -424,12 +410,24 @@
                             <p><strong>AI analysis:</strong> {String(item.analysis)}</p>
                             <p><strong>Proposed GRC work:</strong> {String(item.proposed_work)}</p>
                             <p><strong>Evidence or decision required:</strong> {String(item.evidence_needed)}</p>
-                            <p class="footnote">AI-generated draft, NOT executed or saved in GRC modules.</p>
+                            {#if item.case_profile}
+                                <p><strong>AI-generated case title:</strong> {String(item.case_profile.title)}</p>
+                                <p><strong>Proposed assessment scope:</strong> {String(item.case_profile.scope_summary)}</p>
+                            {/if}
+                            {#if Array.isArray(item.candidate_assets) && item.candidate_assets.length}
+                                <h4>Proposed asset register (unverified)</h4>
+                                <ul class="notes">
+                                    {#each item.candidate_assets as asset (asset.draft_ref)}
+                                        <li><strong>{String(asset.draft_ref)} · {String(asset.name)}</strong> — {String(asset.asset_type)}. {String(asset.business_purpose)} <em>Verification needed:</em> {String(asset.verification_needed)}</li>
+                                    {/each}
+                                </ul>
+                            {/if}
+                            <p class="footnote">AI-generated proposal, not confirmed organization data, executed work or saved GRC records.</p>
                         </article>
                     {/each}
                 </div>
                 {#if generatedSixteen.length === 16}
-                    <p class="footnote">All 16 draft work products generated. Database execution is separate and must use the authorized GRC writers below.</p>
+                    <p class="footnote">All 16 linked AI draft activities generated. Review the proposed title, scope, candidate assets and cross-references. Database saving is deferred.</p>
                 {/if}
             </section>
         {/if}
