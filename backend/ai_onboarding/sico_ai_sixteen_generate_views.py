@@ -334,7 +334,7 @@ class ProposedAssetGenerationError(ValueError):
         super().__init__(f'Qwen could not generate a distinct, valid proposed asset PA-{asset_number}.')
 
 
-class ProposedFrameworkReviewError(ValueError):
+class ProposedFrameworkReviewError(JsonSchemaError, ValueError):
     """A safe reason for failed Activity 1 library-anchored generation.
 
     Neither prompts, framework source data, nor raw model outputs are exposed.
