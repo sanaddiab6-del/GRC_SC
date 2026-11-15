@@ -178,7 +178,7 @@ FIELD_GUIDANCE = {
 
 # Guidance is an instruction to the model, NEVER presented as generated work.
 STAGE_FOCUS = (
-    'Determine which NCA ECC edition applies; verify the regulator source, Saudi jurisdiction and each requirement version; do not fabricate control IDs.',
+    'Verify the selected framework and edition against the authoritative publisher, confirm jurisdiction and scope, and never fabricate requirement IDs.',
     'Define payment-service data flows, merchants, APIs, data stores and boundaries only as candidate scope until the asset owner verifies them.',
     'Propose a draft ComplianceAssessment in the authorized organization folder; link the exact verified framework and RequirementAssessments; leave control results not assessed.',
     'Identify candidate payment-processing assets, IAM, key management, network boundaries and AppliedControls; request the actual inventory before adding them.',
@@ -232,6 +232,12 @@ class OneItemInput(serializers.Serializer):
     problem = serializers.CharField(min_length=20, max_length=4000, trim_whitespace=True)
     activity_number = serializers.IntegerField(min_value=1, max_value=16)
     case_context = serializers.CharField(required=False, allow_blank=True, max_length=5500)
+    # Opt-in v3 mode reuses the authenticated generate-one endpoint; old UI
+    # requests remain unchanged until the new batched UI is connected.
+    full_framework_batch = serializers.BooleanField(required=False, default=False)
+    framework_cursor = serializers.CharField(required=False, allow_blank=True, max_length=2048)
+    framework_batch_size = serializers.IntegerField(required=False, default=2, min_value=1, max_value=3)
+    framework_business_context = serializers.CharField(required=False, allow_blank=True, max_length=1200)
 
 
 def _field_is_valid(name, value):
@@ -889,6 +895,55 @@ class SicoSixteenGenerateItemView(APIView):
         if not request.user.is_active:
             return Response({'detail': 'Your account must be active.'}, status=403)
         data = form.validated_data
+        if data.get('full_framework_batch'):
+            # New opt-in mode. Reuse the SAME authenticated endpoint and existing
+            # SICO framework/requirement RBAC; never create a second GRC store.
+            if data['activity_number'] != 1:
+                return Response({
+                    'detail': 'Full framework batches are available only for Activity 1.',
+                    'business_records_written': False,
+                }, status=400)
+            from .sico_ai_framework_batch_v3 import (
+                FrameworkBatchError, generate_framework_batch,
+            )
+            try:
+                config = resolve_advisory_capability_config(CAPABILITY_GRC_CAPABILITY_SELECTION)
+                selection = get_advisory_provider_selection(config)
+                batch = generate_framework_batch(
+                    user=request.user,
+                    organization=data['organization_name'],
+                    framework=data['framework_name'],
+                    problem=data['problem'],
+                    selection=selection,
+                    cursor=data.get('framework_cursor', ''),
+                    batch_size=data.get('framework_batch_size', 2),
+                    business_context=data.get('framework_business_context', ''),
+                )
+            except FrameworkBatchError as exc:
+                invalid_input = exc.reason in ('invalid_cursor', 'invalid_batch_size')
+                stale = exc.reason in ('invalid_or_stale_cursor', 'permission_or_library_changed')
+                return Response({
+                    'detail': 'Activity 1 framework batch was not completed. '
+                              'Retry this batch or restart after verifying framework access.',
+                    'error_kind': exc.reason,
+                    'retry_cursor': getattr(exc, 'retry_cursor', None),
+                    'business_records_written': False,
+                }, status=400 if invalid_input else 409 if stale else 503)
+            except (AiProviderError, JsonSchemaError, TimeoutError, ValueError, TypeError, KeyError):
+                return Response({
+                    'detail': 'Activity 1 could not initialize its framework batch. '
+                              'No GRC records were changed.',
+                    'error_kind': 'framework_batch_initialization_failed',
+                    'business_records_written': False,
+                }, status=503)
+            return Response({
+                'generated_by_model': bool(batch['requirement_reviews']),
+                'activity_number': 1,
+                'framework_batch': batch,
+                'business_records_written': False,
+                'compliance_verdict': 'not_established',
+                'execution_status': 'provisional_ai_draft_not_saved_to_grc_modules',
+            })
         try:
             config = resolve_advisory_capability_config(CAPABILITY_GRC_CAPABILITY_SELECTION)
             selection = get_advisory_provider_selection(config)

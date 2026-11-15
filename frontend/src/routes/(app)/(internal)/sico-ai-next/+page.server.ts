@@ -95,6 +95,64 @@ export const actions = {
             return fail(502, { control_error: 'Could not reach the control-review service.' });
         }
     },
+    // Activity 1 v3: full authorized framework coverage, one read-only Qwen batch.
+    // Reuses the existing permission-checked generate-one endpoint. No GRC writes.
+    ai_framework_batch: async (event) => {
+        if (!hasAiOnboardingSession(event)) {
+            return fail(401, { framework_batch_error: 'Sign in again.' });
+        }
+        const body = await event.request.formData();
+        const payload = {
+            organization_name: String(body.get('organization_name') ?? '').trim(),
+            framework_name: String(body.get('framework_name') ?? '').trim(),
+            problem: String(body.get('problem') ?? '').trim(),
+            activity_number: 1,
+            full_framework_batch: true,
+            framework_batch_size: Number(body.get('framework_batch_size') ?? 2),
+            framework_cursor: String(body.get('framework_cursor') ?? ''),
+            framework_business_context: String(body.get('framework_business_context') ?? '').trim()
+        };
+        if (payload.organization_name.length < 2 || payload.organization_name.length > 150 ||
+            payload.framework_name.length < 2 || payload.framework_name.length > 150 ||
+            payload.problem.length < 20 || payload.problem.length > 4000 ||
+            !Number.isInteger(payload.framework_batch_size) ||
+            payload.framework_batch_size < 1 || payload.framework_batch_size > 3 ||
+            payload.framework_cursor.length > 2048 ||
+            payload.framework_business_context.length > 1200) {
+            return fail(400, { framework_batch_error: 'Provide a valid organization, exact selected framework, objective, and batch size.' });
+        }
+        try {
+            const response = await fetchAiOnboardingBackend(
+                event, '/ai/workforce/assistant/lifecycle/generate-one/', payload
+            );
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                const kind = typeof data?.error_kind === 'string' ? data.error_kind.slice(0, 80) : '';
+                return fail(response.status, {
+                    framework_batch_error: (kind ? `${kind}: ` : '') + backendMessage(data)
+                });
+            }
+            if (data.activity_number !== 1 || data.business_records_written !== false ||
+                data.compliance_verdict !== 'not_established' ||
+                !data.framework_batch || data.framework_batch.business_records_written !== false) {
+                return fail(502, { framework_batch_error: 'Read-only Activity 1 response could not be verified.' });
+            }
+            const batch = data.framework_batch;
+            if (batch.status === 'partial' || batch.status === 'complete') {
+                if (data.generated_by_model !== true ||
+                    !Array.isArray(batch.requirement_reviews) || !batch.requirement_reviews.length ||
+                    typeof batch.coverage?.accessible_total !== 'number') {
+                    return fail(502, { framework_batch_error: 'The full-framework batch was not validated.' });
+                }
+            } else if (typeof batch.status !== 'string' || !Array.isArray(batch.requirement_reviews) ||
+                batch.requirement_reviews.length !== 0) {
+                return fail(502, { framework_batch_error: 'Framework matching response was invalid.' });
+            }
+            return { ai_framework_batch: data };
+        } catch {
+            return fail(502, { framework_batch_error: 'The full-framework batch could not reach the backend. Previous progress remains available.' });
+        }
+    },
     ai_sixteen_item: async (event) => {
         if (!hasAiOnboardingSession(event)) return fail(401, { ai_sixteen_error: 'Sign in again.' });
         const form = await event.request.formData();

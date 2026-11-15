@@ -3,6 +3,10 @@
     import { enhance, deserialize, applyAction } from '$app/forms';
     import { onMount } from 'svelte';
     import type { ActionData } from './$types';
+    import {
+        applyFrameworkBatch, validateCheckpoint, scopeKey,
+        type ReviewCheckpoint, type ReviewScope
+    } from '$lib/utils/sicoFrameworkReviewV3';
 
     let { form }: { form: ActionData | null } = $props();
     let instruction = $state('');
@@ -38,6 +42,137 @@
     let proposedPerimeter = $state('SICO cybersecurity assessment perimeter');
     let selectedFramework = $state('');
     let selectedRiskMatrix = $state('');
+    // Full-framework review is a separate read-only activity, not the legacy 3-control demo.
+    let frameworkBusinessContext = $state('');
+    let frameworkBatchSize = $state(2);
+    let fullReview = $state<ReviewCheckpoint | null>(null);
+    let fullReviewBusy = $state(false);
+    let fullReviewAutomatic = $state(false);
+    let fullReviewPause = $state(false);
+    let fullReviewError = $state('');
+    let fullReviewNotice = $state('');
+    let fullReviewCandidates = $state<string[]>([]);
+    let fullReviewShown = $state(8);
+    const fullReviewPercent = $derived(fullReview?.coverage.accessible_total
+        ? Math.round(fullReview.coverage.reviewed_through * 10000 / fullReview.coverage.accessible_total) / 100 : 0);
+    const visibleFrameworkReviews = $derived(fullReview?.requirement_reviews.slice(0, fullReviewShown) ?? []);
+
+    function currentFrameworkScope(): ReviewScope {
+        return {
+            organization_name: organization.trim(), framework_name: frameworkSearch.trim(),
+            problem: instruction.trim(), business_context: frameworkBusinessContext.trim()
+        };
+    }
+
+    function changedFrameworkInputs() {
+        // A running model request is allowed to finish, but later batches will
+        // not silently mix updated inputs with an earlier signed cursor.
+        fullReviewPause = true;
+        if (fullReview) fullReviewNotice = 'Inputs changed. Restore the original inputs to resume, or explicitly start a new review.';
+    }
+
+    async function runFullFrameworkReview(automatic: boolean, restart = false) {
+        if (fullReviewBusy) return;
+        const scope = currentFrameworkScope();
+        if (scope.organization_name.length < 2 || scope.organization_name.length > 150 ||
+            scope.framework_name.length < 2 || scope.framework_name.length > 150 ||
+            scope.problem.length < 20 || scope.problem.length > 4000 ||
+            scope.business_context.length > 1200) {
+            fullReviewError = 'Enter the organization, exact framework and assessment objective in the three fields above.';
+            return;
+        }
+        if (restart) {
+            fullReview = null;
+            fullReviewCandidates = [];
+            fullReviewShown = 8;
+        } else if (fullReview && scopeKey(fullReview.scope) !== scopeKey(scope)) {
+            fullReviewError = 'These inputs differ from the existing checkpoint. Restore them, or click Start new review.';
+            return;
+        }
+        if (fullReview?.coverage.complete) return;
+        fullReviewBusy = true;
+        fullReviewAutomatic = automatic;
+        fullReviewPause = false;
+        fullReviewError = '';
+        fullReviewNotice = '';
+        try {
+            do {
+                if (fullReviewPause || scopeKey(currentFrameworkScope()) !== scopeKey(scope)) break;
+                const result = await sicoPostAction('ai_framework_batch', {
+                    organization_name: scope.organization_name,
+                    framework_name: scope.framework_name,
+                    problem: scope.problem,
+                    framework_business_context: scope.business_context,
+                    framework_batch_size: String(frameworkBatchSize),
+                    framework_cursor: fullReview?.next_cursor ?? ''
+                });
+                const response = (result.data as Record<string, any>)?.ai_framework_batch;
+                const batch = response?.framework_batch;
+                if (!batch) throw new Error('No framework review was returned.');
+                if (batch.status !== 'partial' && batch.status !== 'complete') {
+                    fullReviewCandidates = Array.isArray(batch.candidate_frameworks)
+                        ? batch.candidate_frameworks.map(String).slice(0, 8) : [];
+                    throw new Error('An exact authorized framework and accessible requirement list could not be found. Check the name and edition.');
+                }
+                if (scopeKey(currentFrameworkScope()) !== scopeKey(scope)) {
+                    throw new Error('Inputs changed during generation. This batch was not appended. Return to the original inputs and retry.');
+                }
+                fullReview = applyFrameworkBatch(fullReview, scope, batch);
+            } while (automatic && !fullReviewPause && !fullReview?.coverage.complete);
+            if (fullReview?.coverage.complete) {
+                fullReviewNotice = 'All accessible assessable requirements have provisional reviews. Export the checkpoint and arrange evidence-based human verification.';
+            } else if (fullReviewPause) {
+                fullReviewNotice = 'Paused after the current batch. Export the checkpoint before refreshing the page.';
+            } else if (fullReview) {
+                fullReviewNotice = 'Batch completed. Continue when ready, or export a checkpoint.';
+            }
+        } catch (error) {
+            fullReviewError = error instanceof Error ? error.message : 'The current Qwen batch failed. Earlier reviews are preserved.';
+        } finally {
+            fullReviewBusy = false;
+            fullReviewAutomatic = false;
+        }
+    }
+
+    function downloadFullReview() {
+        if (!fullReview || fullReviewBusy) return;
+        const blob = new Blob([JSON.stringify(fullReview, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `SICO_Activity1_v3_checkpoint_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        fullReviewNotice = 'Checkpoint exported to your device. Keep it private: it contains your assessment context and draft responses.';
+    }
+
+    async function importFullReview(event: Event) {
+        if (fullReviewBusy) return;
+        const field = event.currentTarget as HTMLInputElement;
+        const file = field.files?.[0];
+        if (!file) return;
+        try {
+            if (file.size > 6 * 1024 * 1024) throw new Error('Checkpoint exceeds the 6 MB import limit.');
+            const parsed = validateCheckpoint(JSON.parse(await file.text()));
+            // Restore the exact previous inputs before allowing a signed-cursor continuation.
+            organization = parsed.scope.organization_name;
+            frameworkSearch = parsed.scope.framework_name;
+            instruction = parsed.scope.problem;
+            frameworkBusinessContext = parsed.scope.business_context;
+            fullReview = parsed;
+            fullReviewShown = 8;
+            fullReviewCandidates = [];
+            fullReviewError = '';
+            fullReviewNotice = 'Imported an unverified, client-held draft. The backend will re-check the signed cursor, permissions and framework inventory on the next batch.';
+        } catch (error) {
+            fullReviewError = error instanceof Error ? error.message : 'Checkpoint could not be imported.';
+        } finally {
+            field.value = '';
+        }
+    }
+
     function clearStaleCase() {
         generatedSixteen = [];
         generatedFor = '';
@@ -58,7 +193,7 @@
         const parsed = deserialize(await res.text());
         if (parsed.type !== 'success') {
             const body = parsed.type === 'failure' ? (parsed.data as Record<string, any>) : null;
-            throw new Error(String(body?.control_error ?? body?.ai_sixteen_error ?? body?.lifecycle_error ?? 'The requested operation could not finish.'));
+            throw new Error(String(body?.framework_batch_error ?? body?.control_error ?? body?.ai_sixteen_error ?? body?.lifecycle_error ?? 'The requested operation could not finish.'));
         }
         return parsed;
     }
@@ -331,20 +466,20 @@
             <div class="report-head"><h2>Build a GRC case</h2><span class="status-pill">Your organization · Your framework · Your objective</span></div>
             <form method="POST" action="?/lifecycle_intake" onsubmit={startGeneratedCase} class="workflow-form">
                 <label>1. Organization name
-                    <input name="organization_name" bind:value={organization} oninput={() => { organizationConfirmation = ''; clearStaleCase(); }} disabled={sixteenBusy} placeholder="Existing or new organization name" required minlength="2" maxlength="150" />
+                    <input name="organization_name" bind:value={organization} oninput={() => { organizationConfirmation = ''; clearStaleCase(); changedFrameworkInputs(); }} disabled={sixteenBusy} placeholder="Existing or new organization name" required minlength="2" maxlength="150" />
                 </label>
                 <label>2. Framework
-                    <input name="framework_name" bind:value={frameworkSearch} oninput={() => { frameworkConfirmation = ''; clearStaleCase(); }} disabled={sixteenBusy} placeholder="e.g. NCA ECC" required minlength="2" maxlength="150" />
+                    <input name="framework_name" bind:value={frameworkSearch} oninput={() => { frameworkConfirmation = ''; clearStaleCase(); changedFrameworkInputs(); }} disabled={sixteenBusy} placeholder="e.g. NCA ECC" required minlength="2" maxlength="150" />
                     <span class="footnote">The backend checks your loaded GRC library and never silently substitutes another framework.</span>
                 </label>
                 <label>3. What is the problem or assessment objective?
-                    <textarea name="problem" bind:value={instruction} oninput={clearStaleCase} disabled={sixteenBusy} rows="5" required minlength="20" maxlength="4000" placeholder="Describe the problem. SICO coordinates the assessment lifecycle and identifies evidence and decisions it needs."></textarea>
+                    <textarea name="problem" bind:value={instruction} oninput={() => { clearStaleCase(); changedFrameworkInputs(); }} disabled={sixteenBusy} rows="5" required minlength="20" maxlength="4000" placeholder="Describe the problem. SICO coordinates the assessment lifecycle and identifies evidence and decisions it needs."></textarea>
                 </label>
                 <input type="hidden" name="selected_framework_id" value={frameworkConfirmation}/>
                 <input type="hidden" name="selected_organization_id" value={organizationConfirmation}/>
                 <button type="submit" disabled={sixteenBusy || instruction.trim().length < 20 || !organization.trim() || !frameworkSearch.trim()}>{sixteenBusy ? `Generating with Qwen (${generatedSixteen.length}/16)…` : 'Generate connected GRC case with AI'}</button>
-                <button type="button" onclick={() => generateConnectedThrough(1)} disabled={sixteenBusy || instruction.trim().length < 20 || !organization.trim() || !frameworkSearch.trim()}>Test Activity 1 only — use SICO framework library</button>
-                <p class="footnote">Qwen generates a connected proposed case from these three inputs. Test Activity 1 first, or generate all 16. SICO's authorized framework library is consulted for Activity 1; no GRC module records are saved.</p>
+                <button type="button" onclick={() => generateConnectedThrough(1)} disabled={sixteenBusy || instruction.trim().length < 20 || !organization.trim() || !frameworkSearch.trim()}>Legacy Activity 1 sample — 3 controls only</button>
+                <p class="footnote">Qwen generates a connected proposed case from these three inputs. Use the dedicated <strong>Full-framework Activity 1 review</strong> below for complete framework coverage. The legacy buttons above still generate preliminary drafts, not a completed 16-stage GRC case; no GRC records are saved by draft generation.</p>
             {#if latestResponse?.lifecycle_error}
                 <div class="message error" role="alert">{String(latestResponse.lifecycle_error)}</div>
             {/if}
@@ -387,6 +522,77 @@
                     <p>Risk assessment: {String(preparedWorkflow.resolved_from_three_inputs.risk_assessment)}</p>
                     <p class="footnote">The existing approved GRC services handle record creation. Compliance, evidence and audit conclusions remain unverified.</p>
                 </article>
+            {/if}
+        </section>
+        <section class="report" id="full-framework-review" aria-label="Full-framework Activity 1 provisional review">
+            <div class="report-head"><h2>Activity 1 — Full-framework review</h2><span class="status-pill">SICO requirements · Qwen batches · Read-only</span></div>
+            <p class="report-intro">Uses the organization, framework and objective entered above. Loads <strong>every accessible assessable requirement</strong> of the exact selected framework, whether ISO 27001, NCA ECC, CCC, PDPL or another authorized library. Each Qwen batch produces provisional requirement-linked reviews—not compliance findings.</p>
+            <div class="workflow-form">
+                <label>Additional business facts supplied by you (optional, not verified)
+                    <textarea rows="3" bind:value={frameworkBusinessContext} oninput={changedFrameworkInputs} maxlength="1200" placeholder="Describe known activities, systems, locations, data processing and exclusions. SICO will not treat these claims as verified records."></textarea>
+                </label>
+                <label>Requirements per Qwen batch
+                    <select bind:value={frameworkBatchSize} disabled={fullReviewBusy}>
+                        <option value={1}>1 — slowest, smallest context</option>
+                        <option value={2}>2 — recommended for local Qwen</option>
+                        <option value={3}>3 — may require retries</option>
+                    </select>
+                </label>
+                <div class="framework-actions">
+                    {#if !fullReview}
+                        <button type="button" onclick={() => runFullFrameworkReview(false, true)} disabled={fullReviewBusy || instruction.trim().length < 20 || !organization.trim() || !frameworkSearch.trim()}>
+                            {fullReviewBusy ? 'Analyzing requirements…' : 'Start full-framework review (first batch)'}
+                        </button>
+                    {:else if !fullReview.coverage.complete}
+                        <button type="button" onclick={() => runFullFrameworkReview(false)} disabled={fullReviewBusy}>Analyze next batch</button>
+                        <button type="button" onclick={() => runFullFrameworkReview(true)} disabled={fullReviewBusy}>Continue automatically</button>
+                    {/if}
+                    {#if fullReviewBusy && fullReviewAutomatic}
+                        <button type="button" onclick={() => { fullReviewPause = true; }} disabled={fullReviewPause}>{fullReviewPause ? 'Pausing…' : 'Pause after current batch'}</button>
+                    {/if}
+                    {#if fullReview}
+                        <button type="button" onclick={downloadFullReview} disabled={fullReviewBusy}>Download checkpoint / draft report</button>
+                        <button type="button" onclick={() => { fullReviewPause = true; fullReview = null; fullReviewCandidates = []; fullReviewError = ''; fullReviewNotice = 'Previous review cleared from this browser tab. A downloaded checkpoint can still be imported.'; }} disabled={fullReviewBusy}>Start new review</button>
+                    {/if}
+                </div>
+                <label>Resume from a previously downloaded checkpoint
+                    <input type="file" accept=".json,application/json" onchange={importFullReview} disabled={fullReviewBusy} />
+                </label>
+            </div>
+            <p class="footnote">Automatic continuation runs <strong>only while this page stays open</strong>, one batch at a time. Pausing takes effect after the running request finishes. No database checkpoint is saved; download a checkpoint before closing or refreshing. The signed resume cursor expires after seven days and becomes invalid if authorization or the framework catalog changes.</p>
+            {#if fullReviewError}<div class="message error" role="alert">{fullReviewError} Previously completed batches remain available.</div>{/if}
+            {#if fullReviewNotice}<p class="message" role="status">{fullReviewNotice}</p>{/if}
+            {#if fullReviewCandidates.length}
+                <p class="footnote">Potential authorized framework names (confirm the exact edition): {fullReviewCandidates.join(' · ')}</p>
+            {/if}
+            {#if fullReview}
+                <div class="framework-coverage">
+                    <div class="framework-coverage-title">
+                        <strong>{fullReview.matched_framework.name} {fullReview.matched_framework.reference ? `(${fullReview.matched_framework.reference})` : ''}</strong>
+                        <span>{fullReview.coverage.reviewed_through} / {fullReview.coverage.accessible_total} reviewed</span>
+                    </div>
+                    <div class="framework-meter" role="progressbar" aria-label="Accessible requirement analysis progress" aria-valuemin="0" aria-valuemax={fullReview.coverage.accessible_total} aria-valuenow={fullReview.coverage.reviewed_through}>
+                        <div class="framework-meter-fill" style={`width: ${fullReviewPercent}%`}></div>
+                    </div>
+                    <p class="footnote">{fullReview.coverage.remaining} requirements remaining · {fullReviewPercent}% processed · {fullReview.coverage.complete ? 'All accessible requirements covered' : 'Partial provisional assessment'} · {fullReview.framework_edition_status.replaceAll('_', ' ')}</p>
+                </div>
+                <div class="stage-grid">
+                    {#each visibleFrameworkReviews as req (req.requirement_id)}
+                        <article class="report-card">
+                            <h3>{req.reference || 'Reference not listed'} — {req.requirement_name || 'Title unavailable in library'}</h3>
+                            <p><strong>Provisional applicability:</strong> {req.applicability.replaceAll('_', ' ')}</p>
+                            <p><strong>Reasoning:</strong> {req.rationale}</p>
+                            <p><strong>Evidence to request:</strong> {req.evidence_to_request}</p>
+                            <p><strong>Question for organization:</strong> {req.question_to_resolve}</p>
+                            {#if req.source_text_excerpt_truncated}<p class="finding-alert">Source text was shortened for Qwen; verify against the full original requirement.</p>{/if}
+                            <p class="footnote">SICO authorized source · Requirement ID: {req.requirement_id} · AI draft, not a verified assessment</p>
+                        </article>
+                    {/each}
+                </div>
+                {#if fullReview.requirement_reviews.length > fullReviewShown}
+                    <button type="button" onclick={() => { fullReviewShown += 20; }}>Show more requirement reviews ({fullReview.requirement_reviews.length - fullReviewShown} hidden)</button>
+                {/if}
+                <p class="footnote">This report is user-held and not cryptographically signed. Verify imported results, requirement text, framework edition, organization facts, evidence and regulatory applicability with a qualified assessor before any approval or GRC business-record creation.</p>
             {/if}
         </section>
         {#if generatedSixteen.length > 0 || sixteenBusy || sixteenError || caseSaveNotice}
@@ -929,4 +1135,10 @@
     .report-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.report-card{min-width:0;padding:22px}.report-card h3{font-size:18px;margin:0 0 15px;color:#e9f6f8}.report-card p,.report-card li{font-size:14px;line-height:1.7;color:#bfd1e4;overflow-wrap:anywhere}.report-card strong{color:#edf7ff}.records,.notes{padding-left:20px;margin:0}.records li,.notes li{margin-bottom:11px}.footnote{color:#91aabc!important;font-size:12px!important}.technical{margin-top:22px;border:1px solid #31495c;border-radius:12px;padding:15px;color:#a7bdd1}.technical summary{cursor:pointer}.technical p{font-size:12px}.technical pre{font-size:11px;max-height:340px;white-space:pre-wrap;overflow-wrap:anywhere;overflow:auto;background:#081221;padding:14px;border-radius:8px}footer{border-top:1px solid #304354;color:#839ab1;font-size:12px;margin-top:55px;padding-top:23px}.sr-only{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
     @media(max-width:800px){.shell{padding:23px 16px 50px}.scope-pill{display:none}.hero{margin:50px auto 25px}.example-grid,.report-grid,.status-grid{grid-template-columns:1fr}.report-head{flex-direction:column;align-items:flex-start}.prompt-footer{flex-direction:column;align-items:stretch}.prompt-footer button{width:100%}}
 .workflow-form{margin-top:14px;padding:15px;border:1px solid #314b61;border-radius:12px;display:grid;gap:12px;background:#111e30}.workflow-form h3{margin:0;font-size:15px}.workflow-form label{display:grid;gap:6px;font-size:13px;color:#d2e6ef}.workflow-form input:not([type="checkbox"]),.workflow-form textarea,.workflow-form select{min-width:0;width:100%;box-sizing:border-box;padding:10px;background:#0e192b;color:#eef6ff;border:1px solid #46637a;border-radius:8px;font:inherit}.workflow-form button{justify-self:start;border:0;border-radius:9px;padding:11px 16px;font:inherit;font-weight:700;background:#73e2c9;color:#082630;cursor:pointer}.workflow-form button:disabled{opacity:.45;cursor:not-allowed}.workflow-form .confirmation{display:flex;align-items:center;gap:9px}
+    .framework-actions { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:12px 0; }
+    .framework-actions button { flex:0 1 auto; }
+    .framework-coverage { margin:20px 0 16px; padding:16px; border:1px solid rgba(134,185,174,.25); border-radius:12px; }
+    .framework-coverage-title { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+    .framework-meter { height:12px; border-radius:99px; background:rgba(150,170,185,.23); overflow:hidden; }
+    .framework-meter-fill { height:100%; background:#61d8bc; border-radius:99px; transition:width .25s ease; }
 </style>
