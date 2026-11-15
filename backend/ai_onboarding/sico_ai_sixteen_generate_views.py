@@ -334,6 +334,34 @@ class ProposedAssetGenerationError(ValueError):
         super().__init__(f'Qwen could not generate a distinct, valid proposed asset PA-{asset_number}.')
 
 
+class ProposedFrameworkReviewError(ValueError):
+    """A safe reason for failed Activity 1 library-anchored generation.
+
+    Neither prompts, framework source data, nor raw model outputs are exposed.
+    """
+    def __init__(self, reason):
+        self.reason = reason
+        super().__init__('Activity 1 framework review could not be validated.')
+
+
+def _framework_review_failure_reason(exc):
+    """Only expose allowlisted diagnostic categories, never provider exception text."""
+    if isinstance(exc, TimeoutError) or 'timeout' in type(exc).__name__.lower():
+        return 'timeout'
+    code = getattr(exc, 'code', None) or getattr(exc, 'error_code', None)
+    if code == 'local_ai_provider_schema_mismatch' or isinstance(exc, JsonSchemaError):
+        return 'schema_mismatch'
+    if code == 'local_ai_prompt_exceeds_context':
+        return 'context_limit'
+    if code == 'local_ai_provider_invalid_output':
+        return 'invalid_json'
+    if code == 'ai_provider_request_failed':
+        return 'provider_request_failed'
+    if isinstance(exc, ValueError):
+        return 'invalid_generated_content'
+    return 'provider_or_validation_failed'
+
+
 def _validated_candidate_asset(raw, *, asset_number, seen):
     """Never synthesize or repair an asset with non-model-generated facts."""
     Draft202012Validator(CANDIDATE_ASSET_SCHEMA).validate(raw)
@@ -528,7 +556,7 @@ def _read_authorized_framework_catalog(user, query, problem):
     }
 
 
-def _generate_framework_applicability(selection, *, catalog, organization, framework, problem):
+def _generate_framework_applicability_validated(selection, *, catalog, organization, framework, problem):
     """Real framework references are server-owned; only the analysis is AI text."""
     result = {key: catalog[key] for key in (
         'status', 'matched_framework', 'candidate_names',
@@ -608,6 +636,18 @@ def _generate_framework_applicability(selection, *, catalog, organization, frame
         'This is a sampled review, not complete edition verification, '
         'regulatory applicability confirmation, or a compliance assessment.')
     return result
+
+
+def _generate_framework_applicability(selection, *, catalog, organization, framework, problem):
+    """Enforce validated, permission-derived references; classify Qwen failures safely."""
+    try:
+        return _generate_framework_applicability_validated(
+            selection, catalog=catalog, organization=organization,
+            framework=framework, problem=problem)
+    except (AiProviderError, JsonSchemaError, TimeoutError, ValueError,
+            TypeError, KeyError) as exc:
+        raise ProposedFrameworkReviewError(_framework_review_failure_reason(exc)) from exc
+
 
 def generate_one(*, organization, framework, problem, activity_number, selection, case_context=None, user=None):
     """Get real model output. Recover missing fields via bounded small calls.
@@ -749,6 +789,7 @@ class SicoSixteenGenerateItemView(APIView):
         except (AiProviderError, JsonSchemaError, TimeoutError, ValueError, TypeError, KeyError) as exc:
             is_asset_failure = isinstance(exc, ProposedAssetGenerationError)
             is_field_failure = isinstance(exc, ProposedActivityFieldError)
+            is_framework_failure = isinstance(exc, ProposedFrameworkReviewError)
             is_timeout = isinstance(exc, TimeoutError) or 'timeout' in type(exc).__name__.lower() or 'timed out' in str(exc).lower()
             return Response({
                 'detail': (
@@ -758,14 +799,18 @@ class SicoSixteenGenerateItemView(APIView):
                     (f'Qwen could not validate the {exc.field} field for Activity '
                      f'{exc.activity_number} after a bounded correction.'
                      if is_field_failure else
-                     ('Qwen did not return a validated work product for activity '
-                      f"{data['activity_number']}. "
-                      + ('The model request timed out.' if is_timeout else
-                         'The model response was unavailable or invalid.')))
+                     ('Qwen could not validate the authorized SICO framework-library '
+                      'review for Activity 1. No compliance finding was inferred.'
+                      if is_framework_failure else
+                      ('Qwen did not return a validated work product for activity '
+                       f"{data['activity_number']}. "
+                       + ('The model request timed out.' if is_timeout else
+                          'The model response was unavailable or invalid.'))))
                 ),
                 'activity_number': data['activity_number'],
                 'error_kind': ('candidate_asset_generation_failure' if is_asset_failure else
                                'activity_field_generation_failure' if is_field_failure else
+                               ('framework_review_' + exc.reason) if is_framework_failure else
                                'provider_timeout' if is_timeout else 'generation_failure'),
             }, status=503)
         return Response({
