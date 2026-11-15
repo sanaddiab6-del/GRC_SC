@@ -464,6 +464,78 @@ def _framework_draft_schema(count):
     }
 
 
+# Activity 1 pilot selection and organizational intake are based only on
+# permission-filtered requirement metadata and the USER'S unverified objective.
+# No company/asset records are fetched by company-name string matching.
+_ACTIVITY1_SCOPE_PATTERNS = {
+    'industrial_ot': r'\b(?:operational technology|industrial control|industrial systems?|industrial network|\bot\b|\bics\b|scada|ot network|manufactur\w*|factory|production network)\b',
+    'cloud_hosting': r'\b(?:cloud|hosting|hosted infrastructure|data cent\w*|saas|iaas|paas|aws|azure|gcp)\b',
+    'external_suppliers': r'\b(?:third[- ]party|suppliers?|vendors?|outsourc\w*|external service providers?)\b',
+}
+_ACTIVITY1_GENERAL_PRIORITIES = (
+    'cybersecurity strategy', 'cybersecurity governance', 'cybersecurity policies',
+    'risk management', 'asset management', 'asset inventory', 'identity',
+    'access control', 'incident management', 'business continuity',
+    'security awareness', 'vulnerability management', 'network security',
+)
+_ACTIVITY1_UNINFORMATIVE_TOKENS = {
+    'assess', 'assessment', 'under', 'company', 'platform', 'compliance',
+    'risks', 'security', 'cybersecurity', 'operating', 'generate', 'saudi',
+    'organization', 'framework', 'data', 'sico', 'using', 'existing',
+    'controls', 'control', 'evidence', 'applicable', 'requirements',
+    'required', 'review', 'human', 'nca', 'ecc', 'identify', 'supporting',
+}
+
+
+def _activity1_scope_mentions(problem):
+    """Topics mentioned in user text, NOT verified facts or assets."""
+    text = str(problem or '').casefold()
+    return sorted(name for name, pattern in _ACTIVITY1_SCOPE_PATTERNS.items()
+                  if re.search(pattern, text, flags=re.I))
+
+
+def _activity1_scope_exclusions(problem):
+    """Unverified explicit user exclusions; never independently proven facts."""
+    text = str(problem or '').casefold()
+    excluded = set()
+    for topic, pattern in _ACTIVITY1_SCOPE_PATTERNS.items():
+        for match in re.finditer(pattern, text, flags=re.I):
+            # Only a nearby direct negation; avoid inferring exclusions from silence.
+            prefix = text[max(0, match.start() - 40):match.start()]
+            if re.search(r"\b(?:no|without|not using|do not use|does not use|"
+                         r"don't use|doesn't use|do not operate|does not operate|"
+                         r"excluded|exclude)\s{0,2}(?:\w+\s+){0,3}$", prefix):
+                excluded.add(topic)
+    return sorted(excluded)
+
+
+def _activity1_requirement_topic(row):
+    """Flag specialized requirements using SICO's real name/description only."""
+    text = (' '.join(str(row.get(k) or '') for k in ('name', 'description'))).casefold()
+    return next((name for name, pattern in _ACTIVITY1_SCOPE_PATTERNS.items()
+                 if re.search(pattern, text, flags=re.I)), None)
+
+
+def _activity1_priority(row, terms, mentioned):
+    """Broad controls first where the user's sector/systems are unknown."""
+    heading = str(row.get('name') or '').casefold()
+    body = (' '.join(str(row.get(k) or '') for k in
+                     ('name', 'description', 'typical_evidence'))).casefold()
+    topic = _activity1_requirement_topic(row)
+    if topic and topic not in mentioned:
+        # Never select unrelated industrial/cloud/supplier requirements solely
+        # because their control number or library position comes first.
+        specialized_score = -100
+    elif topic:
+        specialized_score = 12  # Explicitly mentioned; STILL UNVERIFIED.
+    else:
+        specialized_score = 0
+    foundation = 8 if any(label in heading for label in
+                          _ACTIVITY1_GENERAL_PRIORITIES) else 0
+    relevance = sum(2 for token in terms if re.search(r'\b' + re.escape(token) + r'\b', body))
+    return specialized_score + foundation + relevance
+
+
 def _read_authorized_framework_catalog(user, query, problem):
     """Read only what SICO already authorizes via its existing framework lookup.
 
@@ -492,24 +564,20 @@ def _read_authorized_framework_catalog(user, query, problem):
     qs = RequirementNode.objects.filter(
         framework=fw, assessable=True, id__in=readable_ids)
     total = qs.count()
-    # Bounded read: enough choice for a focused pilot without injecting the
-    # entire framework text into a small local LLM context window.
+    # SICO's permission-checked queryset is the only framework source.
+    # Read a bounded index; do not send the complete library into a small LLM.
     rows = list(qs.order_by('order_id', 'pk').values(
         'ref_id', 'urn', 'name', 'description', 'typical_evidence', 'parent_urn')[:300])
-    stopwords = {'assess', 'assessment', 'under', 'company', 'platform', 'compliance',
-                 'risks', 'security', 'cybersecurity', 'operating', 'generate',
-                 'fintech', 'saudi', 'organization', 'framework', 'data'}
-    terms = {token for token in re.findall(r'[a-z]{4,}', problem.casefold())
-             if token not in stopwords}
-    def relevance(row):
-        desc = (' '.join(str(row.get(k) or '') for k in
-                         ('name', 'description', 'typical_evidence'))).casefold()
-        return sum(1 for token in terms if token in desc)
-
+    excluded = set(_activity1_scope_exclusions(problem))
+    mentions = set(_activity1_scope_mentions(problem)) - excluded
+    terms = {token for token in re.findall(r'[a-z]{4,}', str(problem).casefold())
+             if token not in _ACTIVITY1_UNINFORMATIVE_TOKENS}
     indexed = list(enumerate(rows))
-    indexed.sort(key=lambda entry: (-relevance(entry[1]), entry[0]))
+    indexed.sort(key=lambda entry: (-_activity1_priority(entry[1], terms, mentions),
+                                    entry[0]))
     chosen, groups = [], set()
-    # Prefer distinct framework groups, rather than three variants of one item.
+    # Mix different real framework groups; specialize only when user supplied
+    # a related scope signal. Signals are not verified company facts.
     for _, row in indexed:
         group = str(row.get('parent_urn') or row.get('urn') or '')
         if group in groups and len(indexed) > 3:
@@ -519,11 +587,13 @@ def _read_authorized_framework_catalog(user, query, problem):
         if len(chosen) == 3:
             break
     if len(chosen) < 3:
-        selected_urns = {str(row.get('urn') or '') for row in chosen}
+        chosen_keys = {str(row.get('urn') or row.get('ref_id') or '') for row in chosen}
         for _, row in indexed:
-            if str(row.get('urn') or '') in selected_urns:
+            key = str(row.get('urn') or row.get('ref_id') or '')
+            if key in chosen_keys:
                 continue
             chosen.append(row)
+            chosen_keys.add(key)
             if len(chosen) == 3:
                 break
     sample, seen_refs = [], set()
@@ -553,6 +623,10 @@ def _read_authorized_framework_catalog(user, query, problem):
         'candidate_names': [], 'accessible_requirement_count': total,
         'sample': sample, 'regulator_edition_status': 'not_independently_verified',
         'source': 'sico_authorized_framework_library_read_only',
+        'scope_topics_mentioned_unverified': sorted(mentions),
+        'scope_topics_user_claimed_excluded_unverified': sorted(excluded),
+        'indexed_requirement_count': len(rows),
+        'selection_policy': 'scope_sensitive_foundational_sample_v2',
     }
 
 
@@ -564,6 +638,21 @@ def _generate_framework_applicability_validated(selection, *, catalog, organizat
     result['coverage'] = 'sample_only_not_full_framework_assessment'
     result['requirement_reviews'] = []
     sample = catalog['sample']
+    result['reviewed_sample_count'] = len(sample)
+    result['not_yet_reviewed_count'] = max(
+        0, catalog['accessible_requirement_count'] - len(sample))
+    result['organization_context_status'] = 'user_claims_only_no_verified_company_record'
+    result['scope_topics_mentioned_unverified'] = catalog.get(
+        'scope_topics_mentioned_unverified', sorted(
+            set(_activity1_scope_mentions(problem)) -
+            set(_activity1_scope_exclusions(problem))))
+    result['scope_topics_user_claimed_excluded_unverified'] = catalog.get(
+        'scope_topics_user_claimed_excluded_unverified', _activity1_scope_exclusions(problem))
+    result['pending_organization_questions'] = [
+        'Which legal entity, business sector and operating jurisdictions are actually in scope?',
+        'Which business services, systems, assets and data flows are verified by an authorized owner?',
+        'Are cloud hosting, external suppliers or industrial/OT environments used, and what records prove that?',
+    ]
     if catalog['status'] != 'matched' or not sample:
         result['note'] = ('No unique authorized framework and assessable requirement '
                           'sample was available. No requirement IDs or edition '
@@ -590,14 +679,27 @@ def _generate_framework_applicability_validated(selection, *, catalog, organizat
             'verification artifact to request. Do not claim a verified system, '
             'regulatory applicability, audit result, compliance verdict, official '
             'framework edition, or completed test. Never generate or quote other '
-            'control IDs. The regulator edition still requires independent '
-            'verification. Give one precise regulatory applicability question '
-            'that a qualified assessor must resolve. Strict JSON schema only.'
+            'control IDs. Do not assume cloud, OT/ICS, suppliers or regulated '
+            'services exist solely from the company name or this assessment request. '
+            'Prefer needs_confirmation for unsupported business-specific scopes. '
+            'For each item name what business fact is missing, the condition under '
+            'which it could apply, and a concrete artifact proving or excluding it. '
+            'The regulator edition still requires independent verification. '
+            'Give one precise regulatory applicability question that a qualified '
+            'assessor must resolve. Strict JSON schema only.'
         ),
         user_payload={
             'organization_as_user_described': organization,
             'framework_label_user_supplied': framework,
             'assessment_objective': problem,
+            'organization_facts_verified': False,
+            'scope_topics_mentioned_by_user_NOT_VERIFIED': result['scope_topics_mentioned_unverified'],
+            'scope_topics_user_claimed_excluded_NOT_VERIFIED': result['scope_topics_user_claimed_excluded_unverified'],
+            'pending_organization_questions': result['pending_organization_questions'],
+            'applicability_rule': (
+                'When a specialized scope (cloud, OT/ICS or suppliers) is not established, '
+                'choose needs_confirmation, ask a specific scoping question, and do not '
+                'assume the organization operates that technology. A mention is not proof.'),
             'loaded_framework_from_SICO_not_official_edition_verification':
                 catalog['matched_framework'],
             'actual_authorized_requirements_in_exact_order': [
@@ -620,6 +722,12 @@ def _generate_framework_applicability_validated(selection, *, catalog, organizat
     for real, proposed in zip(sample, draft['reviews']):
         clean = {key: proposed[key].strip() for key in
                  ('applicability', 'rationale', 'evidence_to_request')}
+        topic = _activity1_requirement_topic(real)
+        scope_signals = set(result['scope_topics_mentioned_unverified'])
+        # Server-side guard: Qwen must not mark specialized scopes tentatively
+        # applicable without even a related USER-SUPPLIED scope signal.
+        if topic and topic not in scope_signals and clean['applicability'] == 'potentially_applicable':
+            clean['applicability'] = 'needs_confirmation'
         for key in ('rationale', 'evidence_to_request'):
             if len(clean[key]) < FRAMEWORK_APPLICABILITY_ITEM_SCHEMA['properties'][key]['minLength']:
                 raise ValueError('Qwen generated an incomplete framework applicability review.')
@@ -629,12 +737,17 @@ def _generate_framework_applicability_validated(selection, *, catalog, organizat
             'rationale': clean['rationale'],
             'evidence_to_request': clean['evidence_to_request'],
             'status': 'ai_proposal_not_evidence_verified',
+            'specialized_scope_topic': topic,
+            'organization_scope_verified': False,
+            'user_claimed_scope_excluded': topic in result['scope_topics_user_claimed_excluded_unverified'],
         })
     result['note'] = (
-        'Loaded requirement references come from accessible SICO records. '
-        'Qwen produced only provisional reasoning and evidence requests. '
-        'This is a sampled review, not complete edition verification, '
-        'regulatory applicability confirmation, or a compliance assessment.')
+        f"Only {len(sample)} of {catalog['accessible_requirement_count']} accessible "
+        'assessable framework requirements were sampled; the rest remain UNREVIEWED. '
+        'Requirement references came from authorized SICO records. '
+        'Company sector, legal scope, actual systems and evidence have not been verified. '
+        'A qualified assessor must confirm the official regulator edition and applicability. '
+        'No GRC assessment or compliance result was saved.')
     return result
 
 
