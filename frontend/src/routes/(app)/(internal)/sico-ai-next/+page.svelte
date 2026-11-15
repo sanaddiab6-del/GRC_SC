@@ -107,6 +107,10 @@
 
     async function startGeneratedCase(event: SubmitEvent) {
         event.preventDefault();
+        await generateConnectedThrough(16);
+    }
+
+    async function generateConnectedThrough(lastActivity: number) {
         if (sixteenBusy || !organization.trim() || !frameworkSearch.trim() || instruction.trim().length < 20) return;
         sixteenBusy = true;
         sixteenError = '';
@@ -122,7 +126,7 @@
         try {
             // A single click generates sequentially; each validated result is
             // displayed immediately and a retry resumes the first missing item.
-            for (let number = generatedSixteen.length + 1; number <= 16; number++) {
+            for (let number = generatedSixteen.length + 1; number <= lastActivity; number++) {
                 // Prior Qwen work products form the shared, unverified case context.
                 // Only bounded earlier-stage text and proposed objects are forwarded.
                 const keyStages = new Set([2, 4, 6, 7, 9, 11, 12]);
@@ -339,7 +343,8 @@
                 <input type="hidden" name="selected_framework_id" value={frameworkConfirmation}/>
                 <input type="hidden" name="selected_organization_id" value={organizationConfirmation}/>
                 <button type="submit" disabled={sixteenBusy || instruction.trim().length < 20 || !organization.trim() || !frameworkSearch.trim()}>{sixteenBusy ? `Generating with Qwen (${generatedSixteen.length}/16)…` : 'Generate connected GRC case with AI'}</button>
-                <p class="footnote">Qwen generates a connected proposed case from these three inputs. It carries the scope and named candidate assets into later activities. Nothing is saved to GRC modules in this generation phase.</p>
+                <button type="button" onclick={() => generateConnectedThrough(1)} disabled={sixteenBusy || instruction.trim().length < 20 || !organization.trim() || !frameworkSearch.trim()}>Test Activity 1 only — use SICO framework library</button>
+                <p class="footnote">Qwen generates a connected proposed case from these three inputs. Test Activity 1 first, or generate all 16. SICO's authorized framework library is consulted for Activity 1; no GRC module records are saved.</p>
             {#if latestResponse?.lifecycle_error}
                 <div class="message error" role="alert">{String(latestResponse.lifecycle_error)}</div>
             {/if}
@@ -410,6 +415,35 @@
                             <p><strong>AI analysis:</strong> {String(item.analysis)}</p>
                             <p><strong>Proposed GRC work:</strong> {String(item.proposed_work)}</p>
                             <p><strong>Evidence or decision required:</strong> {String(item.evidence_needed)}</p>
+                            {#if item.framework_review}
+                                <section aria-label="Activity 1 SICO framework library review" class="report-card" style="margin-top:12px">
+                                    <h4>Framework applicability — SICO library + Qwen</h4>
+                                    <p><strong>Library match:</strong> {item.framework_review.status === 'matched' ? 'Authorized SICO framework found' : String(item.framework_review.status)}</p>
+                                    {#if item.framework_review.matched_framework}
+                                        <p><strong>Loaded framework:</strong> {String(item.framework_review.matched_framework.name)} {item.framework_review.matched_framework.reference ? `(${String(item.framework_review.matched_framework.reference)})` : ''}</p>
+                                        <p><strong>Accessible assessable requirements:</strong> {Number(item.framework_review.accessible_requirement_count)} · <strong>Analysis coverage:</strong> Sample only</p>
+                                    {/if}
+                                    <p><strong>Regulator edition:</strong> Not independently verified against the official publication.</p>
+                                    {#if item.framework_review.regulatory_applicability_question}
+                                        <p><strong>Question requiring professional confirmation:</strong> {String(item.framework_review.regulatory_applicability_question)}</p>
+                                    {/if}
+                                    {#if Array.isArray(item.framework_review.requirement_reviews) && item.framework_review.requirement_reviews.length}
+                                        <h4>Real SICO requirements — provisional AI applicability</h4>
+                                        {#each item.framework_review.requirement_reviews as req (req.reference)}
+                                            <div class="report-card" style="margin-top:8px">
+                                                <p><strong>{String(req.reference)} — {String(req.requirement_name)}</strong></p>
+                                                <p><strong>Draft applicability:</strong> {String(req.applicability).replaceAll('_', ' ')}</p>
+                                                <p><strong>Consultant rationale:</strong> {String(req.rationale)}</p>
+                                                <p><strong>Evidence needed:</strong> {String(req.evidence_to_request)}</p>
+                                            </div>
+                                        {/each}
+                                    {:else if Array.isArray(item.framework_review.candidate_names) && item.framework_review.candidate_names.length}
+                                        <p><strong>Possible authorized frameworks:</strong> {item.framework_review.candidate_names.join(' · ')}</p>
+                                        <p>Type the exact framework edition in the second input to avoid silently selecting a different edition.</p>
+                                    {/if}
+                                    <p class="footnote">{String(item.framework_review.note ?? '')} No verified compliance verdict or database write.</p>
+                                </section>
+                            {/if}
                             {#if item.case_profile}
                                 <p><strong>AI-generated case title:</strong> {String(item.case_profile.title)}</p>
                                 <p><strong>Proposed assessment scope:</strong> {String(item.case_profile.scope_summary)}</p>
