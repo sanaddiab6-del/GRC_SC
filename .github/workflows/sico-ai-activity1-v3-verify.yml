@@ -19,7 +19,7 @@ jobs:
     timeout-minutes: 35
     env:
       CI: 'true'
-      NODE_OPTIONS: '--max-old-space-size=4096'
+      NODE_OPTIONS: '--max-old-space-size=6144'
       PUBLIC_BACKEND_API_URL: 'foo'
     steps:
       - name: Checkout feature branch
