@@ -34,7 +34,7 @@
     let evidenceContext = $state('');
     let selectedFolder = $state('');
     let selectedPerimeter = $state('__new__');
-    let frameworkSearch = $state('NCA ECC');
+    let frameworkSearch = $state('');
     let frameworkConfirmation = $state('');
     let organizationConfirmation = $state('');
     let proposedAssessment = $state('Cybersecurity compliance assessment');
@@ -42,6 +42,19 @@
     let selectedFramework = $state('');
     let selectedRiskMatrix = $state('');
     // Unified Build a GRC case uses full-framework batches; legacy draft handlers remain unused by this page.
+    // Creation-first: the main button uses SICO's existing three-input lifecycle
+    // intake, real case-setup serializer and dry-run. No AI-side business writes.
+    let creationBusy = $state(false);
+    let creationError = $state('');
+    let creationNotice = $state('');
+    let creationChoices = $state<Record<string, any> | null>(null);
+    let confirmCaseCreation = $state(false);
+    let caseSaved = $state(false);
+    let stageBusy = $state(false);
+    let stageNotice = $state('');
+    let stageError = $state('');
+    let stageConfirmed = $state(false);
+    let stageHumanFacts = $state('');
     let frameworkBusinessContext = $state('');
     let frameworkBatchSize = $state(2);
     let fullReview = $state<ReviewCheckpoint | null>(null);
@@ -133,6 +146,155 @@
         }
     }
 
+
+    async function prepareNewGrcCase() {
+        if (creationBusy || preparedWorkflow || caseSaved) return;
+        if (organization.trim().length < 2 || frameworkSearch.trim().length < 2 || instruction.trim().length < 20) {
+            creationError = 'Enter an organization, exact loaded framework and objective of at least 20 characters.';
+            return;
+        }
+        creationBusy = true;
+        creationError = '';
+        creationNotice = '';
+        try {
+            // This already exists in +page.server.ts and invokes the authenticated,
+            // permission-checked Django lifecycle intake. No parallel GRC writer.
+            const response = await sicoPostAction('lifecycle_intake', {
+                organization_name: organization.trim(),
+                framework_name: frameworkSearch.trim(),
+                problem: instruction.trim(),
+                skip_legacy_generation: 'yes',
+                selected_framework_id: frameworkConfirmation,
+                selected_organization_id: organizationConfirmation
+            });
+            const data = response.data as Record<string, any>;
+            if (data?.lifecycle_choices) {
+                creationChoices = data.lifecycle_choices;
+                creationNotice = 'Choose the exact authorized organization/framework record before creating a case.';
+                return;
+            }
+            const prepared = data?.workflow_prepared;
+            if (!prepared?.engagement_id || !prepared?.prepared_digest || !prepared?.review?.operation_payload) {
+                throw new Error('The original SICO case-setup service did not provide a verified review.');
+            }
+            preparedWorkflow = prepared;
+            activeEngagement = String(prepared.engagement_id);
+            lifecycleProgress = prepared.lifecycle ?? null;
+            recordedApproval = null;
+            confirmCaseCreation = false;
+            creationChoices = null;
+            creationNotice = 'New assessment, scope and optional risk assessment are PREPARED through SICO. Review the exact creation plan before approving.';
+        } catch (err) {
+            creationError = err instanceof Error ? err.message : 'Unable to prepare this new GRC case.';
+        } finally {
+            creationBusy = false;
+        }
+    }
+
+    async function approveAndCreateCase() {
+        if (creationBusy || caseSaved || !confirmCaseCreation || !preparedWorkflow?.engagement_id || !preparedWorkflow?.prepared_digest) return;
+        creationBusy = true;
+        creationError = '';
+        try {
+            // The existing SvelteKit action independently obtains server-side approval.
+            // If its restricted case writer is enabled, it commits the SAME reviewed
+            // payload through the existing atomic GRC service. Otherwise no case is saved.
+            const response = await sicoPostAction('workflow_approve', {
+                engagement_id: String(preparedWorkflow.engagement_id),
+                prepared_digest: String(preparedWorkflow.prepared_digest),
+                confirm_reviewed: 'yes'
+            });
+            const data = response.data as Record<string, any>;
+            recordedApproval = data?.workflow_approved ?? null;
+            if (data?.workflow_committed?.business_records_written === true) {
+                caseSaved = true;
+                lifecycleProgress = data.workflow_committed.lifecycle ?? lifecycleProgress;
+                creationNotice = 'SICO confirmed new assessment records were created through its original GRC service.';
+            } else {
+                creationError = String(data?.workflow_error ?? 'Approval recorded, but the GRC case writer is disabled or saving was not independently verified. No case is claimed to be created.');
+            }
+        } catch (err) {
+            creationError = err instanceof Error ? err.message : 'Case creation could not be verified; do not submit a duplicate.';
+        } finally {
+            creationBusy = false;
+        }
+    }
+
+    async function prepareNextRealGrcStage() {
+        if (stageBusy || !caseSaved || !activeEngagement || lifecycleProposal) return;
+        stageBusy = true;
+        stageError = '';
+        stageNotice = '';
+        try {
+            const response = await sicoPostAction('lifecycle_next', {
+                engagement_id: activeEngagement,
+                human_facts: stageHumanFacts.trim().slice(0, 1200)
+            });
+            const result = (response.data as Record<string, any>)?.lifecycle_next;
+            if (!result) throw new Error('No verified lifecycle result was returned.');
+            lifecycleProgress = result.lifecycle ?? lifecycleProgress;
+            if (result.status === 'prepared_for_human_review' && result.review?.operation_payload) {
+                lifecycleProposal = result;
+                stageConfirmed = false;
+                lifecycleApproval = null;
+                stageNotice = `Qwen prepared the ${result.stage} operation using SICO's original GRC service. Nothing has been saved yet.`;
+            } else {
+                stageError = String(result.reason ?? result.questions?.join(' ') ?? 'More information or permission is needed before a new record can be prepared.');
+            }
+        } catch (err) {
+            stageError = err instanceof Error ? err.message : 'Qwen could not prepare this GRC stage.';
+        } finally {
+            stageBusy = false;
+        }
+    }
+
+    async function approveNextRealGrcStage() {
+        if (stageBusy || !stageConfirmed || !lifecycleProposal?.prepared_digest || !activeEngagement) return;
+        stageBusy = true;
+        stageError = '';
+        try {
+            const response = await sicoPostAction('lifecycle_stage_approve', {
+                engagement_id: activeEngagement,
+                stage: String(lifecycleProposal.stage),
+                prepared_digest: String(lifecycleProposal.prepared_digest),
+                confirm_reviewed: 'yes'
+            });
+            lifecycleApproval = (response.data as Record<string, any>)?.lifecycle_stage_approved ?? null;
+            stageNotice = lifecycleApproval?.commit_enabled === true
+                ? 'Human approval recorded. A separate click is required to create this new GRC record.'
+                : 'Approval recorded, but this GRC writer is disabled. No business records were created.';
+        } catch (err) {
+            stageError = err instanceof Error ? err.message : 'Stage approval failed.';
+        } finally {
+            stageBusy = false;
+        }
+    }
+
+    async function commitNextRealGrcStage() {
+        if (stageBusy || !lifecycleApproval?.approved || lifecycleApproval?.commit_enabled !== true || !lifecycleProposal || !activeEngagement) return;
+        stageBusy = true;
+        stageError = '';
+        try {
+            const response = await sicoPostAction('lifecycle_stage_commit', {
+                engagement_id: activeEngagement,
+                stage: String(lifecycleProposal.stage),
+                prepared_digest: String(lifecycleProposal.prepared_digest),
+                confirm_reviewed: 'yes'
+            });
+            const result = (response.data as Record<string, any>)?.lifecycle_stage_committed;
+            if (result?.business_records_written !== true) throw new Error('Original SICO service did not verify that the record was saved.');
+            lifecycleProgress = result.lifecycle ?? lifecycleProgress;
+            stageNotice = `New ${lifecycleProposal.stage} records were saved through SICO's existing GRC service.`;
+            lifecycleProposal = null;
+            lifecycleApproval = null;
+            stageConfirmed = false;
+        } catch (err) {
+            stageError = err instanceof Error ? err.message : 'Stage save could not be verified; do not repeat blindly.';
+        } finally {
+            stageBusy = false;
+        }
+    }
+
     function downloadFullReview() {
         if (!fullReview || fullReviewBusy) return;
         const blob = new Blob([JSON.stringify(fullReview, null, 2)], { type: 'application/json' });
@@ -192,7 +354,7 @@
         const parsed = deserialize(await res.text());
         if (parsed.type !== 'success') {
             const body = parsed.type === 'failure' ? (parsed.data as Record<string, any>) : null;
-            throw new Error(String(body?.framework_batch_error ?? body?.control_error ?? body?.ai_sixteen_error ?? body?.lifecycle_error ?? 'The requested operation could not finish.'));
+            throw new Error(String(body?.framework_batch_error ?? body?.control_error ?? body?.ai_sixteen_error ?? body?.lifecycle_error ?? body?.workflow_error ?? 'The requested operation could not finish.'));
         }
         return parsed;
     }
@@ -443,7 +605,7 @@
 
 <svelte:head>
     <title>SICO AI Next — Assessment Workspace</title>
-    <meta name="description" content="Permission-scoped GRC discovery and reviewable assessment intake." />
+    <meta name="description" content="Create new GRC cases and linked records with Qwen through original SICO services and approval." />
 </svelte:head>
 
 <div class="workspace">
@@ -459,101 +621,113 @@
                 <h2>Build a GRC case</h2>
                 <span class="status-pill">One workflow · Your existing SICO GRC library</span>
             </div>
-            <p class="report-intro">Tell SICO the organization, exact framework and objective once. It will begin with a full review of every accessible assessable requirement in that framework, then use the same verified context as the remaining GRC activities are integrated. No requirement is invented, and this draft does not write GRC business records.</p>
-            <form class="workflow-form" onsubmit={(event) => { event.preventDefault(); void runFullFrameworkReview(false, true); }}>
-                <label>1. Organization name
-                    <input name="organization_name" bind:value={organization} oninput={() => { clearStaleCase(); changedFrameworkInputs(); }} disabled={fullReviewBusy} placeholder="Existing organization name" required minlength="2" maxlength="150" />
+            <p class="report-intro">Give SICO the organization, selected framework and objective once. The main action prepares a NEW assessment and scope using the existing SICO case-setup service. After verified human approval, authorized writers can create the actual records. Qwen then drafts new assets, controls, risks and other GRC operations through the original platform services.</p>
+            <form class="workflow-form" onsubmit={(event) => { event.preventDefault(); void prepareNewGrcCase(); }}>
+                <label>1. Organization
+                    <input name="organization_name" bind:value={organization} oninput={() => { if (!preparedWorkflow) organizationConfirmation = ''; }} disabled={creationBusy || !!preparedWorkflow} required minlength="2" maxlength="150" placeholder="Exact organization name in SICO" />
                 </label>
                 <label>2. Framework
-                    <input name="framework_name" bind:value={frameworkSearch} oninput={() => { clearStaleCase(); changedFrameworkInputs(); }} disabled={fullReviewBusy} placeholder="e.g. ISO 27001:2022, NCA ECC, CCC, PDPL" required minlength="2" maxlength="150" />
-                    <span class="footnote">SICO checks your permitted framework library and exact edition; it never silently switches frameworks.</span>
+                    <input name="framework_name" bind:value={frameworkSearch} oninput={() => { if (!preparedWorkflow) frameworkConfirmation = ''; }} disabled={creationBusy || !!preparedWorkflow} required minlength="2" maxlength="150" placeholder="Exact loaded framework and edition" />
                 </label>
-                <label>3. Assessment objective
-                    <textarea name="problem" bind:value={instruction} oninput={() => { clearStaleCase(); changedFrameworkInputs(); }} disabled={fullReviewBusy} rows="5" required minlength="20" maxlength="4000" placeholder="What should SICO assess? What is the organization's business situation or concern?"></textarea>
+                <label>3. GRC case objective
+                    <textarea name="problem" bind:value={instruction} disabled={creationBusy || !!preparedWorkflow} required minlength="20" maxlength="4000" rows="4" placeholder="Create a complete new GRC case, assets, risks, controls, policies, evidence requests and reports."></textarea>
                 </label>
-                <label>Additional business context (optional, not verified)
-                    <textarea name="framework_business_context" rows="3" bind:value={frameworkBusinessContext} oninput={changedFrameworkInputs} disabled={fullReviewBusy} maxlength="1200" placeholder="Known business activities, assets, systems, locations, data processing and exclusions; SICO will ask for proof."></textarea>
-                </label>
-                <details class="technical">
-                    <summary>Batch size and model settings</summary>
-                    <label style="margin-top:12px">Requirements per Qwen batch
-                        <select bind:value={frameworkBatchSize} disabled={fullReviewBusy}>
-                            <option value={1}>1 — smallest context</option>
-                            <option value={2}>2 — recommended for local Qwen</option>
-                            <option value={3}>3 — may need retries</option>
+                {#if creationChoices?.organizations?.length > 0}
+                    <label>Confirm authorized organization
+                        <select bind:value={organizationConfirmation} required>
+                            <option value="">Select the exact organization record</option>
+                            {#each creationChoices.organizations as option (option.id)}
+                                <option value={option.id}>{option.name}</option>
+                            {/each}
                         </select>
                     </label>
-                </details>
-                {#if !fullReview}
-                    <button type="submit" disabled={fullReviewBusy || instruction.trim().length < 20 || !organization.trim() || !frameworkSearch.trim()}>
-                        {fullReviewBusy ? 'Starting full framework assessment…' : 'Build GRC case with AI'}
+                {/if}
+                {#if creationChoices?.frameworks?.length > 0}
+                    <label>Confirm exact loaded framework
+                        <select bind:value={frameworkConfirmation} required>
+                            <option value="">Select the exact framework record and edition</option>
+                            {#each creationChoices.frameworks as option (option.id)}
+                                <option value={option.id}>{option.name} {option.ref_id ? `(${option.ref_id})` : ''}</option>
+                            {/each}
+                        </select>
+                    </label>
+                {/if}
+                {#if !preparedWorkflow}
+                    <button type="submit" disabled={creationBusy || instruction.trim().length < 20 || !organization.trim() || !frameworkSearch.trim()}>
+                        {creationBusy ? 'Preparing a new GRC case…' : 'Build GRC case with AI'}
                     </button>
                 {/if}
             </form>
-
-            {#if fullReviewBusy && !fullReview}
-                <p class="message" role="status">Qwen is analyzing the first authorized requirements in your selected framework. No records are being saved.</p>
-            {/if}
-            {#if fullReviewError}
-                <div class="message error" role="alert">{fullReviewError} Earlier completed batches remain available.</div>
-            {/if}
-            {#if fullReviewNotice}<p class="message" role="status">{fullReviewNotice}</p>{/if}
-            {#if fullReviewCandidates.length}
-                <p class="footnote">Possible authorized framework names (confirm the exact edition): {fullReviewCandidates.join(' · ')}</p>
-            {/if}
-
-            {#if fullReview}
-                <div class="framework-coverage" aria-label="Activity 1 assessment progress">
-                    <div class="framework-coverage-title">
-                        <div><strong>Activity 1 of 16 · Framework assessment</strong><p class="footnote">{fullReview.matched_framework.name} {fullReview.matched_framework.reference ? `(${fullReview.matched_framework.reference})` : ''}</p></div>
-                        <span>{fullReview.coverage.reviewed_through} / {fullReview.coverage.accessible_total} requirements</span>
+            {#if creationError}<p class="message error" role="alert">{creationError}</p>{/if}
+            {#if creationNotice}<p class="message" role="status">{creationNotice}</p>{/if}
+            {#if preparedWorkflow}
+                <div class="framework-coverage">
+                    <h3>New GRC case creation plan · {caseSaved ? 'Saved and verified' : 'Awaiting approval'}</h3>
+                    <p class="footnote">Organization: {preparedWorkflow.scope?.folder?.name || organization} · Framework: {preparedWorkflow.scope?.framework?.name || frameworkSearch}</p>
+                    <p class="footnote">Engagement: {preparedWorkflow.engagement_id}</p>
+                    <div class="stage-grid">
+                        {#each (preparedWorkflow.planned_actions ?? []) as action, index (index)}
+                            <article class="report-card">
+                                <h4>{action.platform_entity ?? action.object_key ?? 'GRC record'} — {action.action}</h4>
+                                <p>{action.detail ?? action.status}</p>
+                            </article>
+                        {/each}
                     </div>
-                    <div class="framework-meter" role="progressbar" aria-label="Accessible requirement analysis progress" aria-valuemin="0" aria-valuemax={fullReview.coverage.accessible_total} aria-valuenow={fullReview.coverage.reviewed_through}>
-                        <div class="framework-meter-fill" style={`width: ${fullReviewPercent}%`}></div>
-                    </div>
-                    <p class="footnote">{fullReview.coverage.remaining} remaining · {fullReviewPercent}% analyzed · {fullReview.framework_edition_status.replaceAll('_', ' ')} · All conclusions provisional.</p>
-                </div>
-                <div class="framework-actions">
-                    {#if !fullReview.coverage.complete}
-                        <button type="button" onclick={() => runFullFrameworkReview(false)} disabled={fullReviewBusy}>Analyze next batch</button>
-                        <button type="button" onclick={() => runFullFrameworkReview(true)} disabled={fullReviewBusy}>Continue automatically</button>
+                    {#if !caseSaved}
+                        <details class="technical">
+                            <summary>Review the exact prepared creation fields and record IDs</summary>
+                            <pre>{JSON.stringify(preparedWorkflow.review?.operation_payload ?? {}, null, 2)}</pre>
+                        </details>
+                        <label class="confirmation"><input type="checkbox" bind:checked={confirmCaseCreation} disabled={creationBusy} /> I reviewed the exact planned records and authorize creating this new assessment in SICO.</label>
+                        <button type="button" onclick={approveAndCreateCase} disabled={!confirmCaseCreation || creationBusy}>Approve and create new GRC case</button>
+                        <p class="footnote">This invokes SICO's existing approval and case-setup writer. If the backend safety switch is disabled, approval does not create business records.</p>
                     {/if}
-                    {#if fullReviewBusy && fullReviewAutomatic}
-                        <button type="button" onclick={() => { fullReviewPause = true; }} disabled={fullReviewPause}>{fullReviewPause ? 'Pausing…' : 'Pause after current batch'}</button>
-                    {/if}
-                    <button type="button" onclick={downloadFullReview} disabled={fullReviewBusy}>Download checkpoint and draft</button>
-                    <button type="button" onclick={() => { fullReviewPause = true; fullReview = null; fullReviewCandidates = []; fullReviewError = ''; fullReviewNotice = 'Review cleared from this tab; use your downloaded checkpoint to resume.'; }} disabled={fullReviewBusy}>Start new case review</button>
                 </div>
-                <div class="stage-grid" aria-label="Provisional requirement findings">
-                    {#each visibleFrameworkReviews as req (req.requirement_id)}
-                        <article class="report-card">
-                            <h3>{req.reference || 'Reference not listed'} — {req.requirement_name || 'Title unavailable in library'}</h3>
-                            <p><strong>Provisional applicability:</strong> {req.applicability.replaceAll('_', ' ')}</p>
-                            <p><strong>Reasoning:</strong> {req.rationale}</p>
-                            <p><strong>Evidence to request:</strong> {req.evidence_to_request}</p>
-                            <p><strong>Question for organization:</strong> {req.question_to_resolve}</p>
-                            {#if req.source_text_excerpt_truncated}<p class="finding-alert">Source text shortened for Qwen; verify it against the original requirement.</p>{/if}
-                            <p class="footnote">Authorized SICO requirement ID: {req.requirement_id} · AI draft, not a verified compliance finding</p>
-                        </article>
-                    {/each}
-                </div>
-                {#if fullReview.requirement_reviews.length > fullReviewShown}
-                    <button type="button" class="review-more" onclick={() => { fullReviewShown += 20; }}>Show more requirement reviews ({fullReview.requirement_reviews.length - fullReviewShown} hidden)</button>
-                {/if}
-                {#if fullReview.coverage.complete}
-                    <p class="message" role="status">Activity 1 has provisional reviews for every accessible assessable requirement. Evidence, organizational facts, regulatory edition and human decisions still need verification. Activities 2–16 are not yet connected to this unified workflow; no GRC case has been saved.</p>
-                {/if}
             {/if}
-            <details class="technical">
-                <summary>Resume a downloaded assessment checkpoint</summary>
-                <p class="footnote">The draft stays in this browser tab, not SICO's database. Download a checkpoint before refreshing. A signed continuation cursor expires after seven days and becomes invalid if access or the framework catalog changes.</p>
-                <label class="checkpoint-label">Select your private checkpoint JSON file
-                    <input type="file" accept=".json,application/json" onchange={importFullReview} disabled={fullReviewBusy} />
-                </label>
-            </details>
-            <p class="footnote">SICO uses existing authorized framework records for this provisional analysis. Nothing is automatically approved or recorded as compliant.</p>
+            {#if caseSaved && activeEngagement}
+                <div class="framework-coverage">
+                    <h3>Create the next GRC records using Qwen and SICO's existing modules</h3>
+                    <p class="footnote">The case has been saved. Each next-stage proposal uses the existing scoped serializer and original service, with a separate human approval before any write.</p>
+                    {#if lifecycleProgress?.stages?.length}
+                        <div class="stage-grid">
+                            {#each lifecycleProgress.stages as stage, index (index)}
+                                <p class="footnote">{stage.stage ?? stage.slug}: {stage.status ?? 'pending'}</p>
+                            {/each}
+                        </div>
+                    {/if}
+                    {#if !lifecycleProposal}
+                        <label class="footnote">Verified facts to help Qwen (optional, do not invent asset details)
+                            <textarea bind:value={stageHumanFacts} maxlength="1200" rows="3" placeholder="Real systems, asset types, data, business functions or owners that you can verify."></textarea>
+                        </label>
+                        <button type="button" onclick={prepareNextRealGrcStage} disabled={stageBusy}>
+                            {stageBusy ? 'Preparing next creation stage…' : 'Prepare next new GRC records with Qwen'}
+                        </button>
+                    {:else}
+                        <h4>Qwen proposal: {lifecycleProposal.stage}</h4>
+                        <p class="footnote">New records will not be created until this original SICO operation is explicitly approved and enabled.</p>
+                        {#each (lifecycleProposal.planned_actions ?? []) as action, index (index)}
+                            <p>{action.platform_entity ?? action.target_name ?? 'GRC operation'}: {action.action ?? action.status} — {action.detail ?? ''}</p>
+                        {/each}
+                        <details class="technical">
+                            <summary>See the exact validated fields to be saved</summary>
+                            <pre>{JSON.stringify(lifecycleProposal.review?.operation_payload ?? {}, null, 2)}</pre>
+                        </details>
+                        <label class="confirmation"><input type="checkbox" bind:checked={stageConfirmed} disabled={stageBusy || !!lifecycleApproval} /> I reviewed these exact fields and authorize this stage.</label>
+                        {#if !lifecycleApproval}
+                            <button type="button" onclick={approveNextRealGrcStage} disabled={!stageConfirmed || stageBusy}>Approve this new GRC operation</button>
+                        {:else if lifecycleApproval.commit_enabled === true}
+                            <button type="button" onclick={commitNextRealGrcStage} disabled={stageBusy}>Create the approved records in SICO</button>
+                        {:else}
+                            <p class="message">This writer is disabled by SICO's safety settings. No business records have been created for this stage.</p>
+                        {/if}
+                    {/if}
+                    {#if stageError}<p class="message error" role="alert">{stageError}</p>{/if}
+                    {#if stageNotice}<p class="message" role="status">{stageNotice}</p>{/if}
+                </div>
+            {/if}
+            <p class="footnote">The engine uses your existing SICO GRC services, permissions, validated records and human approval. No asset, compliance result or evidence may be invented as verified.</p>
         </section>
-        <footer>SICO AI · One Build a GRC case workflow · Permission-scoped, provisional and read-only. Future GRC stages will reuse the same selected framework and case context after separate validation.</footer>
+        <footer>SICO AI · One Build a GRC case workflow · Creation-first · Existing SICO GRC writers · Exact human approval before business-record changes.</footer>
     </div>
 </div>
 
@@ -567,7 +741,7 @@
     .message{margin-top:25px;padding:17px;border-radius:12px;border:1px solid #3d6572;color:#cfe6ed;background:#183643}.message.error{border-color:#975c58;background:#3a2226}.message p{margin-bottom:0}.report{margin-top:50px}.report-head{display:flex;justify-content:space-between;align-items:center;gap:18px}.report-head h2{font-size:29px;margin:8px 0}.report-intro{color:#b1c1d3;line-height:1.7;margin:18px 0}.status-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:23px 0}.status-item,.report-card{border:1px solid #33485f;background:#132137;border-radius:13px;padding:19px}.status-item span{display:block;font-size:12px;color:#9eb4c9;margin-bottom:9px}.status-item strong{font-size:15px}.finding-alert{border:1px solid #b58e44;background:#342c1b;color:#f3deaf;border-radius:13px;padding:19px 21px;margin:22px 0}.finding-alert h3{margin:0 0 10px;font-size:17px}.finding-alert p{font-size:14px;line-height:1.6}.finding-alert p:last-child{margin-bottom:0}.finding-alert code{overflow-wrap:anywhere;font-size:12px}
     .report-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.report-card{min-width:0;padding:22px}.report-card h3{font-size:18px;margin:0 0 15px;color:#e9f6f8}.report-card p,.report-card li{font-size:14px;line-height:1.7;color:#bfd1e4;overflow-wrap:anywhere}.report-card strong{color:#edf7ff}.records,.notes{padding-left:20px;margin:0}.records li,.notes li{margin-bottom:11px}.footnote{color:#91aabc!important;font-size:12px!important}.technical{margin-top:22px;border:1px solid #31495c;border-radius:12px;padding:15px;color:#a7bdd1}.technical summary{cursor:pointer}.technical p{font-size:12px}.technical pre{font-size:11px;max-height:340px;white-space:pre-wrap;overflow-wrap:anywhere;overflow:auto;background:#081221;padding:14px;border-radius:8px}footer{border-top:1px solid #304354;color:#839ab1;font-size:12px;margin-top:55px;padding-top:23px}.sr-only{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
     @media(max-width:800px){.shell{padding:23px 16px 50px}.scope-pill{display:none}.hero{margin:50px auto 25px}.example-grid,.report-grid,.status-grid{grid-template-columns:1fr}.report-head{flex-direction:column;align-items:flex-start}.prompt-footer{flex-direction:column;align-items:stretch}.prompt-footer button{width:100%}}
-.workflow-form{margin-top:14px;padding:15px;border:1px solid #314b61;border-radius:12px;display:grid;gap:12px;background:#111e30}.workflow-form h3{margin:0;font-size:15px}.workflow-form label{display:grid;gap:6px;font-size:13px;color:#d2e6ef}.workflow-form input:not([type="checkbox"]),.workflow-form textarea,.workflow-form select{min-width:0;width:100%;box-sizing:border-box;padding:10px;background:#0e192b;color:#eef6ff;border:1px solid #46637a;border-radius:8px;font:inherit}.workflow-form button{justify-self:start;border:0;border-radius:9px;padding:11px 16px;font:inherit;font-weight:700;background:#73e2c9;color:#082630;cursor:pointer}.workflow-form button:disabled{opacity:.45;cursor:not-allowed}.workflow-form .confirmation{display:flex;align-items:center;gap:9px}
+.workflow-form{margin-top:14px;padding:15px;border:1px solid #314b61;border-radius:12px;display:grid;gap:12px;background:#111e30}.workflow-form h3{margin:0;font-size:15px}.workflow-form label{display:grid;gap:6px;font-size:13px;color:#d2e6ef}.workflow-form input:not([type="checkbox"]),.workflow-form textarea,.workflow-form select{min-width:0;width:100%;box-sizing:border-box;padding:10px;background:#0e192b;color:#eef6ff;border:1px solid #46637a;border-radius:8px;font:inherit}.workflow-form button{justify-self:start;border:0;border-radius:9px;padding:11px 16px;font:inherit;font-weight:700;background:#73e2c9;color:#082630;cursor:pointer}.workflow-form button:disabled{opacity:.45;cursor:not-allowed}.workflow-form .confirmation{display:flex;align-items:center;gap:9px}.framework-coverage .confirmation{display:flex;align-items:center;gap:10px;padding:16px 0;font-size:13px}.framework-coverage button{border:0;border-radius:9px;background:#73e2c9;color:#082630;padding:12px 16px;font:inherit;font-weight:700;cursor:pointer;margin-top:10px}.framework-coverage button:disabled{opacity:.45;cursor:not-allowed}.framework-coverage textarea{width:100%;background:#0e192b;color:#eef6ff;border:1px solid #46637a;border-radius:8px;padding:11px;box-sizing:border-box;font:inherit}
     .framework-actions { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:12px 0; }
     .framework-actions button { flex:0 1 auto; }
     .framework-coverage { margin:20px 0 16px; padding:16px; border:1px solid rgba(134,185,174,.25); border-radius:12px; }
