@@ -1,7 +1,6 @@
 <!-- SICO-CLEAR-REPORT-V2: no nested JSON in primary report -->
 <script lang="ts">
     import { enhance, deserialize, applyAction } from '$app/forms';
-    import { onMount } from 'svelte';
     import type { ActionData } from './$types';
     import {
         applyFrameworkBatch, validateCheckpoint, scopeKey,
@@ -42,7 +41,7 @@
     let proposedPerimeter = $state('SICO cybersecurity assessment perimeter');
     let selectedFramework = $state('');
     let selectedRiskMatrix = $state('');
-    // Full-framework review is a separate read-only activity, not the legacy 3-control demo.
+    // Unified Build a GRC case uses full-framework batches; legacy draft handlers remain unused by this page.
     let frameworkBusinessContext = $state('');
     let frameworkBatchSize = $state(2);
     let fullReview = $state<ReviewCheckpoint | null>(null);
@@ -238,7 +237,6 @@
         }
     }
 
-    onMount(() => { void loadSavedControlProgress(); });
 
     async function startGeneratedCase(event: SubmitEvent) {
         event.preventDefault();
@@ -456,127 +454,77 @@
             <span class="scope-pill">Uses your GRC permissions</span>
         </header>
 
-        <section class="hero">
-            <p class="eyebrow">ONE REQUEST · REAL CONTEXT · NO INVENTED FINDINGS</p>
-            <h1>What would you like to <em>assess?</em></h1>
-            <p>Describe the goal. SICO will look up permitted records and request an advisory intake. It will tell you clearly when it cannot verify something.</p>
-        </section>
-
-        <section class="report" aria-label="Build complete GRC case from three inputs" id="start-grc-case">
-            <div class="report-head"><h2>Build a GRC case</h2><span class="status-pill">Your organization · Your framework · Your objective</span></div>
-            <form method="POST" action="?/lifecycle_intake" onsubmit={startGeneratedCase} class="workflow-form">
+        <section class="report" aria-label="Build a GRC case" id="start-grc-case">
+            <div class="report-head">
+                <h2>Build a GRC case</h2>
+                <span class="status-pill">One workflow · Your existing SICO GRC library</span>
+            </div>
+            <p class="report-intro">Tell SICO the organization, exact framework and objective once. It will begin with a full review of every accessible assessable requirement in that framework, then use the same verified context as the remaining GRC activities are integrated. No requirement is invented, and this draft does not write GRC business records.</p>
+            <form class="workflow-form" onsubmit={(event) => { event.preventDefault(); void runFullFrameworkReview(false, true); }}>
                 <label>1. Organization name
-                    <input name="organization_name" bind:value={organization} oninput={() => { organizationConfirmation = ''; clearStaleCase(); changedFrameworkInputs(); }} disabled={sixteenBusy} placeholder="Existing or new organization name" required minlength="2" maxlength="150" />
+                    <input name="organization_name" bind:value={organization} oninput={() => { clearStaleCase(); changedFrameworkInputs(); }} disabled={fullReviewBusy} placeholder="Existing organization name" required minlength="2" maxlength="150" />
                 </label>
                 <label>2. Framework
-                    <input name="framework_name" bind:value={frameworkSearch} oninput={() => { frameworkConfirmation = ''; clearStaleCase(); changedFrameworkInputs(); }} disabled={sixteenBusy} placeholder="e.g. NCA ECC" required minlength="2" maxlength="150" />
-                    <span class="footnote">The backend checks your loaded GRC library and never silently substitutes another framework.</span>
+                    <input name="framework_name" bind:value={frameworkSearch} oninput={() => { clearStaleCase(); changedFrameworkInputs(); }} disabled={fullReviewBusy} placeholder="e.g. ISO 27001:2022, NCA ECC, CCC, PDPL" required minlength="2" maxlength="150" />
+                    <span class="footnote">SICO checks your permitted framework library and exact edition; it never silently switches frameworks.</span>
                 </label>
-                <label>3. What is the problem or assessment objective?
-                    <textarea name="problem" bind:value={instruction} oninput={() => { clearStaleCase(); changedFrameworkInputs(); }} disabled={sixteenBusy} rows="5" required minlength="20" maxlength="4000" placeholder="Describe the problem. SICO coordinates the assessment lifecycle and identifies evidence and decisions it needs."></textarea>
+                <label>3. Assessment objective
+                    <textarea name="problem" bind:value={instruction} oninput={() => { clearStaleCase(); changedFrameworkInputs(); }} disabled={fullReviewBusy} rows="5" required minlength="20" maxlength="4000" placeholder="What should SICO assess? What is the organization's business situation or concern?"></textarea>
                 </label>
-                <input type="hidden" name="selected_framework_id" value={frameworkConfirmation}/>
-                <input type="hidden" name="selected_organization_id" value={organizationConfirmation}/>
-                <button type="submit" disabled={sixteenBusy || instruction.trim().length < 20 || !organization.trim() || !frameworkSearch.trim()}>{sixteenBusy ? `Generating with Qwen (${generatedSixteen.length}/16)…` : 'Generate connected GRC case with AI'}</button>
-                <button type="button" onclick={() => generateConnectedThrough(1)} disabled={sixteenBusy || instruction.trim().length < 20 || !organization.trim() || !frameworkSearch.trim()}>Legacy Activity 1 sample — 3 controls only</button>
-                <p class="footnote">Qwen generates a connected proposed case from these three inputs. Use the dedicated <strong>Full-framework Activity 1 review</strong> below for complete framework coverage. The legacy buttons above still generate preliminary drafts, not a completed 16-stage GRC case; no GRC records are saved by draft generation.</p>
-            {#if latestResponse?.lifecycle_error}
-                <div class="message error" role="alert">{String(latestResponse.lifecycle_error)}</div>
-            {/if}
-            {#if latestResponse?.lifecycle_choices}
-                <article class="report-card" aria-label="Confirm exact framework and organization" style="margin-top:14px">
-                    <h3>Confirm the exact loaded record</h3>
-                    <p>SICO will not guess or silently substitute a different framework or company. Confirm the actual loaded record.</p>
-                    {#if (latestResponse.lifecycle_choices.organizations ?? []).length > 1}
-                        <label>Authorized organization
-                            <select bind:value={organizationConfirmation}>
-                                <option value="">Choose the exact company</option>
-                                {#each latestResponse.lifecycle_choices.organizations as o}
-                                    <option value={String(o.id)}>{String(o.name)}</option>
-                                {/each}
-                            </select>
-                        </label>
-                    {/if}
-                    {#if (latestResponse.lifecycle_choices.frameworks ?? []).length > 0}
-                        <label>Loaded framework and edition
-                            <select bind:value={frameworkConfirmation}>
-                                <option value="">Choose the correct framework</option>
-                                {#each latestResponse.lifecycle_choices.frameworks as f}
-                                    <option value={String(f.id)}>{String(f.name)} {f.ref_id ? `(${f.ref_id})` : ''}</option>
-                                {/each}
-                            </select>
-                        </label>
-                    {/if}
-                    <button type="submit" disabled={sixteenBusy || !frameworkConfirmation || ((latestResponse.lifecycle_choices.organizations ?? []).length > 1 && !organizationConfirmation) || instruction.trim().length < 20 || !organization.trim() || !frameworkSearch.trim()}>
-                        {busy ? 'Verifying…' : 'Confirm framework and continue'}
+                <label>Additional business context (optional, not verified)
+                    <textarea name="framework_business_context" rows="3" bind:value={frameworkBusinessContext} oninput={changedFrameworkInputs} disabled={fullReviewBusy} maxlength="1200" placeholder="Known business activities, assets, systems, locations, data processing and exclusions; SICO will ask for proof."></textarea>
+                </label>
+                <details class="technical">
+                    <summary>Batch size and model settings</summary>
+                    <label style="margin-top:12px">Requirements per Qwen batch
+                        <select bind:value={frameworkBatchSize} disabled={fullReviewBusy}>
+                            <option value={1}>1 — smallest context</option>
+                            <option value={2}>2 — recommended for local Qwen</option>
+                            <option value={3}>3 — may need retries</option>
+                        </select>
+                    </label>
+                </details>
+                {#if !fullReview}
+                    <button type="submit" disabled={fullReviewBusy || instruction.trim().length < 20 || !organization.trim() || !frameworkSearch.trim()}>
+                        {fullReviewBusy ? 'Starting full framework assessment…' : 'Build GRC case with AI'}
                     </button>
-                    <p class="footnote">Your three answers stay filled in. You only need to confirm the exact loaded edition when your framework name matches multiple records. Nothing has been saved yet.</p>
-                </article>
-            {/if}
+                {/if}
             </form>
-            {#if preparedWorkflow?.resolved_from_three_inputs}
-                <article class="report-card" style="margin-top:14px">
-                    <h3>Verified scope — ready for approval</h3>
-                    <p>Organization: {String(preparedWorkflow.resolved_from_three_inputs.organization?.name)}</p>
-                    <p>Framework: {String(preparedWorkflow.resolved_from_three_inputs.framework?.name)} ({String(preparedWorkflow.resolved_from_three_inputs.framework?.ref_id)})</p>
-                    <p>Risk assessment: {String(preparedWorkflow.resolved_from_three_inputs.risk_assessment)}</p>
-                    <p class="footnote">The existing approved GRC services handle record creation. Compliance, evidence and audit conclusions remain unverified.</p>
-                </article>
+
+            {#if fullReviewBusy && !fullReview}
+                <p class="message" role="status">Qwen is analyzing the first authorized requirements in your selected framework. No records are being saved.</p>
             {/if}
-        </section>
-        <section class="report" id="full-framework-review" aria-label="Full-framework Activity 1 provisional review">
-            <div class="report-head"><h2>Activity 1 — Full-framework review</h2><span class="status-pill">SICO requirements · Qwen batches · Read-only</span></div>
-            <p class="report-intro">Uses the organization, framework and objective entered above. Loads <strong>every accessible assessable requirement</strong> of the exact selected framework, whether ISO 27001, NCA ECC, CCC, PDPL or another authorized library. Each Qwen batch produces provisional requirement-linked reviews—not compliance findings.</p>
-            <div class="workflow-form">
-                <label>Additional business facts supplied by you (optional, not verified)
-                    <textarea rows="3" bind:value={frameworkBusinessContext} oninput={changedFrameworkInputs} maxlength="1200" placeholder="Describe known activities, systems, locations, data processing and exclusions. SICO will not treat these claims as verified records."></textarea>
-                </label>
-                <label>Requirements per Qwen batch
-                    <select bind:value={frameworkBatchSize} disabled={fullReviewBusy}>
-                        <option value={1}>1 — slowest, smallest context</option>
-                        <option value={2}>2 — recommended for local Qwen</option>
-                        <option value={3}>3 — may require retries</option>
-                    </select>
-                </label>
+            {#if fullReviewError}
+                <div class="message error" role="alert">{fullReviewError} Earlier completed batches remain available.</div>
+            {/if}
+            {#if fullReviewNotice}<p class="message" role="status">{fullReviewNotice}</p>{/if}
+            {#if fullReviewCandidates.length}
+                <p class="footnote">Possible authorized framework names (confirm the exact edition): {fullReviewCandidates.join(' · ')}</p>
+            {/if}
+
+            {#if fullReview}
+                <div class="framework-coverage" aria-label="Activity 1 assessment progress">
+                    <div class="framework-coverage-title">
+                        <div><strong>Activity 1 of 16 · Framework assessment</strong><p class="footnote">{fullReview.matched_framework.name} {fullReview.matched_framework.reference ? `(${fullReview.matched_framework.reference})` : ''}</p></div>
+                        <span>{fullReview.coverage.reviewed_through} / {fullReview.coverage.accessible_total} requirements</span>
+                    </div>
+                    <div class="framework-meter" role="progressbar" aria-label="Accessible requirement analysis progress" aria-valuemin="0" aria-valuemax={fullReview.coverage.accessible_total} aria-valuenow={fullReview.coverage.reviewed_through}>
+                        <div class="framework-meter-fill" style={`width: ${fullReviewPercent}%`}></div>
+                    </div>
+                    <p class="footnote">{fullReview.coverage.remaining} remaining · {fullReviewPercent}% analyzed · {fullReview.framework_edition_status.replaceAll('_', ' ')} · All conclusions provisional.</p>
+                </div>
                 <div class="framework-actions">
-                    {#if !fullReview}
-                        <button type="button" onclick={() => runFullFrameworkReview(false, true)} disabled={fullReviewBusy || instruction.trim().length < 20 || !organization.trim() || !frameworkSearch.trim()}>
-                            {fullReviewBusy ? 'Analyzing requirements…' : 'Start full-framework review (first batch)'}
-                        </button>
-                    {:else if !fullReview.coverage.complete}
+                    {#if !fullReview.coverage.complete}
                         <button type="button" onclick={() => runFullFrameworkReview(false)} disabled={fullReviewBusy}>Analyze next batch</button>
                         <button type="button" onclick={() => runFullFrameworkReview(true)} disabled={fullReviewBusy}>Continue automatically</button>
                     {/if}
                     {#if fullReviewBusy && fullReviewAutomatic}
                         <button type="button" onclick={() => { fullReviewPause = true; }} disabled={fullReviewPause}>{fullReviewPause ? 'Pausing…' : 'Pause after current batch'}</button>
                     {/if}
-                    {#if fullReview}
-                        <button type="button" onclick={downloadFullReview} disabled={fullReviewBusy}>Download checkpoint / draft report</button>
-                        <button type="button" onclick={() => { fullReviewPause = true; fullReview = null; fullReviewCandidates = []; fullReviewError = ''; fullReviewNotice = 'Previous review cleared from this browser tab. A downloaded checkpoint can still be imported.'; }} disabled={fullReviewBusy}>Start new review</button>
-                    {/if}
+                    <button type="button" onclick={downloadFullReview} disabled={fullReviewBusy}>Download checkpoint and draft</button>
+                    <button type="button" onclick={() => { fullReviewPause = true; fullReview = null; fullReviewCandidates = []; fullReviewError = ''; fullReviewNotice = 'Review cleared from this tab; use your downloaded checkpoint to resume.'; }} disabled={fullReviewBusy}>Start new case review</button>
                 </div>
-                <label>Resume from a previously downloaded checkpoint
-                    <input type="file" accept=".json,application/json" onchange={importFullReview} disabled={fullReviewBusy} />
-                </label>
-            </div>
-            <p class="footnote">Automatic continuation runs <strong>only while this page stays open</strong>, one batch at a time. Pausing takes effect after the running request finishes. No database checkpoint is saved; download a checkpoint before closing or refreshing. The signed resume cursor expires after seven days and becomes invalid if authorization or the framework catalog changes.</p>
-            {#if fullReviewError}<div class="message error" role="alert">{fullReviewError} Previously completed batches remain available.</div>{/if}
-            {#if fullReviewNotice}<p class="message" role="status">{fullReviewNotice}</p>{/if}
-            {#if fullReviewCandidates.length}
-                <p class="footnote">Potential authorized framework names (confirm the exact edition): {fullReviewCandidates.join(' · ')}</p>
-            {/if}
-            {#if fullReview}
-                <div class="framework-coverage">
-                    <div class="framework-coverage-title">
-                        <strong>{fullReview.matched_framework.name} {fullReview.matched_framework.reference ? `(${fullReview.matched_framework.reference})` : ''}</strong>
-                        <span>{fullReview.coverage.reviewed_through} / {fullReview.coverage.accessible_total} reviewed</span>
-                    </div>
-                    <div class="framework-meter" role="progressbar" aria-label="Accessible requirement analysis progress" aria-valuemin="0" aria-valuemax={fullReview.coverage.accessible_total} aria-valuenow={fullReview.coverage.reviewed_through}>
-                        <div class="framework-meter-fill" style={`width: ${fullReviewPercent}%`}></div>
-                    </div>
-                    <p class="footnote">{fullReview.coverage.remaining} requirements remaining · {fullReviewPercent}% processed · {fullReview.coverage.complete ? 'All accessible requirements covered' : 'Partial provisional assessment'} · {fullReview.framework_edition_status.replaceAll('_', ' ')}</p>
-                </div>
-                <div class="stage-grid">
+                <div class="stage-grid" aria-label="Provisional requirement findings">
                     {#each visibleFrameworkReviews as req (req.requirement_id)}
                         <article class="report-card">
                             <h3>{req.reference || 'Reference not listed'} — {req.requirement_name || 'Title unavailable in library'}</h3>
@@ -584,543 +532,28 @@
                             <p><strong>Reasoning:</strong> {req.rationale}</p>
                             <p><strong>Evidence to request:</strong> {req.evidence_to_request}</p>
                             <p><strong>Question for organization:</strong> {req.question_to_resolve}</p>
-                            {#if req.source_text_excerpt_truncated}<p class="finding-alert">Source text was shortened for Qwen; verify against the full original requirement.</p>{/if}
-                            <p class="footnote">SICO authorized source · Requirement ID: {req.requirement_id} · AI draft, not a verified assessment</p>
+                            {#if req.source_text_excerpt_truncated}<p class="finding-alert">Source text shortened for Qwen; verify it against the original requirement.</p>{/if}
+                            <p class="footnote">Authorized SICO requirement ID: {req.requirement_id} · AI draft, not a verified compliance finding</p>
                         </article>
                     {/each}
                 </div>
                 {#if fullReview.requirement_reviews.length > fullReviewShown}
-                    <button type="button" onclick={() => { fullReviewShown += 20; }}>Show more requirement reviews ({fullReview.requirement_reviews.length - fullReviewShown} hidden)</button>
+                    <button type="button" class="review-more" onclick={() => { fullReviewShown += 20; }}>Show more requirement reviews ({fullReview.requirement_reviews.length - fullReviewShown} hidden)</button>
                 {/if}
-                <p class="footnote">This report is user-held and not cryptographically signed. Verify imported results, requirement text, framework edition, organization facts, evidence and regulatory applicability with a qualified assessor before any approval or GRC business-record creation.</p>
+                {#if fullReview.coverage.complete}
+                    <p class="message" role="status">Activity 1 has provisional reviews for every accessible assessable requirement. Evidence, organizational facts, regulatory edition and human decisions still need verification. Activities 2–16 are not yet connected to this unified workflow; no GRC case has been saved.</p>
+                {/if}
             {/if}
-        </section>
-        {#if generatedSixteen.length > 0 || sixteenBusy || sixteenError || caseSaveNotice}
-            <section class="report" aria-label="Qwen generated sixteen activity results" aria-live="polite">
-                <div class="report-head">
-                    <h2>AI-generated GRC case — 16 activities</h2>
-                    <span class="status-pill">{generatedSixteen.length}/16 generated by Qwen</span>
-                </div>
-                <p class="report-intro">
-                    {organization} · {frameworkSearch}. These are organization-specific AI work products,
-                    not claims of verified implementation or completed audits.
-                </p>
-                {#if sixteenBusy}
-                    <p class="footnote">Qwen is generating one activity at a time. Each validated result appears immediately; retry resumes where it stopped.</p>
-                {/if}
-                {#if sixteenError}
-                    <div class="message error" role="alert">AI stopped after {generatedSixteen.length} of 16 activities: {sixteenError}. Your completed outputs remain visible; click Generate again to resume the missing batches.</div>
-                {/if}
-                {#if caseSaveNotice}
-                    <article class="report-card"><p>{caseSaveNotice}</p></article>
-                {/if}
-                <div class="stage-grid">
-                    {#each generatedSixteen as item (item.code)}
-                        <article class="report-card">
-                            <h3>{Number(item.number)}. {String(item.title)}</h3>
-                            <p><strong>AI analysis:</strong> {String(item.analysis)}</p>
-                            <p><strong>Proposed GRC work:</strong> {String(item.proposed_work)}</p>
-                            <p><strong>Evidence or decision required:</strong> {String(item.evidence_needed)}</p>
-                            {#if item.framework_review}
-                                <section aria-label="Activity 1 SICO framework library review" class="report-card" style="margin-top:12px">
-                                    <h4>Framework applicability — SICO library + Qwen</h4>
-                                    <p><strong>Library match:</strong> {item.framework_review.status === 'matched' ? 'Authorized SICO framework found' : String(item.framework_review.status)}</p>
-                                    {#if item.framework_review.matched_framework}
-                                        <p><strong>Loaded framework:</strong> {String(item.framework_review.matched_framework.name)} {item.framework_review.matched_framework.reference ? `(${String(item.framework_review.matched_framework.reference)})` : ''}</p>
-                                        <p><strong>Accessible assessable requirements:</strong> {Number(item.framework_review.accessible_requirement_count)} · <strong>Analysis coverage:</strong> Sample only</p>
-                                    {/if}
-                                    <p><strong>Regulator edition:</strong> Not independently verified against the official publication.</p>
-                                    {#if item.framework_review.regulatory_applicability_question}
-                                        <p><strong>Question requiring professional confirmation:</strong> {String(item.framework_review.regulatory_applicability_question)}</p>
-                                    {/if}
-                                    {#if Array.isArray(item.framework_review.requirement_reviews) && item.framework_review.requirement_reviews.length}
-                                        <h4>Real SICO requirements — provisional AI applicability</h4>
-                                        {#each item.framework_review.requirement_reviews as req (req.reference)}
-                                            <div class="report-card" style="margin-top:8px">
-                                                <p><strong>{String(req.reference)} — {String(req.requirement_name)}</strong></p>
-                                                <p><strong>Draft applicability:</strong> {String(req.applicability).replaceAll('_', ' ')}</p>
-                                                <p><strong>Consultant rationale:</strong> {String(req.rationale)}</p>
-                                                <p><strong>Evidence needed:</strong> {String(req.evidence_to_request)}</p>
-                                            </div>
-                                        {/each}
-                                    {:else if Array.isArray(item.framework_review.candidate_names) && item.framework_review.candidate_names.length}
-                                        <p><strong>Possible authorized frameworks:</strong> {item.framework_review.candidate_names.join(' · ')}</p>
-                                        <p>Type the exact framework edition in the second input to avoid silently selecting a different edition.</p>
-                                    {/if}
-                                    <p class="footnote">{String(item.framework_review.note ?? '')} No verified compliance verdict or database write.</p>
-                                </section>
-                            {/if}
-                            {#if item.case_profile}
-                                <p><strong>AI-generated case title:</strong> {String(item.case_profile.title)}</p>
-                                <p><strong>Proposed assessment scope:</strong> {String(item.case_profile.scope_summary)}</p>
-                            {/if}
-                            {#if Array.isArray(item.candidate_assets) && item.candidate_assets.length}
-                                <h4>Proposed asset register (unverified)</h4>
-                                <ul class="notes">
-                                    {#each item.candidate_assets as asset (asset.draft_ref)}
-                                        <li><strong>{String(asset.draft_ref)} · {String(asset.name)}</strong> — {String(asset.asset_type)}. {String(asset.business_purpose)} <em>Verification needed:</em> {String(asset.verification_needed)}</li>
-                                    {/each}
-                                </ul>
-                            {/if}
-                            <p class="footnote">AI-generated proposal, not confirmed organization data, executed work or saved GRC records.</p>
-                        </article>
-                    {/each}
-                </div>
-                {#if generatedSixteen.length === 16}
-                    <p class="footnote">All 16 linked AI draft activities generated. Review the proposed title, scope, candidate assets and cross-references. Database saving is deferred.</p>
-                {/if}
-            </section>
-        {/if}
-        <details class="technical">
-            <summary>Optional: read-only AI discovery and planning</summary>
-        <form method="POST" action="?/run" use:enhance={() => {
-            busy = true;
-            return async ({ update }) => {
-                try { await update({ reset: false }); }
-                finally { busy = false; }
-            };
-        }} class="prompt-form">
-            <label class="sr-only" for="sico-instruction">Describe your GRC assignment</label>
-            <textarea id="sico-instruction" name="scenario_text" bind:value={instruction} rows="5" required minlength="20" maxlength="12000" placeholder="Example: Assess Demo Bank in Saudi Arabia against NCA ECC. Identify the scope, permitted records, missing information, and the next steps for review."></textarea>
-            <div class="context-row">
-                <div>
-                    <label for="sico-organization">Organization (optional)</label>
-                    <input id="sico-organization" name="organization_hint" bind:value={organization} placeholder="Optional organization name" autocomplete="off" />
-                    <span class="help">Optional for framework lookup. Enter an exact authorized organization name, or use folder focus, to inspect company records.</span>
-                </div>
-            </div>
-            <input type="hidden" name="preferred_framework" value="" />
-            <input type="hidden" name="scope_hint" value="" />
-            <input type="hidden" name="assessment_period" value="" />
-            <input type="hidden" name="known_deadline" value="" />
-            <input type="hidden" name="known_trigger" value="" />
-            <div class="prompt-footer">
-                <span>AI planning and authorized read-only execution</span>
-                <button type="submit" disabled={busy || instruction.trim().length < 20}>
-                    {#if busy}Preparing…{:else}Run SICO AI ↗{/if}
-                </button>
-            </div>
-        </form>
-
-        </details>
-
-        {#if generatedAssessment?.generated_by_model && generatedAssessment?.report}
-            <section class="report" aria-live="polite" aria-label="AI generated assessment">
-                <div class="report-head"><h2>AI-generated cybersecurity assessment</h2><span class="status-pill">Generated by local Qwen · Draft</span></div>
-                <p class="report-intro">{String(generatedAssessment.organization)} · {String(generatedAssessment.framework)}. This is substantive AI-generated analysis based on your objective and permitted record titles—not an audit finding or compliance verdict.</p>
-                <article class="report-card"><h3>Assessment analysis</h3><p>{String(generatedAssessment.report.assessment_summary)}</p></article>
-                <article class="report-card">
-                    <h3>Potential risk scenarios — AI-generated hypotheses</h3>
-                    <ul class="notes">{#each generatedAssessment.report.potential_risk_scenarios ?? [] as risk}
-                        <li><strong>{String(risk.scenario)}</strong> — Possible impact: {String(risk.possible_impact)}. <em>Check:</em> {String(risk.verification_needed)}</li>
-                    {/each}</ul>
-                </article>
-                <article class="report-card">
-                    <h3>Control assessment questions</h3>
-                    <ul class="notes">{#each generatedAssessment.report.control_review ?? [] as control}
-                        <li><strong>{String(control.control_area)}</strong>: {String(control.assessment_question)}. Evidence needed: {String(control.verification_needed)}</li>
-                    {/each}</ul>
-                </article>
-                <article class="report-card">
-                    <h3>Evidence requests generated for this assessment</h3>
-                    <ul class="notes">{#each generatedAssessment.report.evidence_requests ?? [] as ev}
-                        <li><strong>{String(ev.request)}</strong> — {String(ev.purpose)}</li>
-                    {/each}</ul>
-                </article>
-                <article class="report-card">
-                    <h3>AI-recommended next actions</h3>
-                    <ul class="notes">{#each generatedAssessment.report.next_actions ?? [] as action}
-                        <li>{String(action)}</li>
-                    {/each}</ul>
-                    <p class="footnote">This is Qwen-generated analysis. The approved case setup writes real Compliance records through existing SICO services. The other activities require their own authorized record operations and supporting evidence; no compliance verdict is inferred.</p>
-                </article>
-            </section>
-        {:else if generationError}
-            <section class="report" aria-live="polite"><h2>AI generation unavailable</h2><p class="message error">{generationError}</p><p>No simulated AI results were shown.</p></section>
-        {/if}
-
-        {#if !result && !busy}
-            <section class="examples">
-                <h2>Example assignments</h2>
-                <div class="example-grid">
-                    {#each examples as example}
-                        <button type="button" onclick={() => instruction = example}>{example} <span>↗</span></button>
-                    {/each}
-                </div>
-            </section>
-        {/if}
-
-        {#if busy}
-            <div class="message" role="status">The local AI is planning and choosing authorized read-only GRC tools. A bounded run may take up to five minutes…</div>
-        {/if}
-        {#if result?.error}
-            <div class="message error" role="alert"><strong>We couldn't complete this request.</strong><p>{String(result.error)}</p></div>
-        {/if}
-
-        {#if result?.plan_error}
-            <div class="message error" role="alert">Planning: {String(result.plan_error)}</div>
-        {/if}
-        {#if result?.agent_error}
-            <div class="message error" role="alert">Agent execution: {String(result.agent_error)}</div>
-        {/if}
-        {#if agent}
-            <section class="report" aria-live="polite" aria-label="Agent execution">
-                <div class="report-head">
-                    <div><p class="eyebrow">SICO AI · REAL TOOL EXECUTION</p><h2>Agent execution</h2></div>
-                    <span class="status-pill">{String(agent.status)} · Read only</span>
-                </div>
-                <p class="footnote">Model: {String(agent.model)} · {Number(agent.model_calls)} model decisions requested · No GRC records written</p>
-                {#if agent.model_error_code}<p class="finding-alert">Model failure: {String(agent.model_error_code)}</p>{/if}
-                <div class="report-grid">
-                    {#each (agent.trace ?? []) as step, i}
-                        {@const observation = (agent.observations ?? []).find((item: any) => item.id === step.observation_id)}
-                        <article class="report-card">
-                            <h3>{i + 1}. {String(step.decision?.tool || step.decision?.kind)}</h3>
-                            <p>{String(step.decision?.explanation ?? '')}</p>
-                            <p class="footnote">{String(step.status ?? 'refused')} {observation ? `· ${observation.id}` : ''}</p>
-                            {#if observation?.status === 'succeeded'}
-                                <p>{Number(observation.result?.returned_count ?? 0)} authorized record(s) retrieved{observation.result?.limited ? ' · Results limited' : ''}.</p>
-                                <ul class="records">
-                                    {#each (observation.result?.records ?? []) as record}
-                                        <li>
-                                            <strong>{String(record.name ?? record.requirement_id ?? record.id)}</strong>
-                                            {#if record.reference} · {String(record.reference)}{/if}
-                                            {#if record.status} · Status: {String(record.status)}{/if}
-                                            {#if record.stored_result} · Stored result: {String(record.stored_result)}{/if}
-                                            <small> · Record {String(record.id)}</small>
-                                        </li>
-                                    {/each}
-                                </ul>
-                                <p class="footnote">{String(observation.result?.caveat ?? '')}</p>
-                            {:else if observation?.error}
-                                <p class="finding-alert">{String(observation.error)}</p>
-                            {/if}
-                            {#if agent.trace[i + 1]}
-                                <p class="footnote">Next AI decision: {String(agent.trace[i + 1].decision?.tool || agent.trace[i + 1].decision?.kind)}</p>
-                            {/if}
-                        </article>
-                    {/each}
-                </div>
-                <article class="report-card" style="margin-top:14px">
-                    <h3>Final answer from retrieved records</h3>
-                    <p style="white-space:pre-wrap">{String(agent.final_answer || 'The run stopped before a grounded final answer was available. Review the partial results and unresolved work.')}</p>
-                    {#if agent.citations?.length}<p class="footnote">Sources: {agent.citations.join(', ')}</p>{/if}
-                    <p class="footnote">AI synthesis of the cited stored records; this is not an independent audit or compliance verdict.</p>
-                    {#if agent.unresolved?.length}
-                        <h3>Unresolved work / authorization needed</h3>
-                        <ul class="notes">{#each agent.unresolved as item}<li>{String(item)}</li>{/each}</ul>
-                    {/if}
-                    <p class="footnote">{String(agent.approval_required)}</p>
-                </article>
-            </section>
-        {/if}
-
-        {#if plan}
-            <section class="report" aria-live="polite">
-                <div class="report-head">
-                    <div>
-                        <p class="eyebrow">SICO AI COORDINATOR · LIVE MODEL PLAN</p>
-                        <h2>GRC workflow plan</h2>
-                    </div>
-                    <span class="status-pill">No GRC records changed</span>
-                </div>
-                <p class="report-intro">{String(plan.summary ?? '')}</p>
-                <p class="footnote">Model: {String(plan.model ?? 'unavailable')} · {Array.isArray(plan.steps) ? plan.steps.length : 0} registered stages selected · AI-generated plan, not executed work.</p>
-                <div class="report-grid">
-                    {#each (Array.isArray(plan.steps) ? plan.steps : []) as step, i}
-                        <article class="report-card">
-                            <h3>{i + 1}. {String(step.title)}</h3>
-                            <p>{String(step.purpose)}</p>
-                            <p class="footnote">Stage: {String(step.stage)} · Awaiting human approval and execution integration</p>
-                        </article>
-                    {/each}
-                </div>
-                {#if Array.isArray(plan.questions) && plan.questions.length}
-                    <article class="report-card" style="margin-top:14px">
-                        <h3>Information to confirm</h3>
-                        <ul class="notes">{#each plan.questions as question}<li>{String(question)}</li>{/each}</ul>
-                    </article>
-                {/if}
-                {#if Array.isArray(plan.limitations) && plan.limitations.length}
-                    <details class="technical">
-                        <summary>Current limits and safeguards</summary>
-                        <ul class="notes">{#each plan.limitations as note}<li>{String(note)}</li>{/each}</ul>
-                    </details>
-                {/if}
-            </section>
-        {/if}
-
-        {#if run && !plan && !agent && !result?.agent_error}
-            <section class="report" aria-live="polite">
-                <div class="report-head">
-                    <div>
-                        <p class="eyebrow">ASSESSMENT INTAKE RESULT</p>
-                        <h2>{recordsReady && intakeReady ? 'Preparation results' : 'Assessment needs attention'}</h2>
-                    </div>
-                    <span class="status-pill">No GRC changes saved</span>
-                </div>
-                <p class="report-intro">This is an advisory intake, not a completed audit or a compliance verdict. Every statement below is limited to what the services actually returned.</p>
-                <div class="status-grid">
-                    <div class="status-item"><span>GRC record lookup</span><strong>{recordsReady ? 'Completed' : 'Unavailable'}</strong></div>
-                    <div class="status-item"><span>AI / intake service</span><strong>{providerFailed ? 'AI fallback — not verified' : intakeReady ? 'Advisory received' : 'Unavailable'}</strong></div>
-                    <div class="status-item"><span>Compliance decision</span><strong>Not established</strong></div>
-                </div>
-
-                {#if !recordsReady || providerFailed || !intakeReady}
-                    <div class="finding-alert" role="alert">
-                        <h3>Why you haven't received an assessment</h3>
-                        {#if !recordsReady}
-                            <p><strong>GRC records could not be verified.</strong> {discoveryFailure || 'The existing record-discovery service did not return a successful result.'}</p>
-                        {/if}
-                        {#if providerFailed}
-                            <p><strong>The AI provider did not produce a reliable response.</strong> The backend reported fallback mode <code>{providerMode}</code>. We are deliberately not presenting that fallback as an AI finding.</p>
-                        {:else if !intakeReady}
-                            <p><strong>Advisory intake is unavailable.</strong> {intakeFailure || 'The intake service did not return an accepted result.'}</p>
-                        {/if}
-                        {#if needsOrganization}
-                            <p><strong>What you can do:</strong> Enter the exact name of a permitted organization in the field above, then rerun the request.</p>
-                        {/if}
-                    </div>
-                {/if}
-
-                <div class="report-grid">
-                    <article class="report-card">
-                        <h3>01 · Records we can verify</h3>
-                        {#if !recordsReady}
-                            <p>No GRC records were verified by this run. This does <strong>not</strong> mean your platform has no records.</p>
-                        {:else if recordGroups.length}
-                            <ul class="records">
-                                {#each recordGroups as group}
-                                    <li><strong>{group.label}:</strong> {group.count} record(s) returned{group.examples.length ? ` — ${group.examples.join(', ')}` : ''}</li>
-                                {/each}
-                            </ul>
-                        {:else}
-                            <p>The lookup completed, but its response did not contain a clear record list suitable for this summary. We aren't claiming that records were found.</p>
-                        {/if}
-                    </article>
-                    <article class="report-card">
-                        <h3>02 · Advisory output</h3>
-                        {#if providerFailed}
-                            <p>AI-generated assessment findings are unavailable. The provider returned an error fallback.</p>
-                        {:else if !intakeReady}
-                            <p>The intake service did not produce a usable advisory result.</p>
-                        {:else if advisoryNotes.length}
-                            <ul class="notes">{#each advisoryNotes as note}<li>{note}</li>{/each}</ul>
-                        {:else}
-                            <p>An advisory response was received, but it contained no concise supported statements for this report. We won't display technical JSON as findings.</p>
-                        {/if}
-                    </article>
-                    <article class="report-card">
-                        <h3>03 · Information still needed</h3>
-                        <ul class="notes">
-                            {#if !organization.trim()}<li>Identify the organization or assessment domain you are authorized to inspect.</li>{/if}
-                            <li>Confirm the relevant regulatory framework, its edition, and the assessment boundary.</li>
-                            <li>Identify existing controls and obtain supporting evidence before evaluating implementation.</li>
-                            {#if providerFailed}<li>Restore the AI provider connection before requesting model-generated analysis.</li>{/if}
-                        </ul>
-                        <p class="footnote">These are prerequisites, not verified deficiencies in the organization's cybersecurity.</p>
-                    </article>
-                    <article class="report-card">
-                        <h3>04 · Recommended next action</h3>
-                        {#if !recordsReady}
-                            <p><strong>First:</strong> Supply an exact permitted organization name and retry record discovery.</p>
-                        {:else if providerFailed}
-                            <p><strong>First:</strong> Resolve the AI provider fallback. Meanwhile, review the verified records shown alongside this message.</p>
-                        {:else}
-                            <p><strong>First:</strong> Have an authorized assessor confirm the framework, scope and evidence requirements before any formal assessment or GRC write.</p>
-                        {/if}
-                        <p class="footnote">No control has been declared compliant, and no risk has been rated or modified.</p>
-                    </article>
-                </div>
-                <details class="technical">
-                    <summary>Developer diagnostics (optional)</summary>
-                    <p>Backend response for troubleshooting only. Not an assessment report.</p>
-                    <pre>{JSON.stringify(result, null, 2)}</pre>
-                </details>
-            </section>
-        {/if}
-        <section class="report" aria-label="Real GRC workflow" id="real-grc-workflow">
-            <div class="report-head">
-                <div><p class="eyebrow">SICO AI · EXISTING GRC SERVICES</p><h2>Existing GRC case execution</h2></div>
-                <span class="status-pill">Independent approval required</span>
-            </div>
-            <p class="report-intro">The current execution adapter can prepare a perimeter, compliance assessment, linked requirement assessments and (with a selected risk matrix) a risk assessment. The other reviewed GRC stages remain pending verified input and separate approvals. This does not declare any compliance result.</p>
-            {#if latestResponse?.workflow_error}
-                <div class="message error" role="alert">{String(latestResponse.workflow_error)}</div>
-            {/if}
-            <p class="report-intro">Your three inputs above pin the organization and framework. SICO prepares a case for approval and tracks all 16 activities here. No risk matrix, perimeter, assessment name, or internal IDs are required from you.</p>
-            {#if preparedWorkflow}
-                <article class="report-card" style="margin-top:14px">
-                    <h3>3. Review the exact prepared operation</h3>
-                    <p class="footnote">Case progress is tracked automatically. You do not need to enter an internal ID.</p>
-                    <ul class="notes">
-                        {#each (preparedWorkflow.planned_actions ?? []) as action}
-                            <li>{String(action.platform_entity)} — {String(action.action)}: {String(action.detail)}</li>
-                        {/each}
-                    </ul>
-                    <details class="technical">
-                        <summary>View exact scoped IDs and business fields before approving</summary>
-                        <pre>{JSON.stringify(preparedWorkflow.review?.operation_payload, null, 2)}</pre>
-                        <p>Fingerprint: {String(preparedWorkflow.prepared_digest)}</p>
-                    </details>
-                    {#if latestResponse?.workflow_committed?.business_records_written === true}
-                        <p class="message" role="status">The approved GRC assessment was saved and verified in your existing Compliance module. SICO will not repeat the case creation on retry.</p>
-                    {:else if !recordedApproval}
-                        <form method="POST" action="?/workflow_approve" use:enhance class="workflow-form">
-                            <input type="hidden" name="engagement_id" value={String(preparedWorkflow.engagement_id)} />
-                            <input type="hidden" name="prepared_digest" value={String(preparedWorkflow.prepared_digest)} />
-                            <label class="confirmation"><input type="checkbox" name="confirm_reviewed" value="yes" required /> I approve creating these exact GRC records for the displayed organization and framework.</label>
-                            <button type="submit">Approve and create the GRC case</button>
-                        </form>
-                    {:else if recordedApproval.commit_enabled === true}
-                        <form method="POST" action="?/workflow_commit" use:enhance class="workflow-form">
-                            <input type="hidden" name="engagement_id" value={String(preparedWorkflow.engagement_id)} />
-                            <input type="hidden" name="prepared_digest" value={String(preparedWorkflow.prepared_digest)} />
-                            <label class="confirmation"><input type="checkbox" name="confirm_reviewed" value="yes" required /> Final confirmation: save these exact records in the existing GRC modules.</label>
-                            <button type="submit">Save approved GRC records</button>
-                        </form>
-                    {:else}
-                        <p class="finding-alert">Human review recorded. Live business writes are still disabled pending isolated PostgreSQL transaction and tenant-isolation verification. No GRC case has been saved.</p>
-                    {/if}
-                </article>
-            {/if}
-            {#if latestResponse?.workflow_committed}
-                <article class="report-card" style="margin-top:14px">
-                    <h3>Verified records saved in existing GRC modules</h3>
-                    <ul class="notes">
-                        {#each (latestResponse.workflow_committed.created_objects ?? []) as record}
-                            <li>{String(record.platform_entity)}: {String(record.name)} — {String(record.id)}</li>
-                        {/each}
-                    </ul>
-                    <p class="footnote">Linked requirement assessments: {Number(latestResponse.workflow_committed.requirement_assessments_count ?? 0)}. Their compliance results and evidence have not been evaluated.</p>
-                </article>
-            {/if}
-            {#if latestResponse?.workflow_resumed || latestResponse?.workflow_committed?.workflow || preparedWorkflow?.workflow}
-                {@const execution = latestResponse?.workflow_resumed ?? latestResponse?.workflow_committed?.workflow ?? preparedWorkflow?.workflow}
-                <div class="report-grid" style="margin-top:14px">
-                    {#each (execution.workflow ?? []) as step}
-                        <article class="report-card"><h3>{String(step.stage)}</h3><p>{String(step.status)}</p></article>
-                    {/each}
-                </div>
-            {/if}
-            <article class="report-card" style="margin-top:22px" aria-label="Actual saved control-level GRC results">
-                <h3>Saved control-by-control AI reviews — Compliance / Audits</h3>
-                <p class="footnote">This section reads real RequirementAssessment records. Qwen generates a specific audit question and evidence request for a requirement, saves it to that existing record, and SICO verifies the write. Until evidence is independently checked, its result stays <strong>Not assessed</strong>.</p>
-                {#if controlProgress?.case_id}
-                    <p><strong>Audit:</strong> {String(controlProgress.case_name)}</p>
-                    <p><strong>Saved and verified initial reviews:</strong> {Number(controlProgress.ai_reviews_saved_and_verified)} / {Number(controlProgress.total_assessable_requirements)} assessable controls</p>
-                    <p class="footnote">Remaining untouched controls: {Number(controlProgress.remaining_blank_to_do)}. Existing human evaluations are never overwritten.</p>
-                    <button type="button" disabled={controlBusy || Number(controlProgress.remaining_blank_to_do) < 1} onclick={generateAndSaveNextControl}>
-                        {controlBusy ? 'Qwen is generating and saving one control review…' : 'Generate and save next control review'}
-                    </button>
-                    {#each (controlProgress.saved_reviews ?? []) as control (control.requirement_assessment_id)}
-                        <div class="technical">
-                            <strong>{String(control.control_id || 'Control')} · {String(control.control_name)}</strong>
-                            <p><strong>Saved result:</strong> {String(control.result).replace(/_/g, ' ')} · <strong>Status:</strong> {String(control.status).replace(/_/g, ' ')}</p>
-                            <p style="white-space:pre-line">{String(control.observation)}</p>
-                            <p class="footnote">Verified in the existing audit record — not a compliance pass/fail conclusion.</p>
-                        </div>
-                    {/each}
-                {:else}
-                    <p class="footnote">No accessible saved audit was found for control-level writes. You can generate drafts for a new company name, but saving its GRC records requires authorized company provisioning and a saved ComplianceAssessment.</p>
-                    <button type="button" disabled={controlBusy} onclick={() => loadSavedControlProgress()}>Check for my latest saved audit automatically</button>
-                {/if}
-                {#if controlNotice}<p class="message" role="status">{controlNotice}</p>{/if}
-                {#if controlError}<p class="message error" role="alert">{controlError}</p>{/if}
-            </article>
-            <article class="report-card" style="margin-top:22px" aria-label="Full professional GRC lifecycle">
-                <h3>One instruction · Full GRC assessment lifecycle</h3>
-                <p class="footnote">You select the existing organization and exact framework above. SICO keeps your original instruction across the assessment, prepares the next reviewed module operation with AI, and pauses for required evidence or human approval. Records save only through authorized existing services.</p>
-                <p class="finding-alert"><strong>Important:</strong> A saved module operation is not proof of compliance, control effectiveness or completed audit. Framework selection is never changed automatically.</p>
-                {#if latestResponse?.lifecycle_error}
-                    <div class="message error" role="alert">{String(latestResponse.lifecycle_error)}</div>
-                {/if}
-                <details class="technical"><summary>Advanced: reload saved case progress</summary>
-                <form method="POST" action="?/lifecycle_status" use:enhance class="workflow-form">
-                    <label>Existing SICO engagement ID (also used to resume after refresh)
-                        <input name="engagement_id" bind:value={activeEngagement} placeholder="Engagement UUID" required />
-                    </label>
-                    <button type="submit">Load saved lifecycle progress</button>
-                </form>
-                </details>
-                {#if lifecycleProgress?.lifecycle}
-                    <p class="footnote">Selected framework ID: {String(lifecycleProgress.framework_id)} · Compliance verdict: {String(lifecycleProgress.compliance_verdict)} · Not yet a completed GRC case</p>
-                    <div class="report-grid" style="margin-top:14px">
-                        {#each lifecycleProgress.lifecycle as task, i}
-                            <article class="report-card">
-                                <h3>{i + 1}. {String(task.title)}</h3>
-                                <p>{String(task.state).replace(/_/g, ' ')}</p>
-                                <p class="footnote">{task.stage ? `Existing service: ${task.stage}` : 'Requires separate verified professional record or review'}</p>
-                            </article>
-                        {/each}
-                    </div>
-                    <form method="POST" action="?/lifecycle_next" use:enhance class="workflow-form">
-                        <h3>Continue the same assessment with AI</h3>
-                        <input type="hidden" name="engagement_id" value={activeEngagement} />
-                        <label>Additional verified facts or evidence references (optional)
-                            <input name="human_facts" bind:value={evidenceContext} maxlength="1200"
-                                placeholder="Only supply information you can verify in the GRC platform" />
-                        </label>
-                        <button type="submit" disabled={busy}>Prepare next authorized GRC stage with Qwen</button>
-                        <p class="footnote">AI cannot approve its own proposal or invent evidence. It may stop to request verified inputs.</p>
-                    </form>
-                {/if}
-                {#if lifecycleProposal}
-                    <article class="report-card" style="margin-top:16px">
-                        <h3>AI next-stage result: {String(lifecycleProposal.stage ?? lifecycleProposal.status)}</h3>
-                        {#if lifecycleProposal.reason}<p class="finding-alert">{String(lifecycleProposal.reason)}</p>{/if}
-                        {#if lifecycleProposal.questions?.length}
-                            <ul class="notes">{#each lifecycleProposal.questions as q}<li>{String(q)}</li>{/each}</ul>
-                        {/if}
-                        {#if lifecycleProposal.status === 'prepared_for_human_review' && lifecycleProposal.review?.operation_payload}
-                            <p>Prepared using the existing GRC serializer. <strong>No business record has been written.</strong></p>
-                            <details class="technical" open>
-                                <summary>Review every proposed record, field and exact ID</summary>
-                                <pre>{JSON.stringify(lifecycleProposal.review.operation_payload, null, 2)}</pre>
-                                <p>SHA-256 fingerprint: {String(lifecycleProposal.prepared_digest)}</p>
-                            </details>
-                            {#if !lifecycleApproval}
-                                <form method="POST" action="?/lifecycle_stage_approve" use:enhance class="workflow-form">
-                                    <input type="hidden" name="engagement_id" value={activeEngagement} />
-                                    <input type="hidden" name="stage" value={String(lifecycleProposal.stage)} />
-                                    <input type="hidden" name="prepared_digest" value={String(lifecycleProposal.prepared_digest)} />
-                                    <label class="confirmation"><input type="checkbox" name="confirm_reviewed" value="yes" required /> I have reviewed the exact GRC changes and have authority to approve them.</label>
-                                    <button type="submit">Record human approval for this stage</button>
-                                </form>
-                            {:else if lifecycleApproval.commit_enabled === true}
-                                <form method="POST" action="?/lifecycle_stage_commit" use:enhance class="workflow-form">
-                                    <input type="hidden" name="engagement_id" value={activeEngagement} />
-                                    <input type="hidden" name="stage" value={String(lifecycleProposal.stage)} />
-                                    <input type="hidden" name="prepared_digest" value={String(lifecycleProposal.prepared_digest)} />
-                                    <label class="confirmation"><input type="checkbox" name="confirm_reviewed" value="yes" required /> Final confirmation: save this exact approved stage in SICO GRC.</label>
-                                    <button type="submit">Save stage to existing GRC modules</button>
-                                </form>
-                            {:else}
-                                <p class="finding-alert">Approval recorded, but this writer is not independently enabled for live saves. Further isolated transaction and permission tests are required.</p>
-                            {/if}
-                        {/if}
-                    </article>
-                {/if}
-                {#if latestResponse?.lifecycle_stage_committed}
-                    <p class="message">The existing GRC service reported a committed operation for {String(latestResponse.lifecycle_stage_committed.stage)}. Verify the saved records in the corresponding module before trusting the result.</p>
-                {/if}
-            </article>
-            <details class="technical"><summary>Advanced: restore a saved engagement</summary>
-            <form method="POST" action="?/workflow_review" use:enhance class="workflow-form">
-                <label>Restore an existing case-setup review by engagement ID
-                    <input name="engagement_id" value={String(preparedWorkflow?.engagement_id ?? '')} placeholder="Prepared engagement UUID" />
+            <details class="technical">
+                <summary>Resume a downloaded assessment checkpoint</summary>
+                <p class="footnote">The draft stays in this browser tab, not SICO's database. Download a checkpoint before refreshing. A signed continuation cursor expires after seven days and becomes invalid if access or the framework catalog changes.</p>
+                <label class="checkpoint-label">Select your private checkpoint JSON file
+                    <input type="file" accept=".json,application/json" onchange={importFullReview} disabled={fullReviewBusy} />
                 </label>
-                <button type="submit">Restore pending approval</button>
-            </form>
-            <form method="POST" action="?/workflow_resume" use:enhance class="workflow-form">
-                <label>Resume an existing SICO engagement (ID)
-                    <input name="engagement_id" value={String(preparedWorkflow?.engagement_id ?? '')} placeholder="Existing engagement UUID" />
-                </label>
-                <button type="submit">Show verified workflow progress</button>
-            </form>
             </details>
+            <p class="footnote">SICO uses existing authorized framework records for this provisional analysis. Nothing is automatically approved or recorded as compliant.</p>
         </section>
-        <footer>SICO AI Next · Three inputs begin a reviewable GRC case · SICO reuses authorized platform services · Missing evidence, human decisions, and disabled writes are never reported as completed.</footer>
+        <footer>SICO AI · One Build a GRC case workflow · Permission-scoped, provisional and read-only. Future GRC stages will reuse the same selected framework and case context after separate validation.</footer>
     </div>
 </div>
 
@@ -1141,4 +574,8 @@
     .framework-coverage-title { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
     .framework-meter { height:12px; border-radius:99px; background:rgba(150,170,185,.23); overflow:hidden; }
     .framework-meter-fill { height:100%; background:#61d8bc; border-radius:99px; transition:width .25s ease; }
+    .review-more{margin-top:14px;border:1px solid #46637a;background:#172d42;color:#e6f3fd;padding:12px 16px;border-radius:9px;cursor:pointer}
+    .checkpoint-label{display:grid;gap:10px;font-size:13px;margin-top:14px}
+    .checkpoint-label input{color:#d0e7ed}
+    #start-grc-case{margin-top:55px}
 </style>
