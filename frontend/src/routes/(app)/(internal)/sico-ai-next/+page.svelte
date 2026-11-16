@@ -44,6 +44,81 @@
     // Unified Build a GRC case uses full-framework batches; legacy draft handlers remain unused by this page.
     // Creation-first: the main button uses SICO's existing three-input lifecycle
     // intake, real case-setup serializer and dry-run. No AI-side business writes.
+    // New creation-first *drafting* mode: never calls GRC writers.
+    let draftedCaseStages = $state<Record<string, any>[]>([]);
+    let draftedCaseScope = $state('');
+    let draftedCaseBusy = $state(false);
+    let draftedCaseError = $state('');
+    let draftedCaseNotice = $state('');
+    let stopAfterPhase = $state(false);
+
+    function draftScopeKey() {
+        return JSON.stringify([organization.trim(), frameworkSearch.trim(), instruction.trim()]);
+    }
+
+    async function generateNewCaseDrafts(restart = false) {
+        if (draftedCaseBusy) return;
+        if (organization.trim().length < 2 || frameworkSearch.trim().length < 2 || instruction.trim().length < 20) {
+            draftedCaseError = 'Enter organization, framework and a detailed assessment objective.';
+            return;
+        }
+        if (restart) {
+            draftedCaseStages = [];
+            draftedCaseScope = draftScopeKey();
+        } else if (draftedCaseScope !== draftScopeKey()) {
+            draftedCaseError = 'Inputs have changed. Start a new draft; existing drafts remain visible until then.';
+            return;
+        }
+        draftedCaseBusy = true;
+        draftedCaseError = '';
+        draftedCaseNotice = '';
+        stopAfterPhase = false;
+        try {
+            for (let phase = Math.floor(draftedCaseStages.length / 4); phase < 4; phase += 1) {
+                if (stopAfterPhase || draftScopeKey() !== draftedCaseScope) break;
+                const response = await sicoPostAction('case_draft_phase', {
+                    organization_name: organization.trim(),
+                    framework_name: frameworkSearch.trim(),
+                    problem: instruction.trim(),
+                    phase: String(phase)
+                });
+                const batch = (response.data as Record<string, any>)?.case_draft_phase;
+                if (!batch || batch.generated_by_model !== true || batch.business_records_written !== false ||
+                    batch.phase !== phase || !Array.isArray(batch.activities) || batch.activities.length !== 4 ||
+                    batch.activities.some((stage: any, index: number) =>
+                        stage.activity_number !== phase * 4 + index + 1 || !stage.drafts?.length)) {
+                    throw new Error('The Qwen draft batch was invalid. Nothing was appended.');
+                }
+                if (draftScopeKey() !== draftedCaseScope) {
+                    throw new Error('Inputs changed while Qwen was drafting. Earlier batches are preserved.');
+                }
+                draftedCaseStages = [...draftedCaseStages, ...batch.activities];
+                draftedCaseNotice = `Qwen drafted ${draftedCaseStages.length}/16 connected activities. Nothing has been saved.`;
+            }
+        } catch (error) {
+            draftedCaseError = error instanceof Error ? error.message : 'Qwen draft generation failed. Earlier stages remain available.';
+        } finally {
+            draftedCaseBusy = false;
+        }
+    }
+
+    function downloadCaseDraft() {
+        if (!draftedCaseStages.length) return;
+        const caseDraft = {
+            schema: 'sico-unsaved-case-drafts-v1', organization_name: organization.trim(),
+            framework_name: frameworkSearch.trim(), objective: instruction.trim(),
+            generated_activity_count: draftedCaseStages.length,
+            business_records_written: false,
+            note: 'Unverified hypothetical drafts. No GRC database records created.',
+            activities: draftedCaseStages
+        };
+        const url = URL.createObjectURL(new Blob([JSON.stringify(caseDraft, null, 2)], { type: 'application/json' }));
+        try {
+            const a = document.createElement('a');
+            a.href = url; a.download = 'SICO-new-GRC-case-DRAFT.json'; a.click();
+        } finally { URL.revokeObjectURL(url); }
+    }
+
     let creationBusy = $state(false);
     let creationError = $state('');
     let creationNotice = $state('');
@@ -354,7 +429,7 @@
         const parsed = deserialize(await res.text());
         if (parsed.type !== 'success') {
             const body = parsed.type === 'failure' ? (parsed.data as Record<string, any>) : null;
-            throw new Error(String(body?.framework_batch_error ?? body?.control_error ?? body?.ai_sixteen_error ?? body?.lifecycle_error ?? body?.workflow_error ?? 'The requested operation could not finish.'));
+            throw new Error(String(body?.case_draft_error ?? body?.framework_batch_error ?? body?.control_error ?? body?.ai_sixteen_error ?? body?.lifecycle_error ?? body?.workflow_error ?? 'The requested operation could not finish.'));
         }
         return parsed;
     }
@@ -621,113 +696,72 @@
                 <h2>Build a GRC case</h2>
                 <span class="status-pill">One workflow · Your existing SICO GRC library</span>
             </div>
-            <p class="report-intro">Give SICO the organization, selected framework and objective once. The main action prepares a NEW assessment and scope using the existing SICO case-setup service. After verified human approval, authorized writers can create the actual records. Qwen then drafts new assets, controls, risks and other GRC operations through the original platform services.</p>
-            <form class="workflow-form" onsubmit={(event) => { event.preventDefault(); void prepareNewGrcCase(); }}>
+            <p class="report-intro">Enter just three inputs. Qwen will generate NEW structured draft assets, risks, controls, policies, evidence requests, tasks and reporting work, mapped to the existing SICO modules across 16 activities. Draft generation never saves records or asserts compliance.</p>
+            <form class="workflow-form" onsubmit={(event) => { event.preventDefault(); void generateNewCaseDrafts(true); }}>
                 <label>1. Organization
-                    <input name="organization_name" bind:value={organization} oninput={() => { if (!preparedWorkflow) organizationConfirmation = ''; }} disabled={creationBusy || !!preparedWorkflow} required minlength="2" maxlength="150" placeholder="Exact organization name in SICO" />
+                    <input name="organization_name" bind:value={organization} disabled={draftedCaseBusy} required minlength="2" maxlength="150" placeholder="Organization name (new or existing)" />
                 </label>
                 <label>2. Framework
-                    <input name="framework_name" bind:value={frameworkSearch} oninput={() => { if (!preparedWorkflow) frameworkConfirmation = ''; }} disabled={creationBusy || !!preparedWorkflow} required minlength="2" maxlength="150" placeholder="Exact loaded framework and edition" />
+                    <input name="framework_name" bind:value={frameworkSearch} disabled={draftedCaseBusy} required minlength="2" maxlength="150" placeholder="ISO/IEC 27001:2022, NCA ECC, CCC, PDPL, etc." />
                 </label>
                 <label>3. GRC case objective
-                    <textarea name="problem" bind:value={instruction} disabled={creationBusy || !!preparedWorkflow} required minlength="20" maxlength="4000" rows="4" placeholder="Create a complete new GRC case, assets, risks, controls, policies, evidence requests and reports."></textarea>
+                    <textarea name="problem" bind:value={instruction} disabled={draftedCaseBusy} required minlength="20" maxlength="4000" rows="4" placeholder="Create a complete new GRC case with proposed assets, controls, risks, policy drafts, evidence requests, remediation and reports."></textarea>
                 </label>
-                {#if creationChoices?.organizations?.length > 0}
-                    <label>Confirm authorized organization
-                        <select bind:value={organizationConfirmation} required>
-                            <option value="">Select the exact organization record</option>
-                            {#each creationChoices.organizations as option (option.id)}
-                                <option value={option.id}>{option.name}</option>
-                            {/each}
-                        </select>
-                    </label>
-                {/if}
-                {#if creationChoices?.frameworks?.length > 0}
-                    <label>Confirm exact loaded framework
-                        <select bind:value={frameworkConfirmation} required>
-                            <option value="">Select the exact framework record and edition</option>
-                            {#each creationChoices.frameworks as option (option.id)}
-                                <option value={option.id}>{option.name} {option.ref_id ? `(${option.ref_id})` : ''}</option>
-                            {/each}
-                        </select>
-                    </label>
-                {/if}
-                {#if !preparedWorkflow}
-                    <button type="submit" disabled={creationBusy || instruction.trim().length < 20 || !organization.trim() || !frameworkSearch.trim()}>
-                        {creationBusy ? 'Preparing a new GRC case…' : 'Build GRC case with AI'}
+                {#if draftedCaseStages.length === 0}
+                    <button type="submit" disabled={draftedCaseBusy || instruction.trim().length < 20 || !organization.trim() || !frameworkSearch.trim()}>
+                        {draftedCaseBusy ? 'Generating new GRC drafts with Qwen…' : 'Build GRC case with AI'}
                     </button>
                 {/if}
             </form>
-            {#if creationError}<p class="message error" role="alert">{creationError}</p>{/if}
-            {#if creationNotice}<p class="message" role="status">{creationNotice}</p>{/if}
-            {#if preparedWorkflow}
+            {#if draftedCaseError}<p class="message error" role="alert">{draftedCaseError}</p>{/if}
+            {#if draftedCaseNotice}<p class="message" role="status">{draftedCaseNotice}</p>{/if}
+            {#if draftedCaseBusy || draftedCaseStages.length > 0}
                 <div class="framework-coverage">
-                    <h3>New GRC case creation plan · {caseSaved ? 'Saved and verified' : 'Awaiting approval'}</h3>
-                    <p class="footnote">Organization: {preparedWorkflow.scope?.folder?.name || organization} · Framework: {preparedWorkflow.scope?.framework?.name || frameworkSearch}</p>
-                    <p class="footnote">Engagement: {preparedWorkflow.engagement_id}</p>
-                    <div class="stage-grid">
-                        {#each (preparedWorkflow.planned_actions ?? []) as action, index (index)}
-                            <article class="report-card">
-                                <h4>{action.platform_entity ?? action.object_key ?? 'GRC record'} — {action.action}</h4>
-                                <p>{action.detail ?? action.status}</p>
-                            </article>
-                        {/each}
+                    <div class="framework-coverage-title">
+                        <h3>New GRC case drafts — {draftedCaseStages.length} of 16 activities</h3>
+                        <span class="footnote">Not saved · No verified findings</span>
                     </div>
-                    {#if !caseSaved}
-                        <details class="technical">
-                            <summary>Review the exact prepared creation fields and record IDs</summary>
-                            <pre>{JSON.stringify(preparedWorkflow.review?.operation_payload ?? {}, null, 2)}</pre>
-                        </details>
-                        <label class="confirmation"><input type="checkbox" bind:checked={confirmCaseCreation} disabled={creationBusy} /> I reviewed the exact planned records and authorize creating this new assessment in SICO.</label>
-                        <button type="button" onclick={approveAndCreateCase} disabled={!confirmCaseCreation || creationBusy}>Approve and create new GRC case</button>
-                        <p class="footnote">This invokes SICO's existing approval and case-setup writer. If the backend safety switch is disabled, approval does not create business records.</p>
-                    {/if}
-                </div>
-            {/if}
-            {#if caseSaved && activeEngagement}
-                <div class="framework-coverage">
-                    <h3>Create the next GRC records using Qwen and SICO's existing modules</h3>
-                    <p class="footnote">The case has been saved. Each next-stage proposal uses the existing scoped serializer and original service, with a separate human approval before any write.</p>
-                    {#if lifecycleProgress?.stages?.length}
-                        <div class="stage-grid">
-                            {#each lifecycleProgress.stages as stage, index (index)}
-                                <p class="footnote">{stage.stage ?? stage.slug}: {stage.status ?? 'pending'}</p>
-                            {/each}
-                        </div>
-                    {/if}
-                    {#if !lifecycleProposal}
-                        <label class="footnote">Verified facts to help Qwen (optional, do not invent asset details)
-                            <textarea bind:value={stageHumanFacts} maxlength="1200" rows="3" placeholder="Real systems, asset types, data, business functions or owners that you can verify."></textarea>
-                        </label>
-                        <button type="button" onclick={prepareNextRealGrcStage} disabled={stageBusy}>
-                            {stageBusy ? 'Preparing next creation stage…' : 'Prepare next new GRC records with Qwen'}
-                        </button>
-                    {:else}
-                        <h4>Qwen proposal: {lifecycleProposal.stage}</h4>
-                        <p class="footnote">New records will not be created until this original SICO operation is explicitly approved and enabled.</p>
-                        {#each (lifecycleProposal.planned_actions ?? []) as action, index (index)}
-                            <p>{action.platform_entity ?? action.target_name ?? 'GRC operation'}: {action.action ?? action.status} — {action.detail ?? ''}</p>
-                        {/each}
-                        <details class="technical">
-                            <summary>See the exact validated fields to be saved</summary>
-                            <pre>{JSON.stringify(lifecycleProposal.review?.operation_payload ?? {}, null, 2)}</pre>
-                        </details>
-                        <label class="confirmation"><input type="checkbox" bind:checked={stageConfirmed} disabled={stageBusy || !!lifecycleApproval} /> I reviewed these exact fields and authorize this stage.</label>
-                        {#if !lifecycleApproval}
-                            <button type="button" onclick={approveNextRealGrcStage} disabled={!stageConfirmed || stageBusy}>Approve this new GRC operation</button>
-                        {:else if lifecycleApproval.commit_enabled === true}
-                            <button type="button" onclick={commitNextRealGrcStage} disabled={stageBusy}>Create the approved records in SICO</button>
-                        {:else}
-                            <p class="message">This writer is disabled by SICO's safety settings. No business records have been created for this stage.</p>
+                    <div class="framework-meter"><div class="framework-meter-fill" style={`width: ${Math.round(draftedCaseStages.length / 16 * 100)}%`}></div></div>
+                    <p class="footnote">Each activity produces concrete new unsaved draft records mapped to SICO modules. Linked stages refer to the same draft case, but no existing database IDs are invented.</p>
+                    <div class="framework-actions">
+                        {#if draftedCaseBusy}
+                            <button type="button" onclick={() => { stopAfterPhase = true; }}>Stop after current batch</button>
+                        {:else if draftedCaseStages.length < 16}
+                            <button type="button" onclick={() => void generateNewCaseDrafts(false)}>Continue generating drafts</button>
                         {/if}
+                        {#if draftedCaseStages.length > 0}
+                            <button type="button" onclick={downloadCaseDraft}>Download generated GRC case draft</button>
+                            {#if !draftedCaseBusy}<button type="button" onclick={() => void generateNewCaseDrafts(true)}>Start a new draft case</button>{/if}
+                        {/if}
+                    </div>
+                    {#each draftedCaseStages as stage (stage.activity_number)}
+                        <article class="report-card">
+                            <h3>{stage.activity_number}. {stage.activity_name}</h3>
+                            <p class="footnote">SICO module: {stage.target_existing_sico_model} · Existing writer: {stage.existing_reviewed_write_stage ?? 'not yet integrated'} · Depends on activities {stage.depends_on_activity_numbers.join(', ') || 'none'}</p>
+                            {#each stage.drafts as draft (draft.draft_reference)}
+                                <div class="sico-case-draft">
+                                    <h4>{draft.title} <span class="footnote">({draft.draft_reference})</span></h4>
+                                    <p>{draft.content}</p>
+                                    <dl>
+                                        {#each draft.proposed_attributes as attr}
+                                            <div><dt>{attr.field}</dt><dd>{attr.proposed_value}</dd></div>
+                                        {/each}
+                                    </dl>
+                                    <p><strong>Evidence to obtain:</strong> {draft.evidence_request}</p>
+                                    <p><strong>Question to confirm:</strong> {draft.verification_question}</p>
+                                    <p class="footnote">Proposed NEW unsaved draft. Not proof of a real asset, vulnerability, approval, audit or compliance.</p>
+                                </div>
+                            {/each}
+                        </article>
+                    {/each}
+                    {#if draftedCaseStages.length === 16}
+                        <p class="message" role="status">All 16 activities have generated draft proposals. Download and review them. Actual SICO record creation and evidence verification are intentionally deferred.</p>
                     {/if}
-                    {#if stageError}<p class="message error" role="alert">{stageError}</p>{/if}
-                    {#if stageNotice}<p class="message" role="status">{stageNotice}</p>{/if}
                 </div>
             {/if}
-            <p class="footnote">The engine uses your existing SICO GRC services, permissions, validated records and human approval. No asset, compliance result or evidence may be invented as verified.</p>
+            <p class="footnote">Qwen drafts new proposals using the existing SICO provider and maps them to reviewed GRC models/services. Original SICO writers are NOT called until independently validated and approved in a later phase.</p>
         </section>
-        <footer>SICO AI · One Build a GRC case workflow · Creation-first · Existing SICO GRC writers · Exact human approval before business-record changes.</footer>
+        <footer>SICO AI · One Build a GRC case workflow · Qwen generates NEW unsaved GRC drafts across 16 activities · No database writes.</footer>
     </div>
 </div>
 
@@ -752,4 +786,10 @@
     .checkpoint-label{display:grid;gap:10px;font-size:13px;margin-top:14px}
     .checkpoint-label input{color:#d0e7ed}
     #start-grc-case{margin-top:55px}
+    .sico-case-draft{padding:15px;margin:12px 0;background:#0d1c30;border:1px solid #35566c;border-radius:9px}
+    .sico-case-draft h4{margin:0 0 10px;color:#9ef0dd}
+    .sico-case-draft p{line-height:1.65;color:#c4d8e6}
+    .sico-case-draft dl{display:grid;gap:8px;margin:12px 0}
+    .sico-case-draft dl div{display:grid;grid-template-columns:minmax(120px,32%) 1fr;gap:10px;border-bottom:1px solid #254052;padding-bottom:7px}
+    .sico-case-draft dt{color:#93bece;font-weight:700}.sico-case-draft dd{margin:0;color:#e5f0f4;overflow-wrap:anywhere}
 </style>

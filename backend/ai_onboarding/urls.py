@@ -197,3 +197,114 @@ urlpatterns += [
         name='sico-engagement-case-setup-auto-prepare',
     ),
 ]
+
+# SICO AI: independent review and approval of prepared operations.
+from .engagement_approval_views import AiEngagementApprovalView
+
+urlpatterns += [
+    path(
+        'workforce/engagements/<uuid:engagement_id>/approval/',
+        AiEngagementApprovalView.as_view(),
+        name='sico-engagement-approval',
+    ),
+]
+
+# SICO AI Next read-only, authenticated coordinator planning endpoint.
+from .sico_ai_plan_views import SicoAiPlanView
+urlpatterns += [
+    path("workforce/assistant/plan/", SicoAiPlanView.as_view(), name="sico-ai-coordinator-plan"),
+]
+
+# sico-ai-platform-hub-v1: 11 reviewed stages, commits off unless independently enabled.
+from .sico_ai_tool_hub_views import (
+    SicoAiToolCatalogView, SicoAiToolPrepareView, SicoAiToolCommitView,
+)
+urlpatterns += [
+    path('workforce/assistant/tools/catalog/', SicoAiToolCatalogView.as_view(), name='sico-ai-tool-catalog'),
+    path('workforce/assistant/tools/prepare/', SicoAiToolPrepareView.as_view(), name='sico-ai-tool-prepare'),
+    path('workforce/assistant/tools/commit/', SicoAiToolCommitView.as_view(), name='sico-ai-tool-commit'),
+]
+# sico-ai-router-phase2: AI-selected REVIEWED stages; read-only and no GRC writes.
+from .sico_ai_router_views import SicoAiCapabilityRouterView
+urlpatterns += [
+    path('workforce/assistant/route/', SicoAiCapabilityRouterView.as_view(), name='sico-ai-capability-router'),
+]
+
+# Model-driven read-only execution; no approval/commit dispatch is registered.
+from .sico_ai_agent_views import SicoAiAgentView
+urlpatterns += [
+    path('workforce/assistant/execute/', SicoAiAgentView.as_view(), name='sico-ai-agent-execute'),
+]
+
+# SICO AI Next — approval-controlled, resumable GRC workflow.
+# Preparation creates metadata/review only. Business commits OFF by default.
+from .sico_ai_workflow_views import (
+    WorkflowOptionsView, WorkflowPrepareView, WorkflowReviewView,
+    WorkflowApproveView, WorkflowCommitView, WorkflowResumeView,
+)
+urlpatterns += [
+    path('workforce/assistant/workflow/options/', WorkflowOptionsView.as_view(), name='sico-ai-workflow-options'),
+    path('workforce/assistant/workflow/prepare/', WorkflowPrepareView.as_view(), name='sico-ai-workflow-prepare'),
+    path('workforce/assistant/workflow/review/', WorkflowReviewView.as_view(), name='sico-ai-workflow-review'),
+    path('workforce/assistant/workflow/approve/', WorkflowApproveView.as_view(), name='sico-ai-workflow-approve'),
+    path('workforce/assistant/workflow/commit/', WorkflowCommitView.as_view(), name='sico-ai-workflow-commit'),
+    path('workforce/assistant/workflow/resume/', WorkflowResumeView.as_view(), name='sico-ai-workflow-resume'),
+]
+
+# Full one-prompt SICO lifecycle: selected human scope, reviewed GRC writers.
+from .sico_ai_lifecycle_views import (
+    LifecycleStartView, LifecycleStatusView, LifecycleDraftNextView,
+    LifecycleStageReviewView, LifecycleStageApproveView, LifecycleStageCommitView,
+)
+urlpatterns += [
+    path('workforce/assistant/lifecycle/start/', LifecycleStartView.as_view(), name='sico-ai-lifecycle-start'),
+    path('workforce/assistant/lifecycle/status/', LifecycleStatusView.as_view(), name='sico-ai-lifecycle-status'),
+    path('workforce/assistant/lifecycle/next/', LifecycleDraftNextView.as_view(), name='sico-ai-lifecycle-next'),
+    path('workforce/assistant/lifecycle/review/', LifecycleStageReviewView.as_view(), name='sico-ai-lifecycle-review'),
+    path('workforce/assistant/lifecycle/approve/', LifecycleStageApproveView.as_view(), name='sico-ai-lifecycle-approve'),
+    path('workforce/assistant/lifecycle/commit/', LifecycleStageCommitView.as_view(), name='sico-ai-lifecycle-commit'),
+]
+
+# Three-input SICO AI intake — verified human-selected organization, framework and goal.
+from .sico_ai_lifecycle_views import LifecycleThreeInputView
+urlpatterns += [
+    path('workforce/assistant/lifecycle/intake/', LifecycleThreeInputView.as_view(), name='sico-ai-three-input-intake'),
+]
+
+
+# SICO AI genuine model-generated, permission-scoped assessment draft.
+# This route cannot approve or write GRC business records.
+from .sico_ai_generated_assessment_views import SicoAiGeneratedAssessmentView
+urlpatterns += [
+    path('workforce/assistant/lifecycle/generate/', SicoAiGeneratedAssessmentView.as_view(),
+         name='sico-ai-generated-assessment'),
+]
+
+# Four bounded batches generate 16 real AI draft work products from three inputs,
+# including a brand-new company name. No domain or business record is created here.
+from .sico_ai_sixteen_generate_views import SicoSixteenGenerateBatchView
+urlpatterns += [
+    path('workforce/assistant/lifecycle/generate-four/', SicoSixteenGenerateBatchView.as_view(),
+         name='sico-ai-generate-four-activities'),
+]
+
+# Incremental Qwen generation: one validated activity per call.
+from .sico_ai_sixteen_generate_views import SicoSixteenGenerateItemView
+urlpatterns += [
+    path('workforce/assistant/lifecycle/generate-one/', SicoSixteenGenerateItemView.as_view(),
+         name='sico-ai-generate-one-activity'),
+]
+
+# SICO AI: save and verify Qwen-generated preliminary observations on the
+# existing RequirementAssessment table. No automatic compliance verdicts.
+from .sico_ai_requirement_review_views import SicoAiRequirementReviewView
+urlpatterns += [
+    path('workforce/assistant/lifecycle/requirements/review/',
+         SicoAiRequirementReviewView.as_view(),
+         name='sico-ai-requirement-initial-review'),
+]
+
+# SICO AI creation-first: NEW structured drafts, no GRC writes or case IDs.
+from .sico_ai_case_draft_views import SicoCaseDraftPhaseView
+urlpatterns += [path('workforce/assistant/case-draft/phase/', SicoCaseDraftPhaseView.as_view(),
+                    name='sico-case-draft-phase')]

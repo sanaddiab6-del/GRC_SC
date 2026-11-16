@@ -20,6 +20,40 @@ function backendMessage(value: unknown): string {
 }
 
 export const actions = {
+    // Creation-first: generate NEW unsaved, structured GRC drafts through SICO Qwen.
+    case_draft_phase: async (event) => {
+        if (!hasAiOnboardingSession(event)) return fail(401, { case_draft_error: 'Sign in again.' });
+        const form = await event.request.formData();
+        const payload = {
+            organization_name: String(form.get('organization_name') ?? '').trim(),
+            framework_name: String(form.get('framework_name') ?? '').trim(),
+            problem: String(form.get('problem') ?? '').trim(),
+            phase: Number(form.get('phase') ?? -1)
+        };
+        if (payload.organization_name.length < 2 || payload.organization_name.length > 150 ||
+            payload.framework_name.length < 2 || payload.framework_name.length > 150 ||
+            payload.problem.length < 20 || payload.problem.length > 4000 ||
+            !Number.isInteger(payload.phase) || payload.phase < 0 || payload.phase > 3) {
+            return fail(400, { case_draft_error: 'Provide a company, framework, objective and valid phase.' });
+        }
+        try {
+            const response = await fetchAiOnboardingBackend(
+                event, '/ai/workforce/assistant/case-draft/phase/', payload
+            );
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) return fail(response.status, { case_draft_error: backendMessage(data) });
+            if (data.business_records_written !== false || data.generated_by_model !== true ||
+                data.phase !== payload.phase || !Array.isArray(data.activities) || data.activities.length !== 4 ||
+                data.activities.some((stage: any) => !Array.isArray(stage?.drafts) || !stage.drafts.length ||
+                    stage.write_service_execution !== 'not_called' ||
+                    stage.drafts.some((draft: any) => draft.status !== 'new_unsaved_ai_draft_pending_verification'))) {
+                return fail(502, { case_draft_error: 'The draft generator response failed SICO validation.' });
+            }
+            return { case_draft_phase: data };
+        } catch {
+            return fail(502, { case_draft_error: 'Could not reach the SICO Qwen case-draft generator.' });
+        }
+    },
     run: async (event) => {
         if (!hasAiOnboardingSession(event)) {
             return fail(401, { error: backendMessage(AI_ONBOARDING_SESSION_EXPIRED) });
