@@ -313,3 +313,9 @@ urlpatterns += [path('workforce/assistant/case-draft/phase/', SicoCaseDraftPhase
 from .authorized_framework_source import AuthorizedFrameworkSourcePageView
 urlpatterns += [path("workforce/assistant/framework-source/page/", AuthorizedFrameworkSourcePageView.as_view(),
                     name="sico-ai-framework-source-page")]
+
+# Single-record quality-gated Qwen generation, with authenticated SICO framework
+# grounding. This keeps the existing HTML runner strategy inside SICO AI Next.
+from .sico_ai_case_quality_views import SicoQualityDraftOneView
+urlpatterns += [path('workforce/assistant/case-draft/quality-one/', SicoQualityDraftOneView.as_view(),
+                    name='sico-ai-quality-draft-one')]

@@ -80,6 +80,56 @@ export const actions = {
             return fail(502, { case_draft_error: 'Could not reach the SICO Qwen case-draft generator.' });
         }
     },
+    // Same one-record-at-a-time Qwen generation as the successful HTML runner.
+    quality_draft_one: async (event) => {
+        if (!hasAiOnboardingSession(event)) return fail(401, { case_draft_error: 'Sign in again.' });
+        const form = await event.request.formData();
+        let previous_drafts: unknown;
+        try {
+            const raw = String(form.get('previous_drafts') ?? '[]');
+            if (raw.length > 30000) throw new Error('Too much context');
+            previous_drafts = JSON.parse(raw);
+            if (!Array.isArray(previous_drafts) || previous_drafts.length > 45) throw new Error('Invalid context');
+        } catch {
+            return fail(400, { case_draft_error: 'Invalid prior-draft checkpoint context.' });
+        }
+        const payload = {
+            organization_name: String(form.get('organization_name') ?? '').trim(),
+            framework_name: String(form.get('framework_name') ?? '').trim(),
+            problem: String(form.get('problem') ?? '').trim(),
+            activity_number: Number(form.get('activity_number')),
+            draft_index: Number(form.get('draft_index')),
+            source_digest: String(form.get('source_digest') ?? ''),
+            requirement_reference: String(form.get('requirement_reference') ?? '').trim(),
+            previous_drafts,
+            focus_attempt: Number(form.get('focus_attempt') ?? 0)
+        };
+        if (payload.organization_name.length < 2 || payload.organization_name.length > 150 ||
+            payload.framework_name.length < 2 || payload.framework_name.length > 150 ||
+            payload.problem.length < 20 || payload.problem.length > 4000 ||
+            !Number.isInteger(payload.activity_number) || payload.activity_number < 1 || payload.activity_number > 16 ||
+            !Number.isInteger(payload.draft_index) || payload.draft_index < 1 || payload.draft_index > 12 ||
+            !/^[0-9a-f]{64}$/.test(payload.source_digest) ||
+            payload.requirement_reference.length > 100 ||
+            !Number.isInteger(payload.focus_attempt) || payload.focus_attempt < 0 || payload.focus_attempt > 30) {
+            return fail(400, { case_draft_error: 'Invalid case scope, framework digest or draft index.' });
+        }
+        try {
+            const response = await fetchAiOnboardingBackend(event, '/ai/workforce/assistant/case-draft/quality-one/', payload);
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) return fail(response.status, { case_draft_error:
+                `${backendMessage(data)} ${typeof data.failure_reason === 'string' ? '(' + data.failure_reason.slice(0, 80) + ')' : ''}` });
+            if (data.business_records_written !== false || data.quality_contract_checked !== true ||
+                data.activity_number !== payload.activity_number ||
+                data.source_digest !== payload.source_digest ||
+                data.draft?.draft_reference !== `draft-${String(payload.activity_number).padStart(2, '0')}-${String(payload.draft_index).padStart(2, '0')}`) {
+                return fail(502, { case_draft_error: 'SICO could not verify the new quality-gated draft.' });
+            }
+            return { quality_draft_one: data };
+        } catch {
+            return fail(502, { case_draft_error: 'One Qwen request failed. Previous drafts stay in your checkpoint.' });
+        }
+    },
     run: async (event) => {
         if (!hasAiOnboardingSession(event)) {
             return fail(401, { error: backendMessage(AI_ONBOARDING_SESSION_EXPIRED) });

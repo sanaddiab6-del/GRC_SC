@@ -1,6 +1,7 @@
 <!-- SICO-CLEAR-REPORT-V2: no nested JSON in primary report -->
 <script lang="ts">
     import { enhance, deserialize, applyAction } from '$app/forms';
+    import { onMount } from 'svelte';
     import type { ActionData } from './$types';
     import {
         applyFrameworkBatch, validateCheckpoint, scopeKey,
@@ -114,56 +115,196 @@
         return JSON.stringify([organization.trim(), frameworkSearch.trim(), instruction.trim()]);
     }
 
+    // One Qwen record per request: the same proven approach as the HTML runner.
+    // No server-side GRC case/asset/risk writers are ever called by this path.
+    const generationOrder = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+    let qualityDrafts = $state<Record<string, any>[]>([]);
+    let qualityIssues = $state<string[]>([]);
+    let loadedOlderCheckpoint = $state(false);
+    let targetDraftsPerActivity = $state(1);
+    let currentGeneratingActivity = $state(0);
+    let localCheckpointInfo = $state('');
+    // Fixed first pass: one substantive draft in each of the 13 AI work areas.
+    // Framework, scope and setup are displayed separately as source-backed
+    // scaffolds; they MUST NOT be counted as AI generated or assessed.
+    const firstPassTarget = generationOrder.length;
+    onMount(() => {
+        // Same-tab recovery only. Nothing is stored in SICO business tables.
+        try {
+            const raw = sessionStorage.getItem('sico-ai-quality-draft-v7');
+            if (!raw) return;
+            const cp = JSON.parse(raw);
+            if (cp?.schema !== 'sico-authenticated-quality-drafts-v7' || !Array.isArray(cp.items)) return;
+            if (cp.items.length > 200 || cp.items.some((r: any) => !r?.draft?.draft_reference)) return;
+            organization = String(cp.scope?.organization ?? '').slice(0, 150);
+            frameworkSearch = String(cp.scope?.framework ?? '').slice(0, 150);
+            instruction = String(cp.scope?.objective ?? '').slice(0, 4000);
+            if (organization.length < 2 || frameworkSearch.length < 2 || instruction.length < 20) return;
+            qualityDrafts = cp.items;
+            qualityIssues = Array.isArray(cp.issues) ? cp.issues.slice(-30) : [];
+            targetDraftsPerActivity = Math.max(1, Math.min(12, ...generationOrder.map(step =>
+                cp.items.filter((r: any) => r.activity_number === step).length)));
+            draftedCaseScope = qualityScopeKey();
+            localCheckpointInfo = 'Recovered drafts from this browser tab. Load framework access again before resuming.';
+        } catch { /* A corrupt or unavailable tab checkpoint is ignored. */ }
+    });
+
+    function qualityScopeKey() {
+        return JSON.stringify([organization.trim(), frameworkSearch.trim(), instruction.trim()]);
+    }
+    function checkpointPayload() {
+        return {
+            schema: 'sico-authenticated-quality-drafts-v7',
+            scope: { organization: organization.trim(), framework: frameworkSearch.trim(), objective: instruction.trim() },
+            source: authorizedFrameworkSource,
+            items: qualityDrafts,
+            target_per_activity: targetDraftsPerActivity,
+            issues: qualityIssues,
+            business_records_written: false,
+            full_framework_assessed: false,
+            saved_in_browser_only: true
+        };
+    }
+    function saveLocalDraftCheckpoint() {
+        try {
+            // sessionStorage keeps this draft in the current browser session;
+            // users can download a JSON checkpoint for longer-term storage.
+            sessionStorage.setItem('sico-ai-quality-draft-v7', JSON.stringify(checkpointPayload()));
+            localCheckpointInfo = 'Progress saved in this browser session. Download a checkpoint to resume another day.';
+        } catch { localCheckpointInfo = 'Browser storage is unavailable; download a checkpoint before leaving.'; }
+    }
+    function downloadQualityCheckpoint() {
+        const url = URL.createObjectURL(new Blob([JSON.stringify(checkpointPayload(), null, 2)], { type: 'application/json' }));
+        try { const link = document.createElement('a'); link.href=url; link.download='SICO-AI-quality-case-checkpoint.json'; link.click(); }
+        finally { URL.revokeObjectURL(url); }
+    }
+    async function importQualityCheckpoint(event: Event) {
+        const input = event.currentTarget as HTMLInputElement;
+        const file = input.files?.[0];
+        if (!file || draftedCaseBusy) return;
+        try {
+            if (file.size > 3000000) throw new Error('Checkpoint file is too large.');
+            const parsed = JSON.parse(await file.text());
+            let items: Record<string, any>[];
+            if (parsed?.schema === 'sico-authenticated-quality-drafts-v7' && Array.isArray(parsed?.items)) {
+                if (parsed?.scope?.organization !== organization.trim() ||
+                    parsed?.scope?.framework !== frameworkSearch.trim() ||
+                    parsed?.scope?.objective !== instruction.trim()) {
+                    throw new Error('The checkpoint belongs to different case inputs. Use those original inputs first.');
+                }
+                items = parsed.items;
+            } else if (String(parsed?.schema ?? '').startsWith('sico-quality') && Array.isArray(parsed?.generated_items)) {
+                // Existing HTML-runner v5 checkpoint: show it here without
+                // claiming imported draft content passed this v7 generation.
+                if (parsed.organization !== organization.trim() || parsed.framework !== frameworkSearch.trim())
+                    throw new Error('HTML checkpoint organization/framework do not match the form.');
+                items = parsed.generated_items.map((item: any) => ({ ...item, provenance: 'imported_html_review_required' }));
+                loadedOlderCheckpoint = true;
+            } else {
+                throw new Error('Unsupported checkpoint. Select a SICO quality generator JSON checkpoint.');
+            }
+            if (items.length > 200 || items.some((r: any) =>
+                !/^draft-(?:0[1-9]|1[0-6])-(?:0[1-9]|1[0-2])$/.test(r?.draft?.draft_reference ?? '') ||
+                !r?.draft?.title || !r?.draft?.record_type || !r?.activity_number)) {
+                throw new Error('Checkpoint contains invalid draft references or content.');
+            }
+            if (new Set(items.map((r: any) => r.draft.draft_reference)).size !== items.length)
+                throw new Error('Checkpoint contains duplicate draft references.');
+            qualityDrafts = items;
+            targetDraftsPerActivity = parsed?.schema === 'sico-authenticated-quality-drafts-v7'
+                ? Math.max(1, Math.min(12, Number(parsed.target_per_activity) || 1))
+                : Math.max(1, Math.min(12, ...generationOrder.map(step => items.filter(r => r.activity_number === step).length)));
+            qualityIssues = [];
+            draftedCaseScope = qualityScopeKey();
+            draftedCaseStages = [];
+            draftedCaseNotice = `Loaded ${items.length} unsaved drafts. Imported records require review.`;
+            draftedCaseError = '';
+            saveLocalDraftCheckpoint();
+        } catch (error) { draftedCaseError = error instanceof Error ? error.message : 'Checkpoint could not be loaded.'; }
+        finally { input.value = ''; }
+    }
+    function nextQualitySlot(): { step: number, index: number } | null {
+        for (const step of generationOrder) {
+            const existing = qualityDrafts.filter((r) => r.activity_number === step);
+            if (existing.length < targetDraftsPerActivity) {
+                const used = new Set(existing.map(r => r.draft.draft_reference));
+                for (let index = 1; index <= targetDraftsPerActivity; index++) {
+                    if (!used.has(`draft-${String(step).padStart(2, '0')}-${String(index).padStart(2, '0')}`))
+                        return { step, index };
+                }
+            }
+        }
+        return null;
+    }
     async function generateNewCaseDrafts(restart = false) {
         if (draftedCaseBusy) return;
         if (organization.trim().length < 2 || frameworkSearch.trim().length < 2 || instruction.trim().length < 20) {
-            draftedCaseError = 'Enter organization, framework and a detailed assessment objective.';
+            draftedCaseError = 'Enter organization, exact framework and assessment objective.';
             return;
         }
         if (restart) {
-            draftedCaseStages = [];
-            draftedCaseScope = draftScopeKey();
-            authorizedFrameworkSource = null;
-            authorizedSourceRows = [];
-            frameworkSourceSummary = '';
-        } else if (draftedCaseScope !== draftScopeKey()) {
-            draftedCaseError = 'Inputs have changed. Start a new draft; existing drafts remain visible until then.';
+            qualityDrafts = []; qualityIssues = []; loadedOlderCheckpoint = false; targetDraftsPerActivity = 1;
+            draftedCaseStages = []; draftedCaseScope = qualityScopeKey();
+            authorizedFrameworkSource = null; authorizedSourceRows = []; frameworkSourceSummary = '';
+        } else if (draftedCaseScope !== qualityScopeKey()) {
+            draftedCaseError = 'The three inputs changed. Restore original inputs or start a new draft case.';
             return;
         }
-        draftedCaseBusy = true;
-        draftedCaseError = '';
-        draftedCaseNotice = '';
-        stopAfterPhase = false;
+        draftedCaseBusy = true; draftedCaseError=''; draftedCaseNotice=''; stopAfterPhase=false;
         try {
-            // Full read-only requirement catalog is obtained using the *logged-in*
-            // SICO user, not a CLI service account or user-supplied database IDs.
             if (!authorizedFrameworkSource) await loadSicoAuthorizedFrameworkSource();
-            for (let phase = Math.floor(draftedCaseStages.length / 4); phase < 4; phase += 1) {
-                if (stopAfterPhase || draftScopeKey() !== draftedCaseScope) break;
-                const response = await sicoPostAction('case_draft_phase', {
-                    organization_name: organization.trim(),
-                    framework_name: frameworkSearch.trim(),
-                    problem: instruction.trim(),
-                    phase: String(phase)
-                });
-                const batch = (response.data as Record<string, any>)?.case_draft_phase;
-                if (!batch || batch.generated_by_model !== true || batch.business_records_written !== false ||
-                    batch.phase !== phase || !Array.isArray(batch.activities) || batch.activities.length !== 4 ||
-                    batch.activities.some((stage: any, index: number) =>
-                        stage.activity_number !== phase * 4 + index + 1 || !stage.drafts?.length)) {
-                    throw new Error('The Qwen draft batch was invalid. Nothing was appended.');
+            while (!stopAfterPhase && qualityScopeKey() === draftedCaseScope) {
+                const slot = nextQualitySlot();
+                if (!slot) { draftedCaseNotice = 'First pass complete. Review the drafts; framework assessment is not complete.'; break; }
+                currentGeneratingActivity = slot.step;
+                const dependencyMap: Record<number, number[]> = {
+                    4: [2, 3], 5: [4], 6: [4, 5], 7: [3, 4, 6], 8: [2, 7],
+                    9: [3, 4, 7], 10: [1, 3, 7, 9], 11: [9, 10], 12: [6, 7, 11],
+                    13: [7, 9, 12], 14: [3, 10, 11, 13], 15: [6, 12, 14], 16: [3, 6, 10, 11, 12, 15]
+                };
+                const allowedActivities = new Set([slot.step, ...(dependencyMap[slot.step] ?? [])]);
+                const previous = qualityDrafts.filter((r) => allowedActivities.has(r.activity_number) &&
+                    r?.draft?.status === 'new_unsaved_ai_draft_pending_verification').slice(-45).map((r) => ({
+                    draft_reference: r.draft.draft_reference,
+                    title: r.draft.title,
+                    record_type: r.draft.record_type,
+                    content: String(r.draft.content || '').slice(0, 220)
+                }));
+                // Only a source-backed SICO reference is selected; the backend
+                // independently rechecks authorization before using it.
+                const chosenRef = slot.step === 10 ? String(authorizedSourceRows[(slot.index - 1) % authorizedSourceRows.length]?.reference ?? '') : '';
+                let succeeded = false;
+                let lastMessage = '';
+                for (let attempt = 0; attempt < 3 && !succeeded && !stopAfterPhase; attempt++) {
+                    try {
+                        const response = await sicoPostAction('quality_draft_one', {
+                            organization_name: organization.trim(), framework_name: frameworkSearch.trim(),
+                            problem: instruction.trim(), activity_number: String(slot.step),
+                            draft_index: String(slot.index), source_digest: String(authorizedFrameworkSource?.source_digest ?? ''),
+                            requirement_reference: chosenRef, previous_drafts: JSON.stringify(previous),
+                            focus_attempt: String(attempt)
+                        });
+                        const item = (response.data as Record<string, any>)?.quality_draft_one;
+                        if (!item || item.quality_contract_checked !== true || item.business_records_written !== false ||
+                            item.activity_number !== slot.step || !item.draft?.draft_reference ||
+                            item.draft.draft_reference !== `draft-${String(slot.step).padStart(2, '0')}-${String(slot.index).padStart(2, '0')}`) {
+                            throw new Error('Qwen returned an invalid record; previous drafts are preserved.');
+                        }
+                        qualityDrafts = [...qualityDrafts, item]; succeeded = true;
+                        draftedCaseNotice = `Generated ${qualityDrafts.filter(r => r.provenance === 'qwen_quality_single_authenticated_v7').length} new quality-checked drafts. Source: ${authorizedSourceRows.length} authorized requirements. No records saved.`;
+                        saveLocalDraftCheckpoint();
+                    } catch (error) { lastMessage = error instanceof Error ? error.message : 'Qwen request failed.'; }
                 }
-                if (draftScopeKey() !== draftedCaseScope) {
-                    throw new Error('Inputs changed while Qwen was drafting. Earlier batches are preserved.');
+                if (!succeeded) {
+                    qualityIssues = [...qualityIssues, `Activity ${slot.step}: ${lastMessage}`];
+                    saveLocalDraftCheckpoint();
+                    draftedCaseError = `Activity ${slot.step} did not pass validation after retries. You can resume without losing earlier drafts.`;
+                    break;
                 }
-                draftedCaseStages = [...draftedCaseStages, ...batch.activities];
-                draftedCaseNotice = `Qwen drafted ${draftedCaseStages.length}/16 connected activities. Nothing has been saved.`;
             }
         } catch (error) {
-            draftedCaseError = error instanceof Error ? error.message : 'Qwen draft generation failed. Earlier stages remain available.';
-        } finally {
-            draftedCaseBusy = false;
-        }
+            draftedCaseError = error instanceof Error ? error.message : 'Generation failed; previous drafts remain.';
+        } finally { draftedCaseBusy = false; currentGeneratingActivity = 0; saveLocalDraftCheckpoint(); }
     }
 
     function downloadAuthorizedRequirementSource() {
@@ -792,62 +933,67 @@
                 <label>3. GRC case objective
                     <textarea name="problem" bind:value={instruction} disabled={draftedCaseBusy} required minlength="20" maxlength="4000" rows="4" placeholder="Create a complete new GRC case with proposed assets, controls, risks, policy drafts, evidence requests, remediation and reports."></textarea>
                 </label>
-                {#if draftedCaseStages.length === 0}
+                {#if qualityDrafts.length === 0}
                     <button type="submit" disabled={draftedCaseBusy || instruction.trim().length < 20 || !organization.trim() || !frameworkSearch.trim()}>
-                        {draftedCaseBusy ? 'Generating new GRC drafts with Qwen…' : 'Build GRC case with AI'}
+                        {draftedCaseBusy ? 'Qwen is generating new GRC drafts…' : 'Build GRC case with AI'}
                     </button>
-                    {#if frameworkSourceSummary}
-                        <p class="source-note">{frameworkSourceSummary} — library text only; compliance not assessed.</p>
-                        {#if authorizedFrameworkSource?.complete_source_snapshot}
-                            <button type="button" onclick={downloadAuthorizedRequirementSource}>Download authorized framework source</button>
-                        {/if}
-                    {/if}
                 {/if}
+                <label class="checkpoint-upload">Already have results from the HTML generator? Load your checkpoint JSON to view them here.
+                    <input type="file" accept=".json,application/json" disabled={draftedCaseBusy} onchange={(event) => { void importQualityCheckpoint(event); }} />
+                </label>
             </form>
             {#if draftedCaseError}<p class="message error" role="alert">{draftedCaseError}</p>{/if}
             {#if draftedCaseNotice}<p class="message" role="status">{draftedCaseNotice}</p>{/if}
-            {#if draftedCaseBusy || draftedCaseStages.length > 0}
-                <div class="framework-coverage">
+            {#if draftedCaseBusy || qualityDrafts.length > 0 || authorizedFrameworkSource}
+                <div class="framework-coverage" aria-label="New SICO GRC case draft results">
                     <div class="framework-coverage-title">
-                        <h3>New GRC case drafts — {draftedCaseStages.length} of 16 activities</h3>
-                        <span class="footnote">Not saved · No verified findings</span>
+                        <h3>Generated GRC case drafts — {qualityDrafts.filter(r => r.provenance === 'qwen_quality_single_authenticated_v7').length} new Qwen records</h3>
+                        <span class="footnote">No records saved · No compliance verdict</span>
                     </div>
-                    <div class="framework-meter"><div class="framework-meter-fill" style={`width: ${Math.round(draftedCaseStages.length / 16 * 100)}%`}></div></div>
-                    <p class="footnote">Each activity produces concrete new unsaved draft records mapped to SICO modules. Linked stages refer to the same draft case, but no existing database IDs are invented.</p>
+                    <p class="source-note">{frameworkSourceSummary || 'Framework catalog not loaded yet.'}</p>
+                    <p class="footnote">Framework, assessment charter and business scope are inputs to confirm, not model-generated assessment results.</p>
+                    <div class="framework-meter"><div class="framework-meter-fill" style={`width: ${Math.round(generationOrder.filter(n => qualityDrafts.some(r => r.activity_number === n)).length / firstPassTarget * 100)}%`}></div></div>
+                    <p class="footnote">First-pass areas with drafts: {generationOrder.filter(n => qualityDrafts.some(r => r.activity_number === n)).length}/{firstPassTarget}. These are not the framework's 106 requirement reviews.</p>
                     <div class="framework-actions">
                         {#if draftedCaseBusy}
-                            <button type="button" onclick={() => { stopAfterPhase = true; }}>Stop after current batch</button>
-                        {:else if draftedCaseStages.length < 16}
-                            <button type="button" onclick={() => void generateNewCaseDrafts(false)}>Continue generating drafts</button>
+                            <span class="footnote">Qwen is drafting activity {currentGeneratingActivity}/16, one record per request.</span>
+                            <button type="button" onclick={() => { stopAfterPhase = true; }}>Pause after current request</button>
+                        {:else}
+                            {#if generationOrder.some(n => !qualityDrafts.some(r => r.activity_number === n))}
+                                <button type="button" onclick={() => void generateNewCaseDrafts(false)}>Resume automatic generation</button>
+                            {/if}
+                            <button type="button" onclick={() => void generateNewCaseDrafts(true)}>Start a new case</button>
                         {/if}
-                        {#if draftedCaseStages.length > 0}
-                            <button type="button" onclick={downloadCaseDraft}>Download generated GRC case draft</button>
-                            {#if !draftedCaseBusy}<button type="button" onclick={() => void generateNewCaseDrafts(true)}>Start a new draft case</button>{/if}
+                        {#if qualityDrafts.length}
+                            <button type="button" onclick={downloadQualityCheckpoint}>Download checkpoint</button>
+                            {#if !draftedCaseBusy && generationOrder.every(n => qualityDrafts.filter(r => r.activity_number === n).length >= targetDraftsPerActivity) && targetDraftsPerActivity < 12}
+                                <button type="button" onclick={() => { targetDraftsPerActivity += 1; saveLocalDraftCheckpoint(); void generateNewCaseDrafts(false); }}>Generate more across all activities</button>
+                            {/if}
+                        {/if}
+                        {#if authorizedFrameworkSource?.complete_source_snapshot}
+                            <button type="button" onclick={downloadAuthorizedRequirementSource}>Download framework requirements</button>
                         {/if}
                     </div>
-                    {#each draftedCaseStages as stage (stage.activity_number)}
-                        <article class="report-card">
-                            <h3>{stage.activity_number}. {stage.activity_name}</h3>
-                            <p class="footnote">SICO module: {stage.target_existing_sico_model} · Existing writer: {stage.existing_reviewed_write_stage ?? 'not yet integrated'} · Depends on activities {stage.depends_on_activity_numbers.join(', ') || 'none'}</p>
-                            {#each stage.drafts as draft (draft.draft_reference)}
-                                <div class="sico-case-draft">
-                                    <h4>{draft.title} <span class="footnote">({draft.draft_reference})</span></h4>
-                                    <p>{draft.content}</p>
-                                    <dl>
-                                        {#each draft.proposed_attributes as attr}
-                                            <div><dt>{attr.field}</dt><dd>{attr.proposed_value}</dd></div>
-                                        {/each}
-                                    </dl>
-                                    <p><strong>Evidence to obtain:</strong> {draft.evidence_request}</p>
-                                    <p><strong>Question to confirm:</strong> {draft.verification_question}</p>
-                                    <p class="footnote">Proposed NEW unsaved draft. Not proof of a real asset, vulnerability, approval, audit or compliance.</p>
-                                </div>
-                            {/each}
+                    {#if localCheckpointInfo}<p class="footnote">{localCheckpointInfo}</p>{/if}
+                    {#if qualityIssues.length}<p class="footnote">Failed attempts: {qualityIssues.length}. Last: {qualityIssues[qualityIssues.length-1]}</p>{/if}
+                    {#each qualityDrafts as item (item.draft.draft_reference)}
+                        <article class="sico-case-draft">
+                            <h4>{item.draft.title} <span class="footnote">{item.draft.draft_reference}</span></h4>
+                            <p class="footnote">Activity {item.activity_number}: {item.activity_name} · SICO module: {item.target_existing_sico_model} · {item.provenance === 'qwen_quality_single_authenticated_v7' ? 'New, validated Qwen proposal' : 'Imported: review required'}</p>
+                            <p>{item.draft.content}</p>
+                            <dl>
+                                {#each item.draft.proposed_attributes ?? [] as attr}
+                                    <div><dt>{attr.field}</dt><dd>{attr.proposed_value}</dd></div>
+                                {/each}
+                            </dl>
+                            <p><strong>Evidence to request:</strong> {item.draft.evidence_request}</p>
+                            <p><strong>Verification question:</strong> {item.draft.verification_question}</p>
+                            {#if item.draft.related_draft_references?.length}
+                                <p><strong>Draft links:</strong> {item.draft.related_draft_references.join(', ')}</p>
+                            {/if}
+                            <p class="footnote">Hypothetical, unsaved. Not verified organization data or proof of compliance.</p>
                         </article>
                     {/each}
-                    {#if draftedCaseStages.length === 16}
-                        <p class="message" role="status">All 16 activities have generated draft proposals. Download and review them. Actual SICO record creation and evidence verification are intentionally deferred.</p>
-                    {/if}
                 </div>
             {/if}
             <p class="footnote">Qwen drafts new proposals using the existing SICO provider and maps them to reviewed GRC models/services. Original SICO writers are NOT called until independently validated and approved in a later phase.</p>
