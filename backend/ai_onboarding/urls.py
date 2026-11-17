@@ -308,3 +308,8 @@ urlpatterns += [
 from .sico_ai_case_draft_views import SicoCaseDraftPhaseView
 urlpatterns += [path('workforce/assistant/case-draft/phase/', SicoCaseDraftPhaseView.as_view(),
                     name='sico-case-draft-phase')]
+
+# Authorized framework requirements for the existing SICO AI workflow. Read-only; RBAC rechecked on every page.
+from .authorized_framework_source import AuthorizedFrameworkSourcePageView
+urlpatterns += [path("workforce/assistant/framework-source/page/", AuthorizedFrameworkSourcePageView.as_view(),
+                    name="sico-ai-framework-source-page")]

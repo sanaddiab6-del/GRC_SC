@@ -113,7 +113,7 @@ def _draft_scope_id(organization, framework, objective):
         ensure_ascii=False, separators=(',', ':')).encode('utf-8')).hexdigest()
 
 
-def _model_drafts(selection, *, organization, framework, objective, phase, library_match=None):
+def _model_drafts(selection, *, organization, framework, objective, phase, library_match=None, authorized_source_rows=()):
     if selection.provider is None:
         raise ValueError('Qwen provider is unavailable')
     activities = DRAFT_ACTIVITIES[phase * BATCH_COUNT:(phase + 1) * BATCH_COUNT]
@@ -125,6 +125,7 @@ def _model_drafts(selection, *, organization, framework, objective, phase, libra
             'organization_USER_INPUT_UNVERIFIED': organization,
             'framework_USER_INPUT_EDITION_NOT_VERIFIED': framework,
             'authorized_sico_library_match_NOT_OFFICIAL_EDITION_VERIFICATION': library_match or {'status': 'not_checked'},
+            'authorized_SICO_requirement_excerpts_NOT_FULL_FRAMEWORK_COVERAGE': list(authorized_source_rows),
             'objective_USER_INPUT_UNVERIFIED': objective,
             'activity_artifact_contracts': [{
                 'step': phase * BATCH_COUNT + index + 1,
@@ -182,14 +183,18 @@ def _wrap_proposals(rows, *, phase):
     return result
 
 
-def generate_case_draft_phase(selection, *, organization, framework, objective, phase, library_match=None):
+def generate_case_draft_phase(selection, *, organization, framework, objective, phase, library_match=None, authorized_source_rows=(), accessible_requirement_count=0):
     if type(phase) is not int or not 0 <= phase <= 3:
         raise ValueError('invalid phase')
-    rows = _model_drafts(selection, organization=organization, framework=framework, objective=objective, phase=phase, library_match=library_match)
+    rows = _model_drafts(selection, organization=organization, framework=framework, objective=objective, phase=phase, library_match=library_match, authorized_source_rows=authorized_source_rows)
     return {
         'phase': phase,
         'scope_digest': _draft_scope_id(organization, framework, objective),
         'framework_library_match': library_match or {'status': 'not_checked'},
+        'source_grounding': {'authorized_assessable_total': accessible_requirement_count,
+                             'source_excerpt_count_supplied_to_qwen': len(authorized_source_rows),
+                             'full_framework_assessed': False,
+                             'framework_edition_independently_verified': False},
         'activities': _wrap_proposals(rows, phase=phase),
         'generated_by_model': True, 'business_records_written': False,
         'is_final_compliance_verdict': False,
@@ -212,6 +217,7 @@ class SicoCaseDraftPhaseView(APIView):
         values = form.validated_data
         # The framework is optional for DRAFTING a new case, but when it exists,
         # reuse the ORIGINAL permission-filtered SICO lookup, not a guessed ID.
+        from .sico_ai_framework_batch_v3 import _load_authorized_requirements, _page_and_digest
         from .sico_ai_lifecycle_views import _framework_candidates
         matches = _framework_candidates(request.user, values['framework_name'])
         if len(matches) == 1:
@@ -222,13 +228,23 @@ class SicoCaseDraftPhaseView(APIView):
         else:
             library_match = {'status': 'multiple_authorized_matches_requires_selection' if matches else
                              'no_exact_authorized_match_framework_label_unverified'}
+        # Explicitly tie Qwen grounding to *the current request user's* SICO
+        # RequirementNode RBAC filter. Never take source text/IDs from the client.
+        source_rows = []
+        accessible_total = 0
+        if len(matches) == 1:
+            source_meta, permitted = _load_authorized_requirements(request.user, values['framework_name'])
+            if source_meta.get('status') == 'matched':
+                source_rows, accessible_total, _ = _page_and_digest(
+                    permitted, start=0, batch_size=3)
         try:
             config = resolve_advisory_capability_config(CAPABILITY_GRC_CAPABILITY_SELECTION)
             selection = get_advisory_provider_selection(config)
             result = generate_case_draft_phase(selection,
                 organization=values['organization_name'],
                 framework=values['framework_name'],
-                objective=values['problem'], phase=values['phase'], library_match=library_match)
+                objective=values['problem'], phase=values['phase'], library_match=library_match,
+                authorized_source_rows=source_rows, accessible_requirement_count=accessible_total)
         except (AiProviderError, JsonSchemaError, ValueError, TimeoutError, TypeError, KeyError):
             return Response({
                 'detail': 'Qwen did not return a validated structured case-draft batch. No placeholder artifacts were substituted.',

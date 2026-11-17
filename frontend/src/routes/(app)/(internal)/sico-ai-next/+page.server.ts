@@ -20,6 +20,32 @@ function backendMessage(value: unknown): string {
 }
 
 export const actions = {
+    // Uses the logged-in SICO user and existing RBAC-filtered RequirementNode catalog.
+    framework_source_page: async (event) => {
+        if (!hasAiOnboardingSession(event)) return fail(401, { source_error: 'Sign in again.' });
+        const form = await event.request.formData();
+        const framework_name = String(form.get('framework_name') ?? '').trim();
+        const cursor = String(form.get('cursor') ?? '');
+        if (framework_name.length < 2 || framework_name.length > 150 || cursor.length > 2048) {
+            return fail(400, { source_error: 'Provide the exact authorized framework.' });
+        }
+        try {
+            const response = await fetchAiOnboardingBackend(
+                event, '/ai/workforce/assistant/framework-source/page/',
+                { framework_name, page_size: 25, cursor }
+            );
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) return fail(response.status, { source_error: backendMessage(data) });
+            if (data.business_records_written !== false || !Array.isArray(data.requirements) ||
+                typeof data.coverage?.accessible_total !== 'number' ||
+                typeof data.coverage?.complete !== 'boolean') {
+                return fail(502, { source_error: 'The authorized framework catalog response was invalid.' });
+            }
+            return { framework_source_page: data };
+        } catch {
+            return fail(502, { source_error: 'Could not reach the authorized framework catalog.' });
+        }
+    },
     // Creation-first: generate NEW unsaved, structured GRC drafts through SICO Qwen.
     case_draft_phase: async (event) => {
         if (!hasAiOnboardingSession(event)) return fail(401, { case_draft_error: 'Sign in again.' });

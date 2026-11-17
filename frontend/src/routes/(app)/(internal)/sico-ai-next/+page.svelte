@@ -51,6 +51,64 @@
     let draftedCaseError = $state('');
     let draftedCaseNotice = $state('');
     let stopAfterPhase = $state(false);
+    let authorizedFrameworkSource = $state<Record<string, any> | null>(null);
+    let authorizedSourceRows = $state<Record<string, any>[]>([]);
+    let frameworkSourceSummary = $state('');
+
+    async function loadSicoAuthorizedFrameworkSource() {
+        let cursor = '';
+        let sourceDigest = '';
+        let selectedFrameworkId = '';
+        const rows: Record<string, any>[] = [];
+        for (let page = 0; page < 200; page++) {
+            const response = await sicoPostAction('framework_source_page', {
+                framework_name: frameworkSearch.trim(), cursor
+            });
+            const part = (response.data as Record<string, any>)?.framework_source_page;
+            if (!part) throw new Error('No authorized framework source was returned.');
+            if (part.status !== 'partial' && part.status !== 'complete') {
+                const candidates = Array.isArray(part.candidates) ? part.candidates.join(', ') : '';
+                throw new Error('The exact selected framework could not be resolved using your SICO permissions.' + (candidates ? ` Authorized matches: ${candidates}` : ''));
+            }
+            if (!part.framework_id || !part.source_digest || !Array.isArray(part.requirements)) {
+                throw new Error('Framework catalog did not include verified SICO source identifiers.');
+            }
+            if (sourceDigest && sourceDigest !== part.source_digest) {
+                throw new Error('Framework library changed during retrieval; restart the draft.');
+            }
+            if (selectedFrameworkId && selectedFrameworkId !== part.framework_id) {
+                throw new Error('The resolved framework changed during retrieval.');
+            }
+            sourceDigest = part.source_digest;
+            selectedFrameworkId = part.framework_id;
+            rows.push(...part.requirements);
+            frameworkSourceSummary = `SICO authorized framework: ${rows.length}/${part.coverage.accessible_total} requirements loaded`;
+            if (part.status === 'complete') {
+                if (part.coverage.accessible_total === 0) {
+                    throw new Error('The selected SICO framework has no requirements readable to this user.');
+                }
+                if (!part.coverage.complete || rows.length !== part.coverage.accessible_total) {
+                    throw new Error('Framework source count mismatch. No coverage can be claimed.');
+                }
+                authorizedSourceRows = rows;
+                authorizedFrameworkSource = {
+                    framework_id: selectedFrameworkId,
+                    matched_framework: part.matched_framework,
+                    source_digest: sourceDigest,
+                    accessible_total: rows.length,
+                    complete_source_snapshot: true,
+                    edition_independently_verified: false
+                };
+                return;
+            }
+            if (!part.next_cursor || part.next_cursor === cursor) {
+                throw new Error('Framework source pagination did not advance.');
+            }
+            cursor = part.next_cursor;
+        }
+        throw new Error('Framework source is too large to load safely in one run.');
+    }
+
 
     function draftScopeKey() {
         return JSON.stringify([organization.trim(), frameworkSearch.trim(), instruction.trim()]);
@@ -65,6 +123,9 @@
         if (restart) {
             draftedCaseStages = [];
             draftedCaseScope = draftScopeKey();
+            authorizedFrameworkSource = null;
+            authorizedSourceRows = [];
+            frameworkSourceSummary = '';
         } else if (draftedCaseScope !== draftScopeKey()) {
             draftedCaseError = 'Inputs have changed. Start a new draft; existing drafts remain visible until then.';
             return;
@@ -74,6 +135,9 @@
         draftedCaseNotice = '';
         stopAfterPhase = false;
         try {
+            // Full read-only requirement catalog is obtained using the *logged-in*
+            // SICO user, not a CLI service account or user-supplied database IDs.
+            if (!authorizedFrameworkSource) await loadSicoAuthorizedFrameworkSource();
             for (let phase = Math.floor(draftedCaseStages.length / 4); phase < 4; phase += 1) {
                 if (stopAfterPhase || draftScopeKey() !== draftedCaseScope) break;
                 const response = await sicoPostAction('case_draft_phase', {
@@ -102,12 +166,33 @@
         }
     }
 
+    function downloadAuthorizedRequirementSource() {
+        if (!authorizedFrameworkSource?.complete_source_snapshot || !authorizedSourceRows.length) return;
+        const payload = {
+            schema: 'sico-user-exported-authorized-framework-requirements-v1',
+            source_status: 'read_from_SICO_under_current_logged_in_user',
+            source: authorizedFrameworkSource,
+            requirements: authorizedSourceRows,
+            official_edition_independently_verified: false,
+            compliance_assessment_completed: false,
+            business_records_written: false
+        };
+        const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }));
+        try {
+            const a = document.createElement('a');
+            a.href = url; a.download = 'SICO-authorized-framework-source-READ-ONLY.json'; a.click();
+        } finally { URL.revokeObjectURL(url); }
+    }
+
     function downloadCaseDraft() {
         if (!draftedCaseStages.length) return;
         const caseDraft = {
             schema: 'sico-unsaved-case-drafts-v1', organization_name: organization.trim(),
             framework_name: frameworkSearch.trim(), objective: instruction.trim(),
             generated_activity_count: draftedCaseStages.length,
+            authorized_framework_source: authorizedFrameworkSource,
+            authorized_requirements: authorizedFrameworkSource?.complete_source_snapshot ? authorizedSourceRows : [],
+            authorized_requirements_not_compliance_verdict: true,
             business_records_written: false,
             note: 'Unverified hypothetical drafts. No GRC database records created.',
             activities: draftedCaseStages
@@ -711,6 +796,12 @@
                     <button type="submit" disabled={draftedCaseBusy || instruction.trim().length < 20 || !organization.trim() || !frameworkSearch.trim()}>
                         {draftedCaseBusy ? 'Generating new GRC drafts with Qwen…' : 'Build GRC case with AI'}
                     </button>
+                    {#if frameworkSourceSummary}
+                        <p class="source-note">{frameworkSourceSummary} — library text only; compliance not assessed.</p>
+                        {#if authorizedFrameworkSource?.complete_source_snapshot}
+                            <button type="button" onclick={downloadAuthorizedRequirementSource}>Download authorized framework source</button>
+                        {/if}
+                    {/if}
                 {/if}
             </form>
             {#if draftedCaseError}<p class="message error" role="alert">{draftedCaseError}</p>{/if}
