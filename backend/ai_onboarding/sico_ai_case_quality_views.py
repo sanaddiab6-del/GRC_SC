@@ -130,7 +130,25 @@ class SicoQualityDraftOneView(APIView):
             )
         except (AiProviderError, JsonSchemaError, ValueError, TimeoutError, TypeError, KeyError) as exc:
             # No secret provider URLs or sensitive prompts in the response.
-            reason = str(exc)[:80] if isinstance(exc, ValueError) else 'model_or_provider_error'
+            if isinstance(exc, AiProviderError):
+                # Keep provider URLs, payloads, prompts and secrets out of responses.
+                # AiProviderError.detail is sanitized; only use it to identify a timeout.
+                if (exc.error_code == 'ai_provider_request_failed' and
+                        'timed out' in exc.detail.casefold()):
+                    reason = 'provider_timeout'
+                else:
+                    reason = (exc.error_code if re.fullmatch(r'[a-z][a-z0-9_]{1,63}', exc.error_code or '')
+                              else 'provider_failure')
+            elif isinstance(exc, TimeoutError):
+                reason = 'provider_timeout'
+            elif isinstance(exc, JsonSchemaError):
+                reason = 'invalid_schema'
+            elif isinstance(exc, ValueError):
+                value_code = str(exc)
+                reason = (value_code if re.fullmatch(r'[a-z][a-z0-9_]{1,63}', value_code)
+                          else 'invalid_draft_value')
+            else:
+                reason = 'draft_processing_error'
             return Response({'detail': 'One Qwen draft was rejected; previous drafts are retained.',
                              'failure_reason': reason, 'business_records_written': False}, status=503)
         result.update({

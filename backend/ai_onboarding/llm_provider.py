@@ -382,6 +382,12 @@ def _build_ollama_prompt(
             "Use short text. Do not include ids, asset ids, status fields, actions, source_summary, provider_mode, duplicate_candidates, warnings, or blocking_questions.",
             "Do not include compliance_result, final_result, result, risk_acceptance, risk_decision, audit_closure, close_audit, status, evidence, finding, vulnerability, remediation, risk_scenario, create_now, or auto_create.",
         ]
+    elif schema_name == "sico_library_anchored_framework_review_v1":
+        # Ollama already receives the strict schema in `format`. Do not repeat it
+        # inside the prompt for this Qwen draft pathway: less input to process.
+        instruction["output_contract"]["response_shape"] = (
+            "One results item containing one drafts item; follow the constrained JSON format."
+        )
     else:
         instruction["output_contract"]["json_schema"] = json_schema
 
