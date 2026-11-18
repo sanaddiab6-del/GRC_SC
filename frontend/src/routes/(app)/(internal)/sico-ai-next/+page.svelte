@@ -288,12 +288,12 @@
                         if (!item || item.quality_contract_checked !== true || item.business_records_written !== false ||
                             item.activity_number !== slot.step || !item.draft?.draft_reference ||
                             item.draft.draft_reference !== `draft-${String(slot.step).padStart(2, '0')}-${String(slot.index).padStart(2, '0')}`) {
-                            throw new Error('Qwen returned an invalid record; previous drafts are preserved.');
+                            throw new Error('The generated draft failed validation; previous drafts are preserved.');
                         }
                         qualityDrafts = [...qualityDrafts, item]; succeeded = true;
                         draftedCaseNotice = `Generated ${qualityDrafts.filter(r => r.provenance === 'qwen_quality_single_authenticated_v7').length} new quality-checked drafts. Source: ${authorizedSourceRows.length} authorized requirements. No records saved.`;
                         saveLocalDraftCheckpoint();
-                    } catch (error) { lastMessage = error instanceof Error ? error.message : 'Qwen request failed.'; }
+                    } catch (error) { lastMessage = error instanceof Error ? error.message : 'Draft generation request failed.'; }
                 }
                 if (!succeeded) {
                     qualityIssues = [...qualityIssues, `Activity ${slot.step}: ${lastMessage}`];
@@ -440,7 +440,7 @@
                 fullReviewNotice = 'Batch completed. Continue when ready, or export a checkpoint.';
             }
         } catch (error) {
-            fullReviewError = error instanceof Error ? error.message : 'The current Qwen batch failed. Earlier reviews are preserved.';
+            fullReviewError = error instanceof Error ? error.message : 'The current generation batch failed. Earlier reviews are preserved.';
         } finally {
             fullReviewBusy = false;
             fullReviewAutomatic = false;
@@ -538,12 +538,12 @@
                 lifecycleProposal = result;
                 stageConfirmed = false;
                 lifecycleApproval = null;
-                stageNotice = `Qwen prepared the ${result.stage} operation using SICO's original GRC service. Nothing has been saved yet.`;
+                stageNotice = `The ${result.stage} operation is prepared using SICO's existing GRC service. Nothing has been saved yet.`;
             } else {
                 stageError = String(result.reason ?? result.questions?.join(' ') ?? 'More information or permission is needed before a new record can be prepared.');
             }
         } catch (err) {
-            stageError = err instanceof Error ? err.message : 'Qwen could not prepare this GRC stage.';
+            stageError = err instanceof Error ? err.message : 'The GRC stage could not be prepared.';
         } finally {
             stageBusy = false;
         }
@@ -692,7 +692,7 @@
                 throw new Error('The audit record could not be independently verified as saved.');
             }
             controlProgress = result.progress;
-            controlNotice = 'Qwen generated a control-specific review, saved it in the existing audit, and SICO read it back.';
+            controlNotice = 'A control-specific review was generated and retrieved through SICO.';
         } catch (error) {
             controlError = error instanceof Error ? error.message : 'Control review could not be saved.';
         } finally {
@@ -743,12 +743,12 @@
                 if (!result || result.activity_number !== number ||
                     !result.activity || result.activity.number !== number ||
                     typeof result.activity.analysis !== 'string') {
-                    throw new Error(`Activity ${number} returned an invalid Qwen result.`);
+                    throw new Error(`Activity ${number} returned an invalid draft result.`);
                 }
                 generatedSixteen = [...generatedSixteen, result.activity];
             }
         } catch (err) {
-            sixteenError = err instanceof Error ? err.message : 'Local Qwen generation stopped unexpectedly.';
+            sixteenError = err instanceof Error ? err.message : 'Draft generation stopped unexpectedly.';
         }
         // This phase is GENERATION ONLY by user request. Never try to create,
         // approve or save an audit or tenant after finishing the 16 drafts.
@@ -835,6 +835,23 @@
         if (!s || /^[\[{]/.test(s) || s.length > 650 || /\"[a-z_]+\"\s*:/.test(s)) return '';
         return s;
     }
+    // Presentation only: preserve the original keys and values in checkpoint JSON.
+    // Turns labels like asset_type / owner_role / linkedRiskReference into readable text.
+    function displayFieldLabel(raw: unknown): string {
+        const label = String(raw ?? '')
+            .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+            .replace(/[_-]+/g, ' ')
+            .replace(/\s*\/\s*/g, ' / ')
+            .replace(/\s+/g, ' ')
+            .trim();
+        const abbreviations = new Set(['AI', 'API', 'CSF', 'CVSS', 'GRC', 'ID', 'IP', 'ISO', 'IT', 'MFA', 'NCA', 'PDPL', 'RBAC', 'RPO', 'RTO', 'SICO', 'SOC', 'URL']);
+        return label.split(' ').map(part => {
+            if (!part || part === '/') return part;
+            const upper = part.toUpperCase();
+            return abbreviations.has(upper) ? upper : part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+        }).join(' ');
+    }
+
     function itemLabel(v: unknown): string {
         if (!isObject(v)) return '';
         for (const k of ['name', 'title', 'ref_id', 'label']) {
@@ -906,7 +923,7 @@
 
 <svelte:head>
     <title>SICO AI Next — Assessment Workspace</title>
-    <meta name="description" content="Create new GRC cases and linked records with Qwen through original SICO services and approval." />
+    <meta name="description" content="Generate structured, reviewable GRC case drafts using the existing SICO workspace." />
 </svelte:head>
 
 <div class="workspace">
@@ -922,23 +939,23 @@
                 <h2>Build a GRC case</h2>
                 <span class="status-pill">One workflow · Your existing SICO GRC library</span>
             </div>
-            <p class="report-intro">Enter just three inputs. Qwen will generate NEW structured draft assets, risks, controls, policies, evidence requests, tasks and reporting work, mapped to the existing SICO modules across 16 activities. Draft generation never saves records or asserts compliance.</p>
+            <p class="report-intro">Enter three details to generate structured GRC case drafts across SICO’s 16 activities, including proposed assets, risks, controls, policies, evidence requests, tasks and reports. Drafts remain unsaved and do not establish compliance.</p>
             <form class="workflow-form" onsubmit={(event) => { event.preventDefault(); void generateNewCaseDrafts(true); }}>
                 <label>1. Organization
                     <input name="organization_name" bind:value={organization} disabled={draftedCaseBusy} required minlength="2" maxlength="150" placeholder="Organization name (new or existing)" />
                 </label>
                 <label>2. Framework
-                    <input name="framework_name" bind:value={frameworkSearch} disabled={draftedCaseBusy} required minlength="2" maxlength="150" placeholder="ISO/IEC 27001:2022, NCA ECC, CCC, PDPL, etc." />
+                    <input name="framework_name" bind:value={frameworkSearch} disabled={draftedCaseBusy} required minlength="2" maxlength="150" placeholder="Enter the exact framework name from SICO’s library" />
                 </label>
                 <label>3. GRC case objective
                     <textarea name="problem" bind:value={instruction} disabled={draftedCaseBusy} required minlength="20" maxlength="4000" rows="4" placeholder="Create a complete new GRC case with proposed assets, controls, risks, policy drafts, evidence requests, remediation and reports."></textarea>
                 </label>
                 {#if qualityDrafts.length === 0}
                     <button type="submit" disabled={draftedCaseBusy || instruction.trim().length < 20 || !organization.trim() || !frameworkSearch.trim()}>
-                        {draftedCaseBusy ? 'Qwen is generating new GRC drafts…' : 'Build GRC case with AI'}
+                        {draftedCaseBusy ? 'Generating GRC case drafts…' : 'Build GRC case with AI'}
                     </button>
                 {/if}
-                <label class="checkpoint-upload">Already have results from the HTML generator? Load your checkpoint JSON to view them here.
+                <label class="checkpoint-upload">Restore an earlier draft session from a JSON checkpoint
                     <input type="file" accept=".json,application/json" disabled={draftedCaseBusy} onchange={(event) => { void importQualityCheckpoint(event); }} />
                 </label>
             </form>
@@ -947,16 +964,16 @@
             {#if draftedCaseBusy || qualityDrafts.length > 0 || authorizedFrameworkSource}
                 <div class="framework-coverage" aria-label="New SICO GRC case draft results">
                     <div class="framework-coverage-title">
-                        <h3>Generated GRC case drafts — {qualityDrafts.filter(r => r.provenance === 'qwen_quality_single_authenticated_v7').length} new Qwen records</h3>
+                        <h3>Generated GRC case drafts — {qualityDrafts.filter(r => r.provenance === 'qwen_quality_single_authenticated_v7').length} new AI-generated drafts</h3>
                         <span class="footnote">No records saved · No compliance verdict</span>
                     </div>
                     <p class="source-note">{frameworkSourceSummary || 'Framework catalog not loaded yet.'}</p>
                     <p class="footnote">Framework, assessment charter and business scope are inputs to confirm, not model-generated assessment results.</p>
                     <div class="framework-meter"><div class="framework-meter-fill" style={`width: ${Math.round(generationOrder.filter(n => qualityDrafts.some(r => r.activity_number === n)).length / firstPassTarget * 100)}%`}></div></div>
-                    <p class="footnote">First-pass areas with drafts: {generationOrder.filter(n => qualityDrafts.some(r => r.activity_number === n)).length}/{firstPassTarget}. These are not the framework's 106 requirement reviews.</p>
+                    <p class="footnote">First-pass areas with drafts: {generationOrder.filter(n => qualityDrafts.some(r => r.activity_number === n)).length}/{firstPassTarget}. This does not indicate framework requirement coverage.</p>
                     <div class="framework-actions">
                         {#if draftedCaseBusy}
-                            <span class="footnote">Qwen is drafting activity {currentGeneratingActivity}/16, one record per request.</span>
+                            <span class="footnote">Generating activity {currentGeneratingActivity} of 16 · Reviewing each draft individually.</span>
                             <button type="button" onclick={() => { stopAfterPhase = true; }}>Pause after current request</button>
                         {:else}
                             {#if generationOrder.some(n => !qualityDrafts.some(r => r.activity_number === n))}
@@ -979,26 +996,26 @@
                     {#each qualityDrafts as item (item.draft.draft_reference)}
                         <article class="sico-case-draft">
                             <h4>{item.draft.title} <span class="footnote">{item.draft.draft_reference}</span></h4>
-                            <p class="footnote">Activity {item.activity_number}: {item.activity_name} · SICO module: {item.target_existing_sico_model} · {item.provenance === 'qwen_quality_single_authenticated_v7' ? 'New, validated Qwen proposal' : 'Imported: review required'}</p>
+                            <p class="footnote">Activity {item.activity_number}: {item.activity_name} · SICO Module: {displayFieldLabel(item.target_existing_sico_model)} · {item.provenance === 'qwen_quality_single_authenticated_v7' ? 'AI-generated draft · Pending verification' : 'Imported draft · Review required'}</p>
                             <p>{item.draft.content}</p>
                             <dl>
                                 {#each item.draft.proposed_attributes ?? [] as attr}
-                                    <div><dt>{attr.field}</dt><dd>{attr.proposed_value}</dd></div>
+                                    <div><dt>{displayFieldLabel(attr.field)}</dt><dd>{attr.proposed_value}</dd></div>
                                 {/each}
                             </dl>
-                            <p><strong>Evidence to request:</strong> {item.draft.evidence_request}</p>
-                            <p><strong>Verification question:</strong> {item.draft.verification_question}</p>
+                            <p><strong>Evidence to Request:</strong> {item.draft.evidence_request}</p>
+                            <p><strong>Verification Question:</strong> {item.draft.verification_question}</p>
                             {#if item.draft.related_draft_references?.length}
-                                <p><strong>Draft links:</strong> {item.draft.related_draft_references.join(', ')}</p>
+                                <p><strong>Related Drafts:</strong> {item.draft.related_draft_references.join(', ')}</p>
                             {/if}
                             <p class="footnote">Hypothetical, unsaved. Not verified organization data or proof of compliance.</p>
                         </article>
                     {/each}
                 </div>
             {/if}
-            <p class="footnote">Qwen drafts new proposals using the existing SICO provider and maps them to reviewed GRC models/services. Original SICO writers are NOT called until independently validated and approved in a later phase.</p>
+            <p class="footnote">These are proposed drafts structured around existing SICO GRC models. They have not been verified against the organization or saved as business records.</p>
         </section>
-        <footer>SICO AI · One Build a GRC case workflow · Qwen generates NEW unsaved GRC drafts across 16 activities · No database writes.</footer>
+        <footer>SICO AI · One case-building workflow · AI-generated GRC drafts across 16 activities · No database writes.</footer>
     </div>
 </div>
 
@@ -1028,5 +1045,22 @@
     .sico-case-draft p{line-height:1.65;color:#c4d8e6}
     .sico-case-draft dl{display:grid;gap:8px;margin:12px 0}
     .sico-case-draft dl div{display:grid;grid-template-columns:minmax(120px,32%) 1fr;gap:10px;border-bottom:1px solid #254052;padding-bottom:7px}
-    .sico-case-draft dt{color:#93bece;font-weight:700}.sico-case-draft dd{margin:0;color:#e5f0f4;overflow-wrap:anywhere}
+    .sico-case-draft dt{color:#93bece;font-weight:700}
+    .sico-case-draft dd{margin:0;color:#e5f0f4;overflow-wrap:anywhere}
+    /* SICO AI Next: display-only refinement. No generation, storage or API changes. */
+    .report-intro{max-width:82ch;font-size:15px;line-height:1.8;color:#c1d4e0}
+    .report-head h2{font-size:clamp(25px,3vw,32px);letter-spacing:-.025em}
+    .workflow-form{padding:20px;gap:15px}
+    .workflow-form label{font-weight:650;line-height:1.45}
+    .workflow-form input:focus-visible,.workflow-form textarea:focus-visible{outline:2px solid #78dfcc;outline-offset:2px}
+    .sico-case-draft{padding:20px 22px;margin:14px 0;background:#102139;border-color:#36536b;border-radius:12px;box-shadow:0 3px 10px #0002}
+    .sico-case-draft h4{font-size:16px;line-height:1.5;letter-spacing:-.01em;color:#80e6d2}
+    .sico-case-draft p{font-size:14px;line-height:1.7;margin:10px 0;color:#d0dfea;overflow-wrap:anywhere}
+    .sico-case-draft p strong{color:#e7f3f9}
+    .sico-case-draft dl{gap:0;margin:16px 0}
+    .sico-case-draft dl div{grid-template-columns:minmax(145px,32%) minmax(0,1fr);align-items:start;gap:14px;padding:9px 0;border-bottom:1px solid #29445a}
+    .sico-case-draft dt{color:#aecbdb;font-weight:700;font-size:13px;line-height:1.5}
+    .sico-case-draft dd{font-size:14px;line-height:1.55}
+    .sico-case-draft .footnote{line-height:1.6}
+    @media(max-width:600px){.workflow-form{padding:14px}.sico-case-draft{padding:15px}.sico-case-draft dl div{grid-template-columns:1fr;gap:3px;padding:10px 0}}
 </style>

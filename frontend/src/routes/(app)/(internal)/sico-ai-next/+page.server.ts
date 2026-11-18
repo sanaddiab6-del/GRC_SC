@@ -77,7 +77,7 @@ export const actions = {
             }
             return { case_draft_phase: data };
         } catch {
-            return fail(502, { case_draft_error: 'Could not reach the SICO Qwen case-draft generator.' });
+            return fail(502, { case_draft_error: 'Could not reach the SICO case-draft service.' });
         }
     },
     // Same one-record-at-a-time Qwen generation as the successful HTML runner.
@@ -127,7 +127,7 @@ export const actions = {
             }
             return { quality_draft_one: data };
         } catch {
-            return fail(502, { case_draft_error: 'One Qwen request failed. Previous drafts stay in your checkpoint.' });
+            return fail(502, { case_draft_error: 'One draft request failed. Previous drafts remain in your checkpoint.' });
         }
     },
     run: async (event) => {
@@ -289,11 +289,11 @@ export const actions = {
             if (data.generated_by_model !== true || data.activity_number !== payload.activity_number ||
                 data.activity?.number !== payload.activity_number ||
                 typeof data.activity.analysis !== 'string') {
-                return fail(502, { ai_sixteen_error: 'Qwen did not return the requested validated activity.' });
+                return fail(502, { ai_sixteen_error: 'The requested activity failed draft validation.' });
             }
             return { ai_sixteen_item: data };
         } catch {
-            return fail(502, { ai_sixteen_error: 'Qwen request could not finish. Previously generated activities remain visible.' });
+            return fail(502, { ai_sixteen_error: 'Draft generation could not finish. Previously generated activities remain visible.' });
         }
     },
     ai_sixteen_phase: async (event) => {
@@ -323,7 +323,7 @@ export const actions = {
             }
             return { ai_sixteen_phase: data };
         } catch {
-            return fail(502, { ai_sixteen_error: 'The Qwen generation request failed. Previously generated activities remain visible.' });
+            return fail(502, { ai_sixteen_error: 'The generation request failed. Previously generated activities remain visible.' });
         }
     },
     lifecycle_intake: async (event) => {
