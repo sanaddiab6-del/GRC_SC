@@ -124,6 +124,63 @@
     let targetDraftsPerActivity = $state(1);
     let currentGeneratingActivity = $state(0);
     let localCheckpointInfo = $state('');
+    // UX-only generation diagnostics: the API and stored draft schema remain unchanged.
+    type DraftAttempt = { activity: number; index: number; elapsed_seconds: number; outcome: 'accepted' | 'rejected'; detail: string };
+    let attemptHistory = $state<DraftAttempt[]>([]);
+    let nextAttemptBySlot = $state<Record<string, number>>({});
+    let lastAttemptInfo = $state('');
+
+    // Only block a clearly conflicting explicit framework name in the objective.
+    // An objective with no named framework, or multiple mentioned frameworks,
+    // remains legal (e.g., a genuine cross-framework comparison).
+    function frameworkNames(text: string): string[] {
+        const value = text.toLowerCase();
+        const detected: string[] = [];
+        const tests: [string, RegExp][] = [
+            ['NCA ECC', /\b(?:nca\s+)?ecc\b|essential cybersecurity controls/i],
+            ['NCA CCC', /\b(?:nca\s+)?ccc\b|cloud cybersecurity controls/i],
+            ['NIST CSF', /\bnist\s*(?:csf|cybersecurity framework)\b/i],
+            ['ISO 27001', /\b(?:iso\s*(?:\/\s*iec)?\s*)?27001\b/i],
+            ['CyberFundamentals', /cyber\s*fundamentals|\bcyfun\b/i],
+            ['PDPL', /\bpdpl\b/i],
+            ['SAMA CSF', /\bsama\s*(?:csf|cybersecurity framework)\b/i]
+        ];
+        for (const [label, pattern] of tests) if (pattern.test(value)) detected.push(label);
+        return detected;
+    }
+    function explicitFrameworkConflict(): string {
+        const selected = frameworkNames(frameworkSearch);
+        const requested = frameworkNames(instruction);
+        if (selected.length !== 1 || requested.length !== 1 || selected[0] === requested[0]) return '';
+        return `Framework mismatch: you selected ${frameworkSearch.trim()}, but the objective names ${requested[0]}. Correct the framework or objective before generating.`;
+    }
+    function slotAttemptKey(step: number, index: number) {
+        return `draft-${String(step).padStart(2, '0')}-${String(index).padStart(2, '0')}`;
+    }
+    function safeAttemptCounters(source: unknown): Record<string, number> {
+        const result: Record<string, number> = {};
+        if (!source || typeof source !== 'object' || Array.isArray(source)) return result;
+        for (const [key, value] of Object.entries(source)) {
+            if (/^draft-(?:0[1-9]|1[0-6])-(?:0[1-9]|1[0-2])$/.test(key) &&
+                Number.isInteger(value) && Number(value) >= 0 && Number(value) <= 30) result[key] = Number(value);
+        }
+        return result;
+    }
+    function safeAttemptHistory(source: unknown): DraftAttempt[] {
+        if (!Array.isArray(source)) return [];
+        return source.slice(-20).filter((entry: any) =>
+            Number.isInteger(entry?.activity) && entry.activity >= 1 && entry.activity <= 16 &&
+            Number.isInteger(entry?.index) && entry.index >= 1 && entry.index <= 12 &&
+            typeof entry?.elapsed_seconds === 'number' && entry.elapsed_seconds >= 0 && entry.elapsed_seconds < 3600 &&
+            (entry?.outcome === 'accepted' || entry?.outcome === 'rejected') && typeof entry?.detail === 'string'
+        ).map((entry: DraftAttempt) => ({ ...entry, detail: entry.detail.slice(0, 180) }));
+    }
+    function recordDraftAttempt(activity: number, index: number, elapsed_seconds: number,
+        outcome: 'accepted' | 'rejected', detail: string) {
+        const event = { activity, index, elapsed_seconds, outcome, detail: detail.slice(0, 180) };
+        attemptHistory = [...attemptHistory.slice(-19), event];
+        lastAttemptInfo = `Activity ${activity}, draft ${index}: ${outcome} after ${elapsed_seconds}s${outcome === 'rejected' ? ` · ${event.detail}` : ''}.`;
+    }
     // Fixed first pass: one substantive draft in each of the 13 AI work areas.
     // Framework, scope and setup are displayed separately as source-backed
     // scaffolds; they MUST NOT be counted as AI generated or assessed.
@@ -142,6 +199,9 @@
             if (organization.length < 2 || frameworkSearch.length < 2 || instruction.length < 20) return;
             qualityDrafts = cp.items;
             qualityIssues = Array.isArray(cp.issues) ? cp.issues.slice(-30) : [];
+            nextAttemptBySlot = safeAttemptCounters(cp.attempt_counters);
+            attemptHistory = safeAttemptHistory(cp.attempt_history);
+            if (attemptHistory.length) { const last = attemptHistory[attemptHistory.length - 1]; lastAttemptInfo = `Last request: activity ${last.activity}, ${last.outcome} after ${last.elapsed_seconds}s.`; }
             targetDraftsPerActivity = Math.max(1, Math.min(12, ...generationOrder.map(step =>
                 cp.items.filter((r: any) => r.activity_number === step).length)));
             draftedCaseScope = qualityScopeKey();
@@ -160,6 +220,8 @@
             items: qualityDrafts,
             target_per_activity: targetDraftsPerActivity,
             issues: qualityIssues,
+            attempt_counters: nextAttemptBySlot,
+            attempt_history: attemptHistory.slice(-20),
             business_records_written: false,
             full_framework_assessed: false,
             saved_in_browser_only: true
@@ -215,6 +277,12 @@
                 ? Math.max(1, Math.min(12, Number(parsed.target_per_activity) || 1))
                 : Math.max(1, Math.min(12, ...generationOrder.map(step => items.filter(r => r.activity_number === step).length)));
             qualityIssues = [];
+            nextAttemptBySlot = parsed?.schema === 'sico-authenticated-quality-drafts-v7'
+                ? safeAttemptCounters(parsed.attempt_counters) : {};
+            attemptHistory = parsed?.schema === 'sico-authenticated-quality-drafts-v7'
+                ? safeAttemptHistory(parsed.attempt_history) : [];
+            lastAttemptInfo = attemptHistory.length
+                ? `Previous request: ${attemptHistory[attemptHistory.length - 1].outcome} after ${attemptHistory[attemptHistory.length - 1].elapsed_seconds}s.` : '';
             draftedCaseScope = qualityScopeKey();
             draftedCaseStages = [];
             draftedCaseNotice = `Loaded ${items.length} unsaved drafts. Imported records require review.`;
@@ -242,8 +310,11 @@
             draftedCaseError = 'Enter organization, exact framework and assessment objective.';
             return;
         }
+        const frameworkConflict = explicitFrameworkConflict();
+        if (frameworkConflict) { draftedCaseError = frameworkConflict; return; }
         if (restart) {
             qualityDrafts = []; qualityIssues = []; loadedOlderCheckpoint = false; targetDraftsPerActivity = 1;
+            nextAttemptBySlot = {}; attemptHistory = []; lastAttemptInfo = '';
             draftedCaseStages = []; draftedCaseScope = qualityScopeKey();
             authorizedFrameworkSource = null; authorizedSourceRows = []; frameworkSourceSummary = '';
         } else if (draftedCaseScope !== qualityScopeKey()) {
@@ -273,32 +344,40 @@
                 // Only a source-backed SICO reference is selected; the backend
                 // independently rechecks authorization before using it.
                 const chosenRef = slot.step === 10 ? String(authorizedSourceRows[(slot.index - 1) % authorizedSourceRows.length]?.reference ?? '') : '';
-                let succeeded = false;
-                let lastMessage = '';
-                for (let attempt = 0; attempt < 3 && !succeeded && !stopAfterPhase; attempt++) {
-                    try {
-                        const response = await sicoPostAction('quality_draft_one', {
-                            organization_name: organization.trim(), framework_name: frameworkSearch.trim(),
-                            problem: instruction.trim(), activity_number: String(slot.step),
-                            draft_index: String(slot.index), source_digest: String(authorizedFrameworkSource?.source_digest ?? ''),
-                            requirement_reference: chosenRef, previous_drafts: JSON.stringify(previous),
-                            focus_attempt: String(attempt)
-                        });
-                        const item = (response.data as Record<string, any>)?.quality_draft_one;
-                        if (!item || item.quality_contract_checked !== true || item.business_records_written !== false ||
-                            item.activity_number !== slot.step || !item.draft?.draft_reference ||
-                            item.draft.draft_reference !== `draft-${String(slot.step).padStart(2, '0')}-${String(slot.index).padStart(2, '0')}`) {
-                            throw new Error('The generated draft failed validation; previous drafts are preserved.');
-                        }
-                        qualityDrafts = [...qualityDrafts, item]; succeeded = true;
-                        draftedCaseNotice = `Generated ${qualityDrafts.filter(r => r.provenance === 'qwen_quality_single_authenticated_v7').length} new quality-checked drafts. Source: ${authorizedSourceRows.length} authorized requirements. No records saved.`;
-                        saveLocalDraftCheckpoint();
-                    } catch (error) { lastMessage = error instanceof Error ? error.message : 'Draft generation request failed.'; }
-                }
-                if (!succeeded) {
-                    qualityIssues = [...qualityIssues, `Activity ${slot.step}: ${lastMessage}`];
+                const key = slotAttemptKey(slot.step, slot.index);
+                // Only one model request per activity slot per run. A rejected
+                // response is visible immediately; Resume rotates the focus.
+                const attempt = Math.min(30, nextAttemptBySlot[key] ?? 0);
+                const started = Date.now();
+                draftedCaseNotice = `Generating activity ${slot.step} of 16, draft ${slot.index}. One request at a time; accepted drafts are preserved.`;
+                try {
+                    const response = await sicoPostAction('quality_draft_one', {
+                        organization_name: organization.trim(), framework_name: frameworkSearch.trim(),
+                        problem: instruction.trim(), activity_number: String(slot.step),
+                        draft_index: String(slot.index), source_digest: String(authorizedFrameworkSource?.source_digest ?? ''),
+                        requirement_reference: chosenRef, previous_drafts: JSON.stringify(previous),
+                        focus_attempt: String(attempt)
+                    });
+                    const item = (response.data as Record<string, any>)?.quality_draft_one;
+                    if (!item || item.quality_contract_checked !== true || item.business_records_written !== false ||
+                        item.activity_number !== slot.step || !item.draft?.draft_reference ||
+                        item.draft.draft_reference !== key) {
+                        throw new Error('The generated draft failed validation; previous drafts are preserved.');
+                    }
+                    const elapsed = Math.round((Date.now() - started) / 1000);
+                    nextAttemptBySlot = { ...nextAttemptBySlot, [key]: Math.min(30, attempt + 1) };
+                    recordDraftAttempt(slot.step, slot.index, elapsed, 'accepted', 'Draft validated');
+                    qualityDrafts = [...qualityDrafts, item];
+                    draftedCaseNotice = `Generated ${qualityDrafts.filter(r => r.provenance === 'qwen_quality_single_authenticated_v7').length} new quality-checked drafts. Last request: ${elapsed}s. Source: ${authorizedSourceRows.length} authorized requirements. No records saved.`;
                     saveLocalDraftCheckpoint();
-                    draftedCaseError = `Activity ${slot.step} did not pass validation after retries. You can resume without losing earlier drafts.`;
+                } catch (error) {
+                    const elapsed = Math.round((Date.now() - started) / 1000);
+                    const message = error instanceof Error ? error.message : 'Draft generation request failed.';
+                    nextAttemptBySlot = { ...nextAttemptBySlot, [key]: Math.min(30, attempt + 1) };
+                    recordDraftAttempt(slot.step, slot.index, elapsed, 'rejected', message);
+                    qualityIssues = [...qualityIssues.slice(-29), `Activity ${slot.step}: ${message} (${elapsed}s)`];
+                    draftedCaseError = `Activity ${slot.step} was not accepted after ${elapsed}s. ${message} The next Resume will try a different focus; previous drafts are preserved.`;
+                    saveLocalDraftCheckpoint();
                     break;
                 }
             }
@@ -951,9 +1030,13 @@
                     <textarea name="problem" bind:value={instruction} disabled={draftedCaseBusy} required minlength="20" maxlength="4000" rows="4" placeholder="Create a complete new GRC case with proposed assets, controls, risks, policy drafts, evidence requests, remediation and reports."></textarea>
                 </label>
                 {#if qualityDrafts.length === 0}
-                    <button type="submit" disabled={draftedCaseBusy || instruction.trim().length < 20 || !organization.trim() || !frameworkSearch.trim()}>
-                        {draftedCaseBusy ? 'Generating GRC case drafts…' : 'Build GRC case with AI'}
-                    </button>
+                    {#if !draftedCaseBusy && qualityIssues.length && draftedCaseScope === qualityScopeKey()}
+                        <button type="button" onclick={() => void generateNewCaseDrafts(false)}>Resume failed draft with a different focus</button>
+                    {:else}
+                        <button type="submit" disabled={draftedCaseBusy || instruction.trim().length < 20 || !organization.trim() || !frameworkSearch.trim()}>
+                            {draftedCaseBusy ? 'Generating GRC case drafts…' : 'Build GRC case with AI'}
+                        </button>
+                    {/if}
                 {/if}
                 <label class="checkpoint-upload">Restore an earlier draft session from a JSON checkpoint
                     <input type="file" accept=".json,application/json" disabled={draftedCaseBusy} onchange={(event) => { void importQualityCheckpoint(event); }} />
@@ -991,6 +1074,17 @@
                             <button type="button" onclick={downloadAuthorizedRequirementSource}>Download framework requirements</button>
                         {/if}
                     </div>
+                    {#if lastAttemptInfo}<p class="footnote" role="status">{lastAttemptInfo}</p>{/if}
+                    {#if attemptHistory.length}
+                        <details class="generation-timing">
+                            <summary>Generation request history ({attemptHistory.length} most recent)</summary>
+                            <ul>
+                                {#each [...attemptHistory].reverse() as attempt}
+                                    <li>Activity {attempt.activity}, draft {attempt.index}: {attempt.outcome === 'accepted' ? 'Accepted' : 'Rejected'} · {attempt.elapsed_seconds}s · {attempt.detail}</li>
+                                {/each}
+                            </ul>
+                        </details>
+                    {/if}
                     {#if localCheckpointInfo}<p class="footnote">{localCheckpointInfo}</p>{/if}
                     {#if qualityIssues.length}<p class="footnote">Failed attempts: {qualityIssues.length}. Last: {qualityIssues[qualityIssues.length-1]}</p>{/if}
                     {#each qualityDrafts as item (item.draft.draft_reference)}
