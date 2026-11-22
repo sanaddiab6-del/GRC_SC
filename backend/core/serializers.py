@@ -3907,6 +3907,59 @@ class ValidationFlowReadSerializer(BaseModelSerializer):
         return linked
 
 
+class WorkflowCaseApprovalStepReadSerializer(BaseModelSerializer):
+    folder = FieldsRelatedField()
+    workflow_case = FieldsRelatedField()
+    approver = FieldsRelatedField()
+
+    class Meta:
+        model = WorkflowCaseApprovalStep
+        fields = "__all__"
+
+
+class WorkflowCaseWriteSerializer(BaseModelSerializer):
+    def _check_closure(self, instance):
+        if instance.status in (
+            WorkflowCase.Status.CLOSED,
+            WorkflowCase.Status.CLOSED_WITH_MONITORING,
+        ):
+            can_close, missing = instance.can_close()
+            if not can_close:
+                raise serializers.ValidationError(
+                    {"missing_closure_requirements": missing}
+                )
+
+    @transaction.atomic
+    def create(self, validated_data):
+        instance = super().create(validated_data)
+        self._check_closure(instance)
+        return instance
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        instance = super().update(instance, validated_data)
+        self._check_closure(instance)
+        return instance
+
+    class Meta:
+        model = WorkflowCase
+        fields = "__all__"
+        read_only_fields = [
+            "is_published",
+            "closed_at",
+            "residual_risk_reassessed_at",
+            "residual_risk_reassessed_by",
+        ]
+
+
+class WorkflowCaseReadSerializer(WorkflowCaseWriteSerializer):
+    folder = FieldsRelatedField()
+    residual_risk_reassessed_by = FieldsRelatedField()
+    approval_state = serializers.CharField(read_only=True)
+    remediation_completion = serializers.IntegerField(read_only=True)
+    approval_steps = WorkflowCaseApprovalStepReadSerializer(many=True, read_only=True)
+
+
 class ComplianceAssessmentEvidenceSerializer(BaseModelSerializer):
     """Serializer for evidences in the context of compliance assessments"""
 

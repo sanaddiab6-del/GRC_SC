@@ -19,6 +19,7 @@ import json
 from typing import Any
 from uuid import UUID
 
+from django.conf import settings
 from django.db import transaction
 from django.http import Http404
 from rest_framework.exceptions import ValidationError
@@ -148,7 +149,7 @@ def _result_is_blocked(value, mode):
 
 
 def execute_stage(request, engagement_id, *, stage, batch_key, mode,
-                  payload, explicitly_approved=False):
+                  payload, explicitly_approved=False, trusted_case_setup_workflow=False):
     """Atomic dry-run receipt + approved commit through the existing GRC service.
 
     Dry-run changes inside the existing service are rolled back while the prepared
@@ -164,10 +165,20 @@ def execute_stage(request, engagement_id, *, stage, batch_key, mode,
     # Keep all SICO engagement commits disabled until the server verifies
     # a separately recorded approval for the exact prepared operation.
     if mode == 'commit':
-        raise EngagementBlocked(
-            'SICO AI engagement commits require independently verified human approval.',
-            http_status=403,
-        )
+        # A review of ONE case must not open the other ten (or future) writers.
+        case_enabled = (stage == 'case_setup' and trusted_case_setup_workflow is True
+                        and getattr(settings, 'SICO_CASE_SETUP_COMMITS_ENABLED', False) is True)
+        reviewed_other_stages = getattr(settings, 'SICO_ENGAGEMENT_COMMIT_STAGE_ALLOWLIST', ())
+        other_enabled = (trusted_case_setup_workflow is False
+                         and stage != 'case_setup'
+                         and getattr(settings, 'SICO_ENGAGEMENT_COMMITS_ENABLED', False) is True
+                         and isinstance(reviewed_other_stages, (tuple, list, frozenset))
+                         and stage in reviewed_other_stages)
+        if not (case_enabled or other_enabled):
+            raise EngagementBlocked(
+                'This GRC writer is disabled until separately reviewed and approved.',
+                http_status=403,
+            )
     if payload.get('dry_run') is not (mode == 'dry_run'):
         raise EngagementBlocked('The existing service dry_run must agree with the operation mode.', http_status=400)
     if mode == 'dry_run' and explicitly_approved:
@@ -202,6 +213,13 @@ def execute_stage(request, engagement_id, *, stage, batch_key, mode,
             if _result_is_blocked(receipt.prepared_result, 'dry_run'):
                 raise EngagementBlocked('The dry-run is blocked and cannot be committed.')
 
+            # Only the authenticated user who approved this prepared receipt may commit.
+            if receipt.approved_by_id != str(user.pk):
+                raise EngagementBlocked(
+                    'Server-recorded approval is required before saving.',
+                    http_status=403,
+                )
+
         handler = _resolve_attribute(STAGES_BY_NAME[stage].service)
         if mode == 'dry_run':
             # Save ONLY a receipt; rollback even accidental changes made by an
@@ -217,6 +235,26 @@ def execute_stage(request, engagement_id, *, stage, batch_key, mode,
         if _result_is_blocked(result, mode):
             raise EngagementBlocked('The existing GRC service blocked this operation.', http_status=422)
 
+        if mode == 'dry_run':
+            # Preserve the exact validated business operation for human review.
+            # Do not change the existing handler response fields.
+            if not isinstance(result, dict) or '_sico_review' in result:
+                raise EngagementBlocked(
+                    'This operation cannot produce a safe review preview.',
+                    http_status=422,
+                )
+
+            from .engagement_rules import _canonical
+            result = dict(result)
+            result['_sico_review'] = {
+                'engagement_id': str(engagement.pk),
+                'folder_id': str(engagement.folder_id),
+                'stage': stage,
+                'batch_key': batch_key,
+                'operation_payload': _canonical(validated),
+                'prepared_digest': digest,
+            }
+
         if receipt is None:
             receipt = EngagementExecution(
                 engagement=engagement, stage=stage, batch_key=batch_key,
@@ -225,6 +263,7 @@ def execute_stage(request, engagement_id, *, stage, batch_key, mode,
             receipt.status = EngagementExecution.Status.PREPARED
             receipt.prepared_digest = digest
             receipt.prepared_result = result
+            receipt.approved_by_id = ''  # A new preparation revokes earlier approval.
             # Repeat dry-run invalidates an earlier preparation, never a commit.
         else:
             receipt.status = EngagementExecution.Status.COMMITTED

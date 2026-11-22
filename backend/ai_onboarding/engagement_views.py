@@ -6,6 +6,7 @@ unchanged and continue to work for manual users.
 from __future__ import annotations
 
 import re
+from django.conf import settings
 from django.http import Http404
 from rest_framework import permissions, serializers, status
 from rest_framework.response import Response
@@ -119,7 +120,7 @@ class AiEngagementOperationView(APIView):
         # SICO AI engagement commits require independent, server-recorded
         # human authorization. Caller-supplied approval flags are not proof.
         # Keep preparation available while that workflow is implemented.
-        if args['mode'] == 'commit':
+        if args['mode'] == 'commit' and not getattr(settings, 'SICO_ENGAGEMENT_COMMITS_ENABLED', False):
             return Response(
                 {
                     'detail': (

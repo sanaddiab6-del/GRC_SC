@@ -18,7 +18,7 @@ from .llm_provider import get_advisory_provider_selection
 from .llm_errors import AiProviderError
 from .sico_ai_case_draft_views import DRAFT_ACTIVITIES
 from .sico_ai_framework_batch_v3 import _load_authorized_requirements, _page_and_digest
-from .quality_sico_drafts_v5 import generate_quality_draft
+from .quality_sico_drafts_v5 import CONTRACTS, generate_quality_draft
 
 # Accept an intentionally small amount of untrusted case context. All drafts
 # are unsaved client-side objects and cannot grant access to SICO records.
@@ -149,8 +149,30 @@ class SicoQualityDraftOneView(APIView):
                           else 'invalid_draft_value')
             else:
                 reason = 'draft_processing_error'
-            return Response({'detail': 'One Qwen draft was rejected; previous drafts are retained.',
-                             'failure_reason': reason, 'business_records_written': False}, status=503)
+            failure = {'detail': 'One Qwen draft was rejected; previous drafts are retained.',
+                       'failure_reason': reason, 'business_records_written': False}
+            schema_error = exc if isinstance(exc, JsonSchemaError) else exc.__cause__
+            if isinstance(schema_error, JsonSchemaError):
+                # Identify the failed contract without exposing generated
+                # values, prompts, provider URLs or arbitrary property names.
+                names = {'results', 'drafts', 'attributes', 'title', 'content',
+                         'evidence_request', 'verification_question', 'related_draft_references',
+                         *CONTRACTS[code][1]}
+                names.update({'field', 'proposed_value'})
+                failure['validation_failure'] = {
+                    'path': [part if isinstance(part, int) or part in names else '[field]'
+                             for part in list(schema_error.absolute_path)[:8]],
+                    'rule': schema_error.validator,
+                }
+                # The Svelte action displays only detail, not validation_failure.
+                # This path is allowlisted and contains no generated values.
+                path = '/'.join(str(part) for part in failure['validation_failure']['path']) or '$'
+                rule = schema_error.validator if schema_error.validator in {
+                    'type', 'required', 'minLength', 'maxLength', 'pattern', 'enum',
+                    'minItems', 'maxItems', 'additionalProperties'
+                } else 'validation'
+                failure['detail'] += f' Schema validation: {path} ({rule}).'
+            return Response(failure, status=503)
         result.update({
             'framework_id': meta['framework_id'],
             'source_digest': digest,
