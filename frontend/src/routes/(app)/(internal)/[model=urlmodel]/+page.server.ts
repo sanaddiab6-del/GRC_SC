@@ -1,4 +1,10 @@
 import { defaultDeleteFormAction, defaultWriteFormAction } from '$lib/utils/actions';
+import { AI_ONBOARDING_ACTION_ENDPOINTS } from '$lib/utils/aiOnboardingActions';
+import {
+	AI_ONBOARDING_SESSION_EXPIRED,
+	fetchAiOnboardingBackend,
+	hasAiOnboardingSession
+} from '$lib/utils/aiOnboardingProxy';
 import { BASE_API_URL } from '$lib/utils/constants';
 import {
 	getModelInfo,
@@ -15,6 +21,60 @@ import type { PageServerLoad } from './$types';
 import { setFlash } from 'sveltekit-flash-message/server';
 import { m } from '$paraglide/messages';
 import { safeTranslate } from '$lib/utils/i18n';
+import type { RequestEvent } from '@sveltejs/kit';
+
+async function readAiPayload(event: RequestEvent) {
+	const contentType = event.request.headers.get('content-type')?.toLowerCase() ?? '';
+
+	if (contentType.includes('application/json')) {
+		try {
+			return await event.request.json();
+		} catch {
+			return null;
+		}
+	}
+
+	if (
+		contentType.includes('application/x-www-form-urlencoded') ||
+		contentType.includes('multipart/form-data')
+	) {
+		try {
+			const formData = await event.request.formData();
+			const rawPayload = formData.get('payload');
+			if (typeof rawPayload !== 'string' || !rawPayload.trim()) return null;
+			return JSON.parse(rawPayload);
+		} catch {
+			return null;
+		}
+	}
+
+	return null;
+}
+
+async function readResponseBody(response: Response) {
+	const text = await response.text();
+	if (!text) return null;
+	try {
+		return JSON.parse(text);
+	} catch {
+		return { detail: text };
+	}
+}
+
+async function proxyAiOnboardingAction(event: RequestEvent, endpoint: string) {
+	// Form actions do not run the (app) layout session guard, so refuse an unauthenticated
+	// caller here instead of proxying the request anonymously.
+	if (!hasAiOnboardingSession(event)) return fail(401, { aiError: AI_ONBOARDING_SESSION_EXPIRED });
+
+	const payload = await readAiPayload(event);
+	if (!payload) return fail(400, { aiError: { detail: 'Invalid AI request payload.' } });
+
+	const response = await fetchAiOnboardingBackend(event, endpoint, payload);
+	const responseBody = await readResponseBody(response);
+
+	if (!response.ok) return fail(response.status, { aiError: responseBody });
+	return { aiResult: responseBody };
+}
 
 export const load: PageServerLoad = async ({ params, fetch }) => {
 	const schema = z.object({ id: z.string().uuid() });
@@ -59,13 +119,29 @@ export const load: PageServerLoad = async ({ params, fetch }) => {
 	return { createForm, deleteForm, model, URLModel };
 };
 
+/**
+ * The AI onboarding step actions kept as form actions on this route.
+ *
+ * Step components post to the shared `/fe-api/ai-onboarding/[action]` proxy instead, because a
+ * step now renders on the page that owns its resource rather than on Assets. These entries are
+ * derived from the same action map so the two entry points can never resolve an action to
+ * different backend endpoints.
+ */
+const aiOnboardingActions: Actions = Object.fromEntries(
+	Object.entries(AI_ONBOARDING_ACTION_ENDPOINTS).map(([action, endpoint]) => [
+		action,
+		async (event: RequestEvent) => proxyAiOnboardingAction(event, endpoint)
+	])
+);
+
 export const actions: Actions = {
+	...aiOnboardingActions,
 	create: async (event) => {
 		const redirectToWrittenObject = Boolean(
 			event.params.model === 'entity-assessments' ||
-				event.params.model === 'quantitative-risk-hypotheses' ||
-				event.params.model === 'quantitative-risk-studies' ||
-				event.params.model === 'quantitative-risk-scenarios'
+			event.params.model === 'quantitative-risk-hypotheses' ||
+			event.params.model === 'quantitative-risk-studies' ||
+			event.params.model === 'quantitative-risk-scenarios'
 		);
 		return defaultWriteFormAction({
 			event,

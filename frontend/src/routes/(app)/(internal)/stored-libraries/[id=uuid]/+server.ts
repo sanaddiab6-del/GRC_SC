@@ -8,13 +8,13 @@ export const GET: RequestHandler = async ({ fetch, url, params }) => {
 	const endpoint = `${BASE_API_URL}/${URLModel}/${params.id}/`;
 	const contentEndpoint = `${BASE_API_URL}/${URLModel}/${params.id}/content/`;
 
-	const [res, contentRes] = await Promise.all([fetch(endpoint), fetch(contentEndpoint)]);
+	const res = await fetch(endpoint);
+        if (!res.ok) error(res.status as NumericRange<400, 599>, await res.json());
+        const data = await res.json();
 
-	if (!res.ok) error(res.status as NumericRange<400, 599>, await res.json());
-	if (!contentRes.ok) error(contentRes.status as NumericRange<400, 599>, await contentRes.json());
-
-	const data = await res.json();
-	const content = await contentRes.json();
+        const contentRes = await fetch(contentEndpoint);
+        if (!contentRes.ok) error(contentRes.status as NumericRange<400, 599>, await contentRes.json());
+        const content = await contentRes.json();
 	data.objects = content;
 
 	return new Response(JSON.stringify(data), {

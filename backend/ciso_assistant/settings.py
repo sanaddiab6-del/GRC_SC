@@ -247,6 +247,7 @@ INSTALLED_APPS = [
     "django_structlog",
     "auditlog",
     "tailwind",
+    "ai_onboarding.apps.AiOnboardingConfig",
     "iam",
     "global_settings",
     "pmbok",

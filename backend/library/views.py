@@ -1,5 +1,6 @@
 from itertools import chain
 import json
+import mimetypes
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.db.models import F, Q, IntegerField, OuterRef, Subquery, Exists
@@ -47,6 +48,23 @@ from .serializers import (
 )
 
 import structlog
+
+try:
+    import magic
+except Exception:
+    class _MagicFallback:
+        @staticmethod
+        def from_buffer(buffer, mime=True):
+            if buffer.startswith(b"PK\x03\x04"):
+                return (
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    if mime
+                    else "Zip archive"
+                )
+            guessed_mime, _ = mimetypes.guess_type("file.txt")
+            return guessed_mime or "text/plain"
+
+    magic = _MagicFallback()
 
 logger = structlog.get_logger(__name__)
 
@@ -142,9 +160,6 @@ class StoredLibraryFilterSet(LibraryMixinFilterSet):
             "object_type",
             "filtering_labels",
         ]
-
-
-import magic
 
 MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB
 

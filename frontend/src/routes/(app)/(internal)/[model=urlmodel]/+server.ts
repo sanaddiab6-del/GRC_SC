@@ -1,7 +1,97 @@
+import {
+	AI_ONBOARDING_SESSION_EXPIRED,
+	fetchAiOnboardingBackend,
+	hasAiOnboardingSession
+} from '$lib/utils/aiOnboardingProxy';
+import { aiOnboardingEndpoint } from '$lib/utils/aiOnboardingActions';
 import { BASE_API_URL } from '$lib/utils/constants';
 import { getModelInfo } from '$lib/utils/crud';
-import { error, type NumericRange } from '@sveltejs/kit';
+import { error, type NumericRange, type RequestEvent } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+
+function getNamedAction(url: URL) {
+	if (url.search.startsWith('?/')) {
+		return decodeURIComponent(url.search.slice(2)).split('&', 1)[0].replace(/=$/, '');
+	}
+
+	for (const key of url.searchParams.keys()) {
+		if (key.startsWith('/')) return key.slice(1);
+	}
+
+	return null;
+}
+
+async function readAiPayload(request: Request) {
+	const contentType = request.headers.get('content-type')?.toLowerCase() ?? '';
+
+	if (contentType.includes('application/json')) {
+		try {
+			return await request.json();
+		} catch {
+			return null;
+		}
+	}
+
+	if (
+		contentType.includes('application/x-www-form-urlencoded') ||
+		contentType.includes('multipart/form-data')
+	) {
+		try {
+			const formData = await request.formData();
+			const rawPayload = formData.get('payload');
+			if (typeof rawPayload !== 'string' || !rawPayload.trim()) return null;
+			return JSON.parse(rawPayload);
+		} catch {
+			return null;
+		}
+	}
+
+	return null;
+}
+
+async function readResponseBody(response: Response) {
+	const text = await response.text();
+	if (!text) return null;
+
+	try {
+		return JSON.parse(text);
+	} catch {
+		return { detail: text };
+	}
+}
+
+async function proxyAiOnboardingAction(event: RequestEvent, endpoint: string) {
+	// This endpoint is not covered by the (app) layout session guard, so it must refuse an
+	// unauthenticated caller itself instead of proxying the request anonymously.
+	if (!hasAiOnboardingSession(event)) {
+		return new Response(JSON.stringify(AI_ONBOARDING_SESSION_EXPIRED), {
+			status: 401,
+			headers: {
+				'Content-Type': 'application/json'
+			}
+		});
+	}
+
+	const payload = await readAiPayload(event.request);
+	if (!payload) {
+		return new Response(JSON.stringify({ detail: 'Invalid AI request payload.' }), {
+			status: 400,
+			headers: {
+				'Content-Type': 'application/json'
+			}
+		});
+	}
+
+	const response = await fetchAiOnboardingBackend(event, endpoint, payload);
+	const responseBody = await readResponseBody(response);
+
+	return new Response(responseBody === null ? '' : JSON.stringify(responseBody), {
+		status: response.status,
+		headers: {
+			'Content-Type': 'application/json'
+		}
+	});
+}
 
 export const GET: RequestHandler = async ({ fetch, params, url }) => {
 	const model = getModelInfo(params.model);
@@ -21,4 +111,21 @@ export const GET: RequestHandler = async ({ fetch, params, url }) => {
 			'Content-Type': 'application/json'
 		}
 	});
+};
+
+export const POST: RequestHandler = async (event) => {
+	const action = getNamedAction(event.url);
+	const endpoint = aiOnboardingEndpoint(action);
+
+	if (event.params.model !== 'assets' || !endpoint) {
+		return new Response(JSON.stringify({ detail: 'POST method not allowed' }), {
+			status: 405,
+			headers: {
+				Allow: 'GET, HEAD',
+				'Content-Type': 'application/json'
+			}
+		});
+	}
+
+	return proxyAiOnboardingAction(event, endpoint);
 };

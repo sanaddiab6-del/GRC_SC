@@ -57,7 +57,7 @@
 				<div class="mt-4">
 					<div class="flex items-center justify-between">
 						<div class="flex items-center text-sm font-medium {getCategoryIconColor(category)}">
-							{m.generateReport ? m.generateReport() : 'Generate Report'}
+							{'Generate Report'}
 							<i class="fas fa-arrow-right ml-2 text-xs"></i>
 						</div>
 					</div>
@@ -94,7 +94,7 @@
 				<div class="mt-4">
 					<div class="flex items-center justify-between">
 						<div class="flex items-center text-sm font-medium {getCategoryIconColor(category)}">
-							{m.generateReport ? m.generateReport() : 'Generate Report'}
+							{'Generate Report'}
 							<i class="fas fa-arrow-right ml-2 text-xs"></i>
 						</div>
 					</div>

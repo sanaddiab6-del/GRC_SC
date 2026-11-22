@@ -23,8 +23,8 @@
 	import ConfirmModal from '$lib/components/Modals/ConfirmModal.svelte';
 	import SyncToActionsRiskModal from '$lib/components/Modals/SyncToActionsRiskModal.svelte';
 	import { defaults, superForm } from 'sveltekit-superforms';
-	import { zod } from 'sveltekit-superforms/adapters';
-	import z from 'zod';
+	import { zod4 } from 'sveltekit-superforms/adapters';
+	import z from 'zod4';
 	import ValidationFlowsSection from '$lib/components/ValidationFlows/ValidationFlowsSection.svelte';
 	import { invalidateAll } from '$app/navigation';
 
@@ -125,7 +125,7 @@
 		const modalComponent: ModalComponent = {
 			ref: SyncToActionsRiskModal,
 			props: {
-				_form: defaults({ reset_residual: false }, zod(schema)),
+				_form: defaults({ reset_residual: false }, zod4(schema)),
 				id,
 				schema,
 				debug: false,

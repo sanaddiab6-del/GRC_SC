@@ -10,6 +10,11 @@
 	import type { ActionData, PageData } from './$types';
 	import Anchor from '$lib/components/Anchor/Anchor.svelte';
 	import { onMount } from 'svelte';
+	import AiOnboardingPanel from '$lib/components/AiOnboarding/AiOnboardingPanel.svelte';
+	import Step3Assets from '$lib/components/AiOnboarding/Step3Assets.svelte';
+	import Step4AppliedControls from '$lib/components/AiOnboarding/Step4AppliedControls.svelte';
+	import Step6RemediationActions from '$lib/components/AiOnboarding/Step6RemediationActions.svelte';
+	import Step8RiskScenarios from '$lib/components/AiOnboarding/Step8RiskScenarios.svelte';
 	import {
 		getModalStore,
 		type ModalComponent,
@@ -81,12 +86,9 @@
 
 			// Check if the add button exists and is not in a disabled list
 			if (
-				![
-					'risk-matrices',
-					'frameworks',
-					'requirement-mapping-sets',
-					'user-groups'
-				].includes(URLModel)
+				!['risk-matrices', 'frameworks', 'requirement-mapping-sets', 'user-groups'].includes(
+					URLModel
+				)
 			) {
 				modalCreateForm();
 			}
@@ -110,6 +112,22 @@
 </script>
 
 {#if data?.table}
+	<!-- Each onboarding step is shown on the page that manages the records it writes, so a list
+	     page only ever carries the steps for its own resource. -->
+	{#if URLModel === 'assets'}
+		<AiOnboardingPanel steps={['3A', '3B']}>
+			<Step3Assets />
+		</AiOnboardingPanel>
+	{:else if URLModel === 'applied-controls'}
+		<AiOnboardingPanel steps={['4A', '4B', '6A', '6B']}>
+			<Step4AppliedControls />
+			<Step6RemediationActions />
+		</AiOnboardingPanel>
+	{:else if URLModel === 'risk-scenarios'}
+		<AiOnboardingPanel steps={['8A', '8B']}>
+			<Step8RiskScenarios />
+		</AiOnboardingPanel>
+	{/if}
 	<div class="shadow-lg">
 		{#key URLModel}
 			<ModelTable
@@ -276,7 +294,7 @@
 					{#if URLModel === 'risk-assessments'}
 						{#if key === 'perimeter' && row.meta.ebios_rm_study}
 							<span
-								class="badge inline-block bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-md border border-amber-200 rotate-[-6deg] font-semibold uppercase tracking-wide"
+								class="badge inline-block bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-md border border-amber-200 -rotate-6 font-semibold uppercase tracking-wide"
 								>ebios-rm</span
 							>
 						{/if}

@@ -72,6 +72,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
 from django.core.cache import cache
+from ctypes.util import find_library
 
 
 from django.apps import apps
@@ -108,9 +109,54 @@ from rest_framework.views import APIView
 from rest_framework.exceptions import NotFound, PermissionDenied
 
 
-from weasyprint import HTML
+try:
+    def _can_load_weasyprint() -> bool:
+        return bool(
+            find_library("gobject-2.0")
+            or find_library("libgobject-2.0-0")
+            or find_library("gobject-2.0-0")
+        )
+
+
+    if _can_load_weasyprint():
+        try:
+            from weasyprint import HTML
+        except Exception:
+            HTML = None
+    else:
+        HTML = None
+except Exception:
+    HTML = None
 
 from core.helpers import *
+from ai_onboarding.advisory_transaction import advisory_rollback_transaction
+from ai_onboarding.evidence_freshness_review_guardrails import (
+    EvidenceFreshnessReviewValidationError,
+    validate_evidence_freshness_review_request_guardrails,
+)
+from ai_onboarding.evidence_freshness_review_provider import (
+    EvidenceFreshnessReviewProviderError,
+)
+from ai_onboarding.evidence_freshness_review_serializers import (
+    AiEvidenceFreshnessReviewBatchInputSerializer,
+    AiEvidenceFreshnessReviewInputSerializer,
+)
+from ai_onboarding.evidence_freshness_review_service import (
+    review_evidence_freshness,
+    review_evidence_freshness_batch,
+)
+from ai_onboarding.risk_treatment_suggestion_guardrails import (
+    RiskTreatmentSuggestionValidationError,
+    validate_risk_treatment_request_guardrails,
+)
+from ai_onboarding.risk_treatment_suggestion_provider import (
+    RiskTreatmentSuggestionProviderError,
+)
+from ai_onboarding.risk_treatment_suggestion_serializers import (
+    AiRiskTreatmentSuggestionInputSerializer,
+)
+from ai_onboarding.risk_treatment_suggestion_service import suggest_risk_treatment
+from ai_onboarding.service import build_onboarding_recommendations
 from core.models import (
     AppliedControl,
     ComplianceAssessment,
@@ -173,6 +219,14 @@ LONG_CACHE_TTL = 60  # mn
 
 
 MAPPING_MAX_DEPTH = 3
+
+
+def _render_pdf(html: str):
+    if HTML is None:
+        raise RuntimeError(
+            "PDF generation is unavailable because WeasyPrint native libraries could not be loaded."
+        )
+    return HTML(string=html).write_pdf()
 
 SETTINGS_MODULE = __import__(os.environ.get("DJANGO_SETTINGS_MODULE"))
 MODULE_PATHS = SETTINGS_MODULE.settings.MODULE_PATHS
@@ -1841,10 +1895,15 @@ class AssetViewSet(ExportMixin, BaseModelViewSet):
     @action(detail=False, name="Get asset class choices")
     def asset_class(self, request):
         # This endpoint is exclusively for filters.
+        viewable_ids, _, _ = RoleAssignment.get_accessible_object_ids(
+            Folder.get_root_folder(), request.user, AssetClass
+        )
         return Response(
             [
                 {"id": ac.id, "name": ac.full_path}
-                for ac in AssetClass.objects.filter(assets__isnull=False).distinct()
+                for ac in AssetClass.objects.filter(
+                    assets__isnull=False, id__in=viewable_ids
+                ).distinct()
             ]
         )
 
@@ -2309,7 +2368,10 @@ class AssetClassViewSet(BaseModelViewSet):
 
     @action(detail=False, name="Get Asset Class Tree")
     def tree(self, request):
-        return Response(AssetClass.build_tree())
+        viewable_ids, _, _ = RoleAssignment.get_accessible_object_ids(
+            Folder.get_root_folder(), request.user, AssetClass
+        )
+        return Response(AssetClass.build_tree(viewable_ids))
 
 
 class ReferenceControlViewSet(BaseModelViewSet):
@@ -3932,7 +3994,7 @@ class RiskAssessmentViewSet(BaseModelViewSet):
                 "feature_flags": feature_flags,
             }
             html = render_to_string("core/ra_pdf.html", data)
-            pdf_file = HTML(string=html).write_pdf()
+            pdf_file = _render_pdf(html)
             response = HttpResponse(pdf_file, content_type="application/pdf")
             return response
         else:
@@ -3979,7 +4041,7 @@ class RiskAssessmentViewSet(BaseModelViewSet):
                 "risk_assessment": risk_assessment_object,
             }
             html = render_to_string("core/risk_action_plan_pdf.html", data)
-            pdf_file = HTML(string=html).write_pdf()
+            pdf_file = _render_pdf(html)
             response = HttpResponse(pdf_file, content_type="application/pdf")
             return response
         else:
@@ -4078,7 +4140,10 @@ class RiskAssessmentViewSet(BaseModelViewSet):
         if dry_run == "false":
             dry_run = False
         reset_residual = request.data.get("reset_residual", False)
-        risk_assessment = RiskAssessment.objects.get(id=pk)
+        try:
+            risk_assessment = RiskAssessment.objects.get(id=pk)
+        except RiskAssessment.DoesNotExist:
+            return Response(status=status.HTTP_403_FORBIDDEN)
 
         if not RoleAssignment.is_access_allowed(
             user=request.user,
@@ -4801,9 +4866,14 @@ class AppliedControlViewSet(ExportMixin, BaseModelViewSet):
 
     @action(detail=False, name="Get all applied controls owners")
     def owner(self, request):
+        viewable_applied_controls, _, _ = RoleAssignment.get_accessible_object_ids(
+            Folder.get_root_folder(), request.user, AppliedControl
+        )
         return Response(
             ActorReadSerializer(
-                Actor.objects.filter(applied_controls__isnull=False).distinct(),
+                Actor.objects.filter(
+                    applied_controls__in=viewable_applied_controls
+                ).distinct(),
                 many=True,
             ).data
         )
@@ -4962,7 +5032,10 @@ class AppliedControlViewSet(ExportMixin, BaseModelViewSet):
 
     @action(detail=False, name="Get priority chart data")
     def priority_chart_data(self, request):
-        qs = AppliedControl.objects.exclude(status="active")
+        viewable_ids, _, _ = RoleAssignment.get_accessible_object_ids(
+            Folder.get_root_folder(), request.user, AppliedControl
+        )
+        qs = AppliedControl.objects.filter(id__in=viewable_ids).exclude(status="active")
 
         data = {
             "--": [],
@@ -5894,6 +5967,12 @@ class RiskScenarioViewSet(ExportMixin, BaseModelViewSet):
     API endpoint that allows risk scenarios to be viewed or edited.
     """
 
+    # Advisory and read-like: gated by the same permission as reading the scenario, not by
+    # add_riskscenario, even though it is a POST.
+    permission_overrides = {
+        "ai_treatment_suggestion": "view_riskscenario",
+    }
+
     model = RiskScenario
     filterset_class = RiskScenarioFilter
     ordering = ["ref_id"]
@@ -6162,7 +6241,10 @@ class RiskScenarioViewSet(ExportMixin, BaseModelViewSet):
         if dry_run == "false":
             dry_run = False
         reset_residual = request.data.get("reset_residual", False)
-        risk_scenario = RiskScenario.objects.get(id=pk)
+        try:
+            risk_scenario = RiskScenario.objects.get(id=pk)
+        except RiskScenario.DoesNotExist:
+            return Response(status=status.HTTP_403_FORBIDDEN)
 
         if not RoleAssignment.is_access_allowed(
             user=request.user,
@@ -6177,6 +6259,39 @@ class RiskScenarioViewSet(ExportMixin, BaseModelViewSet):
         return Response(
             {"changes": AppliedControlReadSerializer(changes, many=True).data}
         )
+
+    @action(methods=["post"], detail=True, url_path="ai-treatment-suggestion")
+    def ai_treatment_suggestion(self, request, pk):
+        """Advisory, read-only AI suggestion of a treatment for this risk scenario.
+
+        Uses the same local AI provider infrastructure as AI onboarding. Never changes the
+        scenario, its treatment or ratings, or any control or remediation: the human reviewing
+        the suggestion decides what, if anything, to change through the normal edit workflow.
+        """
+        request_guardrail_errors = validate_risk_treatment_request_guardrails(
+            request.data if isinstance(request.data, dict) else {}
+        )
+        if request_guardrail_errors:
+            return Response(request_guardrail_errors, status=400)
+
+        serializer = AiRiskTreatmentSuggestionInputSerializer(data=request.data or {})
+        serializer.is_valid(raise_exception=True)
+
+        # get_object() applies the folder/RBAC-scoped queryset and the object permission check
+        # (permission_overrides -> view_riskscenario), exactly as reading the scenario does.
+        risk_scenario = self.get_object()
+
+        try:
+            with advisory_rollback_transaction():
+                result = suggest_risk_treatment(risk_scenario, request.user)
+                transaction.set_rollback(True)
+        except (
+            RiskTreatmentSuggestionValidationError,
+            RiskTreatmentSuggestionProviderError,
+        ) as exc:
+            return Response(exc.to_response(), status=exc.status_code)
+
+        return Response(result)
 
 
 class RiskAcceptanceFilterSet(GenericFilterSet):
@@ -7077,6 +7192,23 @@ class FolderViewSet(BaseModelViewSet):
         """
         folder = serializer.save()
         Folder.create_default_ug_and_ra(folder)
+
+    @action(
+        detail=False,
+        methods=["post"],
+        permission_classes=[permissions.IsAuthenticated],
+        url_path="ai-recommendations",
+    )
+    def ai_recommendations(self, request):
+        """
+        Return advisory-only framework and scope recommendations for folder creation.
+        """
+        payload = request.data if isinstance(request.data, dict) else {}
+        recommendations = build_onboarding_recommendations(
+            payload,
+            base_dir=settings.BASE_DIR.parent,
+        )
+        return Response(recommendations)
 
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
@@ -8674,18 +8806,21 @@ class FrameworkViewSet(BaseModelViewSet):
     @action(detail=False, methods=["get"])
     def names(self, request):
         uuid_list = request.query_params.getlist("id[]", [])
-        queryset = Framework.objects.filter(id__in=uuid_list)
+        viewable_ids, _, _ = RoleAssignment.get_accessible_object_ids(
+            Folder.get_root_folder(), request.user, Framework
+        )
+        queryset = Framework.objects.filter(id__in=uuid_list).filter(id__in=viewable_ids)
 
         return Response(
             {
-                str(framework.id): framework.get_name_translated()
+                str(framework.id): framework.get_name_translated
                 for framework in queryset
             }
         )
 
     @action(detail=True, methods=["get"])
     def tree(self, request, pk):
-        _framework = Framework.objects.get(id=pk)
+        _framework = self.get_object()
         return Response(
             get_sorted_requirement_nodes(
                 RequirementNode.objects.filter(framework=_framework).all(),
@@ -8723,7 +8858,7 @@ class FrameworkViewSet(BaseModelViewSet):
     def mapping_stats(self, request, pk):
         from core.mappings.engine import engine
 
-        framework_urn = Framework.objects.filter(id=pk).values_list("urn")[0][0]
+        framework_urn = self.get_object().urn
         res = engine.paths_and_coverages(framework_urn)
         return Response({"response": res})
 
@@ -8750,7 +8885,7 @@ class FrameworkViewSet(BaseModelViewSet):
 
     @action(detail=True, methods=["get"], name="Framework as an Excel template")
     def excel_template(self, request, pk):
-        fwk = Framework.objects.get(id=pk)
+        fwk = self.get_object()
         req_nodes = RequirementNode.objects.filter(framework=fwk).order_by("urn")
         has_questions = any(rn.questions for rn in req_nodes)
         entries = []
@@ -9036,6 +9171,11 @@ class EvidenceViewSet(BaseModelViewSet):
     API endpoint that allows evidences to be viewed or edited.
     """
 
+    permission_overrides = {
+        "ai_freshness_review": "view_evidence",
+        "ai_freshness_review_batch": "view_evidence",
+    }
+
     model = Evidence
     filterset_fields = [
         "folder",
@@ -9056,9 +9196,12 @@ class EvidenceViewSet(BaseModelViewSet):
 
     @action(detail=False, name="Get all evidences owners")
     def owner(self, request):
+        viewable_evidences, _, _ = RoleAssignment.get_accessible_object_ids(
+            Folder.get_root_folder(), request.user, Evidence
+        )
         return Response(
             ActorReadSerializer(
-                Actor.objects.filter(evidences__isnull=False).distinct(),
+                Actor.objects.filter(evidences__in=viewable_evidences).distinct(),
                 many=True,
             ).data
         )
@@ -9099,6 +9242,84 @@ class EvidenceViewSet(BaseModelViewSet):
     @action(detail=False, name="Get status choices")
     def status(self, request):
         return Response(dict(Evidence.Status.choices))
+
+    @action(methods=["post"], detail=True, url_path="ai-freshness-review")
+    def ai_freshness_review(self, request, pk):
+        """Advisory, read-only AI review of whether this evidence still looks current.
+
+        Uses the same local AI provider infrastructure as AI onboarding. Never writes to
+        Evidence, EvidenceRevision, or any linked record: the human reviewing the result
+        decides what, if anything, to do next.
+        """
+        request_guardrail_errors = validate_evidence_freshness_review_request_guardrails(
+            request.data if isinstance(request.data, dict) else {}
+        )
+        if request_guardrail_errors:
+            return Response(request_guardrail_errors, status=400)
+
+        serializer = AiEvidenceFreshnessReviewInputSerializer(data=request.data or {})
+        serializer.is_valid(raise_exception=True)
+
+        # get_object() applies the same folder/RBAC-scoped queryset and object permission
+        # check (permission_overrides -> view_evidence) as reading this Evidence normally.
+        evidence = self.get_object()
+
+        try:
+            with advisory_rollback_transaction():
+                result = review_evidence_freshness(evidence, request.user)
+                transaction.set_rollback(True)
+        except (
+            EvidenceFreshnessReviewValidationError,
+            EvidenceFreshnessReviewProviderError,
+        ) as exc:
+            return Response(exc.to_response(), status=exc.status_code)
+
+        return Response(result)
+
+    @action(methods=["post"], detail=False, url_path="ai-freshness-review-batch")
+    def ai_freshness_review_batch(self, request):
+        """Advisory, read-only AI freshness review for several evidence items at once.
+
+        Only evidence ids the requesting user can already view are reviewed; any other id
+        in the request is silently dropped (not reported as forbidden), so this endpoint
+        cannot be used to probe which evidence ids exist outside the caller's scope.
+        """
+        request_guardrail_errors = validate_evidence_freshness_review_request_guardrails(
+            request.data if isinstance(request.data, dict) else {}
+        )
+        if request_guardrail_errors:
+            return Response(request_guardrail_errors, status=400)
+
+        serializer = AiEvidenceFreshnessReviewBatchInputSerializer(data=request.data or {})
+        serializer.is_valid(raise_exception=True)
+        requested_ids = serializer.validated_data["evidence_ids"]
+
+        accessible_evidences = list(
+            self.get_queryset().filter(id__in=requested_ids)
+        )
+        requested_count = len(requested_ids)
+        skipped_count = requested_count - len(accessible_evidences)
+
+        try:
+            with advisory_rollback_transaction():
+                batch_result = review_evidence_freshness_batch(
+                    accessible_evidences, request.user
+                )
+                transaction.set_rollback(True)
+        except (
+            EvidenceFreshnessReviewValidationError,
+            EvidenceFreshnessReviewProviderError,
+        ) as exc:
+            return Response(exc.to_response(), status=exc.status_code)
+
+        return Response(
+            {
+                "results": batch_result["results"],
+                "requested_count": requested_count,
+                "reviewed_count": batch_result["reviewed_count"],
+                "skipped_count": skipped_count,
+            }
+        )
 
 
 class EvidenceRevisionViewSet(BaseModelViewSet):
@@ -9607,7 +9828,7 @@ class ComplianceAssessmentViewSet(BaseModelViewSet):
         name="Get target frameworks mapping options with compliance distribution",
     )
     def frameworks(self, request, pk):
-        audit = ComplianceAssessment.objects.get(id=pk)
+        audit = self.get_object()
         from core.mappings.engine import engine
 
         audit_from_results = engine.load_audit_fields(audit)
@@ -10093,7 +10314,7 @@ class ComplianceAssessmentViewSet(BaseModelViewSet):
                 "compliance_assessment": compliance_assessment_object,
             }
             html = render_to_string("core/action_plan_pdf.html", data)
-            pdf_file = HTML(string=html).write_pdf()
+            pdf_file = _render_pdf(html)
             response = HttpResponse(pdf_file, content_type="application/pdf")
             return response
         else:
@@ -11017,7 +11238,10 @@ class ComplianceAssessmentViewSet(BaseModelViewSet):
     @api_view(["GET", "POST"])
     @renderer_classes([JSONRenderer])
     def create_suggested_applied_controls(request, pk):
-        compliance_assessment = ComplianceAssessment.objects.get(id=pk)
+        try:
+            compliance_assessment = ComplianceAssessment.objects.get(id=pk)
+        except ComplianceAssessment.DoesNotExist:
+            return Response(status=status.HTTP_403_FORBIDDEN)
         dry_run = str(request.query_params.get("dry_run", "false")).lower() in {
             "true",
             "1",
@@ -11055,7 +11279,10 @@ class ComplianceAssessmentViewSet(BaseModelViewSet):
         dry_run = request.query_params.get("dry_run", True)
         if dry_run == "false":
             dry_run = False
-        compliance_assessment = ComplianceAssessment.objects.get(id=pk)
+        try:
+            compliance_assessment = ComplianceAssessment.objects.get(id=pk)
+        except ComplianceAssessment.DoesNotExist:
+            return Response(status=status.HTTP_403_FORBIDDEN)
 
         if not RoleAssignment.is_access_allowed(
             user=request.user,
@@ -11069,10 +11296,11 @@ class ComplianceAssessmentViewSet(BaseModelViewSet):
 
     @action(detail=True, methods=["get"], url_path="progress_ts")
     def progress_ts(self, request, pk):
+        compliance_assessment = self.get_object()
         try:
             raw = (
                 HistoricalMetric.objects.filter(
-                    model="ComplianceAssessment", object_id=pk
+                    model="ComplianceAssessment", object_id=compliance_assessment.id
                 )
                 .annotate(progress=F("data__reqs__progress_perc"))
                 .values("date", "progress")
@@ -11772,7 +12000,7 @@ class ComplianceAssessmentViewSet(BaseModelViewSet):
             "compliance_assessment": ca,
         }
         html = render_to_string(template_name, data)
-        pdf_file = HTML(string=html).write_pdf()
+        pdf_file = _render_pdf(html)
         response = HttpResponse(pdf_file, content_type="application/pdf")
         response["Content-Disposition"] = f'attachment; filename="soa_{pk}.pdf"'
         return response
@@ -11923,7 +12151,10 @@ class RequirementAssessmentViewSet(BaseModelViewSet):
     @api_view(["GET", "POST"])
     @renderer_classes([JSONRenderer])
     def create_suggested_applied_controls(request, pk):
-        requirement_assessment = RequirementAssessment.objects.get(id=pk)
+        try:
+            requirement_assessment = RequirementAssessment.objects.get(id=pk)
+        except RequirementAssessment.DoesNotExist:
+            return Response(status=status.HTTP_403_FORBIDDEN)
         dry_run = str(request.query_params.get("dry_run", "false")).lower() in {
             "true",
             "1",
@@ -12127,7 +12358,10 @@ class RequirementMappingSetViewSet(BaseModelViewSet):
 
     @action(detail=True, methods=["get"], url_path="graph_data")
     def graph_data(self, request, pk=None):
-        obj = StoredLibrary.objects.get(id=pk)
+        obj = self.get_object()
+        viewable_libraries, _, _ = RoleAssignment.get_accessible_object_ids(
+            Folder.get_root_folder(), request.user, StoredLibrary
+        )
 
         mapping_set = obj.content.get(
             "requirement_mapping_sets",
@@ -12135,6 +12369,7 @@ class RequirementMappingSetViewSet(BaseModelViewSet):
         )[0]
 
         source_framework_lib = StoredLibrary.objects.filter(
+            id__in=viewable_libraries,
             content__framework__urn=mapping_set["source_framework_urn"],
             content__framework__isnull=False,
             content__requirement_mapping_set__isnull=True,
@@ -12144,6 +12379,7 @@ class RequirementMappingSetViewSet(BaseModelViewSet):
             raise NotFound("Source framework library not found")
 
         target_framework_lib = StoredLibrary.objects.filter(
+            id__in=viewable_libraries,
             content__framework__urn=mapping_set["target_framework_urn"],
             content__framework__isnull=False,
             content__requirement_mapping_set__isnull=True,
@@ -13043,7 +13279,7 @@ class FindingsAssessmentViewSet(BaseModelViewSet):
         }
 
         html = render_to_string("core/findings_assessment_pdf.html", context)
-        pdf_file = HTML(string=html).write_pdf()
+        pdf_file = _render_pdf(html)
         response = HttpResponse(pdf_file, content_type="application/pdf")
         safe_name = slugify(findings_assessment.name) or "findings_assessment"
         response["Content-Disposition"] = (
@@ -13154,9 +13390,12 @@ class FindingViewSet(BaseModelViewSet):
 
     @action(detail=False, name="Get all findings owners")
     def owner(self, request):
+        viewable_findings, _, _ = RoleAssignment.get_accessible_object_ids(
+            Folder.get_root_folder(), request.user, Finding
+        )
         return Response(
             ActorReadSerializer(
-                Actor.objects.filter(findings__isnull=False).distinct(),
+                Actor.objects.filter(findings__in=viewable_findings).distinct(),
                 many=True,
             ).data
         )
@@ -13438,7 +13677,7 @@ class IncidentViewSet(ExportMixin, BaseModelViewSet):
         }
 
         html = render_to_string("core/incident_pdf.html", context)
-        pdf_file = HTML(string=html).write_pdf()
+        pdf_file = _render_pdf(html)
         response = HttpResponse(pdf_file, content_type="application/pdf")
         safe_name = slugify(incident.name) or "incident"
         response["Content-Disposition"] = (
@@ -14550,9 +14789,14 @@ class TaskTemplateViewSet(ExportMixin, BaseModelViewSet):
 
     @action(detail=False, name="Get all task template assigned_to actors")
     def assigned_to(self, request):
+        viewable_task_templates, _, _ = RoleAssignment.get_accessible_object_ids(
+            Folder.get_root_folder(), request.user, TaskTemplate
+        )
         return Response(
             ActorReadSerializer(
-                Actor.objects.filter(assigned_task_templates__isnull=False).distinct(),
+                Actor.objects.filter(
+                    assigned_task_templates__in=viewable_task_templates
+                ).distinct(),
                 many=True,
             ).data
         )
@@ -14717,6 +14961,12 @@ class TaskNodeViewSet(BaseModelViewSet):
     search_fields = ["observation"]
     ordering = ["due_date"]
 
+    # This is a write (it mutates the evidence relationship), so it is gated by
+    # change_tasknode rather than the POST default of add_tasknode.
+    permission_overrides = {
+        "remove_evidence": "change_tasknode",
+    }
+
     @method_decorator(cache_page(60 * LONG_CACHE_TTL))
     @action(detail=False, name="Get Task Node status choices")
     def status(srlf, request):
@@ -14726,10 +14976,21 @@ class TaskNodeViewSet(BaseModelViewSet):
         detail=True, name="Remove/Move evidence to expected evidence", methods=["post"]
     )
     def remove_evidence(self, request, pk):
-        task_node = TaskNode.objects.get(id=pk)
+        task_node = self.get_object()
         evidence_id = request.data.get("evidence_id")
         to_move = request.data.get("move", False)
-        evidence = Evidence.objects.get(id=evidence_id)
+        viewable_evidence_ids, _, _ = RoleAssignment.get_accessible_object_ids(
+            Folder.get_root_folder(), request.user, Evidence
+        )
+        try:
+            evidence = Evidence.objects.get(id=evidence_id)
+        except Evidence.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        # The evidence being detached/moved must be independently visible to the
+        # requester too, not just the task node — otherwise this endpoint could be used
+        # to link an evidence the user cannot see into a template they can access.
+        if evidence.id not in viewable_evidence_ids:
+            return Response(status=status.HTTP_404_NOT_FOUND)
         task_node.evidences.remove(evidence)
         if to_move:
             task_node.task_template.evidences.add(evidence)

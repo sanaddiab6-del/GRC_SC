@@ -8,7 +8,7 @@
 	import SuperForm from '$lib/components/Forms/Form.svelte';
 	import List from '../List/List.svelte';
 	import Checkbox from '../Forms/Checkbox.svelte';
-	import { zod } from 'sveltekit-superforms/adapters';
+	import { zod4 } from 'sveltekit-superforms/adapters';
 
 	const modalStore: ModalStore = getModalStore();
 
@@ -41,7 +41,7 @@
 	}: Props = $props();
 
 	const sForm = superForm(_form, {
-		validators: zod(schema),
+		validators: zod4(schema),
 		dataType: 'json',
 		taintedMessage: false,
 		validationMethod: 'auto'

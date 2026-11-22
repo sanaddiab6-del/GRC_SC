@@ -10,7 +10,11 @@ export default defineConfig({
 			outdir: './src/paraglide',
 			outputStructure: 'locale-modules',
 			cookieName: 'LOCALE',
-			strategy: ['custom-userPreference', 'cookie', 'custom-fallback', 'baseLocale']
+			strategy: ['custom-userPreference', 'cookie', 'custom-fallback', 'baseLocale'],
+			// Lets svelte-check/tsc resolve $paraglide/* from generated .d.ts files instead of
+			// inferring types from the multi-megabyte generated .js implementation on every
+			// import (this was the pathological memory/time cost behind the static-check gate).
+			emitTsDeclarations: true
 		}),
 		tailwindcss(),
 		sveltekit()

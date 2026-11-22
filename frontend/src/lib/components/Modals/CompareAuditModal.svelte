@@ -3,9 +3,9 @@
 	import AutocompleteSelect from '../Forms/AutocompleteSelect.svelte';
 	import { getModalStore, type ModalStore } from './stores';
 	import { superForm } from 'sveltekit-superforms';
-	import { z } from 'zod';
+	import { z } from 'zod4';
 	import { m } from '$paraglide/messages';
-	import { zod } from 'sveltekit-superforms/adapters';
+	import { zod4 } from 'sveltekit-superforms/adapters';
 
 	const modalStore: ModalStore = getModalStore();
 
@@ -31,7 +31,7 @@
 	const form = superForm(
 		{ comparison_audit: undefined },
 		{
-			validators: zod(schema),
+			validators: zod4(schema),
 			SPA: true,
 			onSubmit: () => {
 				const selectedAuditId = $formData.comparison_audit;

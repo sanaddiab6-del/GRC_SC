@@ -23,6 +23,7 @@
 
 	import { goto } from '$app/navigation';
 	import MarkdownRenderer from '$lib/components/MarkdownRenderer.svelte';
+	import EvidenceFreshnessReview from '$lib/components/Evidence/EvidenceFreshnessReview.svelte';
 	import { getListViewFields } from '$lib/utils/table';
 	import { canPerformAction } from '$lib/utils/access-control';
 	import {
@@ -429,6 +430,10 @@
 				</div>
 			{/if}
 		</div>
+	{/if}
+
+	{#if data.urlModel === 'evidences' && data.data?.id}
+		<EvidenceFreshnessReview evidenceId={data.data.id} />
 	{/if}
 
 	<!-- Main content area - modified to use conditional flex layout -->

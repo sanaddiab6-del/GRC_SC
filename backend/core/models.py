@@ -3447,8 +3447,11 @@ class AssetClass(NameDescriptionMixin, FolderMixin, PublishInRootFolderMixin):
             return f"{self.parent.full_path}/{self.name}"
 
     @classmethod
-    def build_tree(cls):
-        all_nodes = list(cls.objects.all())
+    def build_tree(cls, viewable_ids):
+        """Build the tree from only the AssetClass ids in `viewable_ids`. A node whose parent
+        is not in `viewable_ids` is dropped rather than reparented to root, since promoting it
+        would still disclose that a hidden ancestor exists."""
+        all_nodes = list(cls.objects.filter(id__in=viewable_ids))
         nodes_by_id = {
             node.id: {"name": node.name, "children": []} for node in all_nodes
         }

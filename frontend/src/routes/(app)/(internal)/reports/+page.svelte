@@ -73,12 +73,10 @@
 			</div>
 			<div>
 				<h3 class="text-lg font-semibold text-gray-900 mb-2">
-					{m.aboutReports ? m.aboutReports() : 'About Reports'}
+					{'About Reports'}
 				</h3>
 				<p class="text-gray-700">
-					{m.aboutReportsDescription
-						? m.aboutReportsDescription()
-						: 'Reports provide a simple tools to generate specialized reports useful for key insights or required by authorities for specific standards.\nMore specialized capabilities will be added as we identify specific cases.'}
+					{'Reports provide a simple tools to generate specialized reports useful for key insights or required by authorities for specific standards.\nMore specialized capabilities will be added as we identify specific cases.'}
 				</p>
 			</div>
 		</div>

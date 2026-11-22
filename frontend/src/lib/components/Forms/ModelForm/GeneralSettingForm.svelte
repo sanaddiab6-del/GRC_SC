@@ -44,7 +44,7 @@
 			// Show modal to ask for conversion rate
 			const modal: ModalSettings = {
 				type: 'prompt',
-				title: m.currencyConversionRate?.() || 'Currency Conversion Rate',
+				title: 'Currency Conversion Rate',
 				body: `Converting from ${originalCurrency} to ${newCurrency}. Enter conversion rate (default: 1.0):`,
 				value: '1.0',
 				valueAttr: {

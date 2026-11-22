@@ -1,4 +1,6 @@
 <script lang="ts">
+	import AiOnboardingPanel from '$lib/components/AiOnboarding/AiOnboardingPanel.svelte';
+	import Step5EvidenceFindings from '$lib/components/AiOnboarding/Step5EvidenceFindings.svelte';
 	import CreateModal from '$lib/components/Modals/CreateModal.svelte';
 	import ModelTable from '$lib/components/ModelTable/ModelTable.svelte';
 	import { safeTranslate } from '$lib/utils/i18n';
@@ -40,6 +42,13 @@
 </script>
 
 {#if data.table}
+	<!-- Steps 5A/5B write the draft Evidence records for the reviewed evidence requests and audit
+	     questions (and the Finding records for the preliminary findings), so they belong here. -->
+	{#if URLModel === 'evidences'}
+		<AiOnboardingPanel steps={['5A', '5B']}>
+			<Step5EvidenceFindings />
+		</AiOnboardingPanel>
+	{/if}
 	<div class="shadow-lg">
 		{#key URLModel}
 			<ModelTable source={data.table} deleteForm={data.deleteForm} {URLModel}>

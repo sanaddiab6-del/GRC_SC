@@ -1,0 +1,853 @@
+<script lang="ts">
+	import type { ActionData } from './$types';
+
+	let { form }: { form: ActionData | null } = $props();
+	let showTechnical = $state(false);
+	const engagement = $derived((form && 'engagement' in form ? form.engagement : null) as any);
+	const engagements = $derived((form && 'engagements' in form ? form.engagements : null) as any);
+	const engagementPlan = $derived((form && 'engagement_plan' in form ? form.engagement_plan : null) as any);
+	const discovery = $derived((form && 'discovery' in form ? form.discovery : null) as any);
+	const casePlan = $derived((form && 'case_plan' in form ? form.case_plan : null) as any);
+	const draft = $derived((form && 'draft' in form ? form.draft : null) as any);
+	const error = $derived(form && 'error' in form ? form.error : null);
+	const provider = $derived(draft?.source_summary?.provider_mode || 'not verified');
+    const riskDraft = $derived((form && 'risk_draft' in form ? form.risk_draft : null) as any);
+    const riskDiscovery = $derived((form && 'risk_discovery' in form ? form.risk_discovery : null) as any);
+    const riskReview = $derived((form && 'risk_review' in form ? form.risk_review : null) as any);
+    const riskFullContext = $derived((form && 'risk_full_context' in form ? form.risk_full_context : null) as any);
+    const fullRiskLists = [
+        { key: 'asset_references', cat: 'assets', label: 'Affected assets' },
+        { key: 'owner_references', cat: 'owners', label: 'Assigned to (authorized actor)' },
+        { key: 'existing_control_references', cat: 'existing_controls', label: 'Implemented existing controls' },
+        { key: 'extra_control_references', cat: 'extra_controls', label: 'Proposed additional controls' },
+        { key: 'antecedent_references', cat: 'antecedents', label: 'Antecedent risk scenarios' },
+        { key: 'qualification_references', cat: 'qualifications', label: 'Qualifications' },
+        { key: 'exception_references', cat: 'exceptions', label: 'Existing security exceptions' },
+        { key: 'label_references', cat: 'labels', label: 'Labels' }
+    ];
+    const riskDryRun = $derived((form && 'risk_dry_run' in form ? form.risk_dry_run : null) as any);
+    const riskResult = $derived((form && 'risk_result' in form ? form.risk_result : null) as any);
+    const riskCanSave = $derived(riskReview?.full_reviewed === true && riskDryRun && (!riskDryRun.blocking_errors || riskDryRun.blocking_errors.length === 0)
+        && riskDryRun.planned_actions?.some((a: any) => a.status === 'planned' && a.decision === 'create'));
+
+
+	const sections = [
+		{
+			name: 'Case initiation',
+			items: [
+				{ title: 'Frameworks & libraries', href: '/frameworks', detail: 'Verify loaded regulatory frameworks' },
+				{ title: 'Domains & organization', href: '/folders', detail: 'Use the existing organizational domain' },
+				{ title: 'Perimeters & scope', href: '/perimeters', detail: 'Define included systems and boundaries' },
+				{ title: 'Compliance assessments', href: '/compliance-assessments', detail: 'Create an assessment after setup approval' }
+			]
+		},
+		{
+			name: 'Assets & security posture',
+			items: [
+				{ title: 'Assets', href: '/assets', detail: 'Inventory in-scope information assets' },
+				{ title: 'Applied controls', href: '/applied-controls', detail: 'Existing safeguards and planned controls' },
+				{ title: 'Vulnerabilities', href: '/vulnerabilities', detail: 'Document verified weaknesses' },
+				{ title: 'Policies', href: '/policies', detail: 'Review governing policies' }
+			]
+		},
+		{
+			name: 'Assessment & assurance',
+			items: [
+				{ title: 'Risk assessments', href: '/risk-assessments', detail: 'Risk matrix and assessment scope' },
+				{ title: 'Risk scenarios', href: '/risk-scenarios', detail: 'Threats, controls, inherent/current/residual risk' },
+				{ title: 'Evidences', href: '/evidences', detail: 'Actual supporting documents and revisions' },
+				{ title: 'Findings & follow-up', href: '/findings-assessments', detail: 'Review findings, remediation and approvals' }
+			]
+		},
+		{
+			name: 'Extended GRC capabilities',
+			items: [
+				{ title: 'Third-party risk', href: '/entity-assessments', detail: 'Supplier and entity assessments' },
+				{ title: 'Business impact analysis', href: '/business-impact-analysis', detail: 'Critical services and business impacts' },
+				{ title: 'Incidents', href: '/incidents', detail: 'Incident lifecycle and controls' },
+				{ title: 'Reports', href: '/reports', detail: 'Audit and executive deliverables' }
+			]
+		}
+	];
+</script>
+
+<svelte:head>
+	<title>SICO AI Workspace — GRC Consultant</title>
+	<meta name="description" content="SICO AI GRC assignment workspace: framework, organization, scope, assessment and full-platform capability navigation." />
+</svelte:head>
+
+<div class="mx-auto max-w-7xl space-y-6 p-4 text-surface-950 md:p-8">
+	<header class="rounded-2xl bg-slate-900 p-6 text-white shadow-lg md:p-8">
+		<div class="mb-3 flex flex-wrap items-center gap-2 text-xs font-semibold tracking-wide text-teal-200">
+			<span class="rounded-full border border-teal-400/40 bg-teal-500/20 px-3 py-1">SICO AI WORKSPACE</span>
+			<span class="rounded-full border border-white/20 px-3 py-1">SICO AI · Risk workflow · Human-approved writes</span>
+		</div>
+		<h1 class="text-3xl font-bold md:text-4xl">Your AI GRC Consultant & Analyst</h1>
+		<p class="mt-3 max-w-3xl text-sm leading-relaxed text-slate-200">
+			Start with a real assignment. SICO will prepare the proposed framework, organizational domain,
+			assessment scope and setup for your review. All existing GRC functions remain available below.
+		</p>
+	</header>
+
+	<section class="grid gap-3 md:grid-cols-4" aria-label="New case preparation sequence">
+		{#each [
+			{ num: '01', label: 'Framework selection', description: 'Confirm the correct standard' },
+			{ num: '02', label: 'Organization / domain', description: 'Reuse or propose a domain' },
+			{ num: '03', label: 'Perimeter / scope', description: 'Define assessment boundaries' },
+			{ num: '04', label: 'Assessment setup', description: 'Create only after approval' }
+		] as step}
+			<div class="rounded-xl border border-surface-300 bg-surface-50 p-4 shadow-sm">
+				<div class="text-sm font-bold text-teal-700">{step.num}</div>
+				<div class="mt-2 font-semibold">{step.label}</div>
+				<div class="mt-1 text-xs text-surface-600">{step.description}</div>
+			</div>
+		{/each}
+	</section>
+
+	<div class="grid items-start gap-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)]">
+		<section class="rounded-xl border border-surface-300 bg-surface-50 p-5 shadow-sm md:p-6">
+			<h2 class="text-xl font-bold">Start a GRC assignment</h2>
+			<p class="mt-1 text-sm text-surface-600">This action calls the existing authenticated AI Case Intake service. It does not write any GRC records.</p>
+
+			<form method="POST" action="?/intake" class="mt-5 space-y-4">
+				<label class="block space-y-1 text-sm font-semibold">
+					<span>Describe the assignment</span>
+					<textarea name="scenario_text" rows="5" required minlength="20" maxlength="12000"
+						class="textarea w-full" placeholder="Describe the organization, assessment objective, systems, issues and deadline..."></textarea>
+				</label>
+				<div class="grid gap-4 md:grid-cols-2">
+					<label class="block space-y-1 text-sm font-semibold">
+						<span>Preferred framework</span>
+						<input name="preferred_framework" class="input w-full"  />
+					</label>
+					<label class="block space-y-1 text-sm font-semibold">
+						<span>Organization</span>
+						<input name="organization_hint" class="input w-full"  />
+					</label>
+				</div>
+				<label class="block space-y-1 text-sm font-semibold">
+					<span>Scope / systems under assessment</span>
+					<input name="scope_hint" class="input w-full"  />
+				</label>
+				<div class="grid gap-4 md:grid-cols-2">
+					<label class="block space-y-1 text-sm font-semibold">
+						<span>Assessment period</span>
+						<input name="assessment_period" class="input w-full"  />
+					</label>
+					<label class="block space-y-1 text-sm font-semibold">
+						<span>Known deadline (optional)</span>
+						<input name="known_deadline" type="date" class="input w-full" />
+					</label>
+				</div>
+				<label class="block space-y-1 text-sm font-semibold">
+					<span>Known trigger (optional)</span>
+					<input name="known_trigger" class="input w-full"  />
+				</label>
+				<div class="space-y-2">
+					<button type="submit" formaction="?/discover" class="btn preset-filled-primary-500 w-full font-semibold">
+						Investigate real GRC records (no AI model required)
+					</button>
+					<p class="text-xs text-surface-600">Looks up permitted existing frameworks, organizational folders, assets, policies, controls and assessments in the live database. Makes no changes.</p>
+					<button type="submit" formaction="?/intake" class="btn preset-tonal-primary w-full font-semibold">
+						Generate advisory case intake proposal
+					</button>
+				</div>
+				<p class="text-xs text-surface-600">The model may take a minute on a cold start. This is a draft, not an audit conclusion or compliance determination.</p>
+			</form>
+		</section>
+
+		<aside class="rounded-xl border border-surface-300 bg-surface-50 p-5 shadow-sm md:p-6">
+			<h2 class="text-lg font-bold">Full GRC work programme</h2>
+			<p class="mt-2 text-sm text-surface-600">The workspace begins with case foundations. Subsequent specialist work is part of the same overall programme—not limited to a short onboarding wizard.</p>
+			<ol class="mt-4 space-y-2 text-sm">
+				{#each [
+					'Framework, business context and scope',
+					'Domain, perimeter and assessment setup',
+					'Assets, existing controls and vulnerabilities',
+					'Risk scenarios and inherent risk',
+					'Existing controls, current and residual risks',
+					'Control-by-control evidence assessment',
+					'Findings, nonconformities and remediation',
+					'Independent review and audit support',
+					'Risk treatment, approvals and closure',
+					'Third parties, privacy, resilience and reporting'
+				] as label, i}
+					<li class="flex items-start gap-3"><span class="rounded bg-teal-100 px-2 py-0.5 text-xs font-bold text-teal-900">{i + 1}</span> {label}</li>
+				{/each}
+			</ol>
+			<p class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+				Case intake, real-record investigation and new-case preflight are connected. Risk scenario suggestion, dry-run and reviewed creation are connected here. Other GRC workflows and evidence audits remain under development.
+			</p>
+		</aside>
+	</div>
+
+
+    <section class="rounded-xl border border-surface-300 p-4" aria-label="Resume a GRC engagement">
+        <h2 class="text-lg font-bold">Resume an existing GRC engagement</h2>
+        <p class="mt-1 text-sm">Reopen progress stored in PostgreSQL. You will only see engagements you created and are still authorized to access.</p>
+        <form method="POST" action="?/engagementResume" class="mt-3">
+            <button type="submit" class="btn preset-tonal-primary-500">Find my saved engagements</button>
+        </form>
+        {#if engagements?.length}
+            <div class="mt-3 space-y-2">
+                {#each engagements as saved}
+                    <form method="POST" action="?/engagementResume" class="flex flex-wrap items-center justify-between gap-2 rounded border border-surface-300 p-3">
+                        <input type="hidden" name="engagement_id" value={saved.id} />
+                        <span class="text-sm">{saved.title} · {saved.status.replaceAll('_', ' ')}</span>
+                        <button type="submit" class="btn preset-tonal-primary-500 btn-sm">Open engagement</button>
+                    </form>
+                {/each}
+            </div>
+        {:else if engagements}
+            <p class="mt-2 text-sm">No saved engagements are currently accessible.</p>
+        {/if}
+    </section>
+
+    {#if discovery?.selected_domain}
+        <section class="rounded-xl border-2 border-teal-500 bg-surface-50 p-5 shadow-sm md:p-6" aria-label="Create a persistent GRC engagement">
+            <h2 class="text-xl font-bold">Continue as one real GRC engagement</h2>
+            <p class="mt-2 text-sm text-surface-600">The organization below comes from your permitted database records, not from an AI guess. This step creates only SICO coordination metadata and preserves every existing GRC record.</p>
+            <form method="POST" action="?/engagementCreate" class="mt-4 space-y-4">
+                <input type="hidden" name="folder_id" value={discovery.selected_domain.id} />
+                <p class="text-sm">Selected organization: <strong>{discovery.selected_domain.name}</strong></p>
+                <label class="block space-y-1 text-sm font-semibold">
+                    <span>Engagement title</span>
+                    <input name="title" required minlength="4" maxlength="200" class="input w-full" value={`Internal GRC engagement — ${discovery.selected_domain.name}`} />
+                </label>
+                <label class="block space-y-1 text-sm font-semibold">
+                    <span>Real assessment objective</span>
+                    <textarea name="objective" required minlength="20" maxlength="4000" rows="3" class="textarea w-full" placeholder="Describe actual objectives, scope and known systems. No fictional information.">{discovery.case_context?.objective || ''}</textarea>
+                </label>
+                <button type="submit" class="btn preset-filled-primary-500">Create persistent GRC engagement</button>
+            </form>
+        </section>
+    {/if}
+
+    {#if engagement?.id}
+        <section class="rounded-xl border-2 border-teal-500 bg-surface-50 p-5 shadow-sm md:p-6" aria-label="SICO engagement work programme">
+            <h2 class="text-xl font-bold">Engagement workspace</h2>
+            <p class="mt-1 text-sm">{engagement.title || 'Existing engagement'} · Stored in the SICO engagement ledger</p>
+            <form method="POST" action="?/engagementPlan" class="mt-4 space-y-3">
+                <input type="hidden" name="engagement_id" value={engagement.id} />
+                <input type="hidden" name="engagement_title" value={engagement.title || ''} />
+                <label class="flex items-start gap-2 text-sm">
+                    <input type="checkbox" name="use_local_ai" class="checkbox mt-1" />
+                    <span>Use local Qwen for an additional advisory intake analysis. Record discovery and the work programme work without the model.</span>
+                </label>
+                <button type="submit" class="btn preset-filled-primary-500">Investigate and prepare full GRC work programme</button>
+            </form>
+            {#if engagementPlan}
+                <div class="mt-5 space-y-4" aria-live="polite">
+                    <p class="text-sm font-semibold">Authorized scope: {engagementPlan.organization?.name || 'not confirmed'}</p>
+                    <p class="text-xs text-surface-600">This is a real-record backlog, not an evidence-based compliance conclusion. Each execution must pass the original service's permission checks, dry-run and approval requirements.</p>
+                    <div class="grid gap-3 md:grid-cols-2">
+                        {#each engagementPlan.stages || [] as task}
+                            <div class="rounded border border-surface-300 p-3">
+                                <p class="text-sm font-semibold">{task.stage.replaceAll('_', ' ')}</p>
+                                <p class="mt-1 text-xs text-surface-600">{task.state.replaceAll('_', ' ')}</p>
+                                {#if task.dependencies?.length}<p class="mt-1 text-xs">Depends on: {task.dependencies.join(', ').replaceAll('_', ' ')}</p>{/if}
+                            </div>
+                        {/each}
+                    </div>
+                    {#if engagementPlan.additional_workstreams?.length}
+                        <h3 class="text-sm font-semibold">Other GRC functions still requiring integration or an applicability decision</h3>
+                        <div class="grid gap-2 md:grid-cols-2">
+                            {#each engagementPlan.additional_workstreams as stream}
+                                <div class="rounded border border-surface-300 p-3 text-sm">
+                                    <p class="font-semibold">{stream.area.replaceAll('_', ' ')}</p>
+                                    <p class="text-xs">{stream.note}</p>
+                                    <p class="text-xs text-surface-600">{stream.state.replaceAll('_', ' ')}</p>
+                                    {#if stream.manual_route}<a class="text-xs underline" href={stream.manual_route}>Open manual module</a>{/if}
+                                </div>
+                            {/each}
+                        </div>
+                    {/if}
+                    {#each engagementPlan.evidence_and_scope_gaps || [] as issue}
+                        <p class="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{issue}</p>
+                    {/each}
+                </div>
+            {/if}
+        </section>
+    {/if}
+
+	{#if error}
+		<section role="alert" class="rounded-xl border border-red-300 bg-red-50 p-5 text-sm text-red-900">
+			<h2 class="font-bold">Case intake could not complete</h2>
+			<p class="mt-2">{error}</p>
+		</section>
+	{/if}
+
+	{#if discovery}
+		<section class="space-y-4 rounded-xl border-2 border-teal-500 bg-surface-50 p-5 shadow-sm md:p-6" aria-live="polite">
+			<div>
+				<h2 class="text-xl font-bold">Live GRC record investigation</h2>
+				<p class="mt-1 text-sm text-surface-600">Results are from your actual database, filtered by your account's read permissions. This check used no AI model, did not read documents, and made no changes.</p>
+			</div>
+			<div class="grid gap-3 md:grid-cols-2">
+				<div class="rounded-lg border border-surface-300 bg-surface-100 p-4">
+					<h3 class="font-bold">Existing organization / domain</h3>
+					<p class="mt-2 text-sm">Status: <strong>{discovery.domain_status}</strong></p>
+					{#if discovery.selected_domain}
+						<p class="mt-2 text-sm">Selected from platform: <strong>{discovery.selected_domain.name}</strong></p>
+					{:else}
+						<p class="mt-2 text-sm">No unambiguous exact domain was selected. A new one should not be created until candidates are reviewed.</p>
+					{/if}
+					{#each discovery.domain_candidates || [] as item}
+						<p class="mt-2 text-sm">{item.name} — {item.match} match</p>
+					{/each}
+				</div>
+				<div class="rounded-lg border border-surface-300 bg-surface-100 p-4">
+					<h3 class="font-bold">Real framework candidates</h3>
+					{#if !discovery.framework_candidates?.length}
+						<p class="mt-2 text-sm">No readable candidate was found using this framework hint. That does not prove the framework is absent.</p>
+					{:else}
+						{#each discovery.framework_candidates as item}
+							<div class="mt-2 border-b border-surface-300 pb-2 text-sm">
+								<strong>{item.name}</strong> {#if item.reference}({item.reference}){/if}
+								<div class="text-xs text-surface-600">Assessable requirements: {item.assessable_requirements} · Exact name match: {item.match === 'exact' ? 'yes' : 'not verified'}</div>
+							</div>
+						{/each}
+					{/if}
+				</div>
+			</div>
+			{#if !discovery.selected_domain && discovery.domain_candidates?.length}
+				<div class="rounded-lg border border-amber-300 bg-amber-50 p-4">
+					<h3 class="font-bold text-amber-900">Select a matching organizational domain to inspect its records</h3>
+					<p class="mt-1 text-sm text-amber-900">Only domains your account can read are listed. Selection is read-only and is not approval to create anything.</p>
+					{#each discovery.domain_candidates as item}
+						<form method="POST" action="?/discover" class="mt-2 flex items-center justify-between gap-4 rounded border border-amber-200 p-2">
+							<input type="hidden" name="organization_hint" value={discovery.organization_requested} />
+							<input type="hidden" name="preferred_framework" value={discovery.framework_requested} />
+							<input type="hidden" name="selected_folder_id" value={item.id} />
+							<span class="text-sm">{item.name} ({item.match})</span>
+							<button class="btn preset-tonal-primary" type="submit">Inspect</button>
+						</form>
+					{/each}
+				</div>
+			{/if}
+			{#if discovery.selected_domain}
+				<div>
+					<h3 class="font-bold">Records in the selected domain (not child domains)</h3>
+					<div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+						{#each [
+							{label:'Perimeters / scopes',key:'perimeters',href:'/perimeters'},
+							{label:'Assets',key:'assets',href:'/assets'},
+							{label:'Applied controls',key:'applied_controls',href:'/applied-controls'},
+							{label:'Policies',key:'policies',href:'/policies'},
+							{label:'Vulnerabilities',key:'vulnerabilities',href:'/vulnerabilities'},
+							{label:'Evidences',key:'evidences',href:'/evidences'},
+							{label:'Risk assessments',key:'risk_assessments',href:'/risk-assessments'},
+							{label:'Compliance assessments',key:'compliance_assessments',href:'/compliance-assessments'}
+						] as category}
+							<div class="rounded-lg border border-surface-300 bg-surface-100 p-3">
+								<div class="flex items-center justify-between gap-3"><strong>{category.label}</strong><a href={category.href} class="text-sm text-teal-700 underline">Open</a></div>
+							<p class="mt-1 text-xs text-surface-600">Up to {discovery.records_by_category?.[category.key]?.length || 0} visible matches shown</p>
+							{#each discovery.records_by_category?.[category.key] || [] as record}
+								<p class="mt-1 text-sm">{record.name}</p>
+							{/each}
+						</div>
+						{/each}
+					</div>
+				</div>
+			{/if}
+			{#if discovery.next_checks?.length}
+				<div class="rounded-lg border border-surface-300 bg-surface-100 p-4">
+					<h3 class="font-bold">Recommended next investigation checks</h3>
+					<p class="mt-1 text-xs text-surface-600">These checks come from identified database facts and gaps. They are not AI compliance findings.</p>
+					<ul class="mt-2 list-disc space-y-2 pl-5 text-sm">
+						{#each discovery.next_checks as check}
+							<li><strong>{check.topic}:</strong> {check.message}</li>
+						{/each}
+					</ul>
+				</div>
+			{/if}
+			{#if discovery.warnings?.length}
+				<div class="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+					<strong>Items to review</strong>
+					<ul class="mt-2 list-disc pl-5">{#each discovery.warnings as warning}<li>{warning}</li>{/each}</ul>
+				</div>
+			{/if}
+			<p class="text-xs text-surface-600">This is a source-backed starting inventory, not a completed audit. It does not verify evidence or determine compliance. It cannot conclude that records are absent outside the readable, scanned domain.</p>
+		</section>
+	{/if}
+
+{#if discovery}
+    <section class="space-y-4 rounded-xl border border-surface-300 bg-surface-50 p-5 shadow-sm md:p-6" aria-label="Prepare new case from discovered records">
+        <div>
+            <h2 class="text-xl font-bold">Prepare a new GRC case using real records</h2>
+            <p class="mt-1 text-sm text-surface-600">Step 3: choose the exact framework, then tell SICO whether to create a new organizational domain or reuse an existing one. This performs a permission and duplicate preflight, not record creation.</p>
+        </div>
+        {#if discovery.framework_candidates?.length}
+            {#if discovery.new_domain_parent_options?.length}
+                <form method="POST" action="?/casePlan" class="space-y-3 rounded-lg border border-surface-300 p-4">
+                    <h3 class="font-semibold">Option A — Start a completely new company/domain case</h3>
+                    <input type="hidden" name="organization_hint" value={discovery.organization_requested} />
+                    <input type="hidden" name="preferred_framework" value={discovery.framework_requested} />
+                    <input type="hidden" name="domain_strategy" value="create" />
+                    <label class="block space-y-1 text-sm font-semibold"><span>Exact framework from the database</span>
+                        <select name="framework_id" class="select w-full" required>
+                            <option value="" disabled selected>Choose the correct regulation and edition</option>
+                            {#each discovery.framework_candidates as candidate}
+                                <option value={candidate.id}>{candidate.name} ({candidate.assessable_requirements} assessable requirements)</option>
+                            {/each}
+                        </select>
+                    </label>
+                    <label class="block space-y-1 text-sm font-semibold"><span>Parent organizational folder</span>
+                        <select name="parent_folder_id" class="select w-full" required>
+                            <option value="" disabled selected>Choose the allowed parent</option>
+                            {#each discovery.new_domain_parent_options as parent}
+                                <option value={parent.id}>{parent.name}</option>
+                            {/each}
+                        </select>
+                    </label>
+                    <label class="block space-y-1 text-sm font-semibold"><span>Assessment scope / system</span>
+                        <input name="scope_hint" class="input w-full" required minlength="5" maxlength="500" value={discovery.case_context?.scope || ''} placeholder="e.g. Core banking platform — access management" />
+                    </label>
+                    <label class="flex items-start gap-2 text-sm"><input type="checkbox" name="framework_review_confirmed" class="checkbox mt-1" />
+                        <span>I have reviewed the selected framework's applicability and edition. This is my confirmation, not an AI verification.</span>
+                    </label>
+                    <button type="submit" class="btn preset-filled-primary-500 w-full">Prepare new-case plan and check blockers (no writes)</button>
+                </form>
+            {:else}
+                <p class="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">No permitted top-level parent folder is available for new-domain creation. Ask an administrator to check domain-creation permissions; SICO will not bypass them.</p>
+            {/if}
+            {#if discovery.domain_candidates?.length}
+                <form method="POST" action="?/casePlan" class="space-y-3 rounded-lg border border-surface-300 p-4">
+                    <h3 class="font-semibold">Option B — Start a new assessment in an existing organizational domain</h3>
+                    <input type="hidden" name="organization_hint" value={discovery.organization_requested} />
+                    <input type="hidden" name="preferred_framework" value={discovery.framework_requested} />
+                    <input type="hidden" name="domain_strategy" value="reuse" />
+                    <label class="block space-y-1 text-sm font-semibold"><span>Exact framework</span>
+                        <select name="framework_id" class="select w-full" required>
+                            <option value="" disabled selected>Choose a framework</option>
+                            {#each discovery.framework_candidates as candidate}
+                                <option value={candidate.id}>{candidate.name} ({candidate.assessable_requirements} requirements)</option>
+                            {/each}
+                        </select>
+                    </label>
+                    <label class="block space-y-1 text-sm font-semibold"><span>Existing domain to reuse</span>
+                        <select name="selected_folder_id" class="select w-full" required>
+                            <option value="" disabled selected>Choose the existing domain</option>
+                            {#each discovery.domain_candidates as domain}
+                                <option value={domain.id}>{domain.name} ({domain.match} match)</option>
+                            {/each}
+                        </select>
+                    </label>
+                    <label class="block space-y-1 text-sm font-semibold"><span>Assessment scope / system</span>
+                        <input name="scope_hint" class="input w-full" required minlength="5" maxlength="500" value={discovery.case_context?.scope || ''} />
+                    </label>
+                    <label class="flex items-start gap-2 text-sm"><input type="checkbox" name="framework_review_confirmed" class="checkbox mt-1" />
+                        <span>I reviewed the framework applicability and edition.</span>
+                    </label>
+                    <button type="submit" class="btn preset-tonal-primary w-full">Prepare plan using this domain (no writes)</button>
+                </form>
+            {/if}
+        {:else}
+            <p class="text-sm text-surface-600">First resolve a readable framework in the investigation above, then return here.</p>
+        {/if}
+    </section>
+{/if}
+
+{#if casePlan}
+    <section class="space-y-4 rounded-xl border-2 border-teal-500 bg-surface-50 p-5 shadow-sm md:p-6" aria-live="polite">
+        <h2 class="text-xl font-bold">New GRC case — real preflight results</h2>
+        <p class="text-sm">Status: <strong>{casePlan.status === 'blocked' ? 'Blocked: review the issues below' : 'Ready for human review and protected case-setup dry-run'}</strong></p>
+        <p class="text-xs text-surface-600">Checked framework: {casePlan.framework?.name}, {casePlan.framework?.assessable_requirements} assessable requirements. Framework edition and regulatory applicability are NOT independently verified.</p>
+        <div class="space-y-2">
+            {#each casePlan.planned_actions || [] as action, index}
+                <div class="flex gap-3 rounded-lg border border-surface-300 bg-surface-100 p-3 text-sm">
+                    <strong>{index + 1}.</strong>
+                    <span><strong>{action.entity} — {action.operation}:</strong> {action.name}<span class="block text-xs text-surface-600">{action.status}</span></span>
+                </div>
+            {/each}
+        </div>
+        {#if casePlan.blocking_checks?.length}
+            <div class="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+                <strong>Problems to resolve</strong>
+                <ul class="mt-2 list-disc space-y-1 pl-5">{#each casePlan.blocking_checks as blocker}<li>{blocker.message}</li>{/each}</ul>
+            </div>
+        {/if}
+        {#if casePlan.limitations?.length}
+            <details class="rounded-lg border border-surface-300 p-4 text-sm">
+                <summary class="cursor-pointer font-semibold">What this preflight cannot guarantee</summary>
+                <ul class="mt-2 list-disc space-y-1 pl-5">{#each casePlan.limitations as limitation}<li>{limitation}</li>{/each}</ul>
+            </details>
+        {/if}
+        <p class="rounded-lg border border-surface-300 p-4 text-sm">No records were created. After reviewing this plan, a separate existing <strong>Get Started → Local AI Case Onboarding → Step 2 dry-run</strong> must validate the final creation payload. Do not approve or create until the dry-run and permissions pass.</p>
+    </section>
+{/if}
+
+	{#if draft}
+		<section class="space-y-4 rounded-xl border-2 border-teal-500 bg-surface-50 p-5 shadow-sm md:p-6">
+			<div class="flex flex-wrap items-center justify-between gap-3">
+				<div>
+					<h2 class="text-xl font-bold">Your case initiation proposal</h2>
+					<p class="text-sm text-surface-600">Review the proposed framework, domain and perimeter. Nothing has been created.</p>
+				</div>
+				<span class="rounded-full px-3 py-1 text-xs font-semibold {provider === 'configured_local_provider' ? 'bg-teal-100 text-teal-900' : 'bg-amber-100 text-amber-900'}">
+					Provider: {provider}
+				</span>
+			</div>
+			{#if provider !== 'configured_local_provider'}
+				<p class="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+					The provider did not report verified local model inference. Some or all of this proposal may come from deterministic fallback rules.
+				</p>
+			{/if}
+			<div class="grid gap-3 md:grid-cols-2">
+				{#each [
+					{label:'01 · Framework',value:draft.framework_resolution?.canonical_framework_name || draft.framework_resolution?.requested_framework_name,description:'Verify this exact framework is available in the platform',href:'/frameworks'},
+					{label:'02 · Organizational domain',value:draft.case_setup_draft?.folder_domain_draft?.name,description:'Check for an existing domain before creating a duplicate',href:'/folders'},
+					{label:'03 · Perimeter / scope',value:draft.case_setup_draft?.perimeter_draft?.name,description:draft.case_setup_draft?.perimeter_draft?.description || 'Confirm in-scope systems',href:'/perimeters'},
+					{label:'04 · Assessment',value:draft.case_setup_draft?.compliance_assessment_draft?.name,description:'Create only after framework and scope have been approved',href:'/compliance-assessments'}
+				] as item}
+					<div class="rounded-lg border border-surface-300 bg-surface-100 p-4">
+						<div class="text-xs font-bold uppercase tracking-wide text-teal-700">{item.label}</div>
+						<div class="mt-2 font-semibold">{item.value || 'Not resolved yet'}</div>
+						<div class="mt-2 text-xs text-surface-600">{item.description}</div>
+						<a class="mt-3 inline-block text-sm font-semibold text-teal-700 underline" href={item.href}>Review in the platform →</a>
+					</div>
+				{/each}
+			</div>
+			{#if draft.blocking_questions?.length}
+				<div class="rounded-lg border border-amber-300 bg-amber-50 p-4">
+					<h3 class="font-bold text-amber-900">Questions to resolve before creation</h3>
+					<ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-900">
+						{#each draft.blocking_questions as question}
+							<li>{question.question_text || question.question || 'Review the unresolved prerequisite.'}</li>
+						{/each}
+					</ul>
+				</div>
+			{/if}
+			{#if draft.warnings?.length}
+				<details class="rounded border border-surface-300 p-3">
+					<summary class="cursor-pointer font-semibold">AI warnings ({draft.warnings.length})</summary>
+					<ul class="mt-2 list-disc space-y-1 pl-5 text-sm">
+						{#each draft.warnings as warning}
+							<li>{warning.message || warning.code}</li>
+						{/each}
+					</ul>
+				</details>
+			{/if}
+			<div class="rounded border border-surface-300 p-4 text-sm">
+				<p class="font-semibold">Next: validate and approve the actual case setup</p>
+				<p class="mt-1 text-surface-600">Use <strong>Get Started → Local AI Case Onboarding</strong> to run the existing Step 2 dry-run and approval flow. This workspace does not bypass its permission checks or create records silently.</p>
+			</div>
+			<button class="btn preset-tonal-primary" type="button" onclick={() => (showTechnical = !showTechnical)}>
+				{showTechnical ? 'Hide' : 'Show'} structured proposal JSON
+			</button>
+			{#if showTechnical}
+				<pre class="max-h-96 overflow-auto rounded-lg bg-slate-900 p-4 text-xs text-slate-100">{JSON.stringify(draft, null, 2)}</pre>
+			{/if}
+		</section>
+	{/if}
+
+
+    <section id="risk-workflow" class="space-y-4 rounded-xl border-2 border-teal-500 bg-surface-50 p-5 shadow-sm md:p-6">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <h2 class="text-xl font-bold">AI risk scenario — review and save to the real GRC platform</h2>
+                <p class="mt-1 text-sm text-surface-600">Existing Step 8A suggestion and Step 8B protected commit APIs. A risk assessment must already exist; this process never creates one or sets a final risk rating.</p>
+            </div>
+            <a href="/risk-assessments" class="text-sm font-semibold text-teal-700 underline">Open existing risk assessments</a>
+        </div>
+        <form method="POST" action="?/riskSuggest" class="space-y-3 rounded-lg border border-surface-300 p-4">
+            <label class="block space-y-1 text-sm font-semibold">
+                <span>Assessment scope / verified context</span>
+                <textarea name="case_summary" class="textarea w-full" rows="3" minlength="20" maxlength="4000" required
+                    placeholder="Describe the scope, affected system and assessment objective."></textarea>
+            </label>
+            <label class="block space-y-1 text-sm font-semibold">
+                <span>Existing organization name (optional, for permitted assessment lookup)</span>
+                <input name="organization_hint" class="input w-full" maxlength="150" placeholder="Existing organization in your isolated development database" />
+            </label>
+            <label class="block space-y-1 text-sm font-semibold">
+                <span>Known weaknesses (one per line)</span>
+                <textarea name="known_weaknesses" class="textarea w-full" rows="3" maxlength="2500" required
+                    placeholder="Only provide actual documented weaknesses or clearly labelled test assumptions.">No MFA on remote access
+Employees have not completed phishing awareness training</textarea>
+            </label>
+            <button type="submit" class="btn preset-filled-primary-500 w-full sm:w-auto">Generate risk scenarios</button>
+            <p class="text-xs text-surface-600">Generated scenarios are suggestions, not evidence-backed audit conclusions. Model mode is displayed below. Nothing is saved at this stage.</p>
+        </form>
+
+        {#if riskDraft}
+            <div class="space-y-3 rounded-lg border border-surface-300 bg-surface-100 p-4" aria-live="polite">
+                <h3 class="font-bold">Suggested scenarios — review before any write</h3>
+                <p class="text-sm">Generation mode: <strong>{riskDraft.provider_mode || 'unknown'}</strong></p>
+                {#if riskDraft.provider_mode !== 'configured_local_provider'}
+                    <p class="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">The real AI model was not verified for this response. It may be a deterministic fallback; do not describe it as Qwen-generated.</p>
+                {/if}
+                {#each riskDraft.warnings || [] as warning}
+                    <p class="text-sm text-amber-800">{warning.message || warning.code}</p>
+                {/each}
+                {#if !riskDraft.risk_scenarios?.length}
+                    <p class="text-sm">No scenarios generated. Provide a reviewed weakness or asset context and try again.</p>
+                {/if}
+                {#if riskDraft.provider_mode !== 'configured_local_provider'}
+                    <p class="text-sm text-amber-900">To keep this a verified AI workflow, risk creation controls are available only after the backend reports genuine local-model generation.</p>
+                {/if}
+                {#each riskDraft.provider_mode === 'configured_local_provider' ? (riskDraft.risk_scenarios || []) : [] as scenario, index}
+                    <form method="POST" action="?/riskDryRun" class="space-y-3 rounded-lg border border-surface-300 bg-surface-50 p-4">
+                        <h4 class="font-bold">Scenario {index + 1}: {scenario.title}</h4>
+                        <p class="text-xs text-surface-600">AI confidence (not a compliance score): {scenario.confidence} · Advisory risk level: {scenario.risk_level}</p>
+                        <input type="hidden" name="temporary_id" value={scenario.temporary_id} />
+                        <input type="hidden" name="asset_title" value={scenario.asset_title || ''} />
+                        <input type="hidden" name="linked_applied_control_title" value={scenario.linked_applied_control_title || ''} />
+                        <input type="hidden" name="confidence" value={scenario.confidence} />
+                        {#if riskDiscovery?.selected_domain?.id && riskDiscovery.records_by_category?.risk_assessments?.length}
+                            <p class="text-sm">Selected existing domain: <strong>{riskDiscovery.selected_domain.name}</strong></p>
+                            <input type="hidden" name="folder_reference" value={riskDiscovery.selected_domain.id} />
+                            <label class="block space-y-1 text-sm font-semibold"><span>Choose an existing risk assessment (same domain)</span>
+                                <select name="assessment_reference" class="select w-full" required>
+                                    <option value="" disabled selected>Select an existing writable assessment</option>
+                                    {#each riskDiscovery.records_by_category.risk_assessments as assessment}
+                                        <option value={assessment.id}>{assessment.name}</option>
+                                    {/each}
+                                </select>
+                            </label>
+                        {:else}
+                            <div class="grid gap-3 md:grid-cols-2">
+                                <label class="block space-y-1 text-sm font-semibold"><span>Existing organizational folder UUID</span>
+                                    <input name="folder_reference" class="input w-full" pattern="[0-9a-fA-F-]{36}" minlength="36" maxlength="36" required placeholder="Folder UUID of the existing assessment" />
+                                </label>
+                                <label class="block space-y-1 text-sm font-semibold"><span>Existing risk assessment UUID</span>
+                                    <input name="assessment_reference" class="input w-full" pattern="[0-9a-fA-F-]{36}" minlength="36" maxlength="36" required placeholder="Existing RiskAssessment UUID" />
+                                </label>
+                            </div>
+                        {/if}
+                        <p class="text-xs text-surface-600">Choose a permitted existing domain and assessment. The backend independently checks permissions, lock status, duplicates, and matching scope. No new company or assessment is created.</p>
+                        <label class="block space-y-1 text-sm font-semibold"><span>Risk scenario name — editable</span>
+                            <input name="title" class="input w-full" maxlength="200" required value={scenario.title} />
+                        </label>
+                        <label class="block space-y-1 text-sm font-semibold"><span>Description</span>
+                            <textarea name="description" rows="3" maxlength="5000" class="textarea w-full">{scenario.description || ''}</textarea>
+                        </label>
+                        <div class="grid gap-3 md:grid-cols-2">
+                            <label class="block space-y-1 text-sm font-semibold"><span>Threat</span>
+                                <input name="threat" class="input w-full" maxlength="500" value={scenario.threat || ''} />
+                            </label>
+                            <label class="block space-y-1 text-sm font-semibold"><span>Vulnerability</span>
+                                <input name="vulnerability" class="input w-full" maxlength="500" value={scenario.vulnerability || ''} />
+                            </label>
+                        </div>
+                        <p class="text-xs text-amber-900">Threat and vulnerability are AI proposals, not verified findings. After approval, SICO AI will save them as proper same-folder record links, reusing exact matches or creating unpublished drafts. Edit these values before dry-run if necessary.</p>
+                        <label class="block space-y-1 text-sm font-semibold"><span>Potential business impact</span>
+                            <textarea name="impact_description" rows="3" maxlength="3000" class="textarea w-full">{scenario.impact_description || ''}</textarea>
+                        </label>
+                        <div class="grid gap-3 md:grid-cols-3">
+                            <label class="block space-y-1 text-sm font-semibold"><span>Advisory likelihood</span>
+                                <select name="likelihood" class="select w-full">{#each ['low', 'medium', 'high', 'critical'] as value}<option value={value} selected={scenario.likelihood === value}>{value}</option>{/each}</select>
+                            </label>
+                            <label class="block space-y-1 text-sm font-semibold"><span>Advisory impact</span>
+                                <select name="impact" class="select w-full">{#each ['low', 'medium', 'high', 'critical'] as value}<option value={value} selected={scenario.impact === value}>{value}</option>{/each}</select>
+                            </label>
+                            <label class="block space-y-1 text-sm font-semibold"><span>Advisory risk level</span>
+                                <select name="risk_level" class="select w-full">{#each ['low', 'medium', 'high', 'critical'] as value}<option value={value} selected={scenario.risk_level === value}>{value}</option>{/each}</select>
+                            </label>
+                        </div>
+                        <label class="block space-y-1 text-sm font-semibold"><span>Rationale</span>
+                            <textarea name="rationale" rows="3" maxlength="3000" class="textarea w-full">{scenario.rationale || ''}</textarea>
+                        </label>
+                        <label class="block space-y-1 text-sm font-semibold"><span>Suggested next steps (one per line)</span>
+                            <textarea name="recommended_next_steps" rows="3" maxlength="5000" class="textarea w-full">{(scenario.recommended_next_steps || []).join('\n')}</textarea>
+                        </label>
+                        <button type="submit" class="btn preset-tonal-primary">Check this scenario (dry-run, no writes)</button>
+                    </form>
+                {/each}
+            </div>
+        {/if}
+
+        {#if riskReview && riskFullContext}
+            <section class="space-y-4 rounded-xl border-2 border-teal-300 bg-surface-50 p-4" aria-label="Full risk scenario field review">
+                <h3 class="text-lg font-bold">Complete risk form — actual GRC fields</h3>
+                <p class="text-sm">SICO AI loaded existing authorized records for <strong>{riskFullContext.folder?.name}</strong> / <strong>{riskFullContext.assessment?.name}</strong>. It does not create or invent assets, owners, controls or evidence. Select only applicable records and review matrix values.</p>
+                {#if riskFullContext.existing_risk}<p class="rounded bg-teal-50 p-2 text-sm">Existing risk found: <strong>{riskFullContext.existing_risk.label}</strong>. Nonempty manual values will not be overwritten.</p>{/if}
+                {#each riskFullContext.warnings || [] as warning}<p class="text-xs text-amber-900">{warning}</p>{/each}
+                {#if riskFullContext.auto_investigation}
+                    <div class="space-y-2 rounded-lg border border-surface-300 bg-surface-100 p-3" aria-label="SICO AI investigation summary">
+                        <h4 class="text-sm font-bold">SICO AI investigation — suggestions from existing records</h4>
+                        <p class="text-xs">SICO AI checked readable records in this organization. A literal name match is only a proposal, not evidence that an asset is in scope or a control works.</p>
+                        {#if riskFullContext.auto_investigation.candidate_mentions?.assets?.length}
+                            <p class="text-xs"><strong>Assets mentioned in the scenario:</strong> {riskFullContext.auto_investigation.candidate_mentions.assets.map((x: any) => x.label).join(', ')} — confirm the correct asset before saving.</p>
+                        {/if}
+                        {#if riskFullContext.auto_investigation.candidate_mentions?.existing_controls?.length}
+                            <p class="text-xs"><strong>Existing control candidates (not selected):</strong> {riskFullContext.auto_investigation.candidate_mentions.existing_controls.map((x: any) => x.label).join(', ')}</p>
+                        {/if}
+                        <details class="text-xs"><summary class="cursor-pointer font-semibold">What SICO AI cannot verify yet</summary>
+                            <ul class="mt-2 list-disc space-y-1 pl-5">{#each riskFullContext.auto_investigation.gaps || [] as gap}<li>{gap}</li>{/each}</ul>
+                        </details>
+                    </div>
+                {/if}
+                <form method="POST" action="?/riskDryRun" class="space-y-4">
+                    <input type="hidden" name="full_review_ready" value="yes" />
+                    <input type="hidden" name="folder_reference" value={riskReview.folder_reference} />
+                    <input type="hidden" name="assessment_reference" value={riskReview.assessment_reference} />
+                    <input type="hidden" name="temporary_id" value={riskReview.scenario.temporary_id} />
+                    <input type="hidden" name="title" value={riskReview.scenario.title} />
+                    <input type="hidden" name="description" value={riskReview.scenario.description || ''} />
+                    <input type="hidden" name="asset_title" value={riskReview.scenario.asset_title || ''} />
+                    <input type="hidden" name="linked_applied_control_title" value={riskReview.scenario.linked_applied_control_title || ''} />
+                    <input type="hidden" name="threat" value={riskReview.scenario.threat || ''} />
+                    <input type="hidden" name="vulnerability" value={riskReview.scenario.vulnerability || ''} />
+                    <input type="hidden" name="impact_description" value={riskReview.scenario.impact_description || ''} />
+                    <input type="hidden" name="likelihood" value={riskReview.scenario.likelihood} />
+                    <input type="hidden" name="impact" value={riskReview.scenario.impact} />
+                    <input type="hidden" name="risk_level" value={riskReview.scenario.risk_level} />
+                    <input type="hidden" name="rationale" value={riskReview.scenario.rationale || ''} />
+                    <input type="hidden" name="recommended_next_steps" value={(riskReview.scenario.recommended_next_steps || []).join('\n')} />
+                    <input type="hidden" name="confidence" value={riskReview.scenario.confidence} />
+                    <div class="grid gap-3 md:grid-cols-2">
+                        {#each fullRiskLists as entry}
+                            <label class="block space-y-1 text-sm font-semibold">
+                                <span>{entry.label}</span>
+                                <select name={entry.key} class="select w-full" multiple size="3">
+                                    {#each riskFullContext.catalogs?.[entry.cat] || [] as option}
+                                        <option value={option.reference} selected={(riskReview.scenario.reviewed_fields?.[entry.key] || riskFullContext.suggestions?.[entry.key] || []).includes(option.reference)}>{option.label}</option>
+                                    {/each}
+                                </select>
+                                <span class="block text-xs font-normal text-surface-600">{riskFullContext.catalogs?.[entry.cat]?.length ? 'Choose only verified, applicable records. Ctrl+click to select multiple.' : 'No permitted records available; this field stays empty.'}</span>
+                            </label>
+                        {/each}
+                    </div>
+                    <div class="grid gap-3 md:grid-cols-3">
+                        <label class="space-y-1 text-sm font-semibold"><span>Risk origin</span>
+                            <select name="risk_origin_reference" class="select w-full">
+                                <option value="">Unknown / not established</option>
+                                {#each riskFullContext.catalogs?.risk_origins || [] as option}
+                                    <option value={option.reference} selected={riskReview.scenario.reviewed_fields?.risk_origin_reference === option.reference}>{option.label}</option>
+                                {/each}
+                            </select>
+                        </label>
+                        <label class="space-y-1 text-sm font-semibold"><span>Treatment decision</span>
+                            <select name="reviewed_treatment" class="select w-full">
+                                {#each ['open', 'mitigate', 'avoid', 'transfer'] as choice}<option value={choice} selected={(riskReview.scenario.reviewed_fields?.reviewed_treatment || 'open') === choice}>{choice}</option>{/each}
+                            </select>
+                            <span class="block text-xs font-normal text-surface-600">Risk acceptance requires a separate approval. Default is Open.</span>
+                        </label>
+                        <label class="space-y-1 text-sm font-semibold"><span>Strength of knowledge</span>
+                            <select name="strength_of_knowledge" class="select w-full">
+                                {#each [{v:-1,t:'Unknown'}, {v:0,t:'Low'}, {v:1,t:'Medium'}, {v:2,t:'High'}] as opt}
+                                    <option value={opt.v} selected={(riskReview.scenario.reviewed_fields?.strength_of_knowledge ?? -1) === opt.v}>{opt.t}</option>
+                                {/each}
+                            </select>
+                        </label>
+                    </div>
+                    <label class="block space-y-1 text-sm font-semibold"><span>EBIOS operational scenario (where available)</span>
+                        <select name="operational_scenario_reference" class="select w-full">
+                            <option value="">None / not linked</option>
+                            {#each riskFullContext.catalogs?.operational_scenarios || [] as option}
+                                <option value={option.reference} selected={riskReview.scenario.reviewed_fields?.operational_scenario_reference === option.reference}>{option.label}</option>
+                            {/each}
+                        </select>
+                    </label>
+                    <label class="block space-y-1 text-sm font-semibold"><span>Existing controls context (text; only if documented)</span>
+                        <textarea name="existing_controls" rows="2" maxlength="2000" class="textarea w-full" placeholder="Documented existing measures; not AI assumptions">{riskReview.scenario.reviewed_fields?.existing_controls || ''}</textarea>
+                    </label>
+                    <label class="block space-y-1 text-sm font-semibold"><span>Evidence-based justification</span>
+                        <textarea name="justification" rows="3" maxlength="2000" class="textarea w-full" placeholder="Reference the specific documented source for risk rating decisions">{riskReview.scenario.reviewed_fields ? (riskReview.scenario.reviewed_fields.justification ?? '') : (riskFullContext.auto_investigation?.review_drafts?.justification || '')}</textarea>
+                    </label>
+                    <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-3">
+                        <h4 class="font-bold text-sm text-amber-950">Official risk matrix ratings — only where justified by evidence</h4>
+                        <p class="text-xs text-amber-900">The AI's advisory high/medium labels are not scores. Select ordinal values from the assessment's actual matrix only after examining the supporting evidence. Otherwise leave Unrated.</p>
+                        {#each ['inherent', 'current', 'residual'] as stage}
+                            <div class="grid grid-cols-2 gap-3">
+                                {#each [{suffix:'proba',label:'Probability'}, {suffix:'impact',label:'Impact'}] as dimension}
+                                    <label class="space-y-1 text-sm font-semibold"><span>{stage} — {dimension.label}</span>
+                                        <select name={`${stage}_${dimension.suffix}`} class="select w-full">
+                                            <option value="-1">Unrated / unknown</option>
+                                            {#each riskFullContext.matrix?.[dimension.suffix === 'proba' ? 'probability' : 'impact'] || [] as option}
+                                                <option value={option.value} selected={riskReview.scenario.reviewed_fields?.[`${stage}_${dimension.suffix}`] === option.value}>{option.label}</option>
+                                            {/each}
+                                        </select>
+                                    </label>
+                                {/each}
+                            </div>
+                        {/each}
+                        <label class="flex items-start gap-2 text-sm"><input name="reviewer_evidence_confirmed" type="checkbox" class="checkbox mt-1" checked={riskReview.scenario.reviewed_fields?.reviewer_evidence_confirmed === true} />
+                            <span>I personally reviewed the supporting evidence and the justification above for any official numeric risk ratings selected.</span>
+                        </label>
+                    </div>
+                    <button type="submit" class="btn preset-filled-primary-500">Check complete Risk Scenario (dry-run, no writes)</button>
+                </form>
+            </section>
+        {/if}
+
+        {#if riskDryRun}
+            <div class="space-y-3 rounded-lg border border-surface-300 p-4" aria-live="polite">
+                <h3 class="font-bold">Permission and duplicate checks — no writes</h3>
+                <p class="text-sm">Status: <strong>{riskDryRun.commit_status || 'unknown'}</strong></p>
+                {#each riskDryRun.planned_actions || [] as item}
+                    <div class="space-y-1 text-sm">
+                        <p><strong>{item.status}:</strong> {item.detail}</p>
+                        {#if item.related_threat_name}
+                            <p class="rounded bg-surface-100 p-2"><strong>Threat to link:</strong> {item.related_threat_name}</p>
+                        {/if}
+                        {#if item.related_vulnerability_name}
+                            <p class="rounded bg-surface-100 p-2"><strong>Vulnerability to link:</strong> {item.related_vulnerability_name}</p>
+                        {/if}
+                    </div>
+                {/each}
+                {#each riskDryRun.blocking_errors || [] as item}
+                    <p class="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-900"><strong>Blocked:</strong> {item.detail || item.code}</p>
+                {/each}
+                {#each riskDryRun.warnings || [] as item}
+                    <p class="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><strong>Notice:</strong> {item.detail || item.code}</p>
+                {/each}
+                {#if riskReview && riskCanSave}
+                    <form method="POST" action="?/riskCommit" class="space-y-3 rounded border border-teal-300 p-4">
+                        <p class="font-semibold">Reviewed action: save or complete <strong>{riskReview.scenario.title}</strong>, including the real fields and links shown above under the correct assessment.</p>
+                        <p class="text-xs text-surface-600">A final dry-run is repeated server-side. All chosen records are checked against current access and company folder. Existing nonempty manual fields are preserved. Official matrix ratings are stored only when you explicitly confirmed evidence and supplied justification; unverified ratings stay empty. Acceptance and closure are excluded.</p>
+                        <input type="hidden" name="review_json" value={JSON.stringify(riskReview)} />
+                        <label class="flex items-start gap-2 text-sm font-semibold"><input name="approved_by_reviewer" type="checkbox" class="checkbox mt-1" required />
+                            <span>I reviewed the complete Risk Scenario fields, authorized record links, rating evidence and destination, and approve the proposed changes.</span>
+                        </label>
+                        <button type="submit" class="btn preset-filled-primary-500">Approve and save real risk scenario</button>
+                    </form>
+                {/if}
+            </div>
+        {/if}
+        {#if riskResult}
+            <div class="space-y-3 rounded-lg border-2 border-teal-500 p-4" aria-live="polite">
+                <h3 class="font-bold">Protected GRC commit result</h3>
+                <p class="text-sm">Status: <strong>{riskResult.commit_status || 'unknown'}</strong></p>
+                {#each riskResult.created_records || [] as record}
+                    <p class="text-sm">Created: <strong>{record.name}</strong> (record ID: {record.record_id}). Linked threats: {record.linked_threat_ids?.length || 0}; vulnerabilities: {record.linked_vulnerability_ids?.length || 0}. Risk rating recorded: {record.risk_rating_recorded ? 'yes' : 'no'}.</p>
+                {/each}
+                {#each riskResult.reused_records || [] as record}
+                    <p class="text-sm">Reused existing record without modification: <strong>{record.name}</strong>.</p>
+                {/each}
+                {#each riskResult.updated_records || [] as record}
+                    <p class="text-sm">Completed missing links on a previously AI-created risk: <strong>{record.name}</strong>. Linked threats: {record.linked_threat_ids?.length || 0}; vulnerabilities: {record.linked_vulnerability_ids?.length || 0}. Official rating recorded: {record.risk_rating_recorded ? 'yes' : 'no'}.</p>
+                {/each}
+                {#each riskResult.blocking_errors || [] as item}
+                    <p class="text-sm text-red-800">Blocked: {item.detail || item.code}</p>
+                {/each}
+                <a href="/risk-scenarios" class="inline-block text-sm font-semibold text-teal-700 underline">Open Risk Scenarios in the manual platform</a>
+            </div>
+        {/if}
+    </section>
+
+
+	<section class="space-y-3 rounded-xl border border-surface-300 bg-surface-50 p-5 shadow-sm md:p-6">
+		<div class="flex flex-wrap items-center justify-between gap-3">
+			<h2 class="text-xl font-bold">Existing GRC modules</h2>
+			<span class="text-xs text-surface-600">Links to your actual platform screens</span>
+		</div>
+		<p class="text-sm text-surface-600">Use existing functions rather than duplicating them. Every module needs its own AI capability and acceptance tests before we claim automation.</p>
+		<div class="grid gap-4 md:grid-cols-2">
+			{#each sections as section}
+				<div class="rounded-lg border border-surface-300 bg-surface-100 p-4">
+					<h3 class="font-bold">{section.name}</h3>
+					<div class="mt-3 divide-y divide-surface-300">
+						{#each section.items as item}
+							<a href={item.href} class="flex items-center justify-between gap-3 py-2 hover:text-teal-700">
+								<span><span class="block text-sm font-semibold">{item.title}</span><span class="text-xs text-surface-600">{item.detail}</span></span>
+								<span aria-hidden="true">↗</span>
+							</a>
+						{/each}
+					</div>
+				</div>
+			{/each}
+		</div>
+	</section>
+</div>

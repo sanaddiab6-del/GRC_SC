@@ -6,10 +6,8 @@ import FrameworkName from '$lib/components/ModelTable/field/FrameworkName.svelte
 import LibraryActions from '$lib/components/ModelTable/field/LibraryActions.svelte';
 import UserGroupNameDisplay from '$lib/components/ModelTable/field/UserGroupNameDisplay.svelte';
 import LecChartPreview from '$lib/components/ModelTable/field/LecChartPreview.svelte';
-import { listViewFields } from './table';
 import type { urlModel } from './types';
 import LibraryOverview from '$lib/components/ModelTable/field/LibraryOverview.svelte';
-import MarkdownDescription from '$lib/components/ModelTable/field/MarkdownDescription.svelte';
 
 type GetOptionsParams = {
 	objects: any[];
@@ -2613,7 +2611,7 @@ export const URL_MODEL_MAP: ModelMap = {
 
 export const CUSTOM_ACTIONS_COMPONENT = Symbol('CustomActions');
 
-const FIELD_COMPONENT_MAP = {
+export const FIELD_COMPONENT_MAP = {
 	evidences: {
 		attachment: EvidenceFilePreview
 	},
@@ -2641,15 +2639,9 @@ const FIELD_COMPONENT_MAP = {
 	}
 };
 
-export function getFieldComponentMap(URLModel: string) {
-	const fieldComponentMap = (FIELD_COMPONENT_MAP as Record<string, any>)[URLModel] ?? {};
-	const listViewConfig = (listViewFields as Record<string, any>)[URLModel] ?? { body: [] };
-
-	if (listViewConfig.body.findIndex((field: string) => field === 'description') >= 0) {
-		fieldComponentMap.description = MarkdownDescription;
-	}
-	return fieldComponentMap;
-}
+// getFieldComponentMap() lives in ./table because it reads listViewFields. Keeping it here
+// forced crud -> table while table already imports crud, which is a module cycle that Vite's
+// SSR runner can fail to initialize.
 
 // Il faut afficher le tag "draft" pour la column name !
 

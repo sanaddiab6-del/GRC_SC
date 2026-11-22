@@ -14,6 +14,7 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 
+from django.conf import settings
 from django.urls import include, path
 from drf_spectacular.views import (
     SpectacularAPIView,
@@ -41,3 +42,12 @@ urlpatterns = [
     path("serdes/", include("serdes.urls")),
     path("i18n/", include("django.conf.urls.i18n")),
 ]
+
+if settings.DEBUG:
+    # Smoke-test view for local recommendation tuning only; it exposes internal AI-provider
+    # and framework-source state with no auth (AllowAny), so it must never resolve outside DEBUG.
+    from core.debug_views import recommendation_test_view
+
+    urlpatterns.append(
+        path("debug/recommendation-test/", recommendation_test_view, name="recommendation-test")
+    )

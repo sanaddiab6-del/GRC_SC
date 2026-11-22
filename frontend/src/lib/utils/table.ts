@@ -9,7 +9,8 @@ import ChangeEffort from '$lib/components/ContextMenu/applied-controls/ChangeEff
 import ChangeCsfFunction from '$lib/components/ContextMenu/applied-controls/ChangeCsfFunction.svelte';
 import EvidenceChangeStatus from '$lib/components/ContextMenu/evidences/ChangeStatus.svelte';
 import TaskNodeChangeStatus from '$lib/components/ContextMenu/task-nodes/ChangeStatus.svelte';
-import { getModelInfo } from './crud';
+import { FIELD_COMPONENT_MAP, getModelInfo } from './crud';
+import MarkdownDescription from '$lib/components/ModelTable/field/MarkdownDescription.svelte';
 import SelectObject from '$lib/components/ContextMenu/ebios-rm/SelectObject.svelte';
 import ChangePriority from '$lib/components/ContextMenu/applied-controls/ChangePriority.svelte';
 import ChangeAttackStage from '$lib/components/ContextMenu/elementary-actions/ChangeAttackStage.svelte';
@@ -1233,6 +1234,18 @@ export const VULNERABILITY_SEVERITY_FILTER: ListViewFilterConfig = {
 		multiple: true
 	}
 };
+
+// Moved here from ./crud: it reads listViewFields, and keeping it in crud forced a
+// crud <-> table module cycle. Behaviour is unchanged.
+export function getFieldComponentMap(URLModel: string) {
+	const fieldComponentMap = (FIELD_COMPONENT_MAP as Record<string, any>)[URLModel] ?? {};
+	const listViewConfig = (listViewFields as Record<string, any>)[URLModel] ?? { body: [] };
+
+	if (listViewConfig.body.findIndex((field: string) => field === 'description') >= 0) {
+		fieldComponentMap.description = MarkdownDescription;
+	}
+	return fieldComponentMap;
+}
 
 export const listViewFields = {
 	folders: {

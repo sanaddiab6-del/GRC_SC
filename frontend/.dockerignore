@@ -15,3 +15,7 @@ node_modules
 build
 package
 **/*.env
+
+# Exclude local generated pnpm cache from Docker builds
+**/.pnpm-store
+.pnpm-store

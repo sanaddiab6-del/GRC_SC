@@ -27,9 +27,10 @@
 	} from '$lib/components/Modals/stores';
 	import { Progress } from '@skeletonlabs/skeleton-svelte';
 	import SyncToActionsRiskModal from '$lib/components/Modals/SyncToActionsRiskModal.svelte';
+	import RiskTreatmentSuggestion from '$lib/components/RiskScenario/RiskTreatmentSuggestion.svelte';
 	import { defaults } from 'sveltekit-superforms';
-	import { zod } from 'sveltekit-superforms/adapters';
-	import z from 'zod';
+	import { zod4 } from 'sveltekit-superforms/adapters';
+	import z from 'zod4';
 
 	interface Props {
 		data: PageData;
@@ -96,7 +97,7 @@
 		const modalComponent: ModalComponent = {
 			ref: SyncToActionsRiskModal,
 			props: {
-				_form: defaults({ reset_residual: false }, zod(schema)),
+				_form: defaults({ reset_residual: false }, zod4(schema)),
 				schema,
 				id: id,
 				debug: false,
@@ -545,4 +546,8 @@
 			</div>
 		{/if}
 	</div>
+	<RiskTreatmentSuggestion
+		riskScenarioId={data.scenario.id}
+		editHref={canEditObject ? `/risk-scenarios/${data.scenario.id}/edit` : null}
+	/>
 </div>
