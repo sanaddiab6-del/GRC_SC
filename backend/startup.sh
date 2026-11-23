@@ -20,6 +20,8 @@ poetry run python manage.py storelibraries --settings="${DJANGO_SETTINGS_MODULE}
 if [ -n "$DJANGO_SUPERUSER_EMAIL" ]; then
   poetry run python manage.py createsuperuser --noinput --settings="${DJANGO_SETTINGS_MODULE}"
 fi
+# Warn (never block) when the local AI runtime does not serve the pinned model.
+poetry run python manage.py check_ai_model --settings="${DJANGO_SETTINGS_MODULE}" || true
 
 # Set default values for Gunicorn configuration
 GUNICORN_WORKERS=${GUNICORN_WORKERS:-3}

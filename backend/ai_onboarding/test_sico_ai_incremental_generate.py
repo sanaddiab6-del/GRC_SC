@@ -18,7 +18,7 @@ class IncrementalGenerationTests(SimpleTestCase):
         self.provider = Mock()
         self.provider.generate_structured.return_value = ROW.copy()
         self.selection = SimpleNamespace(provider=self.provider, config=SimpleNamespace(
-            model='qwen2.5:3b', timeout_seconds=300, max_output_tokens=2400))
+            model='qwen3:4b-instruct', timeout_seconds=300, max_output_tokens=2400))
 
     def request(self, number=1, org='New Synthetic Fintech'):
         req = self.factory.post('/api/ai/workforce/assistant/lifecycle/generate-one/', {
