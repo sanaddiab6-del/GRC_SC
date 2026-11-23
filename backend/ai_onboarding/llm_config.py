@@ -68,7 +68,14 @@ MODEL_ENV_BY_CAPABILITY = {
 DEFAULT_PROVIDER = ""
 LOCAL_PROVIDER = "local"
 LOCAL_AI_STYLE_OLLAMA = "ollama"
-DEFAULT_MODEL = ""
+# Team-standard local model. Every machine must run this exact build so that
+# results are comparable; `manage.py check_ai_model` reports any mismatch.
+# Chosen after measuring the SICO quality drafts on four frameworks (52/52
+# accepted) and a speed test on a 4 GB GPU / 8 GB RAM laptop. See AI_MODEL_SETUP.md.
+PINNED_MODEL = "qwen3:4b-instruct"
+PINNED_MODEL_DIGEST = "0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0"
+PINNED_OLLAMA_VERSION = "0.40.17"
+DEFAULT_MODEL = PINNED_MODEL
 DEFAULT_TIMEOUT_SECONDS = 60
 DEFAULT_MAX_OUTPUT_TOKENS = 1200
 DEFAULT_TEMPERATURE = 0.1

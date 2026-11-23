@@ -6,7 +6,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-from .llm_config import LOCAL_AI_STYLE_OLLAMA, validate_local_base_url
+from .llm_config import LOCAL_AI_STYLE_OLLAMA, PINNED_MODEL, validate_local_base_url
 
 
 def _extract_json(text: str) -> dict[str, Any] | None:
@@ -41,7 +41,7 @@ def _configured_model() -> str:
     return (
         os.environ.get("LOCAL_AI_MODEL_ONBOARDING", "").strip()
         or os.environ.get("LOCAL_AI_MODEL_DEFAULT", "").strip()
-        or "qwen3:4b-instruct"
+        or PINNED_MODEL
     )
 
 
