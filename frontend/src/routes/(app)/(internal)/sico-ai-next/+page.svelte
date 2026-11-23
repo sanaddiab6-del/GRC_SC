@@ -732,6 +732,11 @@
             method: 'POST', body: payload, headers: { accept: 'application/json' }
         });
         const parsed = deserialize(await res.text());
+        // An expired session makes the server hooks redirect to /login. Say so instead of
+        // the generic failure; accepted drafts stay in this tab's sessionStorage checkpoint.
+        if (parsed.type === 'redirect' && parsed.location.startsWith('/login')) {
+            throw new Error('Your SICO session has expired. Sign in again, then open SICO AI and choose "Resume automatic generation". Accepted drafts are kept in this browser tab.');
+        }
         if (parsed.type !== 'success') {
             const body = parsed.type === 'failure' ? (parsed.data as Record<string, any>) : null;
             throw new Error(String(body?.case_draft_error ?? body?.framework_batch_error ?? body?.control_error ?? body?.ai_sixteen_error ?? body?.lifecycle_error ?? body?.workflow_error ?? 'The requested operation could not finish.'));
