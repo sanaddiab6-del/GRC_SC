@@ -192,6 +192,104 @@ def relevant_authorized_requirements(rows, *, topic, limit=3):
     return [row for _, _, row in matches[:limit]]
 
 
+# Minimal activity-specific semantic cue required in a draft's content. Shared
+# by validate_draft() and the generation rules so the model is told the exact
+# words the gate checks for.
+SEMANTIC_TERMS = {
+    'assets': ('asset', 'system', 'server', 'database', 'platform', 'service', 'application', 'endpoint', 'network', 'directory'),
+    'risk_scenarios': ('risk', 'threat', 'attack', 'compromise', 'exploit', 'weakness'),
+    'applied_controls': ('control', 'enforce', 'implement', 'restrict', 'monitor', 'configure'),
+    'policies': ('shall', 'must', 'policy', 'required', 'prohibit'),
+    'evidence_requests': ('request', 'collect', 'export', 'artifact', 'evidence', 'provide'),
+    'requirement_reviews': ('requirement', 'review', 'assess', 'mapping', 'applicability'),
+    'remediation': ('correct', 'remediat', 'implement', 'action', 'fix', 'resolve'),
+    'control_effectiveness': ('test', 'sample', 'inspect', 'verify', 'procedure'),
+    'human_review': ('review', 'approve', 'signoff', 'sign-off', 'decision'),
+    'reports': ('report', 'metric', 'management', 'decision', 'summary', 'coverage'),
+}
+MIN_DISTINCT_CONTENT_WORDS = 19
+
+
+def output_rules_for(activity, schema):
+    """Plain-language statement of the limits the validators already enforce.
+
+    Derived from the same schema and gate constants, so the model is told the
+    real contract instead of discovering it through rejections.
+    """
+    prefix = CONTRACTS[activity][0]
+    props = schema['properties']
+    def limits(name):
+        p = props[name]
+        return f"{p.get('minLength', 0)}-{p['maxLength']}"
+    attr_props = props['attributes']['properties']
+    attr_max = max(p['maxLength'] for p in attr_props.values())
+    rules = [
+        f"title: start with '{prefix}' then a short noun phrase; at most {props['title']['maxLength']} "
+        "characters in total including the prefix. Never put a full sentence, the requirement text "
+        "or the whole subject hint in the title; put those details in content.",
+        f"content: {limits('content')} characters with at least {MIN_DISTINCT_CONTENT_WORDS} distinct words.",
+        f"each attribute value: at most {attr_max} characters.",
+        f"evidence_request: {limits('evidence_request')} characters.",
+        f"verification_question: {limits('verification_question')} characters.",
+        f"related_draft_references: at most {props['related_draft_references'].get('maxItems', 3)} items.",
+    ]
+    if activity in SEMANTIC_TERMS:
+        words = ', '.join('remediation' if t == 'remediat' else t for t in SEMANTIC_TERMS[activity])
+        rules.append(f"content must literally contain at least one of these words: {words}.")
+    if activity == 'reports':
+        rules.append("attributes.sections_and_metrics must contain the word 'unknown' or 'pending' "
+                     "because no metric has been verified.")
+    return rules
+
+
+# Server-owned explanations for gate failures. Client input only selects one of
+# these codes; free text from the client never reaches the prompt.
+REJECTION_HINTS = {
+    'wrong_activity_title_prefix': 'The title did not start with the exact title_prefix.',
+    'generic_numbered_draft_title': "The title contained 'draft N'; use a descriptive title.",
+    'wrong_activity_attribute_fields': 'attributes must contain exactly the mandatory_attribute_names.',
+    'no_semantic_record_type_content': 'content did not contain any of the required words listed in the rules.',
+    'repeated_or_near_duplicate_title': 'The title was too similar to previous_titles_to_avoid; choose a different subject.',
+    'low_information_repetitive_description': 'content had too few distinct words; add concrete specifics.',
+    'repeated_or_near_duplicate_substance': 'content repeated an earlier draft; develop a different subject.',
+    'report_metrics_unverified_not_marked': "attributes.sections_and_metrics must say 'unknown' or 'pending' for metrics.",
+    'invented_or_duplicate_draft_link': 'related_draft_references must use only allowed_linked_drafts, without duplicates.',
+    'draft_link_to_unrelated_activity': 'related_draft_references must use only allowed_linked_drafts.',
+    'missing_relevant_existing_draft_link': 'related_draft_references must include at least one reference from allowed_linked_drafts.',
+    'threat_asset_reference_not_allowed': 'asset_reference must be an allowed Asset draft reference and also appear in related_draft_references.',
+    'evidence_request_placeholder_value': 'Attribute values must be real text, not <placeholders>.',
+    'evidence_request_control_link_mismatch': 'linked_control_reference must be an allowed control draft and also appear in related_draft_references.',
+    'evidence_request_invented_control': "linked_control_reference must be 'UNLINKED - control draft needed' when no control draft is allowed.",
+    'requirement_ref_not_in_authorized_library': 'framework_requirement_reference must equal the reference in requirement_to_review.',
+    'requirement_reference_not_the_selected_source_record': 'framework_requirement_reference must equal the reference in requirement_to_review.',
+    'unverified_framework_reference': "framework_requirement_reference must be 'UNMAPPED - needs authorized SICO requirement'.",
+}
+_SCHEMA_RULES = {'type', 'required', 'minLength', 'maxLength', 'pattern', 'enum',
+                 'minItems', 'maxItems', 'additionalProperties'}
+
+
+def rejection_hint(activity, failure_reason, path=(), rule=None):
+    """Explain the previous rejection using only allowlisted, server-side text."""
+    if failure_reason in REJECTION_HINTS:
+        return REJECTION_HINTS[failure_reason]
+    if failure_reason != 'local_ai_provider_schema_mismatch' or rule not in _SCHEMA_RULES:
+        return None  # timeouts and provider failures are not content problems
+    schema = quality_wire_schema_for(activity)
+    props = schema['properties']
+    known = set(props) | set(CONTRACTS[activity][1])
+    parts = [p for p in list(path or ())[:2] if isinstance(p, str) and p in known]
+    field = '.'.join(parts) or 'the JSON object'
+    spec = props.get(parts[0], {}) if parts else {}
+    if len(parts) == 2:
+        spec = props['attributes']['properties'].get(parts[1], {})
+    if rule in {'maxLength', 'minLength'} and 'maxLength' in spec:
+        return (f"{field} broke {rule}: it must be {spec.get('minLength', 0)}-{spec['maxLength']} "
+                'characters. Count the characters before answering.')
+    if rule == 'pattern' and parts == ['title']:
+        return REJECTION_HINTS['wrong_activity_title_prefix']
+    return f'{field} broke the {rule} rule of the output schema.'
+
+
 def canonical_title(s):
     s = re.sub(r'\s*\(draft\s*\d+\)|\s+draft\s*\d+\s*$', '', s, flags=re.I)
     return re.sub(r'[^a-z0-9]+',' ',s.casefold()).strip()
@@ -209,18 +307,7 @@ def validate_draft(activity, draft, *, earlier_same=(), prior_records=(), allowe
         raise ValueError('wrong_activity_attribute_fields')
     # A title prefix alone does not make a record useful; enforce a minimal
     # activity-specific semantic cue in its substantive description.
-    semantic_terms = {
-        'assets': ('asset', 'system', 'server', 'database', 'platform', 'service', 'application', 'endpoint', 'network', 'directory'),
-        'risk_scenarios': ('risk', 'threat', 'attack', 'compromise', 'exploit', 'weakness'),
-        'applied_controls': ('control', 'enforce', 'implement', 'restrict', 'monitor', 'configure'),
-        'policies': ('shall', 'must', 'policy', 'required', 'prohibit'),
-        'evidence_requests': ('request', 'collect', 'export', 'artifact', 'evidence', 'provide'),
-        'requirement_reviews': ('requirement', 'review', 'assess', 'mapping', 'applicability'),
-        'remediation': ('correct', 'remediat', 'implement', 'action', 'fix', 'resolve'),
-        'control_effectiveness': ('test', 'sample', 'inspect', 'verify', 'procedure'),
-        'human_review': ('review', 'approve', 'signoff', 'sign-off', 'decision'),
-        'reports': ('report', 'metric', 'management', 'decision', 'summary', 'coverage'),
-    }
+    semantic_terms = SEMANTIC_TERMS
     text = draft['content'].casefold()
     if activity in semantic_terms and not any(term in text for term in semantic_terms[activity]):
         raise ValueError('no_semantic_record_type_content')
@@ -230,7 +317,7 @@ def validate_draft(activity, draft, *, earlier_same=(), prior_records=(), allowe
         other = canonical_title(p)
         if canon == other or SequenceMatcher(None,canon,other).ratio() >= .84:
             raise ValueError('repeated_or_near_duplicate_title')
-    if len(set(re.findall(r'\b\w+\b',draft['content'].casefold()))) < 19:
+    if len(set(re.findall(r'\b\w+\b',draft['content'].casefold()))) < MIN_DISTINCT_CONTENT_WORDS:
         raise ValueError('low_information_repetitive_description')
     # Title suffixes and cosmetic word substitutions do not create new work.
     # Both the narrative and distinct mandatory fields must have substance.
@@ -354,6 +441,7 @@ def generate_quality_draft(selection, *, organization,framework,objective,phase,
             if code == 'requirement_reviews' and chosen_requirement else None
         ),
         'prior_rejection_reasons': list(rejection_feedback)[-2:],
+        'output_rules': output_rules_for(code, sch),
         'no_database_writes': True,
     }
     if code == 'threats':

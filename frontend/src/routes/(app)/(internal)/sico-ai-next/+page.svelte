@@ -128,6 +128,8 @@
     type DraftAttempt = { activity: number; index: number; elapsed_seconds: number; outcome: 'accepted' | 'rejected'; detail: string };
     let attemptHistory = $state<DraftAttempt[]>([]);
     let nextAttemptBySlot = $state<Record<string, number>>({});
+    // Last rejection code per slot; the next Resume sends it so the model learns why.
+    let lastRejectionBySlot = $state<Record<string, unknown>>({});
     let lastAttemptInfo = $state('');
 
     // Only block a clearly conflicting explicit framework name in the objective.
@@ -314,7 +316,7 @@
         if (frameworkConflict) { draftedCaseError = frameworkConflict; return; }
         if (restart) {
             qualityDrafts = []; qualityIssues = []; loadedOlderCheckpoint = false; targetDraftsPerActivity = 1;
-            nextAttemptBySlot = {}; attemptHistory = []; lastAttemptInfo = '';
+            nextAttemptBySlot = {}; lastRejectionBySlot = {}; attemptHistory = []; lastAttemptInfo = '';
             draftedCaseStages = []; draftedCaseScope = qualityScopeKey();
             authorizedFrameworkSource = null; authorizedSourceRows = []; frameworkSourceSummary = '';
         } else if (draftedCaseScope !== qualityScopeKey()) {
@@ -356,7 +358,8 @@
                         problem: instruction.trim(), activity_number: String(slot.step),
                         draft_index: String(slot.index), source_digest: String(authorizedFrameworkSource?.source_digest ?? ''),
                         requirement_reference: chosenRef, previous_drafts: JSON.stringify(previous),
-                        focus_attempt: String(attempt)
+                        focus_attempt: String(attempt),
+                        previous_rejection: JSON.stringify(lastRejectionBySlot[key] ?? null)
                     });
                     const item = (response.data as Record<string, any>)?.quality_draft_one;
                     if (!item || item.quality_contract_checked !== true || item.business_records_written !== false ||
@@ -366,6 +369,8 @@
                     }
                     const elapsed = Math.round((Date.now() - started) / 1000);
                     nextAttemptBySlot = { ...nextAttemptBySlot, [key]: Math.min(30, attempt + 1) };
+                    const { [key]: _accepted, ...remainingRejections } = lastRejectionBySlot;
+                    lastRejectionBySlot = remainingRejections;
                     recordDraftAttempt(slot.step, slot.index, elapsed, 'accepted', 'Draft validated');
                     qualityDrafts = [...qualityDrafts, item];
                     draftedCaseNotice = `Generated ${qualityDrafts.filter(r => r.provenance === 'qwen_quality_single_authenticated_v7').length} new quality-checked drafts. Last request: ${elapsed}s. Source: ${authorizedSourceRows.length} authorized requirements. No records saved.`;
@@ -374,6 +379,8 @@
                     const elapsed = Math.round((Date.now() - started) / 1000);
                     const message = error instanceof Error ? error.message : 'Draft generation request failed.';
                     nextAttemptBySlot = { ...nextAttemptBySlot, [key]: Math.min(30, attempt + 1) };
+                    const rejection = (error as { rejection?: unknown })?.rejection;
+                    if (rejection) lastRejectionBySlot = { ...lastRejectionBySlot, [key]: rejection };
                     recordDraftAttempt(slot.step, slot.index, elapsed, 'rejected', message);
                     qualityIssues = [...qualityIssues.slice(-29), `Activity ${slot.step}: ${message} (${elapsed}s)`];
                     draftedCaseError = `Activity ${slot.step} was not accepted after ${elapsed}s. ${message} The next Resume will try a different focus; previous drafts are preserved.`;
@@ -734,7 +741,10 @@
         const parsed = deserialize(await res.text());
         if (parsed.type !== 'success') {
             const body = parsed.type === 'failure' ? (parsed.data as Record<string, any>) : null;
-            throw new Error(String(body?.case_draft_error ?? body?.framework_batch_error ?? body?.control_error ?? body?.ai_sixteen_error ?? body?.lifecycle_error ?? body?.workflow_error ?? 'The requested operation could not finish.'));
+            const failure = new Error(String(body?.case_draft_error ?? body?.framework_batch_error ?? body?.control_error ?? body?.ai_sixteen_error ?? body?.lifecycle_error ?? body?.workflow_error ?? 'The requested operation could not finish.'));
+            // Allowlisted rejection codes only (quality_draft_one); unused by other actions.
+            if (body?.rejection) Object.assign(failure, { rejection: body.rejection });
+            throw failure;
         }
         return parsed;
     }
