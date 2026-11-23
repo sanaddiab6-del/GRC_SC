@@ -131,7 +131,8 @@ def schema_for(activity):
     }
 
 
-def quality_wire_schema_for(activity, *, allowed_related=(), candidate_assets=(), candidate_controls=()):
+def quality_wire_schema_for(activity, *, allowed_related=(), candidate_assets=(), candidate_controls=(),
+                            selected_requirement_ref=''):
     """A single, flat, named-field model result; legacy checkpoint stays unchanged.
 
     The original schema_for() remains for older code paths. The model is never
@@ -156,6 +157,14 @@ def quality_wire_schema_for(activity, *, allowed_related=(), candidate_assets=()
     if activity == 'evidence_requests':
         draft['properties']['attributes']['properties']['linked_control_reference']['enum'] = (
             sorted(set(candidate_controls)) or ['UNLINKED - control draft needed'])
+    if activity == 'requirement_reviews' and selected_requirement_ref:
+        # Same pattern as the asset/control references above: the model copies the
+        # selected SICO reference instead of writing one (it used to copy the
+        # internal requirement id). minLength is dropped so a short reference such
+        # as "A1" stays valid; maxLength (180) stays because ref_id is at most 100.
+        ref_field = draft['properties']['attributes']['properties']['framework_requirement_reference']
+        ref_field.pop('minLength', None)
+        ref_field['enum'] = [str(selected_requirement_ref)]
     return draft
 
 
@@ -317,8 +326,10 @@ def generate_quality_draft(selection, *, organization,framework,objective,phase,
     ref_ids = [d['draft_reference'] for d in allowed_context]
     controls = [ref for ref in ref_ids if int(ref[6:8]) == 7]
     assets = [d['draft_reference'] for d in allowed_context if d.get('record_type') == 'Asset']
+    reviewing = bool(code == 'requirement_reviews' and chosen_requirement)
     sch = quality_wire_schema_for(code, allowed_related=ref_ids,
-                                  candidate_assets=assets, candidate_controls=controls)
+                                  candidate_assets=assets, candidate_controls=controls,
+                                  selected_requirement_ref=chosen_requirement.get('reference') if reviewing else '')
     previous = [{'draft_reference': d['draft_reference'], 'title': d['title']} for d in prior_drafts]
     ctx = [{'draft_reference': d['draft_reference'], 'record_type': d['record_type'], 'title': d['title']}
            for d in allowed_context]
@@ -341,17 +352,19 @@ def generate_quality_draft(selection, *, organization,framework,objective,phase,
         'previous_titles_to_avoid': previous[-6:],
         'allowed_linked_drafts': ctx,
         'existing_SICO_service_field_hints': SICO_SERVICE_CONTRACT_HINTS.get(code, ''),
+        # Activity 10 never receives the internal requirement id: the model only has
+        # to copy `reference`, and the server already knows the id (see the result).
         'potentially_relevant_authorized_requirements_NOT_ASSESSED': [
-            {'reference': row.get('reference'), 'requirement_id': row.get('requirement_id'),
+            {'reference': row.get('reference'),
+             **({} if code == 'requirement_reviews' else {'requirement_id': row.get('requirement_id')}),
              'requirement_name': str(row.get('requirement_name') or '')[:120],
              'description': str(row.get('description') or '')[:300]}
             for row in allowed_requirement_list
         ],
         'requirement_to_review': (
             {'reference': chosen_requirement.get('reference'),
-             'requirement_id': chosen_requirement.get('requirement_id'),
              'description': str(chosen_requirement.get('description') or '')[:400]}
-            if code == 'requirement_reviews' and chosen_requirement else None
+            if reviewing else None
         ),
         'prior_rejection_reasons': list(rejection_feedback)[-2:],
         'no_database_writes': True,
