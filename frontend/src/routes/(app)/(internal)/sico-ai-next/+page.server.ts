@@ -19,6 +19,25 @@ function backendMessage(value: unknown): string {
     return 'The SICO AI backend could not prepare a workflow plan.';
 }
 
+// Allowlisted shape of a previous quality-draft rejection (codes only, no generated text).
+function parsePreviousRejection(raw: unknown): Record<string, unknown> | null {
+    try {
+        const text = String(raw ?? '');
+        if (!text || text === 'null' || text.length > 600) return null;
+        const value = JSON.parse(text);
+        if (!value || typeof value.failure_reason !== 'string' ||
+            !/^[a-z][a-z0-9_]{1,63}$/.test(value.failure_reason)) return null;
+        const out: Record<string, unknown> = { failure_reason: value.failure_reason };
+        if (Array.isArray(value.path)) {
+            out.path = value.path.slice(0, 8).map((p: unknown) => String(p).slice(0, 40));
+        }
+        if (typeof value.rule === 'string' && /^[A-Za-z]{1,30}$/.test(value.rule)) out.rule = value.rule;
+        return out;
+    } catch {
+        return null;
+    }
+}
+
 export const actions = {
     // Uses the logged-in SICO user and existing RBAC-filtered RequirementNode catalog.
     framework_source_page: async (event) => {
@@ -102,7 +121,8 @@ export const actions = {
             source_digest: String(form.get('source_digest') ?? ''),
             requirement_reference: String(form.get('requirement_reference') ?? '').trim(),
             previous_drafts,
-            focus_attempt: Number(form.get('focus_attempt') ?? 0)
+            focus_attempt: Number(form.get('focus_attempt') ?? 0),
+            previous_rejection: parsePreviousRejection(form.get('previous_rejection'))
         };
         if (payload.organization_name.length < 2 || payload.organization_name.length > 150 ||
             payload.framework_name.length < 2 || payload.framework_name.length > 150 ||
@@ -118,7 +138,13 @@ export const actions = {
             const response = await fetchAiOnboardingBackend(event, '/ai/workforce/assistant/case-draft/quality-one/', payload);
             const data = await response.json().catch(() => ({}));
             if (!response.ok) return fail(response.status, { case_draft_error:
-                `${backendMessage(data)} ${typeof data.failure_reason === 'string' ? '(' + data.failure_reason.slice(0, 80) + ')' : ''}` });
+                `${backendMessage(data)} ${typeof data.failure_reason === 'string' ? '(' + data.failure_reason.slice(0, 80) + ')' : ''}`,
+                // Returned to the page only so the next Resume can tell the model why it was rejected.
+                rejection: parsePreviousRejection(JSON.stringify({
+                    failure_reason: data.failure_reason,
+                    path: data.validation_failure?.path,
+                    rule: data.validation_failure?.rule
+                })) });
             if (data.business_records_written !== false || data.quality_contract_checked !== true ||
                 data.activity_number !== payload.activity_number ||
                 data.source_digest !== payload.source_digest ||

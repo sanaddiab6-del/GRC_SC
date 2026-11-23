@@ -18,7 +18,7 @@ from .llm_provider import get_advisory_provider_selection
 from .llm_errors import AiProviderError
 from .sico_ai_case_draft_views import DRAFT_ACTIVITIES
 from .sico_ai_framework_batch_v3 import _load_authorized_requirements, _page_and_digest
-from .quality_sico_drafts_v5 import CONTRACTS, generate_quality_draft
+from .quality_sico_drafts_v5 import CONTRACTS, generate_quality_draft, rejection_hint
 
 # Accept an intentionally small amount of untrusted case context. All drafts
 # are unsaved client-side objects and cannot grant access to SICO records.
@@ -36,6 +36,12 @@ class PreviousDraft(serializers.Serializer):
             raise serializers.ValidationError('Invalid draft reference.')
         return value
 
+class PreviousRejection(serializers.Serializer):
+    # Only codes the server itself returned; mapped to server-owned hint text.
+    failure_reason = serializers.RegexField(regex=r'^[a-z][a-z0-9_]{1,63}$')
+    path = serializers.ListField(child=serializers.CharField(max_length=40), required=False, max_length=8)
+    rule = serializers.RegexField(regex=r'^[A-Za-z]{1,30}$', required=False)
+
 class QualityDraftInput(serializers.Serializer):
     organization_name = serializers.CharField(min_length=2, max_length=150)
     framework_name = serializers.CharField(min_length=2, max_length=150)
@@ -46,6 +52,7 @@ class QualityDraftInput(serializers.Serializer):
     requirement_reference = serializers.CharField(required=False, allow_blank=True, max_length=100)
     previous_drafts = PreviousDraft(many=True, required=False)
     focus_attempt = serializers.IntegerField(required=False, min_value=0, max_value=30, default=0)
+    previous_rejection = PreviousRejection(required=False, allow_null=True)
 
     def validate_previous_drafts(self, rows):
         if len(rows) > MAX_CONTEXT:
@@ -115,6 +122,11 @@ class SicoQualityDraftOneView(APIView):
                 prior.append(item)
             if position in dependencies:
                 context.append(item)
+        # Tell the model why its previous attempt for this slot was rejected.
+        # Still one model request per HTTP request; no server-side retry.
+        rejection = values.get('previous_rejection') or {}
+        hint = rejection_hint(code, rejection.get('failure_reason'), rejection.get('path') or (),
+                              rejection.get('rule')) if rejection else None
         # The generator checks category contracts, uniqueness and draft links;
         # saved SICO functions remain uncalled until a separate future approval.
         try:
@@ -127,6 +139,7 @@ class SicoQualityDraftOneView(APIView):
                 case_context=context, authorized_requirements=rows,
                 chosen_requirement=chosen,
                 focus_attempt=values['focus_attempt'],
+                rejection_feedback=(hint,) if hint else (),
             )
         except (AiProviderError, JsonSchemaError, ValueError, TimeoutError, TypeError, KeyError) as exc:
             # No secret provider URLs or sensitive prompts in the response.
