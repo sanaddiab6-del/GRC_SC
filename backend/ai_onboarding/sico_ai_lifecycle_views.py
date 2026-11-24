@@ -142,6 +142,59 @@ def _framework_candidates(user, query):
     return [row for row in rows if readable(user, Framework, row.pk)]
 
 
+# Help users find the exact framework name; never selects one for them.
+# _framework_candidates above stays the only way a name becomes a framework.
+_SEARCH_WORD = re.compile(r'[a-z0-9]+')
+FRAMEWORK_CHOICES_LIMIT = 200
+
+
+def framework_search_words(name, ref_id=''):
+    """Words a typed prefix may start: name and reference words, plus the
+    initials of the name's words ("Essential Cybersecurity Controls" -> "ecc")."""
+    name_words = _SEARCH_WORD.findall(str(name).casefold())
+    words = set(name_words) | set(_SEARCH_WORD.findall(str(ref_id or '').casefold()))
+    initials = ''.join(w[0] for w in name_words if w[0].isalpha())
+    if len(initials) > 1:
+        words.add(initials)
+    return words
+
+
+def framework_name_matches(query, name, ref_id=''):
+    """True when every typed word is the start of a word of the framework."""
+    typed = _SEARCH_WORD.findall(str(query).casefold())
+    words = framework_search_words(name, ref_id)
+    return bool(typed) and all(any(w.startswith(t) for w in words) for t in typed)
+
+
+def authorized_framework_choices(user):
+    """Frameworks this user may read, with the same readable() rule as
+    _framework_candidates, so every listed name is accepted as an exact match."""
+    rows = Framework.objects.order_by('name', 'pk')[:FRAMEWORK_CHOICES_LIMIT]
+    return [row for row in rows if readable(user, Framework, row.pk)]
+
+
+def unloaded_framework_libraries(user, limit=400):
+    """Framework libraries in SICO's Libraries catalogue that are not loaded yet.
+
+    Listed so users can see every framework SICO offers. They cannot be used until
+    someone loads them from Libraries with the existing import flow and permissions;
+    nothing here loads a library or writes any record.
+    """
+    from core.models import LoadedLibrary, StoredLibrary
+    from iam.models import RoleAssignment
+    visible = RoleAssignment.get_accessible_object_ids(Folder.get_root_folder(), user, StoredLibrary)[0]
+    loaded_urns = LoadedLibrary.objects.values_list('urn', flat=True)
+    rows = (StoredLibrary.objects.filter(id__in=visible).exclude(urn__in=loaded_urns)
+            .only('id', 'name', 'ref_id', 'locale', 'objects_meta').order_by('name', 'pk'))
+    return [row for row in rows if (row.objects_meta or {}).get('framework')][:limit]
+
+
+def framework_suggestions(user, query, limit=5):
+    """Readable frameworks a non-exact name probably meant. Suggestions only."""
+    return [row for row in authorized_framework_choices(user)
+            if framework_name_matches(query, row.name, row.ref_id)][:limit]
+
+
 class LifecycleThreeInputView(APIView):
     """Prepare one real scoped assessment from organization/framework/problem.
 

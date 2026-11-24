@@ -56,6 +56,82 @@
     let authorizedSourceRows = $state<Record<string, any>[]>([]);
     let frameworkSourceSummary = $state('');
 
+    // Framework picker: lists every framework in SICO's Libraries and narrows the
+    // list on every keystroke. Picking a loaded framework only fills the field with
+    // its exact name; the backend still accepts exact names only and never guesses.
+    // A framework that is not loaded yet links to Libraries; nothing is loaded here.
+    type FrameworkChoice = { name: string; reference: string; loaded: boolean; library_id: string; locale: string };
+    let frameworkChoices = $state<FrameworkChoice[]>([]);
+    let frameworkChoicesLoading = false;
+    let frameworkPickerOpen = $state(false);
+    let frameworkPickerIndex = $state(-1);
+    let frameworkNotLoaded = $state<FrameworkChoice | null>(null);
+    // The list stays hidden until the user types, or asks for every framework.
+    let frameworkShowAll = $state(false);
+
+    function frameworkSearchWords(name: string, reference: string): string[] {
+        const nameWords = name.toLowerCase().match(/[a-z0-9]+/g) ?? [];
+        const words = [...nameWords, ...(reference.toLowerCase().match(/[a-z0-9]+/g) ?? [])];
+        const initials = nameWords.filter((w) => /^[a-z]/.test(w)).map((w) => w[0]).join('');
+        if (initials.length > 1) words.push(initials); // "Essential Cybersecurity Controls" -> "ecc"
+        return words;
+    }
+    // Same rule as the backend suggestions: every typed word starts a framework word.
+    function frameworkMatches(query: string, choice: { name: string; reference: string }): boolean {
+        const typed = query.toLowerCase().match(/[a-z0-9]+/g) ?? [];
+        const words = frameworkSearchWords(choice.name, choice.reference);
+        return typed.every((t) => words.some((w) => w.startsWith(t)));
+    }
+    const frameworkMatchesShown = $derived(
+        frameworkShowAll ? frameworkChoices
+            : frameworkSearch.trim() ? frameworkChoices.filter((choice) => frameworkMatches(frameworkSearch, choice))
+            : []
+    );
+
+    async function openFrameworkPicker() {
+        if (!frameworkPickerOpen) frameworkShowAll = false;
+        frameworkPickerOpen = true;
+        // Refreshed on every open, so a library loaded meanwhile shows as available.
+        if (frameworkChoicesLoading) return;
+        frameworkChoicesLoading = true;
+        try {
+            const response = await sicoPostAction('framework_choices', {});
+            const list = (response.data as Record<string, any>)?.framework_choices;
+            if (Array.isArray(list)) frameworkChoices = list;
+        } catch {
+            // Typing the exact name still works; the list is retried on the next open.
+        } finally {
+            frameworkChoicesLoading = false;
+        }
+    }
+    function pickFramework(choice: FrameworkChoice) {
+        frameworkPickerOpen = false;
+        frameworkPickerIndex = -1;
+        if (!choice.loaded) {
+            frameworkNotLoaded = choice; // Cannot be used until it is loaded from Libraries.
+            return;
+        }
+        frameworkNotLoaded = null;
+        frameworkSearch = choice.name;
+    }
+    function frameworkPickerKey(event: KeyboardEvent) {
+        if (event.key === 'Escape') { frameworkPickerOpen = false; return; }
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            frameworkPickerOpen = true;
+            const count = frameworkMatchesShown.length;
+            if (!count) return;
+            const step = event.key === 'ArrowDown' ? 1 : -1;
+            frameworkPickerIndex = (frameworkPickerIndex + step + count) % count;
+            return;
+        }
+        if (event.key === 'Enter' && frameworkPickerOpen && frameworkPickerIndex >= 0 &&
+            frameworkPickerIndex < frameworkMatchesShown.length) {
+            event.preventDefault(); // Choose the highlighted name instead of submitting the form.
+            pickFramework(frameworkMatchesShown[frameworkPickerIndex]);
+        }
+    }
+
     async function loadSicoAuthorizedFrameworkSource() {
         let cursor = '';
         let sourceDigest = '';
@@ -69,6 +145,18 @@
             if (!part) throw new Error('No authorized framework source was returned.');
             if (part.status !== 'partial' && part.status !== 'complete') {
                 const candidates = Array.isArray(part.candidates) ? part.candidates.join(', ') : '';
+                const suggestions = Array.isArray(part.suggestions) ? part.suggestions.map(String) : [];
+                const typed = frameworkSearch.trim().toLowerCase();
+                const notLoaded = frameworkChoices.find((c) => !c.loaded &&
+                    (c.name.toLowerCase() === typed || c.reference.toLowerCase() === typed));
+                if (!candidates && notLoaded) {
+                    frameworkNotLoaded = notLoaded;
+                    throw new Error(`"${notLoaded.name}" is in SICO's Libraries but is not loaded yet. Load it from Libraries first, then select it in the Framework field.`);
+                }
+                if (!candidates && suggestions.length) {
+                    // Suggestions only: the user still has to choose the exact name.
+                    throw new Error(`Framework "${frameworkSearch.trim()}" was not found in your SICO library. Did you mean: ${suggestions.join(' or ')}? Select it from the Framework list, then build again.`);
+                }
                 throw new Error('The exact selected framework could not be resolved using your SICO permissions.' + (candidates ? ` Authorized matches: ${candidates}` : ''));
             }
             if (!part.framework_id || !part.source_digest || !Array.isArray(part.requirements)) {
@@ -756,7 +844,7 @@
         }
         if (parsed.type !== 'success') {
             const body = parsed.type === 'failure' ? (parsed.data as Record<string, any>) : null;
-            const failure = new Error(String(body?.case_draft_error ?? body?.framework_batch_error ?? body?.control_error ?? body?.ai_sixteen_error ?? body?.lifecycle_error ?? body?.workflow_error ?? 'The requested operation could not finish.'));
+            const failure = new Error(String(body?.case_draft_error ?? body?.source_error ?? body?.framework_batch_error ?? body?.control_error ?? body?.ai_sixteen_error ?? body?.lifecycle_error ?? body?.workflow_error ?? 'The requested operation could not finish.'));
             // Allowlisted rejection codes only (quality_draft_one); unused by other actions.
             if (body?.rejection) Object.assign(failure, { rejection: body.rejection });
             throw failure;
@@ -1049,8 +1137,53 @@
                     <input name="organization_name" bind:value={organization} disabled={draftedCaseBusy} required minlength="2" maxlength="150" placeholder="Organization name (new or existing)" />
                 </label>
                 <label>2. Framework
-                    <input name="framework_name" bind:value={frameworkSearch} disabled={draftedCaseBusy} required minlength="2" maxlength="150" placeholder="Enter the exact framework name from SICO’s library" />
+                    <div class="framework-picker">
+                        <input name="framework_name" bind:value={frameworkSearch} disabled={draftedCaseBusy} required minlength="2" maxlength="150"
+                            placeholder="Type a framework name, e.g. ISO 27001" autocomplete="off"
+                            role="combobox" aria-autocomplete="list" aria-expanded={frameworkPickerOpen} aria-controls="framework-picker-list"
+                            aria-activedescendant={frameworkPickerIndex >= 0 ? `framework-option-${frameworkPickerIndex}` : undefined}
+                            onfocus={openFrameworkPicker} onclick={openFrameworkPicker}
+                            oninput={() => { frameworkPickerOpen = true; frameworkShowAll = false; frameworkPickerIndex = -1; frameworkNotLoaded = null; }}
+                            onkeydown={frameworkPickerKey}
+                            onblur={() => { frameworkPickerOpen = false; frameworkPickerIndex = -1; }} />
+                        {#if frameworkPickerOpen && !draftedCaseBusy}
+                            <!-- Clicks inside a <label> would re-activate the input and reopen the list. -->
+                            <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+                            <div class="framework-picker-panel" onclick={(event) => event.preventDefault()}>
+                                <p class="framework-picker-hint">Start typing the framework name, then select it from the list.</p>
+                                {#if !frameworkShowAll && !frameworkSearch.trim()}
+                                    <button type="button" class="framework-show-all"
+                                        onmousedown={(event) => event.preventDefault()}
+                                        onclick={() => { frameworkShowAll = true; frameworkPickerIndex = -1; }}>Show all frameworks</button>
+                                {/if}
+                                <div id="framework-picker-list" role="listbox" aria-label="Frameworks in your SICO library">
+                                    {#each frameworkMatchesShown as choice, i (choice.library_id || `loaded|${choice.name}|${choice.reference}`)}
+                                        <div id={`framework-option-${i}`} class="framework-picker-option" class:active={i === frameworkPickerIndex}
+                                            class:not-loaded={!choice.loaded}
+                                            role="option" tabindex="-1" aria-selected={i === frameworkPickerIndex}
+                                            onmousedown={(event) => { event.preventDefault(); pickFramework(choice); }}
+                                            onclick={(event) => event.preventDefault()}
+                                            onkeydown={(event) => { if (event.key === 'Enter') pickFramework(choice); }}>
+                                            <span>{choice.name}</span>
+                                            {#if !choice.loaded}
+                                                <span class="framework-picker-tag">{choice.locale ? `${choice.locale.toUpperCase()} · ` : ''}Not loaded</span>
+                                            {/if}
+                                        </div>
+                                    {/each}
+                                </div>
+                                {#if frameworkChoices.length && frameworkSearch.trim() && !frameworkMatchesShown.length}
+                                    <p class="framework-picker-empty">No framework in your SICO library matches "{frameworkSearch.trim()}".</p>
+                                {/if}
+                            </div>
+                        {/if}
+                    </div>
                 </label>
+                {#if frameworkNotLoaded}
+                    <p class="framework-not-loaded" role="status">
+                        "{frameworkNotLoaded.name}" is in SICO's Libraries but is not loaded yet. Load it from Libraries first, then select it here.
+                        <a href={`/stored-libraries/${frameworkNotLoaded.library_id}`} target="_blank" rel="noopener">Open it in Libraries</a>
+                    </p>
+                {/if}
                 <label>3. GRC case objective
                     <textarea name="problem" bind:value={instruction} disabled={draftedCaseBusy} required minlength="20" maxlength="4000" rows="4" placeholder="Create a complete new GRC case with proposed assets, controls, risks, policy drafts, evidence requests, remediation and reports."></textarea>
                 </label>
@@ -1181,5 +1314,18 @@
     .sico-case-draft dt{color:#aecbdb;font-weight:700;font-size:13px;line-height:1.5}
     .sico-case-draft dd{font-size:14px;line-height:1.55}
     .sico-case-draft .footnote{line-height:1.6}
+    .framework-picker{position:relative}
+    .framework-picker-panel{position:absolute;z-index:20;left:0;right:0;top:calc(100% + 4px);max-height:300px;overflow-y:auto;background:#0e192b;border:1px solid #46637a;border-radius:8px;box-shadow:0 10px 24px rgba(0,0,0,.45);font-weight:400}
+    .framework-picker-hint,.framework-picker-empty{margin:0;padding:9px 12px;font-size:12.5px;line-height:1.45;color:#9fb8c8}
+    .framework-picker-hint{border-bottom:1px solid #2a4157}
+    .framework-picker-option{padding:9px 12px;font-size:14px;color:#eef6ff;cursor:pointer}
+    .framework-picker-option:hover,.framework-picker-option.active{background:#1b3149}
+    .framework-picker-option{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+    .framework-show-all{display:block;margin:8px 12px;padding:6px 12px;font:inherit;font-size:13px;font-weight:650;color:#78dfcc;background:transparent;border:1px solid #3c6b72;border-radius:999px;cursor:pointer}
+    .framework-show-all:hover,.framework-show-all:focus-visible{background:#163142}
+    .framework-picker-option.not-loaded{color:#a9bfcd}
+    .framework-picker-tag{flex:none;font-size:11.5px;color:#8fa9ba;border:1px solid #35506a;border-radius:999px;padding:1px 8px;white-space:nowrap}
+    .framework-not-loaded{margin:-4px 0 0;padding:9px 12px;font-size:13px;line-height:1.5;color:#f1d9a8;background:#2a2412;border:1px solid #6b5a2a;border-radius:8px}
+    .framework-not-loaded a{color:#78dfcc;font-weight:650;margin-inline-start:4px}
     @media(max-width:600px){.workflow-form{padding:14px}.sico-case-draft{padding:15px}.sico-case-draft dl div{grid-template-columns:1fr;gap:3px;padding:10px 0}}
 </style>

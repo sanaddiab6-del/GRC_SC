@@ -39,6 +39,34 @@ function parsePreviousRejection(raw: unknown): Record<string, unknown> | null {
 }
 
 export const actions = {
+    // Names of the frameworks this user may read, for the framework picker. Same
+    // readable() rule as exact matching; names and references only.
+    framework_choices: async (event) => {
+        if (!hasAiOnboardingSession(event)) return fail(401, { source_error: 'Sign in again.' });
+        try {
+            const response = await fetchAiOnboardingBackend(
+                event, '/ai/workforce/assistant/framework-source/choices/', {}
+            );
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) return fail(response.status, { source_error: backendMessage(data) });
+            const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            const frameworks = (Array.isArray(data.frameworks) ? data.frameworks : [])
+                .filter((f: unknown) => typeof (f as { name?: unknown })?.name === 'string')
+                .slice(0, 600)
+                .map((f: { name: string; reference?: unknown; loaded?: unknown; library_id?: unknown; locale?: unknown }) => ({
+                    name: f.name.slice(0, 150),
+                    reference: typeof f.reference === 'string' ? f.reference.slice(0, 100) : '',
+                    loaded: f.loaded === true,
+                    // Only a real stored-library id may become a link to Libraries.
+                    library_id: typeof f.library_id === 'string' && uuid.test(f.library_id) ? f.library_id : '',
+                    locale: typeof f.locale === 'string' ? f.locale.replace(/[^a-z-]/gi, '').slice(0, 10) : ''
+                }))
+                .filter((f: { loaded: boolean; library_id: string }) => f.loaded || f.library_id);
+            return { framework_choices: frameworks };
+        } catch {
+            return fail(502, { source_error: 'Could not reach the authorized framework catalog.' });
+        }
+    },
     // Uses the logged-in SICO user and existing RBAC-filtered RequirementNode catalog.
     framework_source_page: async (event) => {
         if (!hasAiOnboardingSession(event)) return fail(401, { source_error: 'Sign in again.' });
