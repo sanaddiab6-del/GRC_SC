@@ -217,6 +217,47 @@ SEMANTIC_TERMS = {
     'reports': ('report', 'metric', 'management', 'decision', 'summary', 'coverage'),
 }
 MIN_DISTINCT_CONTENT_WORDS = 19
+# Length the model is asked to AIM for, well below the schema hard limits. Told only
+# the hard limit, the model wrote up to it and Ollama cut the text mid-word (a field
+# at its limit in 38-69% of drafts), sometimes ending in a Chinese word that fit.
+# The hard limits and the gates are unchanged; these only shape the prompt.
+# Measured: the model followed a character target for short fields but ignored one
+# for content (median still 670), so content is asked for in sentences.
+TARGET_CONTENT_SENTENCES = (3, 4)
+TARGET_CONTENT_CHARS = (300, 500)
+TARGET_MAX_CHARS = {'attribute': 120, 'evidence_request': 200, 'verification_question': 180}
+# Chinese, Japanese and Korean script (incl. CJK punctuation and full-width forms).
+# Arabic and other scripts a customer may use in names are not affected.
+CJK_CHARACTERS = re.compile(
+    r'[⺀-⿟　-ヿ㄀-ㇿ㐀-䶿一-鿿'
+    r'가-힯豈-﫿＀-￯]')
+
+
+# A sentence end: . ! or ? (optionally closed by a quote or bracket) followed by a
+# space, not the period of a list number such as "3." in "1. ... 2. ... 3. Conduct".
+_SENTENCE_END = re.compile(r'(?<![0-9])[.!?]["\')\]]?(?=\s)')
+
+
+def drop_unfinished_sentence(text, max_length, *, min_length=0, min_distinct_words=0):
+    """Remove the fragment Ollama left when it cut a field at its hard limit.
+
+    Only a field that reached its limit is touched, and it is cut back to its last
+    complete sentence. The fragment is unfinished, so no complete statement is lost.
+    If the shorter text would break the field's own minimums, it is left as is.
+    """
+    if len(text) < max_length - 2:
+        return text
+    body = text.rstrip()
+    ends = [m.end() for m in _SENTENCE_END.finditer(body[:-1] + ' ')]
+    ends = [e for e in ends if e < len(body)]
+    if not ends:
+        return text
+    shorter = body[:ends[-1]].rstrip()
+    if len(shorter) < min_length:
+        return text
+    if min_distinct_words and len(set(re.findall(r'\b\w+\b', shorter.casefold()))) < min_distinct_words:
+        return text
+    return shorter
 
 
 def output_rules_for(activity, schema):
@@ -236,10 +277,18 @@ def output_rules_for(activity, schema):
         f"title: start with '{prefix}' then a short noun phrase; at most {props['title']['maxLength']} "
         "characters in total including the prefix. Never put a full sentence, the requirement text "
         "or the whole subject hint in the title; put those details in content.",
-        f"content: {limits('content')} characters with at least {MIN_DISTINCT_CONTENT_WORDS} distinct words.",
-        f"each attribute value: at most {attr_max} characters.",
-        f"evidence_request: {limits('evidence_request')} characters.",
-        f"verification_question: {limits('verification_question')} characters.",
+        f"content: {limits('content')} characters with at least {MIN_DISTINCT_CONTENT_WORDS} distinct words. "
+        f"Write {TARGET_CONTENT_SENTENCES[0]}-{TARGET_CONTENT_SENTENCES[1]} complete sentences "
+        f"(roughly {TARGET_CONTENT_CHARS[0]}-{TARGET_CONTENT_CHARS[1]} characters), then stop; text past "
+        "the maximum is cut off mid-word.",
+        f"each attribute value: at most {attr_max} characters; aim for at most "
+        f"{min(attr_max, TARGET_MAX_CHARS['attribute'])}, written as one complete phrase or sentence.",
+        f"evidence_request: {limits('evidence_request')} characters; aim for at most "
+        f"{min(props['evidence_request']['maxLength'], TARGET_MAX_CHARS['evidence_request'])}.",
+        f"verification_question: {limits('verification_question')} characters; aim for at most "
+        f"{min(props['verification_question']['maxLength'], TARGET_MAX_CHARS['verification_question'])}.",
+        "Write every field in English with Latin characters only; never use Chinese, Japanese "
+        "or Korean characters.",
         f"related_draft_references: at most {props['related_draft_references'].get('maxItems', 3)} items.",
     ]
     if activity in SEMANTIC_TERMS:
@@ -272,6 +321,8 @@ REJECTION_HINTS = {
     'requirement_ref_not_in_authorized_library': 'framework_requirement_reference must equal the reference in requirement_to_review.',
     'requirement_reference_not_the_selected_source_record': 'framework_requirement_reference must equal the reference in requirement_to_review.',
     'unverified_framework_reference': "framework_requirement_reference must be 'UNMAPPED - needs authorized SICO requirement'.",
+    'cjk_characters_in_draft': ('The draft contained Chinese, Japanese or Korean characters. Write every field '
+                                'in English with Latin characters only, and keep each field well under its limit.'),
 }
 _SCHEMA_RULES = {'type', 'required', 'minLength', 'maxLength', 'pattern', 'enum',
                  'minItems', 'maxItems', 'additionalProperties'}
@@ -314,6 +365,12 @@ def validate_draft(activity, draft, *, earlier_same=(), prior_records=(), allowe
     names = [x['field'] for x in draft['attributes']]
     if len(names) != len(fields) or set(names) != set(fields) or len(set(names)) != len(fields):
         raise ValueError('wrong_activity_attribute_fields')
+    # Qwen sometimes finishes a field with a Chinese word when it runs out of room.
+    # Such text must never reach a customer-facing GRC draft.
+    texts = [title, draft['content'], draft.get('evidence_request', ''), draft.get('verification_question', '')]
+    texts += [str(a.get('proposed_value', '')) for a in draft['attributes']]
+    if any(CJK_CHARACTERS.search(str(t)) for t in texts):
+        raise ValueError('cjk_characters_in_draft')
     # A title prefix alone does not make a record useful; enforce a minimal
     # activity-specific semantic cue in its substantive description.
     semantic_terms = SEMANTIC_TERMS
@@ -487,6 +544,16 @@ def generate_quality_draft(selection, *, organization,framework,objective,phase,
         schema_name='sico_quality_draft_one_v2',
     )
     Draft202012Validator(sch).validate(output)
+    # A field that reached its hard limit was cut mid-word by Ollama; keep only its
+    # complete sentences. Done before the gates, which then check the shorter text.
+    props = sch['properties']
+    output['content'] = drop_unfinished_sentence(
+        output['content'], props['content']['maxLength'],
+        min_length=props['content'].get('minLength', 0), min_distinct_words=MIN_DISTINCT_CONTENT_WORDS)
+    for field, spec in props['attributes']['properties'].items():
+        if 'enum' not in spec:
+            output['attributes'][field] = drop_unfinished_sentence(
+                output['attributes'][field], spec['maxLength'], min_length=spec.get('minLength', 0))
     # Strictly validated named fields become the SAME old checkpoint field/value
     # array; nothing in the frontend, existing draft IDs or SICO writers changes.
     d = {**output, 'attributes': [
