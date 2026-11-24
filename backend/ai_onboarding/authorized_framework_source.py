@@ -43,6 +43,7 @@ def read_authorized_source_page(*, user, framework_name, page_size=20, cursor=''
         return {
             'status': meta['status'],
             'candidates': meta.get('candidates', []),
+            'suggestions': meta.get('suggestions', []),
             'requirements': [], 'next_cursor': None,
             'coverage': {'accessible_total': 0, 'exported_through': 0,
                          'complete': False},
@@ -98,3 +99,24 @@ class AuthorizedFrameworkSourcePageView(APIView):
                              'error_kind': exc.reason, 'business_records_written': False},
                             status=409)
         return Response(result)
+
+
+class AuthorizedFrameworkChoicesView(APIView):
+    """Frameworks for the SICO AI framework picker, read from SICO's Libraries.
+
+    loaded=True: a loaded framework the user may read, with the same readable() rule
+    as exact matching, so its name is accepted as typed.
+    loaded=False: a framework library not loaded yet; only its name and stored
+    library id are returned so the page can link to Libraries. Nothing is loaded here.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    http_method_names = ['post', 'options']
+
+    def post(self, request, format=None):
+        from .sico_ai_lifecycle_views import authorized_framework_choices, unloaded_framework_libraries
+        frameworks = [{'name': str(f.name)[:150], 'reference': str(f.ref_id or '')[:100], 'loaded': True}
+                      for f in authorized_framework_choices(request.user)]
+        frameworks += [{'name': str(lib.name)[:150], 'reference': str(lib.ref_id or '')[:100],
+                        'loaded': False, 'library_id': str(lib.pk), 'locale': str(lib.locale or '')[:10]}
+                       for lib in unloaded_framework_libraries(request.user)]
+        return Response({'frameworks': frameworks, 'business_records_written': False})

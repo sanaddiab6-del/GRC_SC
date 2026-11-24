@@ -58,7 +58,7 @@ class RoutingTests(SimpleTestCase):
     @patch('ai_onboarding.sico_ai_router_views.resolve_advisory_capability_config')
     def test_model_selects_without_executing(self, cfg, select):
         cfg.return_value = SimpleNamespace()
-        model = SimpleNamespace(model='qwen2.5:3b', timeout_seconds=60, max_output_tokens=500)
+        model = SimpleNamespace(model='qwen3:4b-instruct', timeout_seconds=60, max_output_tokens=500)
         provider = SimpleNamespace(generate_structured=lambda **kwargs: {'answer': 'risk_scenarios,case_setup'})
         select.return_value = SimpleNamespace(provider=provider, config=model)
         reply = self.post()
@@ -71,7 +71,7 @@ class RoutingTests(SimpleTestCase):
     @patch('ai_onboarding.sico_ai_router_views.resolve_advisory_capability_config')
     def test_bad_model_selection_fails_closed(self, cfg, select):
         cfg.return_value = SimpleNamespace()
-        model = SimpleNamespace(model='qwen2.5:3b', timeout_seconds=60, max_output_tokens=500)
+        model = SimpleNamespace(model='qwen3:4b-instruct', timeout_seconds=60, max_output_tokens=500)
         provider = SimpleNamespace(generate_structured=lambda **kwargs: {'answer': 'arbitrary_admin_delete'})
         select.return_value = SimpleNamespace(provider=provider, config=model)
         reply = self.post()

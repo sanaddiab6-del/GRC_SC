@@ -156,13 +156,16 @@ def _load_authorized_requirements(user, requested_framework):
     """Reuse SICO's existing framework matching + object-level RBAC exactly."""
     from core.models import RequirementNode
     from iam.models import Folder, RoleAssignment
-    from .sico_ai_lifecycle_views import _framework_candidates
+    from .sico_ai_lifecycle_views import _framework_candidates, framework_suggestions
 
     candidates = _framework_candidates(user, requested_framework)
     if len(candidates) != 1:
+        # No exact match: offer readable names to choose from; never pick one.
+        suggestions = [] if candidates else framework_suggestions(user, requested_framework)
         return {
             'status': 'ambiguous' if candidates else 'not_found_or_not_authorized',
             'candidates': [str(c.name)[:150] for c in candidates[:8]],
+            'suggestions': [str(s.name)[:150] for s in suggestions],
         }, iter(())
     framework = candidates[0]
     readable_ids = RoleAssignment.get_accessible_object_ids(

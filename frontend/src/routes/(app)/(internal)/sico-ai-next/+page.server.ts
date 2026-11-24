@@ -19,7 +19,54 @@ function backendMessage(value: unknown): string {
     return 'The SICO AI backend could not prepare a workflow plan.';
 }
 
+// Allowlisted shape of a previous quality-draft rejection (codes only, no generated text).
+function parsePreviousRejection(raw: unknown): Record<string, unknown> | null {
+    try {
+        const text = String(raw ?? '');
+        if (!text || text === 'null' || text.length > 600) return null;
+        const value = JSON.parse(text);
+        if (!value || typeof value.failure_reason !== 'string' ||
+            !/^[a-z][a-z0-9_]{1,63}$/.test(value.failure_reason)) return null;
+        const out: Record<string, unknown> = { failure_reason: value.failure_reason };
+        if (Array.isArray(value.path)) {
+            out.path = value.path.slice(0, 8).map((p: unknown) => String(p).slice(0, 40));
+        }
+        if (typeof value.rule === 'string' && /^[A-Za-z]{1,30}$/.test(value.rule)) out.rule = value.rule;
+        return out;
+    } catch {
+        return null;
+    }
+}
+
 export const actions = {
+    // Names of the frameworks this user may read, for the framework picker. Same
+    // readable() rule as exact matching; names and references only.
+    framework_choices: async (event) => {
+        if (!hasAiOnboardingSession(event)) return fail(401, { source_error: 'Sign in again.' });
+        try {
+            const response = await fetchAiOnboardingBackend(
+                event, '/ai/workforce/assistant/framework-source/choices/', {}
+            );
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) return fail(response.status, { source_error: backendMessage(data) });
+            const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            const frameworks = (Array.isArray(data.frameworks) ? data.frameworks : [])
+                .filter((f: unknown) => typeof (f as { name?: unknown })?.name === 'string')
+                .slice(0, 600)
+                .map((f: { name: string; reference?: unknown; loaded?: unknown; library_id?: unknown; locale?: unknown }) => ({
+                    name: f.name.slice(0, 150),
+                    reference: typeof f.reference === 'string' ? f.reference.slice(0, 100) : '',
+                    loaded: f.loaded === true,
+                    // Only a real stored-library id may become a link to Libraries.
+                    library_id: typeof f.library_id === 'string' && uuid.test(f.library_id) ? f.library_id : '',
+                    locale: typeof f.locale === 'string' ? f.locale.replace(/[^a-z-]/gi, '').slice(0, 10) : ''
+                }))
+                .filter((f: { loaded: boolean; library_id: string }) => f.loaded || f.library_id);
+            return { framework_choices: frameworks };
+        } catch {
+            return fail(502, { source_error: 'Could not reach the authorized framework catalog.' });
+        }
+    },
     // Uses the logged-in SICO user and existing RBAC-filtered RequirementNode catalog.
     framework_source_page: async (event) => {
         if (!hasAiOnboardingSession(event)) return fail(401, { source_error: 'Sign in again.' });
@@ -102,7 +149,8 @@ export const actions = {
             source_digest: String(form.get('source_digest') ?? ''),
             requirement_reference: String(form.get('requirement_reference') ?? '').trim(),
             previous_drafts,
-            focus_attempt: Number(form.get('focus_attempt') ?? 0)
+            focus_attempt: Number(form.get('focus_attempt') ?? 0),
+            previous_rejection: parsePreviousRejection(form.get('previous_rejection'))
         };
         if (payload.organization_name.length < 2 || payload.organization_name.length > 150 ||
             payload.framework_name.length < 2 || payload.framework_name.length > 150 ||
@@ -118,7 +166,13 @@ export const actions = {
             const response = await fetchAiOnboardingBackend(event, '/ai/workforce/assistant/case-draft/quality-one/', payload);
             const data = await response.json().catch(() => ({}));
             if (!response.ok) return fail(response.status, { case_draft_error:
-                `${backendMessage(data)} ${typeof data.failure_reason === 'string' ? '(' + data.failure_reason.slice(0, 80) + ')' : ''}` });
+                `${backendMessage(data)} ${typeof data.failure_reason === 'string' ? '(' + data.failure_reason.slice(0, 80) + ')' : ''}`,
+                // Returned to the page only so the next Resume can tell the model why it was rejected.
+                rejection: parsePreviousRejection(JSON.stringify({
+                    failure_reason: data.failure_reason,
+                    path: data.validation_failure?.path,
+                    rule: data.validation_failure?.rule
+                })) });
             if (data.business_records_written !== false || data.quality_contract_checked !== true ||
                 data.activity_number !== payload.activity_number ||
                 data.source_digest !== payload.source_digest ||

@@ -131,7 +131,8 @@ def schema_for(activity):
     }
 
 
-def quality_wire_schema_for(activity, *, allowed_related=(), candidate_assets=(), candidate_controls=()):
+def quality_wire_schema_for(activity, *, allowed_related=(), candidate_assets=(), candidate_controls=(),
+                            selected_requirement_ref=''):
     """A single, flat, named-field model result; legacy checkpoint stays unchanged.
 
     The original schema_for() remains for older code paths. The model is never
@@ -156,6 +157,14 @@ def quality_wire_schema_for(activity, *, allowed_related=(), candidate_assets=()
     if activity == 'evidence_requests':
         draft['properties']['attributes']['properties']['linked_control_reference']['enum'] = (
             sorted(set(candidate_controls)) or ['UNLINKED - control draft needed'])
+    if activity == 'requirement_reviews' and selected_requirement_ref:
+        # Same pattern as the asset/control references above: the model copies the
+        # selected SICO reference instead of writing one (it used to copy the
+        # internal requirement id). minLength is dropped so a short reference such
+        # as "A1" stays valid; maxLength (180) stays because ref_id is at most 100.
+        ref_field = draft['properties']['attributes']['properties']['framework_requirement_reference']
+        ref_field.pop('minLength', None)
+        ref_field['enum'] = [str(selected_requirement_ref)]
     return draft
 
 
@@ -192,6 +201,155 @@ def relevant_authorized_requirements(rows, *, topic, limit=3):
     return [row for _, _, row in matches[:limit]]
 
 
+# Minimal activity-specific semantic cue required in a draft's content. Shared
+# by validate_draft() and the generation rules so the model is told the exact
+# words the gate checks for.
+SEMANTIC_TERMS = {
+    'assets': ('asset', 'system', 'server', 'database', 'platform', 'service', 'application', 'endpoint', 'network', 'directory'),
+    'risk_scenarios': ('risk', 'threat', 'attack', 'compromise', 'exploit', 'weakness'),
+    'applied_controls': ('control', 'enforce', 'implement', 'restrict', 'monitor', 'configure'),
+    'policies': ('shall', 'must', 'policy', 'required', 'prohibit'),
+    'evidence_requests': ('request', 'collect', 'export', 'artifact', 'evidence', 'provide'),
+    'requirement_reviews': ('requirement', 'review', 'assess', 'mapping', 'applicability'),
+    'remediation': ('correct', 'remediat', 'implement', 'action', 'fix', 'resolve'),
+    'control_effectiveness': ('test', 'sample', 'inspect', 'verify', 'procedure'),
+    'human_review': ('review', 'approve', 'signoff', 'sign-off', 'decision'),
+    'reports': ('report', 'metric', 'management', 'decision', 'summary', 'coverage'),
+}
+MIN_DISTINCT_CONTENT_WORDS = 19
+# Length the model is asked to AIM for, well below the schema hard limits. Told only
+# the hard limit, the model wrote up to it and Ollama cut the text mid-word (a field
+# at its limit in 38-69% of drafts), sometimes ending in a Chinese word that fit.
+# The hard limits and the gates are unchanged; these only shape the prompt.
+# Measured: the model followed a character target for short fields but ignored one
+# for content (median still 670), so content is asked for in sentences.
+TARGET_CONTENT_SENTENCES = (3, 4)
+TARGET_CONTENT_CHARS = (300, 500)
+TARGET_MAX_CHARS = {'attribute': 120, 'evidence_request': 200, 'verification_question': 180}
+# Chinese, Japanese and Korean script (incl. CJK punctuation and full-width forms).
+# Arabic and other scripts a customer may use in names are not affected.
+CJK_CHARACTERS = re.compile(
+    r'[⺀-⿟　-ヿ㄀-ㇿ㐀-䶿一-鿿'
+    r'가-힯豈-﫿＀-￯]')
+
+
+# A sentence end: . ! or ? (optionally closed by a quote or bracket) followed by a
+# space, not the period of a list number such as "3." in "1. ... 2. ... 3. Conduct".
+_SENTENCE_END = re.compile(r'(?<![0-9])[.!?]["\')\]]?(?=\s)')
+
+
+def drop_unfinished_sentence(text, max_length, *, min_length=0, min_distinct_words=0):
+    """Remove the fragment Ollama left when it cut a field at its hard limit.
+
+    Only a field that reached its limit is touched, and it is cut back to its last
+    complete sentence. The fragment is unfinished, so no complete statement is lost.
+    If the shorter text would break the field's own minimums, it is left as is.
+    """
+    if len(text) < max_length - 2:
+        return text
+    body = text.rstrip()
+    ends = [m.end() for m in _SENTENCE_END.finditer(body[:-1] + ' ')]
+    ends = [e for e in ends if e < len(body)]
+    if not ends:
+        return text
+    shorter = body[:ends[-1]].rstrip()
+    if len(shorter) < min_length:
+        return text
+    if min_distinct_words and len(set(re.findall(r'\b\w+\b', shorter.casefold()))) < min_distinct_words:
+        return text
+    return shorter
+
+
+def output_rules_for(activity, schema):
+    """Plain-language statement of the limits the validators already enforce.
+
+    Derived from the same schema and gate constants, so the model is told the
+    real contract instead of discovering it through rejections.
+    """
+    prefix = CONTRACTS[activity][0]
+    props = schema['properties']
+    def limits(name):
+        p = props[name]
+        return f"{p.get('minLength', 0)}-{p['maxLength']}"
+    attr_props = props['attributes']['properties']
+    attr_max = max(p['maxLength'] for p in attr_props.values())
+    rules = [
+        f"title: start with '{prefix}' then a short noun phrase; at most {props['title']['maxLength']} "
+        "characters in total including the prefix. Never put a full sentence, the requirement text "
+        "or the whole subject hint in the title; put those details in content.",
+        f"content: {limits('content')} characters with at least {MIN_DISTINCT_CONTENT_WORDS} distinct words. "
+        f"Write {TARGET_CONTENT_SENTENCES[0]}-{TARGET_CONTENT_SENTENCES[1]} complete sentences "
+        f"(roughly {TARGET_CONTENT_CHARS[0]}-{TARGET_CONTENT_CHARS[1]} characters), then stop; text past "
+        "the maximum is cut off mid-word.",
+        f"each attribute value: at most {attr_max} characters; aim for at most "
+        f"{min(attr_max, TARGET_MAX_CHARS['attribute'])}, written as one complete phrase or sentence.",
+        f"evidence_request: {limits('evidence_request')} characters; aim for at most "
+        f"{min(props['evidence_request']['maxLength'], TARGET_MAX_CHARS['evidence_request'])}.",
+        f"verification_question: {limits('verification_question')} characters; aim for at most "
+        f"{min(props['verification_question']['maxLength'], TARGET_MAX_CHARS['verification_question'])}.",
+        "Write every field in English with Latin characters only; never use Chinese, Japanese "
+        "or Korean characters.",
+        f"related_draft_references: at most {props['related_draft_references'].get('maxItems', 3)} items.",
+    ]
+    if activity in SEMANTIC_TERMS:
+        words = ', '.join('remediation' if t == 'remediat' else t for t in SEMANTIC_TERMS[activity])
+        rules.append(f"content must literally contain at least one of these words: {words}.")
+    if activity == 'reports':
+        rules.append("attributes.sections_and_metrics must contain the word 'unknown' or 'pending' "
+                     "because no metric has been verified.")
+    return rules
+
+
+# Server-owned explanations for gate failures. Client input only selects one of
+# these codes; free text from the client never reaches the prompt.
+REJECTION_HINTS = {
+    'wrong_activity_title_prefix': 'The title did not start with the exact title_prefix.',
+    'generic_numbered_draft_title': "The title contained 'draft N'; use a descriptive title.",
+    'wrong_activity_attribute_fields': 'attributes must contain exactly the mandatory_attribute_names.',
+    'no_semantic_record_type_content': 'content did not contain any of the required words listed in the rules.',
+    'repeated_or_near_duplicate_title': 'The title was too similar to previous_titles_to_avoid; choose a different subject.',
+    'low_information_repetitive_description': 'content had too few distinct words; add concrete specifics.',
+    'repeated_or_near_duplicate_substance': 'content repeated an earlier draft; develop a different subject.',
+    'report_metrics_unverified_not_marked': "attributes.sections_and_metrics must say 'unknown' or 'pending' for metrics.",
+    'invented_or_duplicate_draft_link': 'related_draft_references must use only allowed_linked_drafts, without duplicates.',
+    'draft_link_to_unrelated_activity': 'related_draft_references must use only allowed_linked_drafts.',
+    'missing_relevant_existing_draft_link': 'related_draft_references must include at least one reference from allowed_linked_drafts.',
+    'threat_asset_reference_not_allowed': 'asset_reference must be an allowed Asset draft reference and also appear in related_draft_references.',
+    'evidence_request_placeholder_value': 'Attribute values must be real text, not <placeholders>.',
+    'evidence_request_control_link_mismatch': 'linked_control_reference must be an allowed control draft and also appear in related_draft_references.',
+    'evidence_request_invented_control': "linked_control_reference must be 'UNLINKED - control draft needed' when no control draft is allowed.",
+    'requirement_ref_not_in_authorized_library': 'framework_requirement_reference must equal the reference in requirement_to_review.',
+    'requirement_reference_not_the_selected_source_record': 'framework_requirement_reference must equal the reference in requirement_to_review.',
+    'unverified_framework_reference': "framework_requirement_reference must be 'UNMAPPED - needs authorized SICO requirement'.",
+    'cjk_characters_in_draft': ('The draft contained Chinese, Japanese or Korean characters. Write every field '
+                                'in English with Latin characters only, and keep each field well under its limit.'),
+}
+_SCHEMA_RULES = {'type', 'required', 'minLength', 'maxLength', 'pattern', 'enum',
+                 'minItems', 'maxItems', 'additionalProperties'}
+
+
+def rejection_hint(activity, failure_reason, path=(), rule=None):
+    """Explain the previous rejection using only allowlisted, server-side text."""
+    if failure_reason in REJECTION_HINTS:
+        return REJECTION_HINTS[failure_reason]
+    if failure_reason != 'local_ai_provider_schema_mismatch' or rule not in _SCHEMA_RULES:
+        return None  # timeouts and provider failures are not content problems
+    schema = quality_wire_schema_for(activity)
+    props = schema['properties']
+    known = set(props) | set(CONTRACTS[activity][1])
+    parts = [p for p in list(path or ())[:2] if isinstance(p, str) and p in known]
+    field = '.'.join(parts) or 'the JSON object'
+    spec = props.get(parts[0], {}) if parts else {}
+    if len(parts) == 2:
+        spec = props['attributes']['properties'].get(parts[1], {})
+    if rule in {'maxLength', 'minLength'} and 'maxLength' in spec:
+        return (f"{field} broke {rule}: it must be {spec.get('minLength', 0)}-{spec['maxLength']} "
+                'characters. Count the characters before answering.')
+    if rule == 'pattern' and parts == ['title']:
+        return REJECTION_HINTS['wrong_activity_title_prefix']
+    return f'{field} broke the {rule} rule of the output schema.'
+
+
 def canonical_title(s):
     s = re.sub(r'\s*\(draft\s*\d+\)|\s+draft\s*\d+\s*$', '', s, flags=re.I)
     return re.sub(r'[^a-z0-9]+',' ',s.casefold()).strip()
@@ -207,20 +365,15 @@ def validate_draft(activity, draft, *, earlier_same=(), prior_records=(), allowe
     names = [x['field'] for x in draft['attributes']]
     if len(names) != len(fields) or set(names) != set(fields) or len(set(names)) != len(fields):
         raise ValueError('wrong_activity_attribute_fields')
+    # Qwen sometimes finishes a field with a Chinese word when it runs out of room.
+    # Such text must never reach a customer-facing GRC draft.
+    texts = [title, draft['content'], draft.get('evidence_request', ''), draft.get('verification_question', '')]
+    texts += [str(a.get('proposed_value', '')) for a in draft['attributes']]
+    if any(CJK_CHARACTERS.search(str(t)) for t in texts):
+        raise ValueError('cjk_characters_in_draft')
     # A title prefix alone does not make a record useful; enforce a minimal
     # activity-specific semantic cue in its substantive description.
-    semantic_terms = {
-        'assets': ('asset', 'system', 'server', 'database', 'platform', 'service', 'application', 'endpoint', 'network', 'directory'),
-        'risk_scenarios': ('risk', 'threat', 'attack', 'compromise', 'exploit', 'weakness'),
-        'applied_controls': ('control', 'enforce', 'implement', 'restrict', 'monitor', 'configure'),
-        'policies': ('shall', 'must', 'policy', 'required', 'prohibit'),
-        'evidence_requests': ('request', 'collect', 'export', 'artifact', 'evidence', 'provide'),
-        'requirement_reviews': ('requirement', 'review', 'assess', 'mapping', 'applicability'),
-        'remediation': ('correct', 'remediat', 'implement', 'action', 'fix', 'resolve'),
-        'control_effectiveness': ('test', 'sample', 'inspect', 'verify', 'procedure'),
-        'human_review': ('review', 'approve', 'signoff', 'sign-off', 'decision'),
-        'reports': ('report', 'metric', 'management', 'decision', 'summary', 'coverage'),
-    }
+    semantic_terms = SEMANTIC_TERMS
     text = draft['content'].casefold()
     if activity in semantic_terms and not any(term in text for term in semantic_terms[activity]):
         raise ValueError('no_semantic_record_type_content')
@@ -230,7 +383,7 @@ def validate_draft(activity, draft, *, earlier_same=(), prior_records=(), allowe
         other = canonical_title(p)
         if canon == other or SequenceMatcher(None,canon,other).ratio() >= .84:
             raise ValueError('repeated_or_near_duplicate_title')
-    if len(set(re.findall(r'\b\w+\b',draft['content'].casefold()))) < 19:
+    if len(set(re.findall(r'\b\w+\b',draft['content'].casefold()))) < MIN_DISTINCT_CONTENT_WORDS:
         raise ValueError('low_information_repetitive_description')
     # Title suffixes and cosmetic word substitutions do not create new work.
     # Both the narrative and distinct mandatory fields must have substance.
@@ -317,8 +470,10 @@ def generate_quality_draft(selection, *, organization,framework,objective,phase,
     ref_ids = [d['draft_reference'] for d in allowed_context]
     controls = [ref for ref in ref_ids if int(ref[6:8]) == 7]
     assets = [d['draft_reference'] for d in allowed_context if d.get('record_type') == 'Asset']
+    reviewing = bool(code == 'requirement_reviews' and chosen_requirement)
     sch = quality_wire_schema_for(code, allowed_related=ref_ids,
-                                  candidate_assets=assets, candidate_controls=controls)
+                                  candidate_assets=assets, candidate_controls=controls,
+                                  selected_requirement_ref=chosen_requirement.get('reference') if reviewing else '')
     previous = [{'draft_reference': d['draft_reference'], 'title': d['title']} for d in prior_drafts]
     ctx = [{'draft_reference': d['draft_reference'], 'record_type': d['record_type'], 'title': d['title']}
            for d in allowed_context]
@@ -341,19 +496,22 @@ def generate_quality_draft(selection, *, organization,framework,objective,phase,
         'previous_titles_to_avoid': previous[-6:],
         'allowed_linked_drafts': ctx,
         'existing_SICO_service_field_hints': SICO_SERVICE_CONTRACT_HINTS.get(code, ''),
+        # Activity 10 never receives the internal requirement id: the model only has
+        # to copy `reference`, and the server already knows the id (see the result).
         'potentially_relevant_authorized_requirements_NOT_ASSESSED': [
-            {'reference': row.get('reference'), 'requirement_id': row.get('requirement_id'),
+            {'reference': row.get('reference'),
+             **({} if code == 'requirement_reviews' else {'requirement_id': row.get('requirement_id')}),
              'requirement_name': str(row.get('requirement_name') or '')[:120],
              'description': str(row.get('description') or '')[:300]}
             for row in allowed_requirement_list
         ],
         'requirement_to_review': (
             {'reference': chosen_requirement.get('reference'),
-             'requirement_id': chosen_requirement.get('requirement_id'),
              'description': str(chosen_requirement.get('description') or '')[:400]}
-            if code == 'requirement_reviews' and chosen_requirement else None
+            if reviewing else None
         ),
         'prior_rejection_reasons': list(rejection_feedback)[-2:],
+        'output_rules': output_rules_for(code, sch),
         'no_database_writes': True,
     }
     if code == 'threats':
@@ -386,6 +544,16 @@ def generate_quality_draft(selection, *, organization,framework,objective,phase,
         schema_name='sico_quality_draft_one_v2',
     )
     Draft202012Validator(sch).validate(output)
+    # A field that reached its hard limit was cut mid-word by Ollama; keep only its
+    # complete sentences. Done before the gates, which then check the shorter text.
+    props = sch['properties']
+    output['content'] = drop_unfinished_sentence(
+        output['content'], props['content']['maxLength'],
+        min_length=props['content'].get('minLength', 0), min_distinct_words=MIN_DISTINCT_CONTENT_WORDS)
+    for field, spec in props['attributes']['properties'].items():
+        if 'enum' not in spec:
+            output['attributes'][field] = drop_unfinished_sentence(
+                output['attributes'][field], spec['maxLength'], min_length=spec.get('minLength', 0))
     # Strictly validated named fields become the SAME old checkpoint field/value
     # array; nothing in the frontend, existing draft IDs or SICO writers changes.
     d = {**output, 'attributes': [

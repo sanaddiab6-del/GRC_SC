@@ -310,9 +310,11 @@ urlpatterns += [path('workforce/assistant/case-draft/phase/', SicoCaseDraftPhase
                     name='sico-case-draft-phase')]
 
 # Authorized framework requirements for the existing SICO AI workflow. Read-only; RBAC rechecked on every page.
-from .authorized_framework_source import AuthorizedFrameworkSourcePageView
+from .authorized_framework_source import AuthorizedFrameworkChoicesView, AuthorizedFrameworkSourcePageView
 urlpatterns += [path("workforce/assistant/framework-source/page/", AuthorizedFrameworkSourcePageView.as_view(),
                     name="sico-ai-framework-source-page")]
+urlpatterns += [path("workforce/assistant/framework-source/choices/", AuthorizedFrameworkChoicesView.as_view(),
+                    name="sico-ai-framework-choices")]
 
 # Single-record quality-gated Qwen generation, with authenticated SICO framework
 # grounding. This keeps the existing HTML runner strategy inside SICO AI Next.

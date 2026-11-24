@@ -35,6 +35,14 @@ services:
       - POSTGRES_PASSWORD=cisoassistant2024
       - DB_HOST=postgres
       - DB_PORT=5432
+      # Local AI (Ollama on the host). Team-standard model; see AI_MODEL_SETUP.md.
+      # 192.168.65.254 is the host as seen from Docker Desktop; override in .env if different.
+      - AI_PROVIDER=local
+      - LOCAL_AI_API_STYLE=ollama
+      - LOCAL_AI_BASE_URL=${LOCAL_AI_BASE_URL:-http://192.168.65.254:11434}
+      - LOCAL_AI_MODEL_DEFAULT=qwen3:4b-instruct
+      - LOCAL_AI_TIMEOUT_SECONDS=180
+      - GUNICORN_TIMEOUT=300
     volumes:
       - ./db:/code/db
     healthcheck:
