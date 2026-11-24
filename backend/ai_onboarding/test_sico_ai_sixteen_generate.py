@@ -15,7 +15,7 @@ class SixteenDraftTests(SimpleTestCase):
     def setUp(self):
         self.factory = APIRequestFactory()
         self.user = Mock(is_authenticated=True, is_active=True, pk='test-user')
-        self.config = SimpleNamespace(model='qwen2.5:3b', timeout_seconds=300, max_output_tokens=2400)
+        self.config = SimpleNamespace(model='qwen3:4b-instruct', timeout_seconds=300, max_output_tokens=2400)
         self.provider = Mock()
         self.provider.generate_structured.return_value = SAMPLE
         self.selection = SimpleNamespace(provider=self.provider, config=self.config)

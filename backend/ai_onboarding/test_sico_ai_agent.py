@@ -34,7 +34,7 @@ class AgentTests(SimpleTestCase):
         self.registry.execute.return_value = {'records': [{'id': 'real-record', 'name': 'NCA ECC'}]}
         self.provider = Mock()
         self.selection = SimpleNamespace(provider=self.provider, config=SimpleNamespace(
-            model='qwen2.5:3b', timeout_seconds=30, max_output_tokens=1200))
+            model='qwen3:4b-instruct', timeout_seconds=30, max_output_tokens=1200))
 
     def run_loop(self, **kwargs):
         return run_agent(instruction='Find NCA ECC and inspect authorized compliance information.',

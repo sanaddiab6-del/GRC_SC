@@ -63,6 +63,9 @@ We’re constantly evolving with input from users and customers. Like an octopus
 
 ## Quick Start 🚀
 
+> [!IMPORTANT]
+> SICO AI needs a local Ollama server with the team-standard model. See [AI_MODEL_SETUP.md](AI_MODEL_SETUP.md).
+
 > [!TIP]
 > The easiest way to get started is through the [free trial of cloud instance available here](https://intuitem.com/trial).
 
