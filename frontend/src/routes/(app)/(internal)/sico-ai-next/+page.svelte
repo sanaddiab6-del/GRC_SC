@@ -378,6 +378,13 @@
                 } catch (error) {
                     const elapsed = Math.round((Date.now() - started) / 1000);
                     const message = error instanceof Error ? error.message : 'Draft generation request failed.';
+                    if ((error as { sessionExpired?: boolean })?.sessionExpired) {
+                        // Not a model rejection: keep this slot's focus and attempt count, so
+                        // Resume after signing in retries the same request.
+                        draftedCaseError = message;
+                        saveLocalDraftCheckpoint();
+                        break;
+                    }
                     nextAttemptBySlot = { ...nextAttemptBySlot, [key]: Math.min(30, attempt + 1) };
                     const rejection = (error as { rejection?: unknown })?.rejection;
                     if (rejection) lastRejectionBySlot = { ...lastRejectionBySlot, [key]: rejection };
@@ -739,10 +746,13 @@
             method: 'POST', body: payload, headers: { accept: 'application/json' }
         });
         const parsed = deserialize(await res.text());
-        // An expired session makes the server hooks redirect to /login. Say so instead of
-        // the generic failure; accepted drafts stay in this tab's sessionStorage checkpoint.
-        if (parsed.type === 'redirect' && parsed.location.startsWith('/login')) {
-            throw new Error('Your SICO session has expired. Sign in again, then open SICO AI and choose "Resume automatic generation". Accepted drafts are kept in this browser tab.');
+        // An expired session arrives in two ways: the server hooks redirect this action to
+        // /login, or another request found it first, the cookie is gone and the action
+        // answers 401. Both get one clear message; accepted drafts stay in this tab's
+        // sessionStorage checkpoint.
+        if ((parsed.type === 'redirect' && parsed.location.startsWith('/login')) ||
+            (parsed.type === 'failure' && parsed.status === 401)) {
+            throw Object.assign(new Error('Your SICO session has expired. Sign in again, then open SICO AI and choose "Resume automatic generation". Accepted drafts are kept in this browser tab.'), { sessionExpired: true });
         }
         if (parsed.type !== 'success') {
             const body = parsed.type === 'failure' ? (parsed.data as Record<string, any>) : null;
