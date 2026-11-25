@@ -193,6 +193,27 @@ ASSET_DOMAINS = frozenset({
     'application_security', 'physical_security', 'cryptography'
 })
 
+# Planning estimates only; the current quality-one caller still executes per slot.
+MODEL_BATCH_SIZE = 6
+ACTIVITY_EXECUTION_MODES = {
+    1: 'deterministic',  # Framework and edition metadata.
+    2: 'ai_single',  # One case-wide business scope proposal.
+    3: 'deterministic',  # Assessment setup from the selected source and scope.
+    4: 'ai_batchable',  # Asset proposals.
+    5: 'ai_batchable',  # Threat hypotheses.
+    6: 'ai_batchable',  # Risk scenarios.
+    7: 'ai_batchable',  # Applied control proposals.
+    8: 'ai_batchable',  # Policy outlines.
+    9: 'ai_batchable',  # Evidence requests.
+    10: 'ai_batchable',  # Review reasoning; unassessed placeholders are separate.
+    11: 'ai_batchable',  # Potential findings.
+    12: 'ai_batchable',  # Remediation proposals.
+    13: 'ai_batchable',  # Control effectiveness test drafts.
+    14: 'deterministic',  # Assemble the human review and approval package.
+    15: 'ai_batchable',  # Residual risk review reasoning, without computing ratings.
+    16: 'deterministic',  # Aggregate the case and its coverage for reporting.
+}
+
 
 def explicit_scope_subjects(objective: str) -> list[str]:
     """Literal user-supplied scope lists, never an invented industry inventory."""
@@ -326,10 +347,22 @@ def plan_generation_queue(*, authorized_requirements: Sequence[Mapping],
     # Finish each category's required inventory before moving downstream.
     for activity in range(4,17):
         queue.extend(candidates[activity][:max_slots_per_activity])
+    records_planned = dict.fromkeys(ACTIVITY_EXECUTION_MODES.values(), 0)
+    batchable_by_activity = Counter()
     for slot in queue:
         slot['task_identity'] = hashlib.sha256(repr((slot['activity_number'],slot['draft_index'],
             slot.get('scope_subject',''),slot['theme'],slot['focus_requirement_id'],
             slot['dependency_draft_references'])).encode()).hexdigest()
+        activity = slot['activity_number']
+        mode = ACTIVITY_EXECUTION_MODES[activity]
+        slot['execution_mode'] = mode
+        records_planned[mode] += 1
+        if mode == 'ai_batchable':
+            batchable_by_activity[activity] += 1
+    model_calls_planned = records_planned['ai_single'] + sum(
+        (count + MODEL_BATCH_SIZE - 1) // MODEL_BATCH_SIZE
+        for count in batchable_by_activity.values()
+    )
     return {
         'schema': 'sico-ai-dynamic-generation-queue-v1',
         'generation_queue': queue,
@@ -339,6 +372,8 @@ def plan_generation_queue(*, authorized_requirements: Sequence[Mapping],
             'explicit_scope_subjects': subjects,
             'scope_detail_status': 'explicit_user_scope_requires_verification' if subjects else 'framework_topics_only_scope_inventory_needs_confirmation',
             'planned_qwen_detail_drafts': len(queue),
+            'records_planned': records_planned,
+            'model_calls_planned': model_calls_planned,
             'activity_targets': {**{str(step):1 for step in (1,2,3)},
                                  **{str(step): min(len(x), max_slots_per_activity)
                                  for step, x in candidates.items()}},
