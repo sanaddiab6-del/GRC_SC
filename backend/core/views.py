@@ -8789,6 +8789,22 @@ class FrameworkFilter(GenericFilterSet):
         fields = ["provider"]
 
 
+class WordStartSearchFilter(filters.SearchFilter):
+    """
+    SearchFilter that only matches terms at the start of a word, so that
+    searching "nist" finds "NIST SP 800-53" but not "administration" or
+    "ministère".
+    """
+
+    def get_search_terms(self, request):
+        return [
+            r"(^|\W)" + re.escape(term) for term in super().get_search_terms(request)
+        ]
+
+    def construct_search(self, field_name, queryset=None):
+        return f"{field_name}__iregex"
+
+
 class FrameworkViewSet(BaseModelViewSet):
     """
     API endpoint that allows frameworks to be viewed or edited.
@@ -8796,7 +8812,12 @@ class FrameworkViewSet(BaseModelViewSet):
 
     model = Framework
     filterset_class = FrameworkFilter
-    search_fields = ["name", "description"]
+    filter_backends = [
+        DjangoFilterBackend,
+        WordStartSearchFilter,
+        FolderOrderingFilter,
+    ]
+    search_fields = ["name", "description", "provider"]
 
     def get_queryset(self):
         return super().get_queryset()
