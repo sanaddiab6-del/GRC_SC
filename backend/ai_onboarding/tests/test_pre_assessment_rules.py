@@ -250,9 +250,11 @@ class DetectorTests(unittest.TestCase):
 
 class OutcomeTests(unittest.TestCase):
     def _decide(self, relation, *, uncertain=False, deficiency=True, conditional=False,
-                clause="A cybersecurity strategy must be defined", text=ECC_111):
+                clause="A cybersecurity strategy must be defined", text=ECC_111,
+                subject="a cybersecurity strategy", quote="We do not have a documented cybersecurity strategy"):
         return rules.decide_outcome(relation, fact_uncertain=uncertain, fact_states_deficiency=deficiency,
-                                    requirement_conditional=conditional, clause=clause, requirement_text=text)
+                                    requirement_conditional=conditional, clause=clause, requirement_text=text,
+                                    requirement_subject=subject, fact_quote=quote)
 
     def test_no_stated_deficiency_means_to_be_confirmed(self):
         # Seen in the baseline: "Customers pay by card on our website" -> PCI 6.4.2 Non-compliant.

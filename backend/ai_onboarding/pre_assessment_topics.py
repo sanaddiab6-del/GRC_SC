@@ -175,6 +175,7 @@ class RequirementCandidate:
     has_assessable_children: bool = False
     order: int = 0  # position in the framework, used only to break ties
     conditional: bool = False  # the description starts with "If ..." / "Where ..."
+    subject: str = ""  # requirement name + description words before its first verb
 
 
 @dataclass
@@ -220,6 +221,7 @@ def build_candidates(nodes: Iterable[dict]) -> list[RequirementCandidate]:
                 has_assessable_children=n.get("urn") in has_assessable_child,
                 order=order,
                 conditional=is_conditional_requirement(n.get("description") or ""),
+                subject=requirement_subject(n.get("name"), n.get("description")),
             )
         )
     return candidates
@@ -369,3 +371,141 @@ _DEFICIENCY = re.compile(
 
 def states_deficiency(text: str) -> bool:
     return bool(_DEFICIENCY.search(_fold(text)))
+
+
+# Subject anchor. A finding must be about what the quote is about, and must cite the clause
+# the quote actually contradicts. Each concept below has the words that bring it into a
+# requirement's subject or a cited clause, and the words that show it in the user's quote.
+# Every concept found in the requirement's subject or in the cited clause must show in the
+# quote; otherwise the result is To be confirmed. Measured examples it stops:
+#   PCI 8.6.3 "Passwords for any application and system accounts" vs "the same admin password";
+#   ECC 1-2-3 "A cybersecurity steering committee" vs "no separate cybersecurity team";
+#   ECC 2-2-3 clause "Multi-factor authentication for remote access" vs "one shared VPN account".
+# English only for now: an Arabic quote shows none of these words, so such results fall back
+# to To be confirmed.
+ANCHOR_CONCEPTS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
+    "committee": (("committee*", "steering", "board"), ("committee*", "steering", "board")),
+    "system_accounts": (
+        ("application and system account*", "system and application account*", "system account*",
+         "application account*", "service account*", "accounts used by systems"),
+        ("system account*", "application account*", "service account*", "api account*",
+         "technical account*", "integration account*"),
+    ),
+    "mfa": (
+        ("multi-factor", "multi factor", "mfa", "two-factor", "2fa", "one-time password*"),
+        ("multi-factor", "multi factor", "mfa", "two-factor", "2fa", "otp", "one-time"),
+    ),
+    "passwords": (
+        ("password*", "passphrase*", "username*"),
+        ("password*", "passphrase*", "credential*", "username*", "login*", "log in", "account*"),
+    ),
+    "remote_access": (("remote*",), ("remote*", "vpn", "from home", "from outside", "rdp", "teamviewer", "anydesk")),
+    "wireless": (("wireless", "wi-fi", "wifi"), ("wireless", "wi-fi", "wifi")),
+    "third_party": (
+        ("third-part*", "third part*", "service provider*", "tpsp*", "supplier*", "vendor*", "outsourc*",
+         "managed service*"),
+        ("third-part*", "third part*", "provider*", "supplier*", "vendor*", "outsourc*", "hosting",
+         "contractor*", "partner*", "managed service*", "cloud"),
+    ),
+    "threats": (("threat*",), ("threat*", "phishing", "attack*", "malware", "ransomware", "scam*")),
+    "roles": (
+        ("roles and responsibilities", "organizational structure", "organisational structure", "roles"),
+        ("role", "roles", "responsibilities", "org chart", "organizational structure",
+         "organisational structure", "job description*", "raci"),
+    ),
+    "strategy": (("strategy", "strategies"), ("strategy", "strategies")),
+    "roadmap": (("roadmap*",), ("roadmap*",)),
+    "documentation": (
+        ("document*", "developed and approved", "approved"),
+        ("document*", "written", "approved", "approval", "polic*", "procedure*"),
+    ),
+    "periodicity": (
+        ("periodic*", "regular*", "at least once", "every", "annual*", "frequency", "interval*"),
+        ("never", "periodic*", "regular*", "every", "once", "annual*", "yearly", "monthly", "weekly",
+         "daily", "since", "no longer", "frequen*", "times a"),
+    ),
+    "awareness_training": (("awareness", "training"), ("awareness", "training", "trained", "train")),
+    "security_function": (
+        ("cybersecurity function", "security function", "dedicated", "division", "department", "independent"),
+        ("team", "department", "function", "unit", "division", "separate", "dedicated", "independent",
+         "manager", "person", "staff"),
+    ),
+    "backup_recovery": (
+        ("backup*", "back-up*", "recovery", "restor*"),
+        ("backup*", "back-up*", "back up", "recover*", "restor*"),
+    ),
+    "scope_coverage": (("scope and coverage", "coverage"), ("scope", "coverage", "all systems", "not all", "only some", "critical")),
+    "logging": (("log", "logs", "logging", "audit trail*", "event log*"), ("log", "logs", "logging", "audit trail*", "monitor*")),
+    "encryption": (
+        ("encrypt*", "cryptograph*", "unreadable", "hash*", "tokeniz*", "truncat*"),
+        ("encrypt*", "plain text", "plaintext", "clear text", "cleartext", "hash*", "unreadable", "mask*", "tokeniz*"),
+    ),
+    "physical": (
+        # Not "facilities": ECC writes "information processing facilities" for systems.
+        ("physical*", "visitor*", "premises", "secure area*"),
+        ("physical*", "visitor*", "room", "building", "premises", "office", "door*", "lock*", "cctv", "guard*"),
+    ),
+    "payment_terminals": (
+        ("poi", "point of interaction", "card-reading device*", "payment terminal*"),
+        ("card machine*", "terminal*", "pos", "poi", "card reader*", "payment device*"),
+    ),
+    "web_application": (
+        ("web application*", "public-facing", "payment page*", "script*"),
+        ("website*", "web site*", "web app*", "online store", "e-commerce", "payment page*", "portal*", "online shop*"),
+    ),
+    "privileged": (("privileged", "administrator*"), ("admin*", "privileged", "root", "superuser*")),
+    "vulnerabilities": (
+        ("vulnerabilit*", "patch*", "penetration test*"),
+        ("vulnerab*", "patch*", "update*", "pentest*", "penetration", "scan*", "outdated", "unsupported"),
+    ),
+    "incidents": (("incident*", "breach*"), ("incident*", "breach*", "attack*", "hack*", "compromise*")),
+    "mobile_media": (
+        ("mobile device*", "byod", "laptop*", "storage media", "removable media"),
+        ("mobile*", "phone*", "laptop*", "byod", "usb", "tablet*", "personal device*", "media"),
+    ),
+    "email": (("e-mail", "email"), ("email", "e-mail", "mail", "phishing")),
+    "firewall_network": (
+        ("network security control*", "firewall*", "segmentation"),
+        ("firewall*", "network*", "router*", "segment*", "vlan*"),
+    ),
+}
+
+# Checked in the requirement's subject only: inside a clause these words are usually
+# context ("quick recovery of data and systems after cybersecurity incidents").
+SUBJECT_ONLY_CONCEPTS = frozenset({"incidents"})
+
+_ANCHOR_PATTERNS = {
+    concept: (tuple(_term_pattern(t) for t in triggers), tuple(_term_pattern(t) for t in evidence))
+    for concept, (triggers, evidence) in ANCHOR_CONCEPTS.items()
+}
+
+# The subject of a requirement is what comes before its first verb: "Passwords/passphrases
+# for any application and system accounts | are protected ...".
+_FIRST_VERB = re.compile(
+    r"\b(must|shall|should|is|are|has|have|will|can|needs to|need to|ensures?|establish(?:es)?|implements?)\b",
+    re.IGNORECASE,
+)
+_SUBJECT_MAX_WORDS = 25
+
+
+def requirement_subject(name: str | None, description: str | None) -> str:
+    text = _fold(description or "")
+    # For "If passwords are used as the only factor ..." this keeps "if passwords", which
+    # still names what the requirement is about.
+    match = _FIRST_VERB.search(text)
+    subject = text[: match.start()] if match else text
+    subject = " ".join(subject.split()[:_SUBJECT_MAX_WORDS])
+    return " ".join(filter(None, [_fold(name or ""), subject]))
+
+
+def missing_anchors(subject: str, clause: str, quote: str) -> list[str]:
+    """Concepts named in the requirement's subject or in the cited clause that the quote
+    does not show. An empty list means the finding stays about what the quote says."""
+    subject, clause, quote = _fold(subject), _fold(clause), _fold(quote)
+    missing = []
+    for concept, (triggers, evidence) in _ANCHOR_PATTERNS.items():
+        in_clause = concept not in SUBJECT_ONLY_CONCEPTS and any(p.search(clause) for p in triggers)
+        named = in_clause or any(p.search(subject) for p in triggers)
+        if named and not any(p.search(quote) for p in evidence):
+            missing.append(concept)
+    return missing

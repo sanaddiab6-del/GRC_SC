@@ -8,6 +8,7 @@ every rule can be unit tested:
 * Compliant and Not applicable can never be produced;
 * a conditional requirement or an uncertain sentence never becomes Non-compliant;
 * an explicit result needs a quote that itself states a deficiency;
+* the requirement's subject and the cited clause must be about what the quote shows;
 * the final write re-runs every one of these checks; nothing the page sends back is
   trusted just because an earlier request produced it.
 
@@ -27,6 +28,7 @@ from .pre_assessment_topics import (
     TOPICS,
     RequirementCandidate,
     is_uncertain,
+    missing_anchors,
     shortlist_requirements,
     states_deficiency,
 )
@@ -299,6 +301,8 @@ def decide_outcome(
     requirement_conditional: bool,
     clause: str | None,
     requirement_text: str,
+    requirement_subject: str,
+    fact_quote: str,
 ) -> Outcome | None:
     """Turn the judge's answer for one requirement into what may be written.
 
@@ -313,6 +317,10 @@ def decide_outcome(
         return Outcome(KIND_TO_BE_CONFIRMED)
     if not fact_states_deficiency:
         # The quote states no deficiency: neither a finding nor a Potential gap.
+        return Outcome(KIND_TO_BE_CONFIRMED)
+    if missing_anchors(requirement_subject, verified_clause, fact_quote):
+        # The requirement or the cited clause is about something the quote does not show
+        # (another account type, a committee instead of a team, MFA never mentioned).
         return Outcome(KIND_TO_BE_CONFIRMED)
     if requirement_conditional:
         return Outcome(KIND_POTENTIAL_GAP, verified_clause)
@@ -402,6 +410,8 @@ def plan_fact_results(
             requirement_conditional=candidate.conditional,
             clause=str(raw.get("violated_clause") or ""),
             requirement_text=candidate.text,
+            requirement_subject=candidate.subject,
+            fact_quote=fact.quote,
         )
         if outcome is not None:
             planned.append(PlannedResult(candidate.key, candidate.ref_id, fact.index, rank, outcome, fact.sentence))
