@@ -282,8 +282,9 @@ class NameAndIdTests(unittest.TestCase):
         )
         self.assertEqual(
             rules.perimeter_name("ISO CITY", "International standard ISO/IEC 27001:2022", "ISO/IEC 27001:2022"),
-            "ISO CITY – ISO/IEC 27001:2022 scope",
+            "ISO CITY – ISO-IEC 27001:2022 scope",  # "/" is refused in a Perimeter name
         )
+        self.assertNotIn("/", rules.perimeter_name("A/B Trading", "x", "Y/Z 1.0"))
         self.assertLessEqual(len(rules.perimeter_name("x" * 250, "y", None)), rules.NAME_MAX_CHARS)
 
     def test_perimeter_and_audit_descriptions(self):

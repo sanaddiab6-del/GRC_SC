@@ -1,9 +1,9 @@
-"""SICO AI Pre-Assessment endpoints: extract facts, then judge one fact at a time.
+"""SICO AI Pre-Assessment endpoints: extract facts, judge one fact at a time, commit.
 
 The page drives the steps (extract -> judge per fact -> commit) so every HTTP request
 makes at most one model call and no request holds a database transaction while the model
-runs. Nothing here writes to the database. The feature is off unless the setting or
-environment variable SICO_AI_PRE_ASSESSMENT_ENABLED is true.
+runs. Only the commit endpoint writes, and it makes no model call. The feature is off
+unless the setting or environment variable SICO_AI_PRE_ASSESSMENT_ENABLED is true.
 """
 from __future__ import annotations
 
@@ -12,7 +12,9 @@ import re
 from dataclasses import replace
 
 from django.conf import settings
+from django.utils import timezone
 from rest_framework import permissions, serializers
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -20,7 +22,14 @@ from .llm_config import CAPABILITY_GRC_CAPABILITY_SELECTION, resolve_advisory_ca
 from .llm_errors import AiProviderError
 from .llm_provider import get_advisory_provider_selection
 from .pre_assessment_llm import extract_facts, judge_fact
-from .pre_assessment_service import item_fields, plan_fact_results, verify_facts
+from .pre_assessment_service import (
+    PreAssessmentRefused,
+    commit_pre_assessment,
+    item_fields,
+    plan_fact_results,
+    plan_run,
+    verify_facts,
+)
 from .pre_assessment_topics import TOPIC_ENUM, RequirementCandidate, build_candidates, shortlist_requirements
 
 FEATURE_FLAG = "SICO_AI_PRE_ASSESSMENT_ENABLED"
@@ -134,6 +143,25 @@ class JudgeInput(serializers.Serializer):
     objective = serializers.CharField(min_length=20, max_length=4000)
     fact_index = serializers.IntegerField(min_value=0, max_value=5)
     fact = FactInput()
+
+
+class JudgementItem(serializers.Serializer):
+    ref_id = serializers.CharField(max_length=40)
+    relation = serializers.CharField(max_length=40)
+    violated_clause = serializers.CharField(required=False, allow_blank=True, max_length=600, default="")
+
+
+class FactJudgements(serializers.Serializer):
+    fact_index = serializers.IntegerField(min_value=0, max_value=5)
+    items = serializers.ListField(child=JudgementItem(), max_length=12)
+
+
+class CommitInput(serializers.Serializer):
+    framework_id = serializers.UUIDField()
+    organization_name = serializers.CharField(min_length=2, max_length=150)
+    objective = serializers.CharField(min_length=20, max_length=4000)
+    facts = serializers.ListField(child=FactInput(), min_length=1, max_length=6)
+    judgements = serializers.ListField(child=FactJudgements(), max_length=6, required=False, default=list)
 
 
 class PreAssessmentExtractView(APIView):
@@ -251,3 +279,50 @@ class PreAssessmentJudgeView(APIView):
         response["ignored"] = ignored
         response["model"] = selection.config.model
         return Response(response)
+
+
+class PreAssessmentCommitView(APIView):
+    """Step 3: no model call. Every check runs again on what the page sends back, then
+    Domain, Perimeter, a new Audit and its results are written in one transaction."""
+
+    permission_classes = [permissions.IsAuthenticated]
+    http_method_names = ["post", "options"]
+
+    def post(self, request, format=None):
+        refused = _guard(request)
+        if refused is not None:
+            return refused
+        form = CommitInput(data=request.data)
+        form.is_valid(raise_exception=True)
+        values = form.validated_data
+        framework = readable_framework(request.user, values["framework_id"])
+        if framework is None:
+            return _refused("The selected framework is unavailable to this user.", "framework_unavailable", 403)
+
+        sent_facts = values["facts"]
+        facts, _dropped = verify_facts(
+            [{"quote": f["quote"], "claim_en": f.get("claim_en", ""), "topics": f["topics"],
+              "certainty": "uncertain" if f["uncertain"] else "stated"} for f in sent_facts],
+            values["objective"],
+        )
+        if len(facts) != len(sent_facts):
+            return _refused("A fact is not quoted from the objective. Nothing was saved.", "fact_not_in_objective", 400)
+        judgements_by_fact = {}
+        for group in values.get("judgements") or []:
+            judgements_by_fact.setdefault(group["fact_index"], []).extend(dict(item) for item in group["items"])
+
+        results = plan_run(facts, load_authorized_candidates(request.user, framework), judgements_by_fact)
+        try:
+            model = resolve_advisory_capability_config(CAPABILITY_GRC_CAPABILITY_SELECTION).model
+            outcome = commit_pre_assessment(
+                request=request, framework=framework, organization=values["organization_name"],
+                facts=facts, results=results, model=model, day=timezone.localdate(),
+            )
+        except PreAssessmentRefused as exc:
+            return _refused(exc.detail, exc.code, exc.status)
+        except DRFValidationError:
+            return _refused("The platform refused the new records. Nothing was saved.", "validation_failed", 422)
+        except Exception:  # noqa: BLE001 - the transaction is rolled back; report without internals
+            return _refused("The pre-assessment could not be saved. Nothing was saved.", "transaction_aborted", 422)
+        outcome.update({"provenance": PROVENANCE, "business_records_written": True})
+        return Response(outcome, status=201)

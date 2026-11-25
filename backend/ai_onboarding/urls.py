@@ -323,11 +323,15 @@ urlpatterns += [path('workforce/assistant/case-draft/quality-one/', SicoQualityD
                     name='sico-ai-quality-draft-one')]
 
 # SICO AI Pre-Assessment (off unless SICO_AI_PRE_ASSESSMENT_ENABLED). Extract facts, then
-# judge one fact per request; neither endpoint writes to the database.
-from .pre_assessment_views import PreAssessmentExtractView, PreAssessmentJudgeView
+# judge one fact per request (no database write), then commit: a new Audit with
+# preliminary results in one transaction (no model call). Approved exception to the
+# "no write without human approval" rule.
+from .pre_assessment_views import PreAssessmentCommitView, PreAssessmentExtractView, PreAssessmentJudgeView
 urlpatterns += [
     path('workforce/assistant/pre-assessment/extract/', PreAssessmentExtractView.as_view(),
          name='sico-ai-pre-assessment-extract'),
     path('workforce/assistant/pre-assessment/judge/', PreAssessmentJudgeView.as_view(),
          name='sico-ai-pre-assessment-judge'),
+    path('workforce/assistant/pre-assessment/commit/', PreAssessmentCommitView.as_view(),
+         name='sico-ai-pre-assessment-commit'),
 ]

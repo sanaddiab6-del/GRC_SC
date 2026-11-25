@@ -1,6 +1,7 @@
-"""SICO AI Pre-Assessment: verification and result rules.
+"""SICO AI Pre-Assessment: verification, result rules and the database write.
 
-This part is pure Python (no database, no model call) so every rule can be unit tested:
+Everything except commit_pre_assessment is pure Python (no database, no model call), so
+every rule can be unit tested:
 
 * a quote counts only if it is found verbatim in the objective the user typed;
 * the observation is built by code from verified text only, never from free model text;
@@ -9,8 +10,8 @@ This part is pure Python (no database, no model call) so every rule can be unit 
 * the final write re-runs every one of these checks; nothing the page sends back is
   trusted just because an earlier request produced it.
 
-The database write (Domain, Perimeter, Audit and results in one transaction) is added in
-a later step of this feature.
+commit_pre_assessment writes Domain, Perimeter, a new Audit and the results in one
+transaction.
 """
 from __future__ import annotations
 
@@ -20,7 +21,13 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any, Iterable
 
-from .pre_assessment_topics import CONTEXT_ONLY, TOPICS, RequirementCandidate, is_uncertain
+from .pre_assessment_topics import (
+    CONTEXT_ONLY,
+    TOPICS,
+    RequirementCandidate,
+    is_uncertain,
+    shortlist_requirements,
+)
 
 MAX_FACTS = 6
 MIN_QUOTE_CHARS = 12
@@ -425,7 +432,8 @@ def framework_label(name: str, ref_id: str | None) -> str:
 
 def perimeter_name(organization: str, framework_name: str, framework_ref_id: str | None) -> str:
     name = f"{normalize_name(organization)} – {framework_label(framework_name, framework_ref_id)} scope"
-    return name[:NAME_MAX_CHARS]
+    # The platform refuses "/" in a Perimeter name (PerimeterWriteSerializer.validate_name).
+    return name.replace("/", "-")[:NAME_MAX_CHARS]
 
 
 def perimeter_description(sentences: Iterable[str]) -> str:
@@ -475,3 +483,223 @@ def next_audit_ref_id(year: int, existing_ref_ids: Iterable[str | None]) -> str:
         if match and int(match.group(1)) == year:
             highest = max(highest, int(match.group(2)))
     return f"{AUDIT_REF_PREFIX}-{year:04d}-{highest + 1:04d}"
+
+
+# --------------------------------------------------------------------------- the whole run
+
+def plan_run(
+    facts: list[VerifiedFact],
+    candidates: list[RequirementCandidate],
+    judgements_by_fact: dict[int, Any],
+) -> list[PlannedResult]:
+    """Re-run every rule for every fact with the judge answers the page sent back.
+
+    The short list is rebuilt here, so a judgement for a requirement outside the fact's
+    own short list is ignored. Caps apply across the whole run.
+    """
+    planned: list[PlannedResult] = []
+    for fact in facts:
+        items = judgements_by_fact.get(fact.index)
+        if not fact.judgeable or not items:
+            continue
+        shortlist = shortlist_requirements(candidates, fact.topics, fact.claim)
+        results, _ignored = plan_fact_results(fact, shortlist, items)
+        planned.extend(results)
+    return apply_caps(planned)
+
+
+# --------------------------------------------------------------------------- database write
+#
+# Django models are imported inside the function so the rules above stay importable (and
+# testable) without a configured database.
+
+# One lock for every pre-assessment write: version and SICO-AUD number are computed and
+# used inside it, so two clicks at the same moment cannot get the same values.
+ADVISORY_LOCK_KEY = 0x51C0A1A55E55
+ORGANIZATION_REFUSAL = (
+    "You do not have permission to create or use this organization in SICO. "
+    "Ask an administrator."
+)
+
+
+class PreAssessmentRefused(Exception):
+    def __init__(self, code: str, detail: str, status: int = 403):
+        super().__init__(code)
+        self.code = code
+        self.detail = detail
+        self.status = status
+
+
+def _allowed(user, codename: str, folder) -> bool:
+    from django.contrib.auth.models import Permission
+    from iam.models import RoleAssignment
+
+    permission = Permission.objects.filter(codename=codename).first()
+    return permission is not None and RoleAssignment.is_access_allowed(user, permission, folder)
+
+
+def _refuse_organization() -> None:
+    # Same answer whether the Domain exists but is not readable, or cannot be created:
+    # the message never tells a user that an organization they cannot see exists.
+    raise PreAssessmentRefused("organization_unavailable", ORGANIZATION_REFUSAL)
+
+
+def commit_pre_assessment(
+    *,
+    request,
+    framework,
+    organization: str,
+    facts: list[VerifiedFact],
+    results: list[PlannedResult],
+    model: str,
+    day: date,
+) -> dict[str, Any]:
+    """Create Domain (if needed), Perimeter (if needed), a new Audit and its results.
+
+    Everything happens in one transaction: any failure leaves nothing behind. The Audit is
+    always new, so no Audit made by a person is ever changed.
+    """
+    from django.db import connection, transaction
+
+    from core.models import ComplianceAssessment, Perimeter, RequirementAssessment
+    from core.serializers import (
+        ComplianceAssessmentWriteSerializer,
+        FolderWriteSerializer,
+        PerimeterWriteSerializer,
+        RequirementAssessmentWriteSerializer,
+    )
+    from iam.models import Folder, RoleAssignment
+
+    user = request.user
+    context = {"request": request}
+    org = normalize_name(organization)
+    sentences = [f.sentence for f in facts]
+    created: dict[str, bool] = {"domain": False, "perimeter": False}
+
+    with transaction.atomic():
+        if connection.vendor == "postgresql":
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT pg_advisory_xact_lock(%s)", [ADVISORY_LOCK_KEY])
+
+        # Domain: the organization's name, ignoring case and extra spaces.
+        root = Folder.get_root_folder()
+        domain = next(
+            (f for f in Folder.objects.filter(parent_folder=root, content_type=Folder.ContentType.DOMAIN)
+             if name_key(f.name) == name_key(org)),
+            None,
+        )
+        if domain is not None:
+            if not RoleAssignment.is_object_readable(user, Folder, domain.id):
+                _refuse_organization()
+        else:
+            if not _allowed(user, "add_folder", root):
+                _refuse_organization()
+            # Same as creating a Domain from the platform's own form.
+            serializer = FolderWriteSerializer(
+                data={"name": org, "parent_folder": str(root.id), "create_iam_groups": True}, context=context
+            )
+            serializer.is_valid(raise_exception=True)
+            domain = serializer.save()
+            Folder.create_default_ug_and_ra(domain)
+            created["domain"] = True
+        for codename in ("add_complianceassessment", "change_requirementassessment"):
+            if not _allowed(user, codename, domain):
+                _refuse_organization()
+
+        # Perimeter: one per framework, reused on the next click; its description is
+        # never rewritten.
+        wanted_perimeter = perimeter_name(org, str(framework.name), framework.ref_id)
+        perimeter = next(
+            (p for p in Perimeter.objects.filter(folder=domain) if name_key(p.name) == name_key(wanted_perimeter)),
+            None,
+        )
+        if perimeter is not None:
+            if not RoleAssignment.is_object_readable(user, Perimeter, perimeter.id):
+                _refuse_organization()
+        else:
+            if not _allowed(user, "add_perimeter", domain):
+                _refuse_organization()
+            serializer = PerimeterWriteSerializer(
+                data={"folder": str(domain.id), "name": wanted_perimeter,
+                      "description": perimeter_description(sentences)},
+                context=context,
+            )
+            serializer.is_valid(raise_exception=True)
+            perimeter = serializer.save()
+            created["perimeter"] = True
+
+        # Audit: always new. Version and SICO-AUD number are computed under the lock.
+        versions = [a.version for a in ComplianceAssessment.objects.filter(perimeter=perimeter)
+                    if name_key(a.name) == name_key(org)]
+        ref_ids = ComplianceAssessment.objects.filter(
+            ref_id__istartswith=f"{AUDIT_REF_PREFIX}-{day.year:04d}-"
+        ).values_list("ref_id", flat=True)
+        serializer = ComplianceAssessmentWriteSerializer(
+            data={
+                "folder": str(domain.id),
+                "perimeter": str(perimeter.id),
+                "framework": str(framework.id),
+                "name": org,
+                "version": next_version(versions),
+                "ref_id": next_audit_ref_id(day.year, ref_ids),
+                "status": "in_progress",
+                "description": audit_description(model=model, day=day, sentences=sentences),
+            },
+            context=context,
+        )
+        serializer.is_valid(raise_exception=True)
+        audit = serializer.save()
+        audit.create_requirement_assessments()
+
+        # Results, through the platform's own serializer and its write rules.
+        rows = {
+            str(ra.requirement_id): ra
+            for ra in RequirementAssessment.objects.select_for_update().filter(
+                compliance_assessment=audit,
+                requirement_id__in=[r.requirement_key for r in results],
+                requirement__assessable=True,
+                selected=True,
+            )
+        }
+        written: list[tuple[PlannedResult, Any, str]] = []
+        skipped: list[str] = []
+        for item in results:
+            row = rows.get(item.requirement_key)
+            if row is None:
+                skipped.append(item.ref_id)
+                continue
+            observation = build_observation(item.outcome, model=model, day=day, sentence=item.sentence)
+            serializer = RequirementAssessmentWriteSerializer(
+                instance=row,
+                data={"result": item.outcome.result, "status": item.outcome.status, "observation": observation},
+                partial=True,
+                context=context,
+            )
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            written.append((item, row.pk, observation))
+
+        # Read back: exactly what was planned was saved, and nothing else in the Audit moved.
+        for item, pk, observation in written:
+            row = RequirementAssessment.objects.get(pk=pk)
+            if (row.result, row.status, row.observation) != (item.outcome.result, item.outcome.status, observation):
+                raise RuntimeError("persisted_state_mismatch")
+        touched = RequirementAssessment.objects.filter(compliance_assessment=audit).exclude(
+            result=RequirementAssessment.Result.NOT_ASSESSED, status=RequirementAssessment.Status.TODO
+        ).count()
+        if touched != len(written):
+            raise RuntimeError("persisted_state_mismatch")
+        assessable_total = RequirementAssessment.objects.filter(
+            compliance_assessment=audit, requirement__assessable=True, selected=True
+        ).count()
+
+    return {
+        "audit": {"id": str(audit.id), "name": audit.name, "version": audit.version, "ref_id": audit.ref_id,
+                  "status": audit.status, "url": f"/compliance-assessments/{audit.id}"},
+        "domain": {"id": str(domain.id), "name": domain.name, "created": created["domain"]},
+        "perimeter": {"id": str(perimeter.id), "name": perimeter.name, "created": created["perimeter"]},
+        "summary": summarize([w[0] for w in written], assessable_total),
+        "results": [{"ref_id": w[0].ref_id, "kind": w[0].outcome.kind, "result": w[0].outcome.result}
+                    for w in written],
+        "not_in_audit": skipped,
+    }
