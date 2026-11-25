@@ -1,0 +1,135 @@
+{
+    "Implemented":  [
+                        "Framework-driven task queue connected to Build a GRC case",
+                        "All authorized requirements scheduled; nonuniform activity counts and explicit parent dependencies",
+                        "Focus fields forwarded and independently validated against authorized source",
+                        "16 existing activities and checkpoint schema retained; source identity survives restore",
+                        "Searchable case board, category navigation, linked record inspector, proposed full matrix and honest coverage counts",
+                        "Type/asset/relationship checks, distinct narratives, accountable roles and observable control tests",
+                        "Native SICO treatment choices and conservative Threat/Vulnerability model proposals",
+                        "Provider disconnect sanitization and no synthetic fallback"
+                    ],
+    "ExactChangedSourceFiles":  [
+                                    {
+                                        "Path":  "backend/ai_onboarding/llm_provider.py",
+                                        "NewFile":  false,
+                                        "BeforeSHA256":  "6F3A89192E60BBA3332235F4A34C08D9B59CA1168EBC83800A01CD58929302BF",
+                                        "AfterSHA256":  "8248C4E6DA6575C7E15DB1C4870EFF41B8544C454753A3767D21929320208FDD"
+                                    },
+                                    {
+                                        "Path":  "backend/ai_onboarding/quality_sico_drafts_v5.py",
+                                        "NewFile":  false,
+                                        "BeforeSHA256":  "C617FBBFD74EBC31E6048E8CF95133398AFEA15FEBEBE309038FFEBD3F9BBB7F",
+                                        "AfterSHA256":  "86783EE41881DA7BC8A3147FD13928BF0B64012951D3F1578E41EFB1B969FC92"
+                                    },
+                                    {
+                                        "Path":  "backend/ai_onboarding/sico_ai_case_quality_views.py",
+                                        "NewFile":  false,
+                                        "BeforeSHA256":  "B1BDDAB2AC1E47F579E8FDE5E63035E2C5A4320265830B4C55C8F566F9846B3D",
+                                        "AfterSHA256":  "BA5D539C880DBABA27148316331B667B8F73D82DBBC6690E5CB9D5F3104C975A"
+                                    },
+                                    {
+                                        "Path":  "backend/ai_onboarding/sico_case_coverage.py",
+                                        "NewFile":  false,
+                                        "BeforeSHA256":  "6CBA8D3056E30B316A8501B1020093D2E56B3221866903AEFCAA1ACA644F855B",
+                                        "AfterSHA256":  "593B9E8D8385237A64862B983C036824C4BA299461D551399CFCFCE0D04A9066"
+                                    },
+                                    {
+                                        "Path":  "backend/ai_onboarding/sico_case_record_proposals.py",
+                                        "NewFile":  false,
+                                        "BeforeSHA256":  "EB71444479A4E1DEDBF28DC0602479A60CB9E7D31772A0BF448C55E8D8C8401E",
+                                        "AfterSHA256":  "9243B1FE956D523AD20A400FFB226E9A01CBB386E7C5EA1294124393FB4C818A"
+                                    },
+                                    {
+                                        "Path":  "frontend/src/routes/(app)/(internal)/sico-ai-next/+page.server.ts",
+                                        "NewFile":  false,
+                                        "BeforeSHA256":  "BAD595F97DC47E6AB1C9C1D885CDD875473AD9C7D323C708C5BEA8126469AE5B",
+                                        "AfterSHA256":  "068B34876C325A96FD64D8AD1E0D963170435CBB01C1D5D4D8709E9DD28834BD"
+                                    },
+                                    {
+                                        "Path":  "frontend/src/routes/(app)/(internal)/sico-ai-next/+page.svelte",
+                                        "NewFile":  false,
+                                        "BeforeSHA256":  "8C1BAE5AB83CE874E745C6743F3AA4781EADECAF18B3E977DE644E823A80A8AB",
+                                        "AfterSHA256":  "DDE673D555309DD4F90EEC6EF9720647338C6BCBFCC06C5F9DD34F41A374E3CE"
+                                    },
+                                    {
+                                        "Path":  "frontend/src/lib/utils/sicoGenerationPlan.ts",
+                                        "NewFile":  true,
+                                        "BeforeSHA256":  null,
+                                        "AfterSHA256":  "7637561179B1F8C914BB11C594650454A4644913D7615A8E4EA1052B62E9C63B"
+                                    },
+                                    {
+                                        "Path":  "frontend/src/lib/components/AiOnboarding/SicoGeneratedCase.svelte",
+                                        "NewFile":  true,
+                                        "BeforeSHA256":  null,
+                                        "AfterSHA256":  "C04C7FC2386569B596B2292B5FD3E23C0BB7A57B6D9C272655D97226149993C9"
+                                    },
+                                    {
+                                        "Path":  "backend/ai_onboarding/tests/test_sico_case_generation_queue.py",
+                                        "NewFile":  false,
+                                        "BeforeSHA256":  "C19F785A983CE22089910753E3AF53F82C29602D99D0F70F784C081488D6A1FD",
+                                        "AfterSHA256":  "AB3C34D509424580D7F00E5E33F8AECB6F3D0006C98B229B1131F4B17F197B41"
+                                    },
+                                    {
+                                        "Path":  "backend/ai_onboarding/tests/test_sico_coordinated_generation.py",
+                                        "NewFile":  true,
+                                        "BeforeSHA256":  null,
+                                        "AfterSHA256":  "410F890B8C24DFCBEDBA017670A61CCAEF0B3B6204C5157756AEC9B4C9B3EB10"
+                                    },
+                                    {
+                                        "Path":  "frontend/src/lib/utils/sicoGenerationPlan.test.cjs",
+                                        "NewFile":  true,
+                                        "BeforeSHA256":  null,
+                                        "AfterSHA256":  "2EDA853DD7F92D6BE4E28672AD53E381E1AB35ADC32DF3BF861678F3E7DC0725"
+                                    }
+                                ],
+    "RollbackSnapshot":  "C:\\Users\\sanad\\OneDrive\\Desktop\\GRC_AI\\GRC_SC\\.sico-step2\\rollback-20261124T091421Z",
+    "BackendTests":  {
+                         "compiled_modules":  15,
+                         "tests":  122,
+                         "failures":  0,
+                         "errors":  0,
+                         "skipped":  0,
+                         "successful":  true
+                     },
+    "FrontendTests":  {
+                          "svelte":  "5.53.5",
+                          "compiled_components":  2,
+                          "typescript_transpiled":  2,
+                          "coordinator_strict_typecheck":  true,
+                          "checks":  12,
+                          "genuine_qwen_records_rendered":  4,
+                          "warning_counts":  {
+                                                 "css_unused_selector":  99
+                                             },
+                          "full_frontend_build":  false,
+                          "successful":  true
+                      },
+    "ActualQwen":  {
+                       "Model":  "qwen2.5:3b",
+                       "Framework":  {
+                                         "name":  "ANSSI - Guide d\u0027hygiène informatique",
+                                         "reference":  "ANSSI-GUIDE-HYGIENE",
+                                         "urn":  "urn:intuitem:risk:framework:anssi-guide-hygiene",
+                                         "provider":  "ANSSI"
+                                     },
+                       "AuthorizedRequirementCount":  61,
+                       "PlannedRecordCount":  136,
+                       "AcceptedRecords":  4,
+                       "FullChainDemonstrated":  true,
+                       "GeneratedNarrativesUnchanged":  true,
+                       "ModelFieldsValidated":  true,
+                       "EvidenceFile":  ".sico-step2/qwen-evidence.json",
+                       "RejectedAttemptsPreserved":  true
+                   },
+    "RuntimeDeploymentPerformed":  false,
+    "FullFrontendBuildPerformed":  false,
+    "BusinessRecordWritesPerformed":  false,
+    "Remaining":  [
+                      "Deployment of the tested repository frontend/backend is required; running interface unchanged",
+                      "End-to-end Qwen generation through all 16 activities has not been demonstrated",
+                      "Evidence-backed requirement assessment and complete risk scoring against an approved matrix have not been demonstrated",
+                      "Approved creation through existing tenant-scoped writers has not been demonstrated",
+                      "Generated prose still requires professional human verification; lexical/relationship guards do not establish substantive correctness"
+                  ]
+}

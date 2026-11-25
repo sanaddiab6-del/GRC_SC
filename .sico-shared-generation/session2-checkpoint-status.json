@@ -1,0 +1,16 @@
+{
+  "status": "not_run",
+  "reason": "Required Al Noor Hospital Activity 1 checkpoint unavailable in accessible exports",
+  "checkpoint_found": "Downloads/SICO-AI-quality-case-checkpoint.json",
+  "checkpoint_match": false,
+  "checkpoint_found_contains": "Different organization (Sky Line); Activity 4 only",
+  "required_record": "Al Noor Hospital draft-01-01",
+  "qwen_requests": 0,
+  "generation_attempts": 0,
+  "inference_seconds": 0,
+  "checked_at_utc": "2026-11-24 11:31:32 UTC",
+  "code_changed": false,
+  "deployed": false,
+  "database_used": false,
+  "next_action": "Provide the existing Al Noor Hospital checkpoint containing the accepted Activity 1 record. Do not synthesize a parent record or reuse another case."
+}

@@ -1,0 +1,119 @@
+[
+    {
+        "Path":  "backend/ai_onboarding/llm_provider.py",
+        "LivePath":  "/code/ai_onboarding/llm_provider.py",
+        "BackupPath":  "C:\\Users\\sanad\\OneDrive\\Desktop\\GRC_AI\\GRC_SC\\.sico-step2\\activation-20261124T101741Z\\live\\backend\\ai_onboarding\\llm_provider.py",
+        "BeforeSHA256":  "6f3a89192e60bba3332235f4a34c08d9b59ca1168ebc83800a01cd58929302bf",
+        "BeforeMode":  493,
+        "AfterSHA256":  "8248c4e6da6575c7e15db1c4870eff41b8544c454753a3767d21929320208fdd",
+        "WasAbsent":  false
+    },
+    {
+        "Path":  "backend/ai_onboarding/quality_sico_drafts_v5.py",
+        "LivePath":  "/code/ai_onboarding/quality_sico_drafts_v5.py",
+        "BackupPath":  "C:\\Users\\sanad\\OneDrive\\Desktop\\GRC_AI\\GRC_SC\\.sico-step2\\activation-20261124T101741Z\\live\\backend\\ai_onboarding\\quality_sico_drafts_v5.py",
+        "BeforeSHA256":  "c617fbbfd74ebc31e6048e8cf95133398afea15febebe309038ffebd3f9bbb7f",
+        "BeforeMode":  493,
+        "AfterSHA256":  "86783ee41881da7bc8a3147fd13928bf0b64012951d3f1578e41efb1b969fc92",
+        "WasAbsent":  false
+    },
+    {
+        "Path":  "backend/ai_onboarding/sico_ai_case_quality_views.py",
+        "LivePath":  "/code/ai_onboarding/sico_ai_case_quality_views.py",
+        "BackupPath":  "C:\\Users\\sanad\\OneDrive\\Desktop\\GRC_AI\\GRC_SC\\.sico-step2\\activation-20261124T101741Z\\live\\backend\\ai_onboarding\\sico_ai_case_quality_views.py",
+        "BeforeSHA256":  "0f71eaa205df1d87a98c57cf6b6a9a474f053b760b1b20a554ccb2c6859f6801",
+        "BeforeMode":  493,
+        "AfterSHA256":  "ba5d539c880dbaba27148316331b667b8f73d82dbbc6690e5cb9d5f3104c975a",
+        "WasAbsent":  false
+    },
+    {
+        "Path":  "backend/ai_onboarding/sico_case_coverage.py",
+        "LivePath":  "/code/ai_onboarding/sico_case_coverage.py",
+        "BackupPath":  null,
+        "BeforeSHA256":  null,
+        "BeforeMode":  null,
+        "AfterSHA256":  "593b9e8d8385237a64862b983c036824c4ba299461d551399cfcfce0d04a9066",
+        "WasAbsent":  true
+    },
+    {
+        "Path":  "backend/ai_onboarding/sico_case_record_proposals.py",
+        "LivePath":  "/code/ai_onboarding/sico_case_record_proposals.py",
+        "BackupPath":  null,
+        "BeforeSHA256":  null,
+        "BeforeMode":  null,
+        "AfterSHA256":  "9243b1fe956d523ad20a400ffb226e9a01cbb386e7c5ea1294124393fb4c818a",
+        "WasAbsent":  true
+    },
+    {
+        "Path":  "backend/ai_onboarding/urls.py",
+        "LivePath":  "/code/ai_onboarding/urls.py",
+        "BackupPath":  "C:\\Users\\sanad\\OneDrive\\Desktop\\GRC_AI\\GRC_SC\\.sico-step2\\activation-20261124T101741Z\\live\\backend\\ai_onboarding\\urls.py",
+        "BeforeSHA256":  "7cc296c0deaca259c45debc34f2388de3bcaa62b3ec2795ed90bf0543970c828",
+        "BeforeMode":  493,
+        "AfterSHA256":  "553084838f7076c3771db4b34843a3abd5f47597a9ea68565399b1e344aef8fe",
+        "WasAbsent":  false
+    },
+    {
+        "Path":  "backend/ai_onboarding/sico_case_coverage_views.py",
+        "LivePath":  "/code/ai_onboarding/sico_case_coverage_views.py",
+        "BackupPath":  null,
+        "BeforeSHA256":  null,
+        "BeforeMode":  null,
+        "AfterSHA256":  "3e0ee0952e3daad36777a66ef1ebe66d4fb1d4269dcce6cf09667dc3cd5a7f34",
+        "WasAbsent":  true
+    },
+    {
+        "Path":  "backend/ai_onboarding/sico_full_case_blueprint.py",
+        "LivePath":  "/code/ai_onboarding/sico_full_case_blueprint.py",
+        "BackupPath":  null,
+        "BeforeSHA256":  null,
+        "BeforeMode":  null,
+        "AfterSHA256":  "ca082ddeea51c6d5862f63a0c2a51840e681d1124d28300c90679825ca14118e",
+        "WasAbsent":  true
+    },
+    {
+        "Path":  "backend/ai_onboarding/sico_case_matrix_methodology.py",
+        "LivePath":  "/code/ai_onboarding/sico_case_matrix_methodology.py",
+        "BackupPath":  null,
+        "BeforeSHA256":  null,
+        "BeforeMode":  null,
+        "AfterSHA256":  "98aee829c205c8d672d8137f06b44cd93b83d4dcce450729da18d99eed072694",
+        "WasAbsent":  true
+    },
+    {
+        "Path":  "frontend/src/routes/(app)/(internal)/sico-ai-next/+page.server.ts",
+        "LivePath":  "/workspace/src/routes/(app)/(internal)/sico-ai-next/+page.server.ts",
+        "BackupPath":  "C:\\Users\\sanad\\OneDrive\\Desktop\\GRC_AI\\GRC_SC\\.sico-step2\\activation-20261124T101741Z\\live\\frontend\\src\\routes\\(app)\\(internal)\\sico-ai-next\\+page.server.ts",
+        "BeforeSHA256":  "bad595f97dc47e6ab1c9c1d885cdd875473ad9c7d323c708c5bea8126469ae5b",
+        "BeforeMode":  511,
+        "AfterSHA256":  "068b34876c325a96fd64d8ad1e0d963170435cbb01c1d5d4d8709e9dd28834bd",
+        "WasAbsent":  false
+    },
+    {
+        "Path":  "frontend/src/routes/(app)/(internal)/sico-ai-next/+page.svelte",
+        "LivePath":  "/workspace/src/routes/(app)/(internal)/sico-ai-next/+page.svelte",
+        "BackupPath":  "C:\\Users\\sanad\\OneDrive\\Desktop\\GRC_AI\\GRC_SC\\.sico-step2\\activation-20261124T101741Z\\live\\frontend\\src\\routes\\(app)\\(internal)\\sico-ai-next\\+page.svelte",
+        "BeforeSHA256":  "8c1bae5ab83ce874e745c6743f3aa4781eadecaf18b3e977de644e823a80a8ab",
+        "BeforeMode":  511,
+        "AfterSHA256":  "dde673d555309dd4f90eec6ef9720647338c6bcbfcc06c5f9dd34f41a374e3ce",
+        "WasAbsent":  false
+    },
+    {
+        "Path":  "frontend/src/lib/utils/sicoGenerationPlan.ts",
+        "LivePath":  "/workspace/src/lib/utils/sicoGenerationPlan.ts",
+        "BackupPath":  null,
+        "BeforeSHA256":  null,
+        "BeforeMode":  null,
+        "AfterSHA256":  "7637561179b1f8c914bb11c594650454a4644913d7615a8e4ea1052b62e9c63b",
+        "WasAbsent":  true
+    },
+    {
+        "Path":  "frontend/src/lib/components/AiOnboarding/SicoGeneratedCase.svelte",
+        "LivePath":  "/workspace/src/lib/components/AiOnboarding/SicoGeneratedCase.svelte",
+        "BackupPath":  null,
+        "BeforeSHA256":  null,
+        "BeforeMode":  null,
+        "AfterSHA256":  "c04c7fc2386569b596b2292b5fd3e23c0bb7a57b6d9c272655d97226149993c9",
+        "WasAbsent":  true
+    }
+]

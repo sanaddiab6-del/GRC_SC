@@ -1,0 +1,21 @@
+[
+    {
+        "Check":  "vite-page",
+        "Status":  "200",
+        "UpdatedMarkerFound":  true
+    },
+    {
+        "Check":  "vite-component",
+        "Status":  "200",
+        "UpdatedMarkerFound":  true
+    },
+    {
+        "Check":  "vite-coordinator",
+        "Status":  "200",
+        "UpdatedMarkerFound":  true
+    },
+    {
+        "Check":  "public-page",
+        "Response":  "302 https://localhost:9443/login?next=/sico-ai-next"
+    }
+]

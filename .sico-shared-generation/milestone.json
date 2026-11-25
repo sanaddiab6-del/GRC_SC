@@ -1,0 +1,69 @@
+{
+    "Milestone":  "Shared 16-activity generation/validation and bounded-retry mechanism",
+    "SessionStartedUTC":  "2026-11-24 11:19:23",
+    "CompletedUTC":  "2026-11-24 11:28:17",
+    "ChangedFiles":  [
+                         {
+                             "Path":  "backend/ai_onboarding/quality_sico_drafts_v5.py",
+                             "BeforeSHA256":  "1A4FFE5E8FA081CE2D6F2E0744F8767C4AED5A6DBACD3BEE8BBCC459A75D3494",
+                             "AfterSHA256":  "1FFAAB22F36ED43EBBFF7CB2361FE528F41795AB1AF777D5B78179090926AA47"
+                         },
+                         {
+                             "Path":  "backend/ai_onboarding/sico_ai_case_quality_views.py",
+                             "BeforeSHA256":  "BA5D539C880DBABA27148316331B667B8F73D82DBBC6690E5CB9D5F3104C975A",
+                             "AfterSHA256":  "EF9B4EB0827B3FF3C45541C8B60C5CD0C86831CB95E6107786548704ED6F58F4"
+                         },
+                         {
+                             "Path":  "backend/ai_onboarding/tests/test_quality_all_activities.py",
+                             "BeforeSHA256":  null,
+                             "AfterSHA256":  "5FBC6899A6CF38733EC3BA8D157A8172B5B813D8DBE976334E9F3D82BFFD657E"
+                         },
+                         {
+                             "Path":  "backend/ai_onboarding/tests/test_quality_title_recovery.py",
+                             "BeforeSHA256":  "6F571C730F3C99E66507975C02D132A59D23DBFB92BFBF205385F94D982ACF16",
+                             "AfterSHA256":  "1A96F320948E12219BF7254E860D6D7484F0949D726E3D11BED150E5FFF8EB5C"
+                         },
+                         {
+                             "Path":  "backend/ai_onboarding/tests/test_quality_evidence_requests.py",
+                             "BeforeSHA256":  "0B602B310464B7E03541560224E8A11ECADFAA47C75DDFFC02697C48510E8A15",
+                             "AfterSHA256":  "F52F143282ED6C49289867FA2DE0F68E92FCCB9DE9F71878A347ACB490976237"
+                         }
+                     ],
+    "RollbackSnapshot":  "C:\\Users\\sanad\\OneDrive\\Desktop\\GRC_AI\\GRC_SC\\.sico-shared-generation\\rollback-20261124T112102Z",
+    "Tests":  {
+                  "tests":  113,
+                  "failures":  0,
+                  "errors":  0,
+                  "contracts_passed":  [
+                                           "applied_controls",
+                                           "assets",
+                                           "audit_findings",
+                                           "business_scope",
+                                           "compliance_assessment",
+                                           "control_effectiveness",
+                                           "evidence_requests",
+                                           "framework_scope",
+                                           "human_review",
+                                           "policies",
+                                           "remediation",
+                                           "reports",
+                                           "requirement_reviews",
+                                           "residual_risk",
+                                           "risk_scenarios",
+                                           "threats"
+                                       ],
+                  "provider":  "mocked HTTP responses",
+                  "real_qwen_verified":  false,
+                  "deployment_performed":  false,
+                  "successful":  true
+              },
+    "LiveQwenExecuted":  false,
+    "Deployed":  false,
+    "DatabaseWrites":  false,
+    "Unverified":  [
+                       "Real Qwen success rates, latency and professional content depth for these changes",
+                       "Authenticated browser behavior and real tenant authorization/RBAC end-to-end",
+                       "Full live 16-activity case, approved matrix scoring, evidence-backed coverage and approved persistence"
+                   ],
+    "ExactNextAction":  "In a separately authorized short session, run a bounded representative no-write real-Qwen check of the shared mechanism and inspect retry diagnostics; deploy only after that verification. Do not run the full queue."
+}

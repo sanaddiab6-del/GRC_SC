@@ -1,0 +1,28 @@
+{
+  "status": "Two-file fix activated; one real Qwen draft accepted",
+  "root_cause": "LocalAiProvider validates the model response before generate_structured returns, so caller-side title handling cannot recover the title maxLength error.",
+  "production_files": [
+    "backend/ai_onboarding/llm_provider.py",
+    "backend/ai_onboarding/quality_sico_drafts_v5.py"
+  ],
+  "test_file": "backend/ai_onboarding/tests/test_quality_title_recovery.py",
+  "recovery": "One word-boundary shortening pass only when the sole schema error is title maxLength. Original full title retained in model_provenance.title_formatting_recovery. Non-title fields unchanged; complete schema and downstream safeguards still enforced. No extra model call.",
+  "targeted_tests_passed": 31,
+  "actual_model": "qwen2.5:3b",
+  "actual_activity": 1,
+  "actual_draft_index": 1,
+  "actual_accepted": true,
+  "actual_title": "Framework charter: Assess regional delivery operator security",
+  "actual_title_length": 61,
+  "actual_elapsed_seconds": 109.02,
+  "actual_request_needed_title_recovery": false,
+  "actual_test": "Isolated no-write Activity 1 generation through deployed modules; previous exported framework label, no current framework/database lookup. Model-supplied facts and edition remain unverified.",
+  "live_route_health": 401,
+  "activation_manifest": ".sico-title-fix/activate-result.json",
+  "evidence": ".sico-title-fix/real-result.json",
+  "rollback_snapshot": "C:/Users/sanad/OneDrive/Desktop/GRC_AI/GRC_SC/.sico-title-fix/rollback-20261124T105447Z",
+  "database_used": false,
+  "business_records_written": false,
+  "queue_executed": false,
+  "frontend_changed": false
+}

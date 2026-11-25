@@ -1,0 +1,35 @@
+[2m2026-11-24T10:17:36.973289Z[0m [[33m[1mwarning  [0m] [1mrequest_finished              [0m [[0m[1m[34mdjango_structlog.middlewares.request[0m][0m [36mciso_assistant_url[0m=[35mhttps://localhost:9443[0m [36mcode[0m=[35m401[0m [36mip[0m=[35m172.20.0.1[0m [36mrequest[0m=[35mGET /api/iam/registration-requests/count/[0m [36mrequest_id[0m=[35mbd1e9688-a7d7-4868-82fe-8815b8fcbb94[0m [36muser_id[0m=[35mNone[0m
+Unauthorized: /api/iam/registration-requests/count/
+[1mUnauthorized: /api/iam/registration-requests/count/[0m
+[2026-11-24 10:18:34 +0000] [1] [INFO] Handling signal: hup
+[2026-11-24 10:18:34 +0000] [1] [INFO] Hang up: Master
+[2026-11-24 10:18:34 +0000] [13078] [INFO] Booting worker with pid: 13078
+[2026-11-24 10:18:34 +0000] [13080] [INFO] Booting worker with pid: 13080
+[2026-11-24 10:18:34 +0000] [13079] [INFO] Booting worker with pid: 13079
+[2026-11-24 10:18:34 +0000] [6182] [INFO] Worker exiting (pid: 6182)
+[2026-11-24 10:18:34 +0000] [6181] [INFO] Worker exiting (pid: 6181)
+[2026-11-24 10:18:34 +0000] [6180] [INFO] Worker exiting (pid: 6180)
+[2026-11-24 10:18:36 +0000] [1] [ERROR] Worker (pid:6180) was sent SIGTERM!
+[2026-11-24 10:18:36 +0000] [1] [ERROR] Worker (pid:6181) was sent SIGTERM!
+[2026-11-24 10:18:36 +0000] [1] [ERROR] Worker (pid:6182) was sent SIGTERM!
+[2m2026-11-24T10:19:12.474901Z[0m [[33m[1mwarning  [0m] [1mrequest_finished              [0m [[0m[1m[34mdjango_structlog.middlewares.request[0m][0m [36mciso_assistant_url[0m=[35mhttps://localhost:9443[0m [36mcode[0m=[35m401[0m [36mip[0m=[35m172.20.0.1[0m [36mrequest[0m=[35mGET /api/iam/registration-requests/count/[0m [36mrequest_id[0m=[35ma8e0802b-21d7-4290-9ec5-e05f7e0b993d[0m [36muser_id[0m=[35mNone[0m
+Unauthorized: /api/iam/registration-requests/count/
+[1mUnauthorized: /api/iam/registration-requests/count/[0m
+[2m2026-11-24T10:19:12.963965Z[0m [[33m[1mwarning  [0m] [1mrequest_finished              [0m [[0m[1m[34mdjango_structlog.middlewares.request[0m][0m [36mciso_assistant_url[0m=[35mhttps://localhost:9443[0m [36mcode[0m=[35m401[0m [36mip[0m=[35m172.20.0.1[0m [36mrequest[0m=[35mGET /api/iam/registration-requests/count/[0m [36mrequest_id[0m=[35ma539311a-2ac3-49a3-85b1-ed946793b8c8[0m [36muser_id[0m=[35mNone[0m
+Unauthorized: /api/iam/registration-requests/count/
+[1mUnauthorized: /api/iam/registration-requests/count/[0m
+[2m2026-11-24T10:19:13.033215Z[0m [[33m[1mwarning  [0m] [1mrequest_finished              [0m [[0m[1m[34mdjango_structlog.middlewares.request[0m][0m [36mciso_assistant_url[0m=[35mhttps://localhost:9443[0m [36mcode[0m=[35m401[0m [36mip[0m=[35m172.20.0.1[0m [36mrequest[0m=[35mGET /api/iam/registration-requests/count/[0m [36mrequest_id[0m=[35m94a1574d-72ae-45e9-a2dc-4491c0734b92[0m [36muser_id[0m=[35mNone[0m
+Unauthorized: /api/iam/registration-requests/count/
+[1mUnauthorized: /api/iam/registration-requests/count/[0m
+[2m2026-11-24T10:19:13.622306Z[0m [[33m[1mwarning  [0m] [1mrequest_finished              [0m [[0m[1m[34mdjango_structlog.middlewares.request[0m][0m [36mciso_assistant_url[0m=[35mhttps://localhost:9443[0m [36mcode[0m=[35m401[0m [36mip[0m=[35m172.20.0.1[0m [36mrequest[0m=[35mGET /api/ai/workforce/assistant/case-draft/coverage-plan/[0m [36mrequest_id[0m=[35m6af940e0-702d-47f4-9d73-d8d07a288e74[0m [36muser_id[0m=[35mNone[0m
+Unauthorized: /api/ai/workforce/assistant/case-draft/coverage-plan/
+[1mUnauthorized: /api/ai/workforce/assistant/case-draft/coverage-plan/[0m
+[2m2026-11-24T10:19:19.285340Z[0m [[33m[1mwarning  [0m] [1mrequest_finished              [0m [[0m[1m[34mdjango_structlog.middlewares.request[0m][0m [36mciso_assistant_url[0m=[35mhttps://localhost:9443[0m [36mcode[0m=[35m401[0m [36mip[0m=[35m172.20.0.1[0m [36mrequest[0m=[35mGET /api/iam/registration-requests/count/[0m [36mrequest_id[0m=[35ma301582e-1385-4034-ba53-0eda5674d7db[0m [36muser_id[0m=[35mNone[0m
+Unauthorized: /api/iam/registration-requests/count/
+[1mUnauthorized: /api/iam/registration-requests/count/[0m
+[2m2026-11-24T10:19:19.535968Z[0m [[33m[1mwarning  [0m] [1mrequest_finished              [0m [[0m[1m[34mdjango_structlog.middlewares.request[0m][0m [36mciso_assistant_url[0m=[35mhttps://localhost:9443[0m [36mcode[0m=[35m401[0m [36mip[0m=[35m172.20.0.1[0m [36mrequest[0m=[35mGET /api/iam/registration-requests/count/[0m [36mrequest_id[0m=[35m51103e1c-ad2c-43ef-a8cf-918363fd2e60[0m [36muser_id[0m=[35mNone[0m
+Unauthorized: /api/iam/registration-requests/count/
+[1mUnauthorized: /api/iam/registration-requests/count/[0m
+[2m2026-11-24T10:19:34.296978Z[0m [[33m[1mwarning  [0m] [1mrequest_finished              [0m [[0m[1m[34mdjango_structlog.middlewares.request[0m][0m [36mciso_assistant_url[0m=[35mhttps://localhost:9443[0m [36mcode[0m=[35m401[0m [36mip[0m=[35m172.20.0.1[0m [36mrequest[0m=[35mGET /api/iam/registration-requests/count/[0m [36mrequest_id[0m=[35m397265c6-189c-4932-b8e2-e801ac70307d[0m [36muser_id[0m=[35mNone[0m
+Unauthorized: /api/iam/registration-requests/count/
+[1mUnauthorized: /api/iam/registration-requests/count/[0m

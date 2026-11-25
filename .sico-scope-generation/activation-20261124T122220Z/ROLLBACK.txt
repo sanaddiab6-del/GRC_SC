@@ -1,0 +1,6 @@
+Exact source rollback for this activation only (verify no later edits first):
+powershell -NoProfile -ExecutionPolicy Bypass -File .sico-scope-generation/activate.ps1 -Phase rollback-frontend
+powershell -NoProfile -ExecutionPolicy Bypass -File .sico-scope-generation/activate.ps1 -Phase rollback-backend
+powershell -NoProfile -ExecutionPolicy Bypass -File .sico-scope-generation/activate.ps1 -Phase reload
+The helper verifies current deployed hashes before restoring exact backup bytes.
+No database operations, startup scripts or migrations are part of rollback.

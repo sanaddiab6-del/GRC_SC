@@ -1,0 +1,56 @@
+{
+    "Milestone":  "Explicit-scope multi-record planning, focused quality and coordinated progression",
+    "ChangedFiles":  [
+                         {
+                             "Path":  "backend/ai_onboarding/sico_case_coverage.py",
+                             "SHA256":  "1095B51EC68334524891FC8035902B6B18FF30FF94F996AEFB0FDC5450B69946"
+                         },
+                         {
+                             "Path":  "backend/ai_onboarding/quality_sico_drafts_v5.py",
+                             "SHA256":  "2F68E432C40A035413998341C6DA459F8D51566AFC9D5B602CB9D28FE91F9BCF"
+                         },
+                         {
+                             "Path":  "backend/ai_onboarding/sico_ai_case_quality_views.py",
+                             "SHA256":  "52262525EC7EF1C4F005306AEFEC0D9281A2E74FDA5B31071FA69146B3558064"
+                         },
+                         {
+                             "Path":  "frontend/src/lib/utils/sicoGenerationPlan.ts",
+                             "SHA256":  "0C95EE5E1994E05034BD65E221F8E48266CEC024DFB57F0FAA5B37A6EF73182D"
+                         },
+                         {
+                             "Path":  "backend/ai_onboarding/tests/test_sico_case_generation_queue.py",
+                             "SHA256":  "8425F069A7740104AD4DD9D9724F0459616950C2D96FA7460125A8261D248E6C"
+                         },
+                         {
+                             "Path":  "backend/ai_onboarding/tests/test_scope_generation.py",
+                             "SHA256":  "F4F4D70EEFB2D709FFD96695604FB0A290D38B5E459277FB78D2F908B07A8336"
+                         }
+                     ],
+    "Rollback":  "C:\\Users\\sanad\\OneDrive\\Desktop\\GRC_AI\\GRC_SC\\.sico-scope-generation\\rollback-20261124T120950Z",
+    "BackendMocks":  103,
+    "AllActivityContractsPassed":  16,
+    "Coordinator":  {
+                        "scheduled_records":  37,
+                        "simulated_accepted_records":  37,
+                        "activity_count":  16,
+                        "checkpoint_resume":  true,
+                        "scope_reassignment_blocked":  true,
+                        "real_qwen_verified":  false,
+                        "deployed":  false
+                    },
+    "RealQwenExecuted":  false,
+    "Deployed":  false,
+    "DatabaseWrites":  false,
+    "RootFindings":  [
+                         "One record per request is not a total-record cap",
+                         "Previous queue interleaved one record per category before later inventory records",
+                         "Original asset quantity followed framework topics instead of explicit organization scope"
+                     ],
+    "Limits":  [
+                   "Scope extraction requires an explicit Scope:/Systems:/Services:/Assets:/Processes: list; no guessed industry inventory",
+                   "Provider request batching has not been implemented",
+                   "Existing scoped checkpoints without matching task identity require scope review and are never silently reassigned",
+                   "Crescent current objective, accepted checkpoint and verified framework identity were not available in accessible export; real case unverified",
+                   "Full live 16-activity generation, scoring and approved creation remain unverified"
+               ]
+}

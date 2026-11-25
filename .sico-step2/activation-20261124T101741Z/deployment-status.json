@@ -1,0 +1,24 @@
+{
+  "status": "Step 2 activated in existing amro-backend and amro-frontend",
+  "activated_files_manifest": "activation-manifest.json",
+  "activated_file_count": 13,
+  "backend_reload": "Gunicorn SIGHUP; workers reloaded; container not restarted",
+  "frontend_activation": "Existing Vite hot reload; no restart, build, or dependency installation",
+  "verification": {
+    "coverage_plan_route": 401,
+    "quality_one_route": 401,
+    "updated_vite_page": 200,
+    "updated_case_board": 200,
+    "updated_coordinator": 200,
+    "requested_page": 302,
+    "login_redirect": "https://localhost:9443/login?next=/sico-ai-next"
+  },
+  "authenticated_screen_view_verified": false,
+  "verification_limit": "The protected screen requires an existing authenticated user session. No session or account was created.",
+  "deployment_blocker": null,
+  "rollback_snapshot": "C:/Users/sanad/OneDrive/Desktop/GRC_AI/GRC_SC/.sico-step2/activation-20261124T101741Z",
+  "generation_executed": false,
+  "business_record_writes": false,
+  "migrations": false,
+  "initial_health_check": "Client timed out during worker startup. Exact backup was restored, then the identical activation completed after allowing startup."
+}

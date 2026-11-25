@@ -1,0 +1,37 @@
+{
+  "activated": true,
+  "production_files_changed": [
+    "backend/ai_onboarding/sico_case_coverage.py",
+    "backend/ai_onboarding/quality_sico_drafts_v5.py",
+    "backend/ai_onboarding/sico_ai_case_quality_views.py",
+    "frontend/src/lib/utils/sicoGenerationPlan.ts"
+  ],
+  "earlier_shared_generation_changes_included": true,
+  "live_hashes_and_runtime_imports_verified": true,
+  "route_bound_to_shared_generator": true,
+  "maximum_generation_attempts": 2,
+  "shared_generation_budget_seconds": 240,
+  "scope_dependency_logic_verified_with_pure_planner_probe": true,
+  "api_routes": {"coverage_plan": 401, "quality_one": 401},
+  "vite_routes": {"updated_coordinator": 200, "page_module": 200},
+  "protected_page": "302 to https://localhost:9443/login?next=/sico-ai-next",
+  "authenticated_browser_screen_verified": false,
+  "new_case_reset_path_verified_in_running_frontend_source": true,
+  "new_case_requires_old_checkpoint": false,
+  "backend_action": "Gunicorn worker SIGHUP reload only",
+  "frontend_action": "Existing Vite hot reload only",
+  "rollback_location": "C:/Users/sanad/OneDrive/Desktop/GRC_AI/GRC_SC/.sico-scope-generation/activation-20261124T122220Z",
+  "rollback_instructions": "ROLLBACK.txt",
+  "file_hashes_and_exact_backups": "activation-manifest.json",
+  "qwen_generation_executed": false,
+  "test_suites_repeated": false,
+  "business_record_writes": false,
+  "database_migrations": false,
+  "production_build": false,
+  "container_restarts": false,
+  "remaining_limitations": [
+    "Detailed per-system scope expansion still depends on explicit scope lists in the objective; reliable free-form natural-language scope discovery is incomplete.",
+    "Authenticated browser testing requires the user's existing login.",
+    "Real Qwen reliability and the full live 16-activity workflow are not verified by this activation."
+  ]
+}

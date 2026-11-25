@@ -1,0 +1,10 @@
+{
+    "files_written":  4,
+    "paths":  [
+                  "/workspace/src/lib/utils/sicoGenerationPlan.ts",
+                  "/workspace/src/lib/components/AiOnboarding/SicoGeneratedCase.svelte",
+                  "/workspace/src/routes/(app)/(internal)/sico-ai-next/+page.server.ts",
+                  "/workspace/src/routes/(app)/(internal)/sico-ai-next/+page.svelte"
+              ],
+    "vite_hot_reload":  true
+}

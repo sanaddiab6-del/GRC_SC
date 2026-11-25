@@ -1,0 +1,198 @@
+{
+  "data_source": "disposable_in_memory_test_fixtures",
+  "existing_databases_used": false,
+  "record_checks": {
+    "run": 13,
+    "failures": 0,
+    "errors": 0
+  },
+  "real_qwen_verified": true,
+  "real_qwen_execution": {
+    "mode": "model_driven_read_only_agent",
+    "status": "completed",
+    "model": "qwen2.5:3b",
+    "model_calls": 4,
+    "model_error_code": null,
+    "model_validation_retries": 0,
+    "trace": [
+      {
+        "step": 1,
+        "decision": {
+          "kind": "tool",
+          "explanation": "Find the NCA ECC framework and list its authorized compliance assessments.",
+          "tool": "frameworks.search",
+          "arguments": {
+            "query": "NCA ECC"
+          }
+        },
+        "status": "succeeded",
+        "observation_id": "observation_1"
+      },
+      {
+        "step": 2,
+        "decision": {
+          "kind": "tool",
+          "explanation": "Find the NCA ECC framework and list the available compliance assessments.",
+          "tool": "compliance.list",
+          "arguments": {
+            "framework_id": "0311feac-9bcf-447c-9c88-8376d14c0065"
+          }
+        },
+        "status": "succeeded",
+        "observation_id": "observation_2"
+      },
+      {
+        "step": 3,
+        "decision": {
+          "kind": "tool",
+          "explanation": "Find the NCA ECC framework and list the available compliance assessments.",
+          "tool": "compliance.list",
+          "arguments": {
+            "framework_id": "0311feac-9bcf-447c-9c88-8376d14c0065"
+          }
+        },
+        "status": "failed",
+        "observation_id": "observation_3"
+      },
+      {
+        "step": 4,
+        "decision": {
+          "kind": "final",
+          "explanation": "The NCA ECC framework has been identified and the authorized compliance information has been reviewed. The assessment is currently in progress. Further assessment would involve waiting for the assessment to complete and then reviewing the results to determine compliance.",
+          "answer": "The NCA ECC framework has been found and the authorized compliance information is available. The assessment is currently in progress. Further assessment would involve waiting for the assessment to complete and then reviewing the results to determine compliance.",
+          "citations": [
+            "observation_1",
+            "observation_2"
+          ],
+          "unresolved": [
+            "Wait for the assessment to complete and review the results for compliance."
+          ]
+        },
+        "status": "completed"
+      }
+    ],
+    "observations": [
+      {
+        "id": "observation_1",
+        "tool": "frameworks.search",
+        "arguments": {
+          "query": "NCA ECC"
+        },
+        "status": "succeeded",
+        "result": {
+          "category": "frameworks",
+          "records": [
+            {
+              "id": "0311feac-9bcf-447c-9c88-8376d14c0065",
+              "name": "NCA ECC (isolated test fixture)",
+              "reference": "NCA-ECC-TEST",
+              "urn": "urn:test:nca-ecc"
+            }
+          ],
+          "returned_count": 1,
+          "limited": false,
+          "folder_id": "b0eb5b28-2e2c-4182-a126-7b82949feb6a",
+          "caveat": "Authorized stored records only; bounded exact-folder search. No evidence content reviewed or compliance verdict established."
+        }
+      },
+      {
+        "id": "observation_2",
+        "tool": "compliance.list",
+        "arguments": {
+          "framework_id": "0311feac-9bcf-447c-9c88-8376d14c0065"
+        },
+        "status": "succeeded",
+        "result": {
+          "category": "compliance_assessments",
+          "records": [
+            {
+              "id": "d652d29b-2784-4264-92cf-faff389b20d2",
+              "name": "NCA ECC isolated assessment",
+              "status": "in_progress",
+              "framework_id": "0311feac-9bcf-447c-9c88-8376d14c0065"
+            }
+          ],
+          "returned_count": 1,
+          "limited": false,
+          "folder_id": "b0eb5b28-2e2c-4182-a126-7b82949feb6a",
+          "caveat": "Authorized stored records only; bounded exact-folder search. No evidence content reviewed or compliance verdict established."
+        }
+      },
+      {
+        "id": "observation_3",
+        "tool": "compliance.list",
+        "arguments": {
+          "framework_id": "0311feac-9bcf-447c-9c88-8376d14c0065"
+        },
+        "status": "failed",
+        "error": "This exact call already succeeded. Summarize the verified results and unresolved work.",
+        "error_code": "duplicate_call"
+      }
+    ],
+    "verified_results": [
+      {
+        "id": "observation_1",
+        "tool": "frameworks.search",
+        "arguments": {
+          "query": "NCA ECC"
+        },
+        "status": "succeeded",
+        "result": {
+          "category": "frameworks",
+          "records": [
+            {
+              "id": "0311feac-9bcf-447c-9c88-8376d14c0065",
+              "name": "NCA ECC (isolated test fixture)",
+              "reference": "NCA-ECC-TEST",
+              "urn": "urn:test:nca-ecc"
+            }
+          ],
+          "returned_count": 1,
+          "limited": false,
+          "folder_id": "b0eb5b28-2e2c-4182-a126-7b82949feb6a",
+          "caveat": "Authorized stored records only; bounded exact-folder search. No evidence content reviewed or compliance verdict established."
+        }
+      },
+      {
+        "id": "observation_2",
+        "tool": "compliance.list",
+        "arguments": {
+          "framework_id": "0311feac-9bcf-447c-9c88-8376d14c0065"
+        },
+        "status": "succeeded",
+        "result": {
+          "category": "compliance_assessments",
+          "records": [
+            {
+              "id": "d652d29b-2784-4264-92cf-faff389b20d2",
+              "name": "NCA ECC isolated assessment",
+              "status": "in_progress",
+              "framework_id": "0311feac-9bcf-447c-9c88-8376d14c0065"
+            }
+          ],
+          "returned_count": 1,
+          "limited": false,
+          "folder_id": "b0eb5b28-2e2c-4182-a126-7b82949feb6a",
+          "caveat": "Authorized stored records only; bounded exact-folder search. No evidence content reviewed or compliance verdict established."
+        }
+      }
+    ],
+    "final_answer": "The NCA ECC framework has been found and the authorized compliance information is available. The assessment is currently in progress. Further assessment would involve waiting for the assessment to complete and then reviewing the results to determine compliance.",
+    "citations": [
+      "observation_1",
+      "observation_2"
+    ],
+    "unresolved": [
+      "Wait for the assessment to complete and review the results for compliance."
+    ],
+    "answer_kind": "model_synthesis_of_cited_records_not_an_audit_verdict",
+    "writes_enabled": false,
+    "grc_records_written": false,
+    "approval_required": "Writes are disabled. Future writes require separately validated preparation, fingerprint and human approval.",
+    "limits": {
+      "max_steps": 6,
+      "total_seconds": 300
+    }
+  },
+  "fixture_record_counts_unchanged": true
+}

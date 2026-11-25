@@ -1,0 +1,38 @@
+[
+    {
+        "Path":  "backend/ai_onboarding/sico_case_coverage.py",
+        "LivePath":  "/code/ai_onboarding/sico_case_coverage.py",
+        "BackupPath":  "C:\\Users\\sanad\\OneDrive\\Desktop\\GRC_AI\\GRC_SC\\.sico-scope-generation\\activation-20261124T122220Z\\live\\backend\\ai_onboarding\\sico_case_coverage.py",
+        "BeforeSHA256":  "593b9e8d8385237a64862b983c036824c4ba299461d551399cfcfce0d04a9066",
+        "AfterSHA256":  "1095b51ec68334524891fc8035902b6b18ff30ff94f996aefb0fdc5450b69946",
+        "BeforeMode":  420,
+        "WasAbsent":  false
+    },
+    {
+        "Path":  "backend/ai_onboarding/quality_sico_drafts_v5.py",
+        "LivePath":  "/code/ai_onboarding/quality_sico_drafts_v5.py",
+        "BackupPath":  "C:\\Users\\sanad\\OneDrive\\Desktop\\GRC_AI\\GRC_SC\\.sico-scope-generation\\activation-20261124T122220Z\\live\\backend\\ai_onboarding\\quality_sico_drafts_v5.py",
+        "BeforeSHA256":  "1a4ffe5e8fa081ce2d6f2e0744f8767c4aed5a6dbacd3bee8bbcc459a75d3494",
+        "AfterSHA256":  "2f68e432c40a035413998341c6da459f8d51566afc9d5b602cb9d28fe91f9bcf",
+        "BeforeMode":  493,
+        "WasAbsent":  false
+    },
+    {
+        "Path":  "backend/ai_onboarding/sico_ai_case_quality_views.py",
+        "LivePath":  "/code/ai_onboarding/sico_ai_case_quality_views.py",
+        "BackupPath":  "C:\\Users\\sanad\\OneDrive\\Desktop\\GRC_AI\\GRC_SC\\.sico-scope-generation\\activation-20261124T122220Z\\live\\backend\\ai_onboarding\\sico_ai_case_quality_views.py",
+        "BeforeSHA256":  "ba5d539c880dbaba27148316331b667b8f73d82dbbc6690e5cb9d5f3104c975a",
+        "AfterSHA256":  "52262525ec7ef1c4f005306aefec0d9281a2e74fda5b31071fa69146b3558064",
+        "BeforeMode":  493,
+        "WasAbsent":  false
+    },
+    {
+        "Path":  "frontend/src/lib/utils/sicoGenerationPlan.ts",
+        "LivePath":  "/workspace/src/lib/utils/sicoGenerationPlan.ts",
+        "BackupPath":  "C:\\Users\\sanad\\OneDrive\\Desktop\\GRC_AI\\GRC_SC\\.sico-scope-generation\\activation-20261124T122220Z\\live\\frontend\\src\\lib\\utils\\sicoGenerationPlan.ts",
+        "BeforeSHA256":  "7637561179b1f8c914bb11c594650454a4644913d7615a8e4ea1052b62e9c63b",
+        "AfterSHA256":  "0c95ee5e1994e05034bd65e221f8e48266cec024dfb57f0faa5b37a6ef73182d",
+        "BeforeMode":  420,
+        "WasAbsent":  false
+    }
+]

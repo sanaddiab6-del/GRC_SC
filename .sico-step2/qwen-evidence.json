@@ -1,0 +1,452 @@
+{
+    "Framework":  {
+                      "name":  "ANSSI - Guide d\u0027hygiène informatique",
+                      "reference":  "ANSSI-GUIDE-HYGIENE",
+                      "urn":  "urn:intuitem:risk:framework:anssi-guide-hygiene",
+                      "provider":  "ANSSI"
+                  },
+    "Organization":  "Cedar Dispatch demonstration organization",
+    "RejectedAttempts":  [
+                             {
+                                 "event":  "rejected",
+                                 "reference":  "draft-05-01",
+                                 "reason":  "local_ai_provider_schema_mismatch",
+                                 "elapsed_seconds":  159.16,
+                                 "content_substituted":  false
+                             },
+                             {
+                                 "event":  "rejected",
+                                 "reference":  "draft-05-01",
+                                 "reason":  "Remote end closed connection without response",
+                                 "elapsed_seconds":  82.1,
+                                 "content_substituted":  false
+                             },
+                             {
+                                 "event":  "rejected",
+                                 "reference":  "draft-05-01",
+                                 "reason":  "ai_provider_request_failed",
+                                 "elapsed_seconds":  0.07,
+                                 "content_substituted":  false
+                             },
+                             {
+                                 "event":  "review_rejected",
+                                 "reference":  "draft-05-01",
+                                 "reason":  "threat_narrative_must_describe_conditional_adverse_event",
+                                 "raw_output_preserved":  true
+                             },
+                             {
+                                 "event":  "review_rejected",
+                                 "reference":  "draft-05-01",
+                                 "reason":  "threat_narrative_must_describe_conditional_adverse_event",
+                                 "raw_output_preserved":  true
+                             },
+                             {
+                                 "event":  "review_rejected",
+                                 "reference":  "draft-06-01",
+                                 "reason":  "copied_parent_narrative_not_new_record",
+                                 "raw_output_preserved":  true
+                             },
+                             {
+                                 "event":  "review_rejected",
+                                 "reference":  "draft-07-01",
+                                 "reason":  "invented_or_duplicate_draft_link",
+                                 "raw_output_preserved":  true
+                             },
+                             {
+                                 "event":  "rejected",
+                                 "reference":  "draft-06-01",
+                                 "reason":  "copied_parent_narrative_not_new_record",
+                                 "elapsed_seconds":  119.84,
+                                 "content_substituted":  false
+                             },
+                             {
+                                 "event":  "review_rejected",
+                                 "reference":  "draft-05-01",
+                                 "candidate_title":  "Threat hypothesis: Password Policy Enforcement for Driver Dispatch",
+                                 "reason":  "threat_narrative_must_describe_conditional_adverse_event",
+                                 "raw_output_preserved":  true
+                             },
+                             {
+                                 "event":  "review_rejected",
+                                 "reference":  "draft-06-01",
+                                 "candidate_title":  "Risk scenario: Unauthorized access to dispatch service compromises customer data integrity",
+                                 "reason":  "copied_parent_narrative_not_new_record",
+                                 "raw_output_preserved":  true
+                             },
+                             {
+                                 "event":  "review_rejected",
+                                 "reference":  "draft-07-01",
+                                 "candidate_title":  "Applied control: Verify IAM System for Driver Dispatch",
+                                 "reason":  "invented_or_duplicate_draft_link",
+                                 "raw_output_preserved":  true
+                             },
+                             {
+                                 "event":  "rejected",
+                                 "reference":  "draft-07-01",
+                                 "reason":  "control_test_requires_observable_evidence_or_result",
+                                 "elapsed_seconds":  105.23,
+                                 "content_substituted":  false
+                             },
+                             {
+                                 "event":  "review_rejected",
+                                 "reference":  "draft-05-01",
+                                 "candidate_title":  "Threat hypothesis: Password Policy Enforcement for Driver Dispatch",
+                                 "reason":  "threat_narrative_must_describe_conditional_adverse_event",
+                                 "raw_output_preserved":  true
+                             },
+                             {
+                                 "event":  "review_rejected",
+                                 "reference":  "draft-06-01",
+                                 "candidate_title":  "Risk scenario: Unauthorized access to dispatch service compromises customer data integrity",
+                                 "reason":  "copied_parent_narrative_not_new_record",
+                                 "raw_output_preserved":  true
+                             },
+                             {
+                                 "event":  "review_rejected",
+                                 "reference":  "draft-07-01",
+                                 "candidate_title":  "Applied control: Verify IAM System for Driver Dispatch",
+                                 "reason":  "invented_or_duplicate_draft_link",
+                                 "raw_output_preserved":  true
+                             },
+                             {
+                                 "event":  "review_rejected",
+                                 "reference":  "draft-05-01",
+                                 "candidate_title":  "Threat hypothesis: Password Policy Enforcement for Driver Dispatch",
+                                 "reason":  "threat_narrative_must_describe_conditional_adverse_event",
+                                 "raw_output_preserved":  true
+                             },
+                             {
+                                 "event":  "review_rejected",
+                                 "reference":  "draft-06-01",
+                                 "candidate_title":  "Risk scenario: Unauthorized access to dispatch service compromises customer data integrity",
+                                 "reason":  "copied_parent_narrative_not_new_record",
+                                 "raw_output_preserved":  true
+                             },
+                             {
+                                 "event":  "review_rejected",
+                                 "reference":  "draft-07-01",
+                                 "candidate_title":  "Applied control: Verify IAM System for Driver Dispatch",
+                                 "reason":  "invented_or_duplicate_draft_link",
+                                 "raw_output_preserved":  true
+                             },
+                             {
+                                 "event":  "review_rejected",
+                                 "reference":  "draft-07-01",
+                                 "candidate_title":  "Applied control: Verify Dispatch Service Integrity",
+                                 "reason":  "control_field_ends_with_incomplete_instruction",
+                                 "raw_output_preserved":  true
+                             },
+                             {
+                                 "event":  "rejected",
+                                 "reference":  "draft-07-01",
+                                 "reason":  "draft_copied_instruction_instead_of_evidence_request",
+                                 "elapsed_seconds":  99.57,
+                                 "content_substituted":  false
+                             },
+                             {
+                                 "event":  "review_rejected",
+                                 "reference":  "draft-05-01",
+                                 "candidate_title":  "Threat hypothesis: Password Policy Enforcement for Driver Dispatch",
+                                 "reason":  "threat_narrative_must_describe_conditional_adverse_event",
+                                 "raw_output_preserved":  true
+                             },
+                             {
+                                 "event":  "review_rejected",
+                                 "reference":  "draft-06-01",
+                                 "candidate_title":  "Risk scenario: Unauthorized access to dispatch service compromises customer data integrity",
+                                 "reason":  "copied_parent_narrative_not_new_record",
+                                 "raw_output_preserved":  true
+                             },
+                             {
+                                 "event":  "review_rejected",
+                                 "reference":  "draft-07-01",
+                                 "candidate_title":  "Applied control: Verify IAM System for Driver Dispatch",
+                                 "reason":  "invented_or_duplicate_draft_link",
+                                 "raw_output_preserved":  true
+                             },
+                             {
+                                 "event":  "review_rejected",
+                                 "reference":  "draft-07-01",
+                                 "candidate_title":  "Applied control: Verify Dispatch Service Integrity",
+                                 "reason":  "control_field_ends_with_incomplete_instruction",
+                                 "raw_output_preserved":  true
+                             }
+                         ],
+    "FrameworkId":  "61caf4dc-270e-4800-b6c0-44258ad653e2",
+    "SourceDigest":  "352fd934f0db94a0afe1f4cc79b7836e94b1c53a78252c2028953fa6ae8a2d61",
+    "PlannedRecordCount":  136,
+    "BusinessRecordsWritten":  false,
+    "Model":  "qwen2.5:3b",
+    "AcceptedModelRecords":  [
+                                 {
+                                     "activity_number":  4,
+                                     "activity_code":  "assets",
+                                     "activity_name":  "New asset inventory drafts",
+                                     "target_existing_sico_model":  "Asset",
+                                     "existing_reviewed_write_stage":  "assets",
+                                     "draft":  {
+                                                   "draft_reference":  "draft-04-01",
+                                                   "record_type":  "Asset",
+                                                   "title":  "Asset: Identity Access Management System for Driver Dispatch",
+                                                   "content":  "The proposed regional delivery operator will handle customer addresses, driver dispatch, and supplier integrations. To ensure the integrity of the dispatch service and verify all systems and roles, a specific Identity Access Management (IAM) system will be established. This system will manage the access rights and identity verification for drivers and dispatchers. The IAM system will be crucial for maintaining the confidentiality and integrity of the dispatch service and customer data.",
+                                                   "proposed_attributes":  [
+                                                                               {
+                                                                                   "field":  "asset_type",
+                                                                                   "proposed_value":  "Information System"
+                                                                               },
+                                                                               {
+                                                                                   "field":  "business_purpose",
+                                                                                   "proposed_value":  "To manage and verify the identity and access rights of drivers and dispatchers, ensuring the integrity of the dispatch service and customer data."
+                                                                               },
+                                                                               {
+                                                                                   "field":  "owner_role",
+                                                                                   "proposed_value":  "Information Security Manager"
+                                                                               },
+                                                                               {
+                                                                                   "field":  "information_classification",
+                                                                                   "proposed_value":  "Confidential"
+                                                                               }
+                                                                           ],
+                                                   "evidence_request":  "Establish a detailed IAM system design document, including access control policies, identity verification procedures, and a risk assessment report.",
+                                                   "verification_question":  "Can the IAM system be designed and implemented to ensure that only authorized drivers and dispatchers have access to the dispatch service and customer data?",
+                                                   "related_draft_references":  [
+
+                                                                                ],
+                                                   "framework_requirement_mapping_status":  "not_verified",
+                                                   "authorized_requirement_id":  null,
+                                                   "status":  "new_unsaved_ai_draft_pending_verification",
+                                                   "is_verified_existing_asset_or_evidence":  false
+                                               },
+                                     "quality_contract_checked":  true,
+                                     "business_records_written":  false,
+                                     "model_provenance":  {
+                                                              "provider":  "LocalAiProvider",
+                                                              "model":  "qwen2.5:3b",
+                                                              "schema":  "sico_quality_draft_one_v2",
+                                                              "generated_content_substituted":  false
+                                                          },
+                                     "provenance":  "qwen_quality_single_authenticated_v7",
+                                     "framework_id":  "61caf4dc-270e-4800-b6c0-44258ad653e2",
+                                     "source_digest":  "352fd934f0db94a0afe1f4cc79b7836e94b1c53a78252c2028953fa6ae8a2d61",
+                                     "generation_focus_requirement_id":  "2c12bacf-5977-45dd-b45c-af7a43a0d9b3",
+                                     "generation_focus_reference":  "10"
+                                 },
+                                 {
+                                     "activity_number":  5,
+                                     "activity_code":  "threats",
+                                     "activity_name":  "Threat and vulnerability hypotheses",
+                                     "target_existing_sico_model":  "Threat / Vulnerability",
+                                     "existing_reviewed_write_stage":  null,
+                                     "draft":  {
+                                                   "draft_reference":  "draft-05-01",
+                                                   "record_type":  "Threat / Vulnerability",
+                                                   "title":  "Threat hypothesis: Unauthorized access to dispatch service undermines customer data integrity",
+                                                   "content":  "A malicious actor could exploit the weakness in the Identity Access Management (IAM) system to gain unauthorized access to the dispatch service, leading to the exposure of customer addresses and compromising the integrity of the dispatch operations.",
+                                                   "proposed_attributes":  [
+                                                                               {
+                                                                                   "field":  "asset_reference",
+                                                                                   "proposed_value":  "draft-04-01"
+                                                                               },
+                                                                               {
+                                                                                   "field":  "threat_source",
+                                                                                   "proposed_value":  "Malicious actor exploiting IAM system vulnerabilities"
+                                                                               },
+                                                                               {
+                                                                                   "field":  "weakness_hypothesis",
+                                                                                   "proposed_value":  "IAM system lacks proper authentication and authorization mechanisms, allowing unauthorized access to the dispatch service"
+                                                                               },
+                                                                               {
+                                                                                   "field":  "impact_if_realized",
+                                                                                   "proposed_value":  "Exposure of customer addresses, disruption of dispatch operations, loss of trust from customers"
+                                                                               }
+                                                                           ],
+                                                   "evidence_request":  "Conduct a security assessment of the IAM system to identify and remediate vulnerabilities, including multi-factor authentication and role-based access controls.",
+                                                   "verification_question":  "Can the IAM system be secured with multi-factor authentication and role-based access controls to prevent unauthorized access to the dispatch service?",
+                                                   "related_draft_references":  [
+                                                                                    "draft-04-01"
+                                                                                ],
+                                                   "framework_requirement_mapping_status":  "not_verified",
+                                                   "authorized_requirement_id":  null,
+                                                   "status":  "new_unsaved_ai_draft_pending_verification",
+                                                   "is_verified_existing_asset_or_evidence":  false,
+                                                   "threat_proposal":  {
+                                                                           "target_model":  "Threat",
+                                                                           "source_draft_reference":  "draft-05-01",
+                                                                           "model_fields":  {
+                                                                                                "name":  "Threat hypothesis: Unauthorized access to dispatch service undermines customer data integrity",
+                                                                                                "description":  "A malicious actor could exploit the weakness in the Identity Access Management (IAM) system to gain unauthorized access to the dispatch service, leading to the exposure of customer addresses and compromising the integrity of the dispatch operations."
+                                                                                            },
+                                                                           "candidate_asset_draft_reference":  "draft-04-01",
+                                                                           "business_records_written":  false
+                                                                       },
+                                                   "vulnerability_proposal":  {
+                                                                                  "target_model":  "Vulnerability",
+                                                                                  "source_draft_reference":  "draft-05-01",
+                                                                                  "model_fields":  {
+                                                                                                       "name":  "IAM system lacks proper authentication and authorization mechanisms, allowing unauthorized access to the dispatch service",
+                                                                                                       "description":  "IAM system lacks proper authentication and authorization mechanisms, allowing unauthorized access to the dispatch service",
+                                                                                                       "status":  "potential"
+                                                                                                   },
+                                                                                  "candidate_asset_draft_reference":  "draft-04-01",
+                                                                                  "evidence_verified":  false,
+                                                                                  "derived_from_model_generated_hypothesis":  true,
+                                                                                  "business_records_written":  false
+                                                                              }
+                                               },
+                                     "quality_contract_checked":  true,
+                                     "business_records_written":  false,
+                                     "model_provenance":  {
+                                                              "provider":  "LocalAiProvider",
+                                                              "model":  "qwen2.5:3b",
+                                                              "schema":  "sico_quality_draft_one_v2",
+                                                              "generated_content_substituted":  false
+                                                          },
+                                     "provenance":  "qwen_quality_single_authenticated_v7",
+                                     "framework_id":  "61caf4dc-270e-4800-b6c0-44258ad653e2",
+                                     "source_digest":  "352fd934f0db94a0afe1f4cc79b7836e94b1c53a78252c2028953fa6ae8a2d61",
+                                     "generation_focus_requirement_id":  "2c12bacf-5977-45dd-b45c-af7a43a0d9b3",
+                                     "generation_focus_reference":  "10"
+                                 },
+                                 {
+                                     "activity_number":  6,
+                                     "activity_code":  "risk_scenarios",
+                                     "activity_name":  "New risk scenario drafts",
+                                     "target_existing_sico_model":  "RiskScenario",
+                                     "existing_reviewed_write_stage":  "risk_scenarios",
+                                     "draft":  {
+                                                   "draft_reference":  "draft-06-01",
+                                                   "record_type":  "RiskScenario",
+                                                   "title":  "Risk scenario: Unauthorized access to dispatch service disrupts customer data integrity",
+                                                   "content":  "A malicious actor exploits vulnerabilities in the Identity Access Management (IAM) system to gain unauthorized access to the dispatch service, compromising customer addresses and disrupting service operations.",
+                                                   "proposed_attributes":  [
+                                                                               {
+                                                                                   "field":  "asset_reference",
+                                                                                   "proposed_value":  "draft-04-01"
+                                                                               },
+                                                                               {
+                                                                                   "field":  "threat_event",
+                                                                                   "proposed_value":  "Unauthorized access to dispatch service undermines customer data integrity"
+                                                                               },
+                                                                               {
+                                                                                   "field":  "business_impact",
+                                                                                   "proposed_value":  "Exposure of customer addresses, disruption of dispatch operations, loss of trust from customers"
+                                                                               },
+                                                                               {
+                                                                                   "field":  "treatment_option",
+                                                                                   "proposed_value":  "mitigate"
+                                                                               }
+                                                                           ],
+                                                   "evidence_request":  "An audit of the IAM system\u0027s authentication and authorization mechanisms, as well as a review of the dispatch service\u0027s security protocols.",
+                                                   "verification_question":  "Can the IAM system and dispatch service be secured to prevent unauthorized access and ensure customer data integrity?",
+                                                   "related_draft_references":  [
+                                                                                    "draft-04-01",
+                                                                                    "draft-05-01"
+                                                                                ],
+                                                   "framework_requirement_mapping_status":  "not_verified",
+                                                   "authorized_requirement_id":  null,
+                                                   "status":  "new_unsaved_ai_draft_pending_verification",
+                                                   "is_verified_existing_asset_or_evidence":  false,
+                                                   "risk_scenario_assessment_proposal":  {
+                                                                                             "target_model":  "RiskScenario",
+                                                                                             "risk_assessment":  null,
+                                                                                             "risk_matrix":  null,
+                                                                                             "model_fields":  {
+                                                                                                                  "inherent_proba":  -1,
+                                                                                                                  "inherent_impact":  -1,
+                                                                                                                  "inherent_level":  -1,
+                                                                                                                  "current_proba":  -1,
+                                                                                                                  "current_impact":  -1,
+                                                                                                                  "current_level":  -1,
+                                                                                                                  "residual_proba":  -1,
+                                                                                                                  "residual_impact":  -1,
+                                                                                                                  "residual_level":  -1,
+                                                                                                                  "strength_of_knowledge":  -1,
+                                                                                                                  "treatment":  "mitigate"
+                                                                                                              },
+                                                                                             "candidate_asset_draft_reference":  "draft-04-01",
+                                                                                             "asset_reference_requires_manual_resolution":  false,
+                                                                                             "requires_authorized_risk_assessment_and_matrix":  true,
+                                                                                             "requires_assessor_likelihood_impact_inputs":  true,
+                                                                                             "requires_verified_existing_controls_for_current_risk":  true,
+                                                                                             "requires_effectiveness_evidence_for_actual_residual_risk":  true,
+                                                                                             "risk_ratings_verified":  false,
+                                                                                             "business_records_written":  false
+                                                                                         }
+                                               },
+                                     "quality_contract_checked":  true,
+                                     "business_records_written":  false,
+                                     "model_provenance":  {
+                                                              "provider":  "LocalAiProvider",
+                                                              "model":  "qwen2.5:3b",
+                                                              "schema":  "sico_quality_draft_one_v2",
+                                                              "generated_content_substituted":  false
+                                                          },
+                                     "provenance":  "qwen_quality_single_authenticated_v7",
+                                     "framework_id":  "61caf4dc-270e-4800-b6c0-44258ad653e2",
+                                     "source_digest":  "352fd934f0db94a0afe1f4cc79b7836e94b1c53a78252c2028953fa6ae8a2d61",
+                                     "generation_focus_requirement_id":  "2c12bacf-5977-45dd-b45c-af7a43a0d9b3",
+                                     "generation_focus_reference":  "10"
+                                 },
+                                 {
+                                     "activity_number":  7,
+                                     "activity_code":  "applied_controls",
+                                     "activity_name":  "New applied control drafts",
+                                     "target_existing_sico_model":  "AppliedControl",
+                                     "existing_reviewed_write_stage":  "applied_controls",
+                                     "draft":  {
+                                                   "draft_reference":  "draft-07-01",
+                                                   "record_type":  "AppliedControl",
+                                                   "title":  "Applied control: Verify dispatch service integrity through role-based access control",
+                                                   "content":  "To ensure the integrity of the dispatch service and customer data, the Information Security Manager will be responsible for implementing role-based access control (RBAC) to verify the dispatch service integrity. This safeguard will be enforced by configuring RBAC settings and approving role assignments for different dispatch roles, including drivers, dispatchers, and customer service representatives. The test method will involve exporting the RBAC configuration settings and verifying that only authorized personnel have access to the dispatch service.",
+                                                   "proposed_attributes":  [
+                                                                               {
+                                                                                   "field":  "linked_risk_reference",
+                                                                                   "proposed_value":  "draft-06-01"
+                                                                               },
+                                                                               {
+                                                                                   "field":  "control_objective",
+                                                                                   "proposed_value":  "Ensure the integrity of the dispatch service and customer data by verifying operator identity and access rights."
+                                                                               },
+                                                                               {
+                                                                                   "field":  "implementation_steps",
+                                                                                   "proposed_value":  "1. Define and assign roles for drivers, dispatchers, and customer service representatives. 2. Configure RBAC settings to enforce role-based access control. 3. Approve role assignments and monitor access logs for unauthorized access attempts."
+                                                                               },
+                                                                               {
+                                                                                   "field":  "test_method",
+                                                                                   "proposed_value":  "Export the RBAC configuration settings and verify that only authorized personnel have access to the dispatch service by reviewing access logs and RBAC configuration files."
+                                                                               }
+                                                                           ],
+                                                   "evidence_request":  "Exported RBAC configuration settings and access logs for review.",
+                                                   "verification_question":  "Can the Information Security Manager verify that only authorized personnel have access to the dispatch service through the RBAC configuration settings and access logs?",
+                                                   "related_draft_references":  [
+                                                                                    "draft-04-01",
+                                                                                    "draft-06-01"
+                                                                                ],
+                                                   "framework_requirement_mapping_status":  "not_verified",
+                                                   "authorized_requirement_id":  null,
+                                                   "status":  "new_unsaved_ai_draft_pending_verification",
+                                                   "is_verified_existing_asset_or_evidence":  false
+                                               },
+                                     "quality_contract_checked":  true,
+                                     "business_records_written":  false,
+                                     "model_provenance":  {
+                                                              "provider":  "LocalAiProvider",
+                                                              "model":  "qwen2.5:3b",
+                                                              "schema":  "sico_quality_draft_one_v2",
+                                                              "generated_content_substituted":  false
+                                                          },
+                                     "provenance":  "qwen_quality_single_authenticated_v7",
+                                     "framework_id":  "61caf4dc-270e-4800-b6c0-44258ad653e2",
+                                     "source_digest":  "352fd934f0db94a0afe1f4cc79b7836e94b1c53a78252c2028953fa6ae8a2d61",
+                                     "generation_focus_requirement_id":  "2c12bacf-5977-45dd-b45c-af7a43a0d9b3",
+                                     "generation_focus_reference":  "10"
+                                 }
+                             ],
+    "AuthorizedRequirementCount":  61,
+    "ContentReviewRejections":  [
+
+                                ],
+    "ModelFieldsValidatedAgainstExistingSicoModels":  true,
+    "GeneratedNarrativesUnchanged":  true,
+    "FullChainDemonstrated":  true
+}
