@@ -3,6 +3,8 @@
     import { enhance, deserialize, applyAction } from '$app/forms';
     import { onMount } from 'svelte';
     import type { ActionData } from './$types';
+    import SicoGeneratedCase from "$lib/components/AiOnboarding/SicoGeneratedCase.svelte";
+    import { validateGenerationQueue, nextGenerationSlot, plannedDraftContext } from '$lib/utils/sicoGenerationPlan';
     import {
         applyFrameworkBatch, validateCheckpoint, scopeKey,
         type ReviewCheckpoint, type ReviewScope
@@ -42,10 +44,8 @@
     let proposedPerimeter = $state('SICO cybersecurity assessment perimeter');
     let selectedFramework = $state('');
     let selectedRiskMatrix = $state('');
-    // Unified Build a GRC case uses full-framework batches; legacy draft handlers remain unused by this page.
-    // Creation-first: the main button uses SICO's existing three-input lifecycle
-    // intake, real case-setup serializer and dry-run. No AI-side business writes.
-    // New creation-first *drafting* mode: never calls GRC writers.
+    // Build a GRC case follows the authorized framework plan, generating one
+    // Qwen record per dependency-ready task. Approval and writers stay separate.
     let draftedCaseStages = $state<Record<string, any>[]>([]);
     let draftedCaseScope = $state('');
     let draftedCaseBusy = $state(false);
@@ -55,6 +55,75 @@
     let authorizedFrameworkSource = $state<Record<string, any> | null>(null);
     let authorizedSourceRows = $state<Record<string, any>[]>([]);
     let frameworkSourceSummary = $state('');
+    // Source-grounded requirement-review queue. A prepared work item is NOT a
+    // completed assessment, and this state is never used to authorize access.
+    let coveragePlan = $state<Record<string, any> | null>(null);
+    let coveragePlanScope = $state('');
+    let coveragePlanError = $state('');
+    let showAllCoverageItems = $state(false);
+
+    function validCoveragePlanForScope(): Record<string, any> | null {
+        return coveragePlanScope === qualityScopeKey() ? coveragePlan : null;
+    }
+
+    // Only Qwen records that cite a real authorized requirement count as
+    // provisional review drafts. Never count them as verified compliance.
+    function sourceLinkedReviewCount(): number {
+        const plan = validCoveragePlanForScope();
+        if (!plan) return 0;
+        const allowed = new Set((plan.requirement_work_items ?? []).map((row: any) => row.requirement_id));
+        const referenced = new Set<string>();
+        for (const row of qualityDrafts) {
+            const id = String(row?.draft?.authorized_requirement_id ?? '');
+            if (row?.activity_number === 10 &&
+                row?.activity_code === 'requirement_reviews' &&
+                row?.business_records_written === false &&
+                row?.draft?.status === 'new_unsaved_ai_draft_pending_verification' &&
+                allowed.has(id)) referenced.add(id);
+        }
+        return referenced.size;
+    }
+
+    async function loadSicoCoveragePlan() {
+        if (!authorizedFrameworkSource?.complete_source_snapshot ||
+            !authorizedFrameworkSource.source_digest || !authorizedFrameworkSource.framework_id ||
+            !authorizedSourceRows.length) {
+            throw new Error('An authorized complete framework source is required before planning coverage.');
+        }
+        const response = await sicoPostAction('case_coverage_plan', {
+            organization_name: organization.trim(), framework_name: frameworkSearch.trim(),
+            problem: instruction.trim(), source_digest: String(authorizedFrameworkSource.source_digest)
+        });
+        const plan = (response.data as Record<string, any>)?.case_coverage_plan;
+        const rows = Array.isArray(plan?.requirement_work_items) ? plan.requirement_work_items : [];
+        const sourceIds = new Set(authorizedSourceRows.map(r => String(r.requirement_id)));
+        if (plan?.schema !== 'sico-ai-coverage-plan-v1' ||
+            plan?.business_records_written !== false || plan?.full_framework_assessed !== false ||
+            plan.source_digest !== authorizedFrameworkSource.source_digest ||
+            plan.framework_id !== authorizedFrameworkSource.framework_id ||
+            rows.length !== authorizedSourceRows.length ||
+            new Set(rows.map((r: any) => String(r.requirement_id))).size !== rows.length ||
+            rows.some((r: any) => !sourceIds.has(String(r.requirement_id)) ||
+                r.proposed_result !== 'not_assessed' || r.evidence_verified !== false)) {
+            throw new Error('Coverage plan does not match the authorized SICO framework source.');
+        }
+        validateGenerationQueue(plan, authorizedSourceRows);
+        coveragePlan = plan;
+        coveragePlanScope = qualityScopeKey();
+        coveragePlanError = '';
+    }
+
+    function downloadCoveragePlan() {
+        const plan = validCoveragePlanForScope();
+        if (!plan) return;
+        const file = new Blob([JSON.stringify(plan, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(file);
+        try {
+            const link = document.createElement('a');
+            link.href = url; link.download = 'SICO-AI-REQUIREMENT-REVIEW-PLAN.json'; link.click();
+        } finally { URL.revokeObjectURL(url); }
+    }
+
 
     async function loadSicoAuthorizedFrameworkSource() {
         let cursor = '';
@@ -117,11 +186,11 @@
 
     // One Qwen record per request: the same proven approach as the HTML runner.
     // No server-side GRC case/asset/risk writers are ever called by this path.
-    const generationOrder = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+    const generationOrder = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
     let qualityDrafts = $state<Record<string, any>[]>([]);
     let qualityIssues = $state<string[]>([]);
     let loadedOlderCheckpoint = $state(false);
-    let targetDraftsPerActivity = $state(1);
+    let checkpointSource = $state<Record<string, any> | null>(null);
     let currentGeneratingActivity = $state(0);
     let localCheckpointInfo = $state('');
     // UX-only generation diagnostics: the API and stored draft schema remain unchanged.
@@ -130,30 +199,6 @@
     let nextAttemptBySlot = $state<Record<string, number>>({});
     let lastAttemptInfo = $state('');
 
-    // Only block a clearly conflicting explicit framework name in the objective.
-    // An objective with no named framework, or multiple mentioned frameworks,
-    // remains legal (e.g., a genuine cross-framework comparison).
-    function frameworkNames(text: string): string[] {
-        const value = text.toLowerCase();
-        const detected: string[] = [];
-        const tests: [string, RegExp][] = [
-            ['NCA ECC', /\b(?:nca\s+)?ecc\b|essential cybersecurity controls/i],
-            ['NCA CCC', /\b(?:nca\s+)?ccc\b|cloud cybersecurity controls/i],
-            ['NIST CSF', /\bnist\s*(?:csf|cybersecurity framework)\b/i],
-            ['ISO 27001', /\b(?:iso\s*(?:\/\s*iec)?\s*)?27001\b/i],
-            ['CyberFundamentals', /cyber\s*fundamentals|\bcyfun\b/i],
-            ['PDPL', /\bpdpl\b/i],
-            ['SAMA CSF', /\bsama\s*(?:csf|cybersecurity framework)\b/i]
-        ];
-        for (const [label, pattern] of tests) if (pattern.test(value)) detected.push(label);
-        return detected;
-    }
-    function explicitFrameworkConflict(): string {
-        const selected = frameworkNames(frameworkSearch);
-        const requested = frameworkNames(instruction);
-        if (selected.length !== 1 || requested.length !== 1 || selected[0] === requested[0]) return '';
-        return `Framework mismatch: you selected ${frameworkSearch.trim()}, but the objective names ${requested[0]}. Correct the framework or objective before generating.`;
-    }
     function slotAttemptKey(step: number, index: number) {
         return `draft-${String(step).padStart(2, '0')}-${String(index).padStart(2, '0')}`;
     }
@@ -161,7 +206,7 @@
         const result: Record<string, number> = {};
         if (!source || typeof source !== 'object' || Array.isArray(source)) return result;
         for (const [key, value] of Object.entries(source)) {
-            if (/^draft-(?:0[1-9]|1[0-6])-(?:0[1-9]|1[0-2])$/.test(key) &&
+            if (/^draft-(?:0[1-9]|1[0-6])-(?:0[1-9]|[1-9][0-9]{1,3}|10000)$/.test(key) &&
                 Number.isInteger(value) && Number(value) >= 0 && Number(value) <= 30) result[key] = Number(value);
         }
         return result;
@@ -170,7 +215,7 @@
         if (!Array.isArray(source)) return [];
         return source.slice(-20).filter((entry: any) =>
             Number.isInteger(entry?.activity) && entry.activity >= 1 && entry.activity <= 16 &&
-            Number.isInteger(entry?.index) && entry.index >= 1 && entry.index <= 12 &&
+            Number.isInteger(entry?.index) && entry.index >= 1 && entry.index <= 10000 &&
             typeof entry?.elapsed_seconds === 'number' && entry.elapsed_seconds >= 0 && entry.elapsed_seconds < 3600 &&
             (entry?.outcome === 'accepted' || entry?.outcome === 'rejected') && typeof entry?.detail === 'string'
         ).map((entry: DraftAttempt) => ({ ...entry, detail: entry.detail.slice(0, 180) }));
@@ -181,9 +226,8 @@
         attemptHistory = [...attemptHistory.slice(-19), event];
         lastAttemptInfo = `Activity ${activity}, draft ${index}: ${outcome} after ${elapsed_seconds}s${outcome === 'rejected' ? ` · ${event.detail}` : ''}.`;
     }
-    // Fixed first pass: one substantive draft in each of the 13 AI work areas.
-    // Framework, scope and setup are displayed separately as source-backed
-    // scaffolds; they MUST NOT be counted as AI generated or assessed.
+    // All 16 existing activities use source-driven task counts. Planning and
+    // unsaved Qwen work never count as evidence-verified assessment results.
     const firstPassTarget = generationOrder.length;
     onMount(() => {
         // Same-tab recovery only. Nothing is stored in SICO business tables.
@@ -192,7 +236,7 @@
             if (!raw) return;
             const cp = JSON.parse(raw);
             if (cp?.schema !== 'sico-authenticated-quality-drafts-v7' || !Array.isArray(cp.items)) return;
-            if (cp.items.length > 200 || cp.items.some((r: any) => !r?.draft?.draft_reference)) return;
+            if (cp.items.length > 160000 || cp.items.some((r: any) => !r?.draft?.draft_reference)) return;
             organization = String(cp.scope?.organization ?? '').slice(0, 150);
             frameworkSearch = String(cp.scope?.framework ?? '').slice(0, 150);
             instruction = String(cp.scope?.objective ?? '').slice(0, 4000);
@@ -202,8 +246,7 @@
             nextAttemptBySlot = safeAttemptCounters(cp.attempt_counters);
             attemptHistory = safeAttemptHistory(cp.attempt_history);
             if (attemptHistory.length) { const last = attemptHistory[attemptHistory.length - 1]; lastAttemptInfo = `Last request: activity ${last.activity}, ${last.outcome} after ${last.elapsed_seconds}s.`; }
-            targetDraftsPerActivity = Math.max(1, Math.min(12, ...generationOrder.map(step =>
-                cp.items.filter((r: any) => r.activity_number === step).length)));
+            checkpointSource = cp.source ?? null;
             draftedCaseScope = qualityScopeKey();
             localCheckpointInfo = 'Recovered drafts from this browser tab. Load framework access again before resuming.';
         } catch { /* A corrupt or unavailable tab checkpoint is ignored. */ }
@@ -216,9 +259,9 @@
         return {
             schema: 'sico-authenticated-quality-drafts-v7',
             scope: { organization: organization.trim(), framework: frameworkSearch.trim(), objective: instruction.trim() },
-            source: authorizedFrameworkSource,
+            source: authorizedFrameworkSource ?? checkpointSource,
             items: qualityDrafts,
-            target_per_activity: targetDraftsPerActivity,
+            generation_queue: validCoveragePlanForScope()?.generation_queue ?? [],
             issues: qualityIssues,
             attempt_counters: nextAttemptBySlot,
             attempt_history: attemptHistory.slice(-20),
@@ -245,7 +288,7 @@
         const file = input.files?.[0];
         if (!file || draftedCaseBusy) return;
         try {
-            if (file.size > 3000000) throw new Error('Checkpoint file is too large.');
+            if (file.size > 50000000) throw new Error('Checkpoint file is too large.');
             const parsed = JSON.parse(await file.text());
             let items: Record<string, any>[];
             if (parsed?.schema === 'sico-authenticated-quality-drafts-v7' && Array.isArray(parsed?.items)) {
@@ -265,17 +308,15 @@
             } else {
                 throw new Error('Unsupported checkpoint. Select a SICO quality generator JSON checkpoint.');
             }
-            if (items.length > 200 || items.some((r: any) =>
-                !/^draft-(?:0[1-9]|1[0-6])-(?:0[1-9]|1[0-2])$/.test(r?.draft?.draft_reference ?? '') ||
+            if (items.length > 160000 || items.some((r: any) =>
+                !/^draft-(?:0[1-9]|1[0-6])-(?:0[1-9]|[1-9][0-9]{1,3}|10000)$/.test(r?.draft?.draft_reference ?? '') ||
                 !r?.draft?.title || !r?.draft?.record_type || !r?.activity_number)) {
                 throw new Error('Checkpoint contains invalid draft references or content.');
             }
             if (new Set(items.map((r: any) => r.draft.draft_reference)).size !== items.length)
                 throw new Error('Checkpoint contains duplicate draft references.');
             qualityDrafts = items;
-            targetDraftsPerActivity = parsed?.schema === 'sico-authenticated-quality-drafts-v7'
-                ? Math.max(1, Math.min(12, Number(parsed.target_per_activity) || 1))
-                : Math.max(1, Math.min(12, ...generationOrder.map(step => items.filter(r => r.activity_number === step).length)));
+            checkpointSource = parsed.source ?? null;
             qualityIssues = [];
             nextAttemptBySlot = parsed?.schema === 'sico-authenticated-quality-drafts-v7'
                 ? safeAttemptCounters(parsed.attempt_counters) : {};
@@ -285,24 +326,23 @@
                 ? `Previous request: ${attemptHistory[attemptHistory.length - 1].outcome} after ${attemptHistory[attemptHistory.length - 1].elapsed_seconds}s.` : '';
             draftedCaseScope = qualityScopeKey();
             draftedCaseStages = [];
+            authorizedFrameworkSource = null; authorizedSourceRows = []; frameworkSourceSummary = '';
+            coveragePlan = null; coveragePlanScope = ''; coveragePlanError = '';
             draftedCaseNotice = `Loaded ${items.length} unsaved drafts. Imported records require review.`;
             draftedCaseError = '';
             saveLocalDraftCheckpoint();
         } catch (error) { draftedCaseError = error instanceof Error ? error.message : 'Checkpoint could not be loaded.'; }
         finally { input.value = ''; }
     }
-    function nextQualitySlot(): { step: number, index: number } | null {
-        for (const step of generationOrder) {
-            const existing = qualityDrafts.filter((r) => r.activity_number === step);
-            if (existing.length < targetDraftsPerActivity) {
-                const used = new Set(existing.map(r => r.draft.draft_reference));
-                for (let index = 1; index <= targetDraftsPerActivity; index++) {
-                    if (!used.has(`draft-${String(step).padStart(2, '0')}-${String(index).padStart(2, '0')}`))
-                        return { step, index };
-                }
-            }
-        }
-        return null;
+    function nextQualitySlot() {
+        const plan = validCoveragePlanForScope();
+        if (!plan) return null;
+        const planned = nextGenerationSlot(plan.generation_queue, qualityDrafts);
+        return planned ? { step: planned.activity_number, index: planned.draft_index, planned } : null;
+    }
+    function hasPendingGeneration(): boolean {
+        try { return !validCoveragePlanForScope() || nextQualitySlot() !== null; }
+        catch { return true; } // A damaged checkpoint remains downloadable.
     }
     async function generateNewCaseDrafts(restart = false) {
         if (draftedCaseBusy) return;
@@ -310,13 +350,12 @@
             draftedCaseError = 'Enter organization, exact framework and assessment objective.';
             return;
         }
-        const frameworkConflict = explicitFrameworkConflict();
-        if (frameworkConflict) { draftedCaseError = frameworkConflict; return; }
         if (restart) {
-            qualityDrafts = []; qualityIssues = []; loadedOlderCheckpoint = false; targetDraftsPerActivity = 1;
+            qualityDrafts = []; qualityIssues = []; loadedOlderCheckpoint = false; checkpointSource = null;
             nextAttemptBySlot = {}; attemptHistory = []; lastAttemptInfo = '';
             draftedCaseStages = []; draftedCaseScope = qualityScopeKey();
             authorizedFrameworkSource = null; authorizedSourceRows = []; frameworkSourceSummary = '';
+            coveragePlan = null; coveragePlanScope = ''; coveragePlanError = ''; showAllCoverageItems = false;
         } else if (draftedCaseScope !== qualityScopeKey()) {
             draftedCaseError = 'The three inputs changed. Restore original inputs or start a new draft case.';
             return;
@@ -324,26 +363,22 @@
         draftedCaseBusy = true; draftedCaseError=''; draftedCaseNotice=''; stopAfterPhase=false;
         try {
             if (!authorizedFrameworkSource) await loadSicoAuthorizedFrameworkSource();
+            if (checkpointSource && (checkpointSource.source_digest !== authorizedFrameworkSource?.source_digest ||
+                checkpointSource.framework_id !== authorizedFrameworkSource?.framework_id)) {
+                throw new Error('The checkpoint framework edition or source changed. Preserve this checkpoint and start a new case.');
+            }
+            if (!validCoveragePlanForScope() || coveragePlan?.source_digest !== authorizedFrameworkSource?.source_digest) {
+                draftedCaseNotice = 'Loading the authorized framework generation plan.';
+                await loadSicoCoveragePlan();
+            }
             while (!stopAfterPhase && qualityScopeKey() === draftedCaseScope) {
                 const slot = nextQualitySlot();
-                if (!slot) { draftedCaseNotice = 'First pass complete. Review the drafts; framework assessment is not complete.'; break; }
+                if (!slot) { draftedCaseNotice = 'All scheduled Qwen drafts are ready for review. Evidence, risk ratings and approvals remain pending; the GRC case is not complete.'; break; }
                 currentGeneratingActivity = slot.step;
-                const dependencyMap: Record<number, number[]> = {
-                    4: [2, 3], 5: [4], 6: [4, 5], 7: [3, 4, 6], 8: [2, 7],
-                    9: [3, 4, 7], 10: [1, 3, 7, 9], 11: [9, 10], 12: [6, 7, 11],
-                    13: [7, 9, 12], 14: [3, 10, 11, 13], 15: [6, 12, 14], 16: [3, 6, 10, 11, 12, 15]
-                };
-                const allowedActivities = new Set([slot.step, ...(dependencyMap[slot.step] ?? [])]);
-                const previous = qualityDrafts.filter((r) => allowedActivities.has(r.activity_number) &&
-                    r?.draft?.status === 'new_unsaved_ai_draft_pending_verification').slice(-45).map((r) => ({
-                    draft_reference: r.draft.draft_reference,
-                    title: r.draft.title,
-                    record_type: r.draft.record_type,
-                    content: String(r.draft.content || '').slice(0, 220)
-                }));
+                const previous = plannedDraftContext(slot.planned, qualityDrafts);
                 // Only a source-backed SICO reference is selected; the backend
                 // independently rechecks authorization before using it.
-                const chosenRef = slot.step === 10 ? String(authorizedSourceRows[(slot.index - 1) % authorizedSourceRows.length]?.reference ?? '') : '';
+                const chosenRef = slot.step === 10 ? slot.planned.focus_requirement_reference : '';
                 const key = slotAttemptKey(slot.step, slot.index);
                 // Only one model request per activity slot per run. A rejected
                 // response is visible immediately; Resume rotates the focus.
@@ -356,6 +391,8 @@
                         problem: instruction.trim(), activity_number: String(slot.step),
                         draft_index: String(slot.index), source_digest: String(authorizedFrameworkSource?.source_digest ?? ''),
                         requirement_reference: chosenRef, previous_drafts: JSON.stringify(previous),
+                        focus_requirement_reference: slot.planned.focus_requirement_reference,
+                        focus_theme: slot.planned.theme,
                         focus_attempt: String(attempt)
                     });
                     const item = (response.data as Record<string, any>)?.quality_draft_one;
@@ -734,7 +771,7 @@
         const parsed = deserialize(await res.text());
         if (parsed.type !== 'success') {
             const body = parsed.type === 'failure' ? (parsed.data as Record<string, any>) : null;
-            throw new Error(String(body?.case_draft_error ?? body?.framework_batch_error ?? body?.control_error ?? body?.ai_sixteen_error ?? body?.lifecycle_error ?? body?.workflow_error ?? 'The requested operation could not finish.'));
+            throw new Error(String(body?.coverage_plan_error ?? body?.source_error ?? body?.case_draft_error ?? body?.framework_batch_error ?? body?.control_error ?? body?.ai_sixteen_error ?? body?.lifecycle_error ?? body?.workflow_error ?? 'The requested operation could not finish.'));
         }
         return parsed;
     }
@@ -1051,24 +1088,57 @@
                         <span class="footnote">No records saved · No compliance verdict</span>
                     </div>
                     <p class="source-note">{frameworkSourceSummary || 'Framework catalog not loaded yet.'}</p>
+                    <SicoGeneratedCase items={qualityDrafts} plan={validCoveragePlanForScope()} {organization} framework={frameworkSearch} />
+                    {#if validCoveragePlanForScope()}
+                        <section class="requirement-coverage-plan" aria-label="Framework requirement review coverage">
+                            <h4>Requirement-by-requirement review plan</h4>
+                            <p>
+                                <strong>{validCoveragePlanForScope()?.coverage?.requirements_considered_for_review}</strong>
+                                requirements prepared for review ·
+                                <strong>{sourceLinkedReviewCount()}</strong> source-linked Qwen review drafts ·
+                                <strong>0</strong> evidence-verified compliance decisions
+                            </p>
+                            <p class="footnote">All requirement work items start as Not assessed. Applicability and organization evidence are awaiting review. A work item is not an AI-generated compliance conclusion.</p>
+                            <p class="footnote">Risk ratings: pending tenant-authorized risk assessment and configured SICO risk matrix. The AI cannot calculate current or residual risk from a framework name alone.</p>
+                            <p class="footnote">The case board displays accepted Qwen content only. Planned records and an unapproved matrix do not establish implementation or compliance.</p>
+                            <button type="button" onclick={downloadCoveragePlan}>Download full requirement work plan</button>
+                            <details>
+                                <summary>Review requirement work queue ({validCoveragePlanForScope()?.requirement_work_items?.length ?? 0})</summary>
+                                <ol class="requirement-work-items">
+                                    {#each (showAllCoverageItems ? validCoveragePlanForScope()?.requirement_work_items : validCoveragePlanForScope()?.requirement_work_items?.slice(0, 12)) ?? [] as item (item.requirement_id)}
+                                        <li>
+                                            <strong>{item.reference}</strong>: {item.requirement_name || item.description}
+                                            <span class="footnote"> · Not assessed · Evidence needed · Human review required</span>
+                                        </li>
+                                    {/each}
+                                </ol>
+                                {#if !showAllCoverageItems && (validCoveragePlanForScope()?.requirement_work_items?.length ?? 0) > 12}
+                                    <button type="button" onclick={() => { showAllCoverageItems = true; }}>Show remaining requirements</button>
+                                {:else if showAllCoverageItems}
+                                    <button type="button" onclick={() => { showAllCoverageItems = false; }}>Show first 12 only</button>
+                                {/if}
+                            </details>
+                        </section>
+                    {:else if draftedCaseBusy}
+                        <p class="footnote">Preparing authorized framework coverage before model drafting.</p>
+                    {/if}
+                    {#if coveragePlanError}<p class="message error" role="alert">{coveragePlanError}</p>{/if}
+
                     <p class="footnote">Framework, assessment charter and business scope are inputs to confirm, not model-generated assessment results.</p>
                     <div class="framework-meter"><div class="framework-meter-fill" style={`width: ${Math.round(generationOrder.filter(n => qualityDrafts.some(r => r.activity_number === n)).length / firstPassTarget * 100)}%`}></div></div>
-                    <p class="footnote">First-pass areas with drafts: {generationOrder.filter(n => qualityDrafts.some(r => r.activity_number === n)).length}/{firstPassTarget}. This does not indicate framework requirement coverage.</p>
+                    <p class="footnote">Activities with drafts: {generationOrder.filter(n => qualityDrafts.some(r => r.activity_number === n)).length}/{firstPassTarget}. Scheduled Qwen records: {validCoveragePlanForScope()?.generation_summary?.planned_qwen_detail_drafts ?? 'Planning pending'}. Each requirement review remains unassessed until evidence review.</p>
                     <div class="framework-actions">
                         {#if draftedCaseBusy}
                             <span class="footnote">Generating activity {currentGeneratingActivity} of 16 · Reviewing each draft individually.</span>
                             <button type="button" onclick={() => { stopAfterPhase = true; }}>Pause after current request</button>
                         {:else}
-                            {#if generationOrder.some(n => !qualityDrafts.some(r => r.activity_number === n))}
+                            {#if hasPendingGeneration()}
                                 <button type="button" onclick={() => void generateNewCaseDrafts(false)}>Resume automatic generation</button>
                             {/if}
                             <button type="button" onclick={() => void generateNewCaseDrafts(true)}>Start a new case</button>
                         {/if}
                         {#if qualityDrafts.length}
                             <button type="button" onclick={downloadQualityCheckpoint}>Download checkpoint</button>
-                            {#if !draftedCaseBusy && generationOrder.every(n => qualityDrafts.filter(r => r.activity_number === n).length >= targetDraftsPerActivity) && targetDraftsPerActivity < 12}
-                                <button type="button" onclick={() => { targetDraftsPerActivity += 1; saveLocalDraftCheckpoint(); void generateNewCaseDrafts(false); }}>Generate more across all activities</button>
-                            {/if}
                         {/if}
                         {#if authorizedFrameworkSource?.complete_source_snapshot}
                             <button type="button" onclick={downloadAuthorizedRequirementSource}>Download framework requirements</button>
@@ -1114,6 +1184,27 @@
 </div>
 
 <style>
+.live-qwen-case{margin:18px 0;padding:20px;border:1px solid #2a9db6;border-radius:15px;background:linear-gradient(135deg,#112b3c 0%,#101c30 70%);color:#eefaff}
+.live-qwen-case-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.live-qwen-case h4{margin:0 0 8px;font-size:20px;color:#fff}
+.live-qwen-case-head p{margin:4px 0;color:#d2e3ee}
+.live-qwen-tag{padding:6px 10px;border:1px solid #33bcd0;border-radius:20px;font-size:12px;color:#93eeff;white-space:nowrap}
+.live-qwen-stats{margin:16px 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.live-qwen-stats>div{padding:15px;background:#0b1b2e;border:1px solid #2d4e62;border-radius:10px;display:flex;flex-direction:column;gap:6px}
+.live-qwen-stats strong{font-size:26px;color:#a0f2ff}
+.live-qwen-stats span{font-size:12px;color:#c2d4e1}
+.live-qwen-groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:12px;align-items:start}
+.live-qwen-group{border:1px solid #3a536a;border-radius:12px;background:#0d2031;min-width:0}
+.live-qwen-group summary{padding:12px;cursor:pointer;display:flex;justify-content:space-between;gap:12px;align-items:center}
+.live-qwen-group summary>span{text-transform:capitalize;font-weight:650}
+.live-qwen-group summary>strong{color:#9bdeed;font-size:12px;white-space:nowrap}
+.live-qwen-record{border-top:1px solid #2d4a60;padding:13px}
+.live-qwen-record h5{font-size:15px;color:#b0efff;margin:0 0 8px}
+.live-qwen-record p{font-size:13px;line-height:1.55;overflow-wrap:anywhere}
+.live-qwen-record dl{margin:8px 0;display:grid;gap:8px}
+.live-qwen-record dl>div{display:grid;gap:3px}
+.live-qwen-record dt{font-size:11px;color:#8ab6ce;text-transform:capitalize}
+.live-qwen-record dd{font-size:13px;margin:0;overflow-wrap:anywhere}
     .workspace{min-height:100vh;background:radial-gradient(ellipse at 60% 0%,#123950 0,transparent 46%),#080f20;color:#e9f4ff;font-family:inherit}
     .shell{max-width:1060px;margin:auto;padding:34px 28px 65px}
     .topbar{display:flex;gap:12px;align-items:center}.logo{display:grid;place-items:center;width:42px;height:42px;border:1px solid #438c8c;border-radius:12px;background:#12404a;font-size:25px;color:#78e2ce}.topbar strong{display:block;font-size:17px;letter-spacing:.08em}.topbar small{font-size:10px;letter-spacing:.14em;color:#a2b7cb}.scope-pill,.status-pill{margin-left:auto;font-size:12px;color:#a3eadc;border:1px solid #37636a;border-radius:30px;padding:8px 12px}
@@ -1157,4 +1248,23 @@
     .sico-case-draft dd{font-size:14px;line-height:1.55}
     .sico-case-draft .footnote{line-height:1.6}
     @media(max-width:600px){.workflow-form{padding:14px}.sico-case-draft{padding:15px}.sico-case-draft dl div{grid-template-columns:1fr;gap:3px;padding:10px 0}}
+    .full-case-preview{border:1px solid #397f78;background:#102b33;border-radius:12px;padding:16px;margin:16px 0}
+    .full-case-preview-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+    .full-case-preview h4{margin:4px 0 8px;font-size:17px;color:#b6f5e6}
+    .full-case-warning{padding:5px 9px;border:1px solid #b98b4d;border-radius:20px;font-size:11px;color:#f3d0a2}
+    .full-case-counts{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:8px;margin:12px 0}
+    .full-case-count{border:1px solid #335c69;border-radius:8px;padding:11px;background:#132c3d}
+    .full-case-count strong{display:block;font-size:21px;color:#dff9f6}
+    .full-case-count span{font-size:12px;color:#b6cedb}
+    .full-case-details{border-top:1px solid #315765;padding:10px 0;margin-top:10px}
+    .full-case-details summary{cursor:pointer;font-size:14px;font-weight:700;color:#ccecef}
+    .full-case-subdetails{margin-left:12px}
+    .full-case-record-list{max-height:330px;overflow:auto;padding-left:20px;font-size:13px}
+    .full-case-record-list li{padding:6px 0;line-height:1.5;border-bottom:1px solid #244852}
+    .full-case-matrix-scroll{overflow-x:auto;margin:12px 0}
+    .full-case-matrix{display:grid;gap:3px;min-width:max-content}
+    .full-case-matrix-label{padding:8px 6px;background:#223d4d;color:#edf5f8;font-size:11px;text-align:center;border-radius:4px;display:grid;place-items:center;min-height:38px}
+    .full-case-matrix-cell{display:grid;place-items:center;min-height:42px;border-radius:4px;padding:5px;font-size:11px;font-weight:800;color:#18252d;text-align:center}
+    .requirement-coverage-plan{border:1px solid #416d72;border-radius:12px;background:#102534;padding:18px;margin:18px 0;color:#e9f4ff}
+    .requirement-coverage-plan h4{font-size:17px;margin:0 0 8px}.requirement-coverage-plan p{margin:8px 0}.requirement-coverage-plan details{margin-top:12px}.requirement-work-items{max-height:320px;overflow:auto;padding-left:25px}.requirement-work-items li{padding:8px 0;border-bottom:1px solid #24444c;line-height:1.4}
 </style>

@@ -19,17 +19,23 @@ from .llm_errors import AiProviderError
 from .sico_ai_case_draft_views import DRAFT_ACTIVITIES
 from .sico_ai_framework_batch_v3 import _load_authorized_requirements, _page_and_digest
 from .quality_sico_drafts_v5 import CONTRACTS, generate_quality_draft
+from .sico_case_coverage import plan_generation_queue
+from .sico_case_record_proposals import enrich_quality_draft_result
 
 # Accept an intentionally small amount of untrusted case context. All drafts
 # are unsaved client-side objects and cannot grant access to SICO records.
-DRAFT_REF = re.compile(r'^draft-(?:0[1-9]|1[0-6])-(?:0[1-9]|1[0-2])$')
+DRAFT_REF = re.compile(r'^draft-(?:0[1-9]|1[0-6])-(?:0[1-9]|[1-9][0-9]{1,3}|10000)$')
 MAX_CONTEXT = 45
 
 class PreviousDraft(serializers.Serializer):
-    draft_reference = serializers.CharField(max_length=12)
+    draft_reference = serializers.CharField(max_length=14)
     title = serializers.CharField(min_length=5, max_length=110)
     record_type = serializers.CharField(max_length=90)
     content = serializers.CharField(required=False, allow_blank=True, max_length=670)
+    proposed_attributes = serializers.ListField(child=serializers.DictField(
+        child=serializers.CharField(max_length=360)), required=False, max_length=7)
+    related_draft_references = serializers.ListField(child=serializers.RegexField(regex=DRAFT_REF),
+                                                   required=False, max_length=3)
 
     def validate_draft_reference(self, value):
         if not DRAFT_REF.fullmatch(value):
@@ -41,9 +47,11 @@ class QualityDraftInput(serializers.Serializer):
     framework_name = serializers.CharField(min_length=2, max_length=150)
     problem = serializers.CharField(min_length=20, max_length=4000)
     activity_number = serializers.IntegerField(min_value=1, max_value=16)
-    draft_index = serializers.IntegerField(min_value=1, max_value=12)
+    draft_index = serializers.IntegerField(min_value=1, max_value=10000)
     source_digest = serializers.RegexField(regex=r'^[0-9a-f]{64}$')
     requirement_reference = serializers.CharField(required=False, allow_blank=True, max_length=100)
+    focus_requirement_reference = serializers.CharField(required=False, allow_blank=True, max_length=100)
+    focus_theme = serializers.RegexField(regex=r'^[a-z_]{1,60}$', required=False, allow_blank=True)
     previous_drafts = PreviousDraft(many=True, required=False)
     focus_attempt = serializers.IntegerField(required=False, min_value=0, max_value=30, default=0)
 
@@ -66,6 +74,9 @@ class QualityDraftInput(serializers.Serializer):
             raise serializers.ValidationError('This draft already exists in the checkpoint.')
         if values.get('requirement_reference') and step != 10:
             raise serializers.ValidationError('Requirement selection is only for requirement reviews.')
+        if (step == 10 and values.get('focus_requirement_reference') and
+                values.get('requirement_reference') != values.get('focus_requirement_reference')):
+            raise serializers.ValidationError('Requirement review focus must match the selected requirement.')
         return values
 
 # Full framework coverage is tracked independently. A selected record is only
@@ -98,6 +109,15 @@ class SicoQualityDraftOneView(APIView):
                              'business_records_written': False}, status=409)
         step = values['activity_number']; index = values['draft_index']
         code, _, model, _, dependencies, _ = DRAFT_ACTIVITIES[step-1]
+        # Never trust client-provided topics or source identities. Look up
+        # the proposed focus through the same fully authorized snapshot.
+        focus = None
+        focus_ref = values.get('focus_requirement_reference') or ''
+        if focus_ref:
+            focus = next((r for r in rows if r.get('reference') == focus_ref), None)
+            if not focus:
+                return Response({'detail': 'The draft focus is not an authorized framework requirement.',
+                                 'business_records_written': False}, status=400)
         chosen = None
         if step == 10:
             ref = values.get('requirement_reference', '')
@@ -105,6 +125,23 @@ class SicoQualityDraftOneView(APIView):
             if not chosen:
                 return Response({'detail': 'Select an exact authorized framework requirement.',
                                  'business_records_written': False}, status=400)
+            if focus and focus.get('requirement_id') != chosen.get('requirement_id'):
+                return Response({'detail': 'Requirement focus does not match selected review.',
+                                 'business_records_written': False}, status=400)
+        focus_theme = values.get('focus_theme', '')
+        expected = None
+        if focus_theme:
+            # Validate BOTH task identity and topic against a fresh plan
+            # computed from the real authorized requirement snapshot. An
+            # arbitrary client topic cannot steer Qwen or grant data access.
+            work = plan_generation_queue(
+                authorized_requirements=rows, objective=values['problem'])
+            expected = next((t for t in work['generation_queue'] if
+                             t['activity_number'] == step and t['draft_index'] == index), None)
+            if (not expected or expected['theme'] != focus_theme or
+                    not focus or expected['focus_requirement_id'] != focus['requirement_id']):
+                return Response({'detail': 'Draft focus does not match the authorized case plan.',
+                                 'business_records_written': False}, status=409)
         prior = []
         context = []
         for row in values.get('previous_drafts', []):
@@ -115,6 +152,13 @@ class SicoQualityDraftOneView(APIView):
                 prior.append(item)
             if position in dependencies:
                 context.append(item)
+        if expected:
+            required = set(expected['dependency_draft_references'])
+            supplied = {row['draft_reference'] for row in context}
+            if not required.issubset(supplied):
+                return Response({'detail': 'Generate the planned parent records before this draft.',
+                                 'business_records_written': False}, status=409)
+            context = [row for row in context if row['draft_reference'] in required]
         # The generator checks category contracts, uniqueness and draft links;
         # saved SICO functions remain uncalled until a separate future approval.
         try:
@@ -126,6 +170,10 @@ class SicoQualityDraftOneView(APIView):
                 phase=step-1, draft_index=index, prior_drafts=prior,
                 case_context=context, authorized_requirements=rows,
                 chosen_requirement=chosen,
+                focus_requirement=focus,
+                focus_theme=focus_theme,
+                required_context_references=expected['dependency_draft_references'] if expected else None,
+                scope_subject=expected.get('scope_subject','') if expected else '',
                 focus_attempt=values['focus_attempt'],
             )
         except (AiProviderError, JsonSchemaError, ValueError, TimeoutError, TypeError, KeyError) as exc:
@@ -151,6 +199,11 @@ class SicoQualityDraftOneView(APIView):
                 reason = 'draft_processing_error'
             failure = {'detail': 'One Qwen draft was rejected; previous drafts are retained.',
                        'failure_reason': reason, 'business_records_written': False}
+            if getattr(exc,'failure_history',None):
+                failure.update(generation_attempts=exc.generation_attempts,
+                               last_failure_reason=exc.last_failure_reason,
+                               rejected_attempts=exc.failure_history)
+                failure['detail'] += f' Last rejection: {exc.last_failure_reason}.'
             schema_error = exc if isinstance(exc, JsonSchemaError) else exc.__cause__
             if isinstance(schema_error, JsonSchemaError):
                 # Identify the failed contract without exposing generated
@@ -173,10 +226,21 @@ class SicoQualityDraftOneView(APIView):
                 } else 'validation'
                 failure['detail'] += f' Schema validation: {path} ({rule}).'
             return Response(failure, status=503)
+        # Model-shaped proposals accompany the existing v7 draft without
+        # changing its saved checkpoint reference or claiming compliance.
+        try:
+            result = enrich_quality_draft_result(result, chosen_requirement=chosen)
+        except ValueError:
+            return Response({'detail': 'The draft could not be mapped to the existing SICO model.',
+                             'business_records_written': False}, status=422)
         result.update({
             'framework_id': meta['framework_id'],
             'source_digest': digest,
             'authorized_requirement_count': count,
+            'generation_focus_requirement_id': focus.get('requirement_id') if focus else None,
+            'generation_focus_reference': focus.get('reference') if focus else None,
+            'generation_scope_subject':expected.get('scope_subject','') if expected else '',
+            'generation_task_identity':expected.get('task_identity') if expected else None,
             'source_grounding': 'read_from_SICO_with_request_user_permissions',
             'framework_edition_independently_verified': False,
             'full_framework_assessed': False,

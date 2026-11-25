@@ -111,7 +111,7 @@ class EvidenceRequestTests(unittest.TestCase):
     def generate(self, output=None, **changes):
         args = dict(organization='Offline example', framework='NCA ECC',
                     objective='Request evidence for the proposed privileged access control.',
-                    phase=8, draft_index=1, prior_drafts=[], case_context=self.context)
+                    phase=8, draft_index=1, prior_drafts=[], case_context=self.context, max_attempts=1)
         args.update(changes)
         with self.transport(evidence_output() if output is None else output):
             return quality.generate_quality_draft(self.selection, **args)
@@ -220,11 +220,29 @@ class EvidenceRequestTests(unittest.TestCase):
         with self.assertRaises(AiProviderExecutionError):
             self.generate(output)
 
-    def test_control_must_be_in_relationships(self):
+    def test_allowed_control_in_named_field_is_added_to_redundant_links(self):
         output = evidence_output()
         output['related_draft_references'] = ['draft-04-01']
-        with self.assertRaisesRegex(ValueError, 'evidence_request_control_link_mismatch'):
-            self.generate(output)
+        before = copy.deepcopy(output)
+        result = self.generate(output)
+        self.assertEqual(result['draft']['related_draft_references'],
+                         ['draft-04-01', 'draft-07-01'])
+        self.assertEqual(output, before)  # provider output is never mutated
+        self.assertEqual(len(self.calls), 1)  # no expensive Qwen retry
+
+    def test_missing_control_link_when_other_links_empty_is_safely_completed(self):
+        output = evidence_output()
+        output['related_draft_references'] = []
+        result = self.generate(output)
+        self.assertEqual(result['draft']['related_draft_references'], ['draft-07-01'])
+        self.assertEqual(len(self.calls), 1)
+
+    def test_control_cannot_be_inferred_from_title_or_replaced_with_another(self):
+        output = evidence_output()
+        output['attributes']['linked_control_reference'] = 'draft-07-02'
+        output['related_draft_references'] = ['draft-07-01']
+        with self.assertRaises(AiProviderExecutionError):
+            self.generate(output)  # the asserted ID is outside allowed context
 
     def test_invented_duplicate_and_unrelated_relationships_are_rejected(self):
         for refs in (['draft-07-01', 'draft-04-02'], ['draft-07-01', 'draft-07-01'], ['draft-08-01']):
@@ -289,20 +307,22 @@ class EvidenceRequestTests(unittest.TestCase):
         self.assertEqual(self.checkpoint, before)
         self.assertEqual(len(self.calls), 1)
 
-    def test_endpoint_failure_preserves_checkpoint_and_does_not_retry(self):
+    def test_endpoint_failure_preserves_checkpoint_after_bounded_retries(self):
         before = copy.deepcopy(self.checkpoint)
         output = evidence_output()
         del output['attributes']['request_scope']
         response = self.post(output)
         self.assertEqual(response.status_code, 503)
-        self.assertEqual(response.data['failure_reason'], 'local_ai_provider_schema_mismatch')
+        self.assertEqual(response.data['failure_reason'], 'quality_generation_recovery_exhausted')
+        self.assertEqual(response.data['last_failure_reason'], 'local_ai_provider_schema_mismatch')
+        self.assertEqual(response.data['generation_attempts'], 2)
         self.assertEqual(response.data['validation_failure'], {
             'path': ['attributes'], 'rule': 'required',
         })
         self.assertFalse(response.data['business_records_written'])
         self.assertNotIn('draft', response.data)
         self.assertEqual(self.checkpoint, before)
-        self.assertEqual(len(self.calls), 1)
+        self.assertEqual(len(self.calls), 2)
 
     def test_schema_diagnostic_identifies_field_without_disclosing_its_value(self):
         output = evidence_output()

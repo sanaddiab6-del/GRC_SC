@@ -319,3 +319,11 @@ urlpatterns += [path("workforce/assistant/framework-source/page/", AuthorizedFra
 from .sico_ai_case_quality_views import SicoQualityDraftOneView
 urlpatterns += [path('workforce/assistant/case-draft/quality-one/', SicoQualityDraftOneView.as_view(),
                     name='sico-ai-quality-draft-one')]
+
+# Coverage-aware, evidence-pending planning. Source is rechecked against the
+# signed-in user's permitted framework catalog; no business records are written.
+from .sico_case_coverage_views import SicoCaseCoveragePlanView
+urlpatterns += [
+    path('workforce/assistant/case-draft/coverage-plan/',
+         SicoCaseCoveragePlanView.as_view(), name='sico-ai-case-coverage-plan'),
+]

@@ -46,6 +46,64 @@ export const actions = {
             return fail(502, { source_error: 'Could not reach the authorized framework catalog.' });
         }
     },
+    // Coverage planning is NOT a compliance decision. Rechecks the signed-in
+    // user and exact authorized framework digest on the backend.
+    case_coverage_plan: async (event) => {
+        if (!hasAiOnboardingSession(event)) return fail(401, { coverage_plan_error: 'Sign in again.' });
+        const form = await event.request.formData();
+        const payload = {
+            organization_name: String(form.get('organization_name') ?? '').trim(),
+            framework_name: String(form.get('framework_name') ?? '').trim(),
+            problem: String(form.get('problem') ?? '').trim(),
+            source_digest: String(form.get('source_digest') ?? '').trim()
+        };
+        if (payload.organization_name.length < 2 || payload.organization_name.length > 150 ||
+            payload.framework_name.length < 2 || payload.framework_name.length > 150 ||
+            payload.problem.length < 20 || payload.problem.length > 4000 ||
+            !/^[0-9a-f]{64}$/.test(payload.source_digest)) {
+            return fail(400, { coverage_plan_error: 'Invalid case objective, framework, or source digest.' });
+        }
+        try {
+            const response = await fetchAiOnboardingBackend(
+                event, '/ai/workforce/assistant/case-draft/coverage-plan/', payload
+            );
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) return fail(response.status, { coverage_plan_error: backendMessage(data) });
+            if (data.schema !== 'sico-ai-coverage-plan-v1' ||
+                data.business_records_written !== false || data.full_framework_assessed !== false ||
+                data.source_digest !== payload.source_digest ||
+                !Array.isArray(data.requirement_work_items) ||
+                data.requirement_work_items.length !== data.coverage?.requirements_considered_for_review ||
+                data.requirement_work_items.some((item: any) =>
+                    !item?.requirement_id || !item?.reference ||
+                    item?.proposed_result !== 'not_assessed' || item?.evidence_verified !== false)) {
+                return fail(502, { coverage_plan_error: 'Framework coverage plan failed verification.' });
+            }
+            // A full-case preview is never a verified compliance result or
+            // permission to write records. Validate its relationship to the
+            // exact signed-in framework response before forwarding to the UI.
+            const blueprint = data.full_case_blueprint;
+            if (blueprint !== undefined && blueprint !== null) {
+                if (blueprint.schema !== 'sico-full-case-proposed-records-v1' ||
+                    blueprint.framework_id !== data.framework_id ||
+                    blueprint.source_digest !== payload.source_digest ||
+                    blueprint.business_records_written !== false ||
+                    blueprint.coverage?.case_complete !== false ||
+                    !Array.isArray(blueprint.records?.requirement_assessments) ||
+                    blueprint.records.requirement_assessments.length !== data.requirement_work_items.length ||
+                    blueprint.records.requirement_assessments.some((r: any) =>
+                        r?.model_fields?.result !== 'not_assessed' || r?.compliance_verdict_made !== false) ||
+                    (blueprint.risk_matrix_proposal !== null && blueprint.risk_matrix_proposal !== undefined &&
+                     (blueprint.risk_matrix_proposal.approved !== false ||
+                      !Array.isArray(blueprint.risk_matrix_proposal.json_definition?.grid)))) {
+                    return fail(502, { coverage_plan_error: 'The complete case proposal failed framework and safety validation.' });
+                }
+            }
+            return { case_coverage_plan: data };
+        } catch {
+            return fail(502, { coverage_plan_error: 'Cannot reach the SICO coverage service.' });
+        }
+    },
     // Creation-first: generate NEW unsaved, structured GRC drafts through SICO Qwen.
     case_draft_phase: async (event) => {
         if (!hasAiOnboardingSession(event)) return fail(401, { case_draft_error: 'Sign in again.' });
@@ -87,7 +145,7 @@ export const actions = {
         let previous_drafts: unknown;
         try {
             const raw = String(form.get('previous_drafts') ?? '[]');
-            if (raw.length > 30000) throw new Error('Too much context');
+            if (raw.length > 120000) throw new Error('Too much context');
             previous_drafts = JSON.parse(raw);
             if (!Array.isArray(previous_drafts) || previous_drafts.length > 45) throw new Error('Invalid context');
         } catch {
@@ -101,6 +159,8 @@ export const actions = {
             draft_index: Number(form.get('draft_index')),
             source_digest: String(form.get('source_digest') ?? ''),
             requirement_reference: String(form.get('requirement_reference') ?? '').trim(),
+            focus_requirement_reference: String(form.get('focus_requirement_reference') ?? '').trim(),
+            focus_theme: String(form.get('focus_theme') ?? '').trim(),
             previous_drafts,
             focus_attempt: Number(form.get('focus_attempt') ?? 0)
         };
@@ -108,9 +168,11 @@ export const actions = {
             payload.framework_name.length < 2 || payload.framework_name.length > 150 ||
             payload.problem.length < 20 || payload.problem.length > 4000 ||
             !Number.isInteger(payload.activity_number) || payload.activity_number < 1 || payload.activity_number > 16 ||
-            !Number.isInteger(payload.draft_index) || payload.draft_index < 1 || payload.draft_index > 12 ||
+            !Number.isInteger(payload.draft_index) || payload.draft_index < 1 || payload.draft_index > 10000 ||
             !/^[0-9a-f]{64}$/.test(payload.source_digest) ||
             payload.requirement_reference.length > 100 ||
+            payload.focus_requirement_reference.length > 100 ||
+            (payload.focus_theme !== '' && !/^[a-z_]{1,60}$/.test(payload.focus_theme)) ||
             !Number.isInteger(payload.focus_attempt) || payload.focus_attempt < 0 || payload.focus_attempt > 30) {
             return fail(400, { case_draft_error: 'Invalid case scope, framework digest or draft index.' });
         }
@@ -122,6 +184,8 @@ export const actions = {
             if (data.business_records_written !== false || data.quality_contract_checked !== true ||
                 data.activity_number !== payload.activity_number ||
                 data.source_digest !== payload.source_digest ||
+                (payload.focus_requirement_reference !== '' &&
+                 data.generation_focus_reference !== payload.focus_requirement_reference) ||
                 data.draft?.draft_reference !== `draft-${String(payload.activity_number).padStart(2, '0')}-${String(payload.draft_index).padStart(2, '0')}`) {
                 return fail(502, { case_draft_error: 'SICO could not verify the new quality-gated draft.' });
             }
