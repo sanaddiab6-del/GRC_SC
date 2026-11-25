@@ -1,30 +1,65 @@
-# SICO GRC Platform - AI Agent Guide
+# SICO AI Next - STANDING RULES (read fully before every task)
 
-## Architecture & Responsibilities
-- Full stack spans FastAPI backend, Next.js 14 frontend, and LangChain-based RAG; backend entrypoint [src/backend/main.py](src/backend/main.py) wires controls, evidence, reporting, and AI routers under /api/v1.
-- Runtime settings live in [src/backend/core/config.py](src/backend/core/config.py); .env co-located with backend sets DATABASE_URL, Redis, vector DB, and CORS, so load settings through pydantic BaseSettings instead of manual env parsing.
-- Async SQLAlchemy infrastructure in [src/backend/core/database.py](src/backend/core/database.py) converts sync DSNs to asyncpg, exposes AsyncSession dependency, and auto-creates tables during startup lifespan; keep new models inheriting from Base to participate.
-- Compliance domains are modularised: [src/backend/controls](src/backend/controls), [src/backend/evidence](src/backend/evidence), and [src/backend/reporting](src/backend/reporting) share a consistent trio of models, schemas, and routers.
+## North star
+SICO AI Next takes exactly THREE inputs: organization, authorized framework
+(exact edition), and a plain-language assessment objective. From them it
+proposes a NEW, complete, interconnected GRC case across the 16 activities,
+using existing SICO models, services, RBAC, tenant scope and approval gates.
+Everything generated is a PROPOSED DRAFT until a human approves it.
 
-## Backend Conventions
-- Bilingual payloads are mandatory; follow the *_en/*_ar pattern and bilingual error payloads demonstrated in [src/backend/controls/router.py](src/backend/controls/router.py) and [src/backend/evidence/router.py](src/backend/evidence/router.py).
-- Control identifiers must respect enums in [src/backend/controls/models.py](src/backend/controls/models.py), with framework stored as FrameworkType and statuses as ControlStatus; evidence rows reference controls via control_id.
-- List endpoints implement offset/limit pagination with default 50 and optional filters; reuse the pattern in [src/backend/controls/router.py](src/backend/controls/router.py#L20-L66) to keep count queries and Query params aligned.
-- Evidence creation computes expiry from retention days and stamps collection timestamps (see [src/backend/evidence/router.py](src/backend/evidence/router.py#L60-L119)); prefer server-side timestamps rather than trusting clients.
-- Reporting dashboards in [src/backend/reporting/router.py](src/backend/reporting/router.py#L20-L160) aggregate SQL counts per framework and domain, so extend using SQLAlchemy queries before post-processing in Python.
+## Architecture rule
+- SICO code does deterministic work: framework lookup, requirement lists,
+  review placeholders (not_assessed), IDs, links, statuses, progress,
+  checkpoints, aggregations, exports, permissions.
+- The local model (Ollama qwen2.5:3b) does only specialist analysis:
+  organization-specific processes/assets, threat-risk-control-evidence
+  bundles, requirement review reasoning, finding and remediation proposals.
+- The model is called in bounded multi-record BATCHES. Each record is parsed,
+  validated and linked separately. One bad record never discards good ones.
+- Extend the EXISTING planner/coordinator. NEVER build a parallel generator.
 
-## AI/RAG Layer
-- Retrieval lives in [ai/rag/bilingual_retriever.py](ai/rag/bilingual_retriever.py); it instantiates HuggingFace embeddings and Chroma, returning bilingual metadata plus citations—avoid creating new retrievers per request.
-- Document preparation uses [ai/rag/chunker.py](ai/rag/chunker.py) to build multi-section Document chunks mixing Arabic and English text; preserve control_id, framework, and section metadata when generating new chunks.
-- Tests in [tests/ai/test_rag.py](tests/ai/test_rag.py) assert chunk metadata and mark vector-store-dependent tests with pytest.skip; mirror that gating for heavy integrations.
+## Scope discipline
+- Touch ONLY the files named in the task. Need another file? STOP and say why.
+- Do not patch a single activity in isolation. Do not add dependencies.
+- Do not ask for a new test organization or an old checkpoint.
+- Do not copy any content from OPEN_PREVIEW_OFFLINE.html (visual reference only).
+- Do not replace model analysis with hardcoded security text.
 
-## Frontend Patterns
-- App Router is locale-aware via [src/frontend/app/[locale]/layout.tsx](src/frontend/app/%5Blocale%5D/layout.tsx); every page receives locale and sets dir rtl/ltr, so new routes belong under [src/frontend/app/[locale]](src/frontend/app/%5Blocale%5D).
-- UI strings come from [src/frontend/messages/en.json](src/frontend/messages/en.json) and [src/frontend/messages/ar.json](src/frontend/messages/ar.json); fetch translations with next-intl hooks instead of hardcoding.
-- API access is centralised in [src/frontend/lib/api-client.ts](src/frontend/lib/api-client.ts) using axios with interceptors and NEXT_PUBLIC_API_URL; when adding data hooks use the shared client or SWR fetcher like [src/frontend/app/[locale]/controls/page.tsx](src/frontend/app/%5Blocale%5D/controls/page.tsx).
+## Honesty rules (most important)
+- Tag EVERY claim in your report as one of:
+  [RAN-REAL] command actually run, raw output pasted
+  [RAN-MOCK] test used a mocked model; proves wiring only, NOT quality
+  [NOT-RUN]  not executed
+  [DESIGN-ONLY] described but not implemented
+- Never write "works", "fixed" or "complete" without a [RAN-REAL] tag and
+  pasted output.
+- Never invent a file, function, class or route name. Every name you cite
+  must appear in a grep/ls/git output from THIS session, otherwise write
+  NOT FOUND.
+- Planned tasks are not generated records. 16 mocked contracts are not 16
+  working activities. A schema-valid record is not a good record.
 
-## Workflows & Tooling
-- Make targets orchestrate common tasks: make install installs backend/frontend/AI deps, make docker-up starts the stack defined in [deployment/docker-compose.yml](deployment/docker-compose.yml), make test runs pytest then frontend npm tests.
-- Backend tests under [tests/backend](tests/backend) rely on httpx.AsyncClient against the FastAPI app; ensure new routes expose predictable bilingual JSON to satisfy assertions.
-- Seed data and utilities reside in [scripts](scripts); for example [scripts/load_sample_data.py](scripts/load_sample_data.py) populates baseline controls, so keep schema changes compatible.
-- Security automation commands live in the Makefile (make security, make security-deps, make security-sast); align new tooling with the existing targets.
+## Safety (non-negotiable)
+- Never: docker compose down -v, prune, volume deletion, migrations, DB
+  writes, destructive git commands, container restarts, frontend production
+  build, broad installs, secrets in output.
+- Protect all existing users, tenants, cases, volumes and backups
+  (grc_amro_test, grc_sc, sanadcom).
+- Keep tenant isolation, active-membership checks, RBAC, deny-by-default.
+
+## Time
+- Target 10-15 minutes. At the limit: stop, commit a checkpoint, write the
+  report. Never start a second work package.
+
+## Before finishing
+Re-read the task's DONE WHEN list. Confirm each item with evidence or mark it
+FAILED. A failed item reported honestly is a success; a hidden one is not.
+
+## Required report format
+1. Task as understood (2 lines)
+2. Files changed (paste git diff --stat)
+3. Commands run with raw output (trimmed, not paraphrased)
+4. Claims, each tagged [RAN-REAL]/[RAN-MOCK]/[NOT-RUN]/[DESIGN-ONLY]
+5. DONE WHEN checklist, item by item: PASS/FAIL + evidence
+6. Not done / blockers
+7. Exactly ONE proposed next step
