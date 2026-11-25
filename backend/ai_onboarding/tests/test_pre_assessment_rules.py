@@ -117,6 +117,28 @@ class FactTests(unittest.TestCase):
         self.assertEqual(len(facts), rules.MAX_FACTS)
         self.assertTrue(any(d["reason"] == "too_many_facts" for d in dropped))
 
+    def test_topic_copied_with_its_meaning_is_read_as_the_bare_name(self):
+        # Seen with qwen3:4b-instruct: it returned the whole hint line as the topic.
+        facts, _ = rules.verify_facts(
+            [{"quote": "the developer still uses the same admin password since 2022",
+              "topics": ["authentication_passwords: password", " Governance_Policy : polic",
+                         "made_up: authentication_passwords"],
+              "certainty": "stated"}],
+            PETRA,
+        )
+        self.assertEqual(facts[0].topics, ("authentication_passwords", "governance_policy"))
+
+    def test_odd_key_spelling_from_the_model_is_read(self):
+        # Seen with qwen3:4b-instruct: {"ref- id": "A2.1.1", ...}.
+        self.assertEqual(rules.item_fields({"ref- id": "A2.1.1", "Relation": "not_related", "x": 1}),
+                         {"ref_id": "A2.1.1", "relation": "not_related"})
+        facts, _ = rules.verify_facts(
+            [{"Quote": "we also have 3 shops with card machines", "claim en": "3 shops",
+              "topics": ["payment_terminals"], "certainty": "stated"}],
+            PETRA,
+        )
+        self.assertEqual(facts[0].claim, "3 shops")
+
     def test_context_only_fact_is_not_judged(self):
         facts, _ = rules.verify_facts(
             [{"quote": "We need PCI DSS compliance because the bank asked us", "topics": [CONTEXT_ONLY],
@@ -137,6 +159,17 @@ class DetectorTests(unittest.TestCase):
         self.assertTrue(is_conditional_requirement("Where applicable, logs are reviewed daily."))
         self.assertFalse(is_conditional_requirement(ECC_111))
         self.assertFalse(is_conditional_requirement("MFA is implemented for all non-console access into the CDE."))
+
+    def test_condition_after_a_scope_prefix_is_found(self):
+        # PCI 8.3.10.1 was judged Non-compliant for a merchant before this rule.
+        self.assertTrue(is_conditional_requirement(
+            "Additional requirement for service providers only: If passwords/passphrases are used as "
+            "the only authentication factor for customer user access then either: ..."))
+        self.assertTrue(is_conditional_requirement(
+            "Additional requirement for service providers only: Reviews are performed at least once every three months."))
+        # "if" deep inside a long requirement is not its condition.
+        self.assertFalse(is_conditional_requirement(
+            "Audit logs are reviewed at least once daily. " * 8 + "Escalate if anomalies are found."))
 
     def test_uncertainty_in_english_and_arabic(self):
         for text in ("not sure if card numbers are saved", "I think we use AWS", "maybe weekly",

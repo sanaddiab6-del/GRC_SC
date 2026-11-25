@@ -5,7 +5,9 @@ This part is pure Python (no database, no model call) so every rule can be unit 
 * a quote counts only if it is found verbatim in the objective the user typed;
 * the observation is built by code from verified text only, never from free model text;
 * Compliant and Not applicable can never be produced;
-* a conditional requirement or an uncertain sentence never becomes Non-compliant.
+* a conditional requirement or an uncertain sentence never becomes Non-compliant;
+* the final write re-runs every one of these checks; nothing the page sends back is
+  trusted just because an earlier request produced it.
 
 The database write (Domain, Perimeter, Audit and results in one transaction) is added in
 a later step of this feature.
@@ -18,7 +20,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any, Iterable
 
-from .pre_assessment_topics import CONTEXT_ONLY, TOPICS, is_uncertain
+from .pre_assessment_topics import CONTEXT_ONLY, TOPICS, RequirementCandidate, is_uncertain
 
 MAX_FACTS = 6
 MIN_QUOTE_CHARS = 12
@@ -181,6 +183,29 @@ class VerifiedFact:
         return any(t != CONTEXT_ONLY for t in self.topics)
 
 
+_FIELD_NAMES = ("quote", "claim_en", "topics", "certainty", "ref_id", "relation", "violated_clause", "reason")
+_FIELD_BY_SIMPLE_KEY = {re.sub(r"[^a-z]", "", name): name for name in _FIELD_NAMES}
+
+
+def item_fields(raw: dict) -> dict[str, Any]:
+    """The known fields of one model item, whatever spacing or case the model used for the
+    keys (seen: "ref- id"). Unknown keys are dropped."""
+    fields: dict[str, Any] = {}
+    for key, value in raw.items():
+        name = _FIELD_BY_SIMPLE_KEY.get(re.sub(r"[^a-z]", "", str(key).lower()))
+        if name and name not in fields:
+            fields[name] = value
+    return fields
+
+
+def _topic_name(value: Any) -> str:
+    """The topic name the model meant: it sometimes answers "authentication_passwords:
+    password" instead of the bare name. Only names in the closed list are accepted after."""
+    if not isinstance(value, str):
+        return ""
+    return value.split(":", 1)[0].strip().lower()
+
+
 def verify_facts(raw_facts: Any, objective: str) -> tuple[list[VerifiedFact], list[dict[str, str]]]:
     """Keep only facts whose quote is in the objective; return (facts, dropped)."""
     facts: list[VerifiedFact] = []
@@ -196,14 +221,15 @@ def verify_facts(raw_facts: Any, objective: str) -> tuple[list[VerifiedFact], li
         if not isinstance(raw, dict):
             dropped.append({"reason": "fact_not_an_object", "quote": ""})
             continue
+        raw = item_fields(raw)
         quote = str(raw.get("quote") or "")
         verified = verify_quote(quote, objective)
         if verified is None:
             dropped.append({"reason": "quote_not_in_objective", "quote": quote[:80]})
             continue
         topics = tuple(
-            t for t in dict.fromkeys(raw.get("topics") or [])
-            if isinstance(t, str) and (t in TOPICS or t == CONTEXT_ONLY)
+            t for t in dict.fromkeys(_topic_name(t) for t in (raw.get("topics") or []))
+            if t in TOPICS or t == CONTEXT_ONLY
         )[:2]
         if not topics:
             dropped.append({"reason": "no_known_topic", "quote": quote[:80]})
@@ -312,6 +338,53 @@ def apply_caps(
         per_fact_count[item.fact_index] = per_fact_count.get(item.fact_index, 0) + 1
         kept.append(item)
     return kept
+
+
+def plan_fact_results(
+    fact: VerifiedFact,
+    shortlist: list[RequirementCandidate],
+    judgements: Any,
+) -> tuple[list[PlannedResult], list[dict[str, str]]]:
+    """Apply the code's rules to the judge's raw answer for one fact.
+
+    Only requirements of the fact's own short list are accepted, each once; an unknown
+    relation (including "compliant" or "not_applicable") is ignored. Returns (results,
+    ignored items).
+    """
+    if not isinstance(judgements, list):
+        return [], [{"reason": "judgements_not_a_list", "ref_id": ""}]
+    by_ref = {c.ref_id: (rank, c) for rank, c in enumerate(shortlist)}
+    planned: list[PlannedResult] = []
+    ignored: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for raw in judgements:
+        if not isinstance(raw, dict):
+            ignored.append({"reason": "judgement_not_an_object", "ref_id": ""})
+            continue
+        raw = item_fields(raw)
+        ref = normalize_text(str(raw.get("ref_id") or ""))
+        if ref not in by_ref:
+            ignored.append({"reason": "ref_not_in_short_list", "ref_id": ref[:40]})
+            continue
+        if ref in seen:
+            ignored.append({"reason": "duplicate_judgement", "ref_id": ref[:40]})
+            continue
+        seen.add(ref)
+        relation = normalize_text(str(raw.get("relation") or "")).lower()
+        if relation not in RELATIONS:
+            ignored.append({"reason": "unknown_relation", "ref_id": ref[:40]})
+            continue
+        rank, candidate = by_ref[ref]
+        outcome = decide_outcome(
+            relation,
+            fact_uncertain=fact.uncertain,
+            requirement_conditional=candidate.conditional,
+            clause=str(raw.get("violated_clause") or ""),
+            requirement_text=candidate.text,
+        )
+        if outcome is not None:
+            planned.append(PlannedResult(candidate.key, candidate.ref_id, fact.index, rank, outcome, fact.sentence))
+    return apply_caps(planned, per_fact=MAX_RESULTS_PER_FACT, per_run=MAX_RESULTS_PER_FACT), ignored
 
 
 def build_observation(outcome: Outcome, *, model: str, day: date, sentence: str) -> str:

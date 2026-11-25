@@ -174,6 +174,7 @@ class RequirementCandidate:
     context: str = ""  # names and descriptions of its parent sections
     has_assessable_children: bool = False
     order: int = 0  # position in the framework, used only to break ties
+    conditional: bool = False  # the description starts with "If ..." / "Where ..."
 
 
 @dataclass
@@ -218,6 +219,7 @@ def build_candidates(nodes: Iterable[dict]) -> list[RequirementCandidate]:
                 context=" ".join(context_parts),
                 has_assessable_children=n.get("urn") in has_assessable_child,
                 order=order,
+                conditional=is_conditional_requirement(n.get("description") or ""),
             )
         )
     return candidates
@@ -312,17 +314,23 @@ def shortlist_requirements(
 
 # Conditional requirements: "If passwords are used as the only factor..." cannot be
 # judged non-compliant unless the condition itself is stated, so these become a
-# Potential gap.
-_CONDITIONAL_START = re.compile(r"^\W*(if|where|when|in case)\b", re.IGNORECASE)
+# Potential gap. The condition is not always first: PCI writes "Additional requirement
+# for service providers only: If passwords ...".
+_CONDITIONAL_OPENING = re.compile(r"(?:^|[.:;]\s*)\W*(if|where|when|in case)\b", re.IGNORECASE)
+_CONDITIONAL_OPENING_CHARS = 250
 _CONDITIONAL_ANYWHERE = re.compile(
-    r"\b(where applicable|if applicable|when applicable|where relevant|if used|where used)\b",
+    r"\b(where applicable|if applicable|when applicable|where relevant|if used|where used"
+    r"|service providers? only|for service providers)\b",
     re.IGNORECASE,
 )
 
 
 def is_conditional_requirement(text: str) -> bool:
     folded = _fold(text)
-    return bool(_CONDITIONAL_START.search(folded) or _CONDITIONAL_ANYWHERE.search(folded))
+    return bool(
+        _CONDITIONAL_OPENING.search(folded[:_CONDITIONAL_OPENING_CHARS])
+        or _CONDITIONAL_ANYWHERE.search(folded)
+    )
 
 
 # Uncertainty in the objective: a fact from such a sentence can never become a

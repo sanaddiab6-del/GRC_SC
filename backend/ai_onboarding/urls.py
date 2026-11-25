@@ -321,3 +321,13 @@ urlpatterns += [path("workforce/assistant/framework-source/choices/", Authorized
 from .sico_ai_case_quality_views import SicoQualityDraftOneView
 urlpatterns += [path('workforce/assistant/case-draft/quality-one/', SicoQualityDraftOneView.as_view(),
                     name='sico-ai-quality-draft-one')]
+
+# SICO AI Pre-Assessment (off unless SICO_AI_PRE_ASSESSMENT_ENABLED). Extract facts, then
+# judge one fact per request; neither endpoint writes to the database.
+from .pre_assessment_views import PreAssessmentExtractView, PreAssessmentJudgeView
+urlpatterns += [
+    path('workforce/assistant/pre-assessment/extract/', PreAssessmentExtractView.as_view(),
+         name='sico-ai-pre-assessment-extract'),
+    path('workforce/assistant/pre-assessment/judge/', PreAssessmentJudgeView.as_view(),
+         name='sico-ai-pre-assessment-judge'),
+]
