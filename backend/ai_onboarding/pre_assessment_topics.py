@@ -464,6 +464,13 @@ ANCHOR_CONCEPTS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
         ("mobile*", "phone*", "laptop*", "byod", "usb", "tablet*", "personal device*", "media"),
     ),
     "email": (("e-mail", "email"), ("email", "e-mail", "mail", "phishing")),
+    # Audits and reviews are their own subject: "no separate cybersecurity team" says nothing
+    # about independent audits (ECC 1-8-2), and "never received any training" says nothing
+    # about reviewing the awareness programme (ECC 1-10-5).
+    "audit_review": (
+        ("audit*", "review*", "assess*"),
+        ("audit*", "review*", "assess*", "check*", "inspect*", "evaluat*"),
+    ),
     "firewall_network": (
         ("network security control*", "firewall*", "segmentation"),
         ("firewall*", "network*", "router*", "segment*", "vlan*"),

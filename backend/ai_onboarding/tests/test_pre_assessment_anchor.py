@@ -65,6 +65,10 @@ DROP = [
      "approved, supported and assigned by the Authorizing Official"),
     ("ecc-1.yaml", NAJD, "awareness", "1-10-3", "gap_explicit",
      "must cover the latest cyber threats and how to protect against them"),
+    # Audits / reviews are another subject (seen after the first anchor commit).
+    ("ecc-1.yaml", NAJD, "it_manager", "1-8-2", "gap_explicit",
+     "Cybersecurity audits and reviews must be conducted by independent parties outside the cybersecurity function"),
+    ("ecc-1.yaml", NAJD, "awareness", "1-10-5", "gap_explicit", "must be reviewed periodically"),
     # A clause the quote does not contradict.
     ("ecc-1.yaml", NAJD, "awareness", "1-10-1", "gap_explicit", "must be developed and approved"),
     ("ecc-1.yaml", NAJD, "vpn", "2-2-3", "gap_explicit", "Multi-factor authentication for remote access"),
@@ -115,6 +119,13 @@ class SubjectAnchorUnitTests(unittest.TestCase):
         self.assertEqual(missing_anchors("", "Multi-factor authentication for remote access",
                                          "connects remotely using one shared VPN account"), ["mfa"])
         self.assertEqual(missing_anchors("a cybersecurity strategy", "", "We do not have a documented cybersecurity strategy"), [])
+
+    def test_audit_and_review_need_their_own_evidence(self):
+        self.assertEqual(missing_anchors("", "must be reviewed periodically",
+                                         "Employees have never received any security awareness training"),
+                         ["audit_review"])
+        self.assertEqual(missing_anchors("", "must be reviewed periodically",
+                                         "We have never reviewed our access rights"), [])
 
     def test_incidents_in_a_clause_are_context_not_subject(self):
         self.assertEqual(missing_anchors("backup and recovery management",
