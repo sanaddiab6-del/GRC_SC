@@ -11,6 +11,7 @@ from ai_onboarding.pre_assessment_topics import (
     TOPIC_ENUM,
     is_conditional_requirement,
     is_uncertain,
+    states_deficiency,
 )
 
 PETRA = (
@@ -171,6 +172,71 @@ class DetectorTests(unittest.TestCase):
         self.assertFalse(is_conditional_requirement(
             "Audit logs are reviewed at least once daily. " * 8 + "Escalate if anomalies are found."))
 
+    def test_stated_deficiency_including_contractions(self):
+        stated = [
+            "We don't have a documented policy",
+            "We dont have a documented policy",
+            "We don’t have a documented policy",
+            "We do not have a documented cybersecurity strategy",
+            "Employees have never received any security awareness training",
+            "connects remotely using one shared VPN account",
+            "the developer still uses the same admin password since 2022",
+            "We have no separate cybersecurity team",
+            "Backups are kept without encryption",
+            "Nobody reviews the logs",
+            "There is none", "MFA is missing", "Logging is absent", "We lack a backup policy",
+            "lacking an incident plan", "The firewall is no longer maintained", "We have only one administrator",
+            "We are unable to restore data", "We cannot restore data",
+            "It doesn't", "We didn't", "We haven't", "It hasn't", "It isn't", "They aren't", "It wasn't",
+            "They weren't", "We can't", "we cant", "we havent", "it isnt",
+        ]
+        for text in stated:
+            with self.subTest(text=text):
+                self.assertTrue(states_deficiency(text))
+        neutral = [
+            "Customers pay by card on our website",
+            "we also have 3 shops with card machines",
+            "Our website runs on a hosting company server",
+            "A new internal data protection policy was approved and must be implemented within 2 months",
+            "Focus on access control to student data and protection of trade secrets",
+            "All data is hosted on internal on-premise servers",
+            "We take backups once a week to an external hard drive",
+            "Our notebook inventory is known", "snowfall", "Nora's cannoli",
+        ]
+        for text in neutral:
+            with self.subTest(text=text):
+                self.assertFalse(states_deficiency(text))
+
+    def test_contraction_deficiency_becomes_non_compliant_end_to_end(self):
+        from ai_onboarding.pre_assessment_topics import build_candidates
+
+        objective = "We are a small clinic in Irbid with 20 staff. We don't have a documented policy for information security."
+        facts, _ = rules.verify_facts(
+            [{"quote": "We don't have a documented policy for information security",
+              "claim_en": "No documented information security policy.", "topics": ["governance_policy"],
+              "certainty": "stated"}],
+            objective,
+        )
+        candidates = build_candidates([{"urn": "p", "assessable": True, "ref_id": "P-1", "key": "p1",
+                                        "description": "An information security policy must be documented and approved."}])
+        results, _ = rules.plan_fact_results(facts[0], candidates, [
+            {"ref_id": "P-1", "relation": "gap_explicit",
+             "violated_clause": "An information security policy must be documented and approved"}])
+        self.assertEqual([r.outcome.kind for r in results], [rules.KIND_NON_COMPLIANT])
+
+    def test_deficiency_is_checked_on_the_quote_not_the_sentence(self):
+        # One sentence, two facts: hosting (neutral) and the admin password (deficiency).
+        facts, _ = rules.verify_facts(
+            [{"quote": "Our website runs on a hosting company server", "topics": ["third_party_providers"],
+              "certainty": "stated"},
+             {"quote": "the developer still uses the same admin password since 2022",
+              "topics": ["authentication_passwords"], "certainty": "stated"}],
+            PETRA,
+        )
+        self.assertEqual(facts[0].sentence, facts[1].sentence)
+        self.assertFalse(facts[0].states_deficiency)
+        self.assertTrue(facts[1].states_deficiency)
+
     def test_uncertainty_in_english_and_arabic(self):
         for text in ("not sure if card numbers are saved", "I think we use AWS", "maybe weekly",
                      "We don't know who has access", "مش متأكد إذا البطاقات محفوظة"):
@@ -183,9 +249,19 @@ class DetectorTests(unittest.TestCase):
 
 
 class OutcomeTests(unittest.TestCase):
-    def _decide(self, relation, *, uncertain=False, conditional=False, clause="A cybersecurity strategy must be defined", text=ECC_111):
-        return rules.decide_outcome(relation, fact_uncertain=uncertain, requirement_conditional=conditional,
-                                    clause=clause, requirement_text=text)
+    def _decide(self, relation, *, uncertain=False, deficiency=True, conditional=False,
+                clause="A cybersecurity strategy must be defined", text=ECC_111):
+        return rules.decide_outcome(relation, fact_uncertain=uncertain, fact_states_deficiency=deficiency,
+                                    requirement_conditional=conditional, clause=clause, requirement_text=text)
+
+    def test_no_stated_deficiency_means_to_be_confirmed(self):
+        # Seen in the baseline: "Customers pay by card on our website" -> PCI 6.4.2 Non-compliant.
+        for relation in ("gap_explicit", "partial_explicit"):
+            with self.subTest(relation=relation):
+                self.assertEqual(self._decide(relation, deficiency=False).kind, rules.KIND_TO_BE_CONFIRMED)
+        # Not even a Potential gap on a conditional requirement.
+        self.assertEqual(self._decide("gap_explicit", deficiency=False, conditional=True).kind,
+                         rules.KIND_TO_BE_CONFIRMED)
 
     def test_mapping_table(self):
         self.assertIsNone(self._decide("not_related"))

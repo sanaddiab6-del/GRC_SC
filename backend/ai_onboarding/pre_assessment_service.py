@@ -7,6 +7,7 @@ every rule can be unit tested:
 * the observation is built by code from verified text only, never from free model text;
 * Compliant and Not applicable can never be produced;
 * a conditional requirement or an uncertain sentence never becomes Non-compliant;
+* an explicit result needs a quote that itself states a deficiency;
 * the final write re-runs every one of these checks; nothing the page sends back is
   trusted just because an earlier request produced it.
 
@@ -27,6 +28,7 @@ from .pre_assessment_topics import (
     RequirementCandidate,
     is_uncertain,
     shortlist_requirements,
+    states_deficiency,
 )
 
 MAX_FACTS = 6
@@ -189,6 +191,13 @@ class VerifiedFact:
     def judgeable(self) -> bool:
         return any(t != CONTEXT_ONLY for t in self.topics)
 
+    @property
+    def states_deficiency(self) -> bool:
+        # Checked on the quote, not the whole sentence: one sentence can hold a neutral
+        # fact and a deficiency ("runs on a hosting company server and ... the same admin
+        # password since 2022").
+        return states_deficiency(self.quote)
+
 
 _FIELD_NAMES = ("quote", "claim_en", "topics", "certainty", "ref_id", "relation", "violated_clause", "reason")
 _FIELD_BY_SIMPLE_KEY = {re.sub(r"[^a-z]", "", name): name for name in _FIELD_NAMES}
@@ -286,6 +295,7 @@ def decide_outcome(
     relation: str,
     *,
     fact_uncertain: bool,
+    fact_states_deficiency: bool,
     requirement_conditional: bool,
     clause: str | None,
     requirement_text: str,
@@ -300,6 +310,9 @@ def decide_outcome(
         return Outcome(KIND_TO_BE_CONFIRMED)
     verified_clause = verify_clause(clause or "", requirement_text)
     if verified_clause is None:
+        return Outcome(KIND_TO_BE_CONFIRMED)
+    if not fact_states_deficiency:
+        # The quote states no deficiency: neither a finding nor a Potential gap.
         return Outcome(KIND_TO_BE_CONFIRMED)
     if requirement_conditional:
         return Outcome(KIND_POTENTIAL_GAP, verified_clause)
@@ -385,6 +398,7 @@ def plan_fact_results(
         outcome = decide_outcome(
             relation,
             fact_uncertain=fact.uncertain,
+            fact_states_deficiency=fact.states_deficiency,
             requirement_conditional=candidate.conditional,
             clause=str(raw.get("violated_clause") or ""),
             requirement_text=candidate.text,

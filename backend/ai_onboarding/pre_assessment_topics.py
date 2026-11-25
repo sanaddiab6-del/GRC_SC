@@ -348,3 +348,24 @@ _UNCERTAIN = re.compile(
 
 def is_uncertain(text: str) -> bool:
     return bool(_UNCERTAIN.search(_fold(text)))
+
+
+# A stated deficiency: an explicit result (Non-compliant / Partially compliant) needs the
+# quoted words themselves to say that something is missing, never done, shared or stale.
+# "Customers pay by card on our website" states no deficiency, so nothing can be explicit.
+# Contractions count, with or without the apostrophe, as people type them ("don't",
+# "dont"). English only for now; Arabic objectives fall back to To be confirmed.
+_DEFICIENCY = re.compile(
+    r"(?<![a-z0-9])(?:"
+    r"not|no|never|without|nobody|nothing|none|neither|nor|no one|no longer"
+    r"|lack|lacks|lacking|lacked|missing|absent|unable|cannot|only one"
+    r"|still|same|shared"
+    r"|dont|doesnt|didnt|havent|hasnt|hadnt|isnt|arent|wasnt|werent|cant|wont|wouldnt"
+    r"|shouldnt|couldnt|mustnt|neednt"
+    r")(?![a-z0-9])"
+    r"|[a-z]n't(?![a-z0-9])"
+)
+
+
+def states_deficiency(text: str) -> bool:
+    return bool(_DEFICIENCY.search(_fold(text)))
