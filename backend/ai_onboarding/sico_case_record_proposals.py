@@ -18,8 +18,91 @@ REQUIREMENT_RESULTS = ('not_assessed', 'partially_compliant', 'non_compliant', '
 RISK_TREATMENTS = ('open', 'mitigate', 'accept', 'avoid', 'transfer')
 
 
+def deterministic_draft_scope(context: Mapping, *, organization: str,
+                              framework_id: str, source_digest: str) -> dict:
+    """Bind drafts to the domain and catalog snapshot authorized by the caller."""
+    if (
+        not (context.get('organization_id') or context.get('draft_case_scope_id'))
+        or str(context.get('organization_name', '')).casefold() != organization.casefold()
+        or context.get('framework_id') != framework_id
+        or context.get('source_digest') != source_digest
+        or not context.get('framework_name')
+        or not context.get('framework_reference')
+        or type(context.get('library_version')) is not int
+    ):
+        raise ValueError('deterministic_draft_context_mismatch')
+    scope = {'source': 'sico_deterministic', 'approval_status': 'not_approved'}
+    if context.get('draft_case_scope_id'):
+        import re
+        if not re.fullmatch(r'draft-case:[a-f0-9]{64}', context['draft_case_scope_id']):
+            raise ValueError('invalid_draft_case_scope')
+        scope.update(draft_case_scope_id=context['draft_case_scope_id'], scope_kind=context['scope_kind'])
+    if context.get('scope_kind') == 'draft_only_case':
+        if context.get('organization_id') or context.get('tenant_id'):
+            raise ValueError('draft_scope_cannot_bind_tenant')
+        return scope
+    domain_id = context.get('organization_id')
+    if not domain_id:
+        raise ValueError('missing_authorized_scope')
+    return {**scope, 'tenant_id': domain_id, 'organization_id': domain_id}
+
+
+
+def prepare_deterministic_drafts(*, generation_queue: Sequence[Mapping],
+                                 authorized_context: Mapping, draft_scope: Mapping,
+                                 objective: str, requirement_count: int,
+                                 scope_subjects: Sequence[str]) -> list[dict]:
+    """Fill existing draft references with source metadata and case inputs."""
+    from .sico_full_case_blueprint import _record
+
+    scope_ref = next(task['draft_reference'] for task in generation_queue if task['activity_number'] == 2)
+    assessment_ref = next(task['draft_reference'] for task in generation_queue if task['activity_number'] == 3)
+    framework = {
+        'framework_id': authorized_context['framework_id'],
+        'framework_name': authorized_context['framework_name'],
+        'framework_edition': authorized_context['framework_name'],
+        'library_version': authorized_context['library_version'],
+        'source_reference': authorized_context['framework_reference'],
+        'source_digest': authorized_context['source_digest'],
+    }
+    records = {
+        1: ('Framework / Perimeter', 'Framework charter', {
+            **framework, 'requirement_count': requirement_count,
+        }),
+        2: ('Perimeter', 'Business scope', {
+            'organization_name': authorized_context['organization_name'],
+            'objective': {'label': 'user-provided objective', 'value': objective},
+            'assumptions': [{'system': subject, 'confirmed': False} for subject in scope_subjects],
+        }),
+        3: ('ComplianceAssessment', 'Assessment setup', {
+            **framework, 'scope_draft_reference': scope_ref, 'assessment_status': 'proposed',
+        }),
+        14: ('ComplianceAssessment', 'Human review package', {
+            'assessment_draft_reference': assessment_ref,
+            'unassessed_requirement_count': requirement_count, 'signed_off': False,
+        }),
+        16: ('ComplianceAssessment', 'Management and audit report outline', {
+            'assessment_draft_reference': assessment_ref, 'requirement_count': requirement_count,
+            'verified_requirement_count': 0, 'report_final': False,
+        }),
+    }
+    drafts = []
+    for task in generation_queue:
+        activity = task['activity_number']
+        # The source-backed business scope shell precedes specialist scope analysis.
+        if task['execution_mode'] != 'deterministic' and activity != 2:
+            continue
+        model, title, fields = records[activity]
+        drafts.append(_record(
+            task['draft_reference'], model, title,
+            **draft_scope, activity_number=activity, model_fields=fields,
+        ))
+    return drafts
+
+
 def prepare_requirement_assessments(*, requirement_work_items: Sequence[Mapping],
-                                    framework_id: str, source_digest: str) -> list[dict]:
+                                    framework_id: str, source_digest: str,
+                                    draft_scope: Mapping | None = None) -> list[dict]:
     """One complete unassessed RequirementAssessment-shaped work record/source row.
 
     The caller must give the *already server-authorized* coverage items.
@@ -45,7 +128,7 @@ def prepare_requirement_assessments(*, requirement_work_items: Sequence[Mapping]
         seen.add(rid)
         # Exact field names from existing RequirementAssessment model. A null
         # compliance_assessment is intentionally NOT a valid persistence payload.
-        proposals.append({
+        proposal = {
             'target_model': 'RequirementAssessment',
             'requirement_id': rid,
             'requirement_reference': ref,
@@ -77,7 +160,12 @@ def prepare_requirement_assessments(*, requirement_work_items: Sequence[Mapping]
             'human_review_required': True,
             'compliance_verdict_made': False,
             'business_records_written': False,
-        })
+        }
+        if draft_scope is not None:
+            proposal.update(draft_scope, status='not_assessed')
+            for field in ('assessment_justification', 'evidence_request', 'review_method'):
+                del proposal[field]
+        proposals.append(proposal)
     return proposals
 
 

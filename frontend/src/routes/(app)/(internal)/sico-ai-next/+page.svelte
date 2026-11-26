@@ -4,7 +4,7 @@
     import { onMount } from 'svelte';
     import type { ActionData } from './$types';
     import SicoGeneratedCase from "$lib/components/AiOnboarding/SicoGeneratedCase.svelte";
-    import { validateGenerationQueue, nextGenerationSlot, plannedDraftContext } from '$lib/utils/sicoGenerationPlan';
+    import { validateGenerationQueue, nextGenerationSlot, plannedDraftContext, deterministicGenerationItem, nextAssetBatch } from '$lib/utils/sicoGenerationPlan';
     import {
         applyFrameworkBatch, validateCheckpoint, scopeKey,
         type ReviewCheckpoint, type ReviewScope
@@ -198,6 +198,22 @@
     let attemptHistory = $state<DraftAttempt[]>([]);
     let nextAttemptBySlot = $state<Record<string, number>>({});
     let lastAttemptInfo = $state('');
+    let modelCallsCompleted = $state(0);
+    let assetBatchSize = $state<1 | 2>(2);
+    let deferredAssetRefs = $state<string[]>([]);
+    let aiRecordsRejected = $state(0);
+    let generationElapsedSeconds = $state(0);
+    let activeRequestStarted = $state(0);
+    let generationClock = $state(0);
+    onMount(() => {
+        const timer = setInterval(() => { if (draftedCaseBusy) generationClock = Date.now(); }, 1000);
+        return () => clearInterval(timer);
+    });
+    function blockedGenerationCount(): number {
+        const accepted = new Set(qualityDrafts.filter(r => r.quality_contract_checked === true || r.deterministic_contract_checked === true).map(r => r.draft.draft_reference));
+        return (validCoveragePlanForScope()?.generation_queue ?? []).filter((s: any) => !accepted.has(s.draft_reference) &&
+            s.dependency_draft_references.some((ref: string) => !accepted.has(ref))).length;
+    }
 
     function slotAttemptKey(step: number, index: number) {
         return `draft-${String(step).padStart(2, '0')}-${String(index).padStart(2, '0')}`;
@@ -242,10 +258,15 @@
             instruction = String(cp.scope?.objective ?? '').slice(0, 4000);
             if (organization.length < 2 || frameworkSearch.length < 2 || instruction.length < 20) return;
             qualityDrafts = cp.items;
+            modelCallsCompleted = Math.max(0, Number(cp.model_calls_completed) || 0);
+            aiRecordsRejected = Math.max(0, Number(cp.ai_records_rejected) || 0);
+            generationElapsedSeconds = Math.max(0, Number(cp.elapsed_seconds) || 0);
             qualityIssues = Array.isArray(cp.issues) ? cp.issues.slice(-30) : [];
             nextAttemptBySlot = safeAttemptCounters(cp.attempt_counters);
             attemptHistory = safeAttemptHistory(cp.attempt_history);
             if (attemptHistory.length) { const last = attemptHistory[attemptHistory.length - 1]; lastAttemptInfo = `Last request: activity ${last.activity}, ${last.outcome} after ${last.elapsed_seconds}s.`; }
+            assetBatchSize = cp.asset_batch_size === 1 ? 1 : 2;
+            deferredAssetRefs = Array.isArray(cp.deferred_asset_refs) ? cp.deferred_asset_refs.filter((v: unknown) => typeof v === 'string' && /^draft-04-[0-9]{2,5}$/.test(v)) : [];
             checkpointSource = cp.source ?? null;
             draftedCaseScope = qualityScopeKey();
             localCheckpointInfo = 'Recovered drafts from this browser tab. Load framework access again before resuming.';
@@ -261,7 +282,11 @@
             scope: { organization: organization.trim(), framework: frameworkSearch.trim(), objective: instruction.trim() },
             source: authorizedFrameworkSource ?? checkpointSource,
             items: qualityDrafts,
+            asset_batch_size: assetBatchSize, deferred_asset_refs: deferredAssetRefs,
+            model_calls_completed: modelCallsCompleted, ai_records_rejected: aiRecordsRejected,
+            elapsed_seconds: generationElapsedSeconds,
             generation_queue: validCoveragePlanForScope()?.generation_queue ?? [],
+            requirement_placeholders: validCoveragePlanForScope()?.requirement_assessment_proposals ?? [],
             issues: qualityIssues,
             attempt_counters: nextAttemptBySlot,
             attempt_history: attemptHistory.slice(-20),
@@ -316,6 +341,11 @@
             if (new Set(items.map((r: any) => r.draft.draft_reference)).size !== items.length)
                 throw new Error('Checkpoint contains duplicate draft references.');
             qualityDrafts = items;
+            modelCallsCompleted = Math.max(0, Number(parsed.model_calls_completed) || 0);
+            aiRecordsRejected = Math.max(0, Number(parsed.ai_records_rejected) || 0);
+            generationElapsedSeconds = Math.max(0, Number(parsed.elapsed_seconds) || 0);
+            assetBatchSize = parsed.asset_batch_size === 1 ? 1 : 2;
+            deferredAssetRefs = Array.isArray(parsed.deferred_asset_refs) ? parsed.deferred_asset_refs.filter((v: unknown) => typeof v === 'string' && /^draft-04-[0-9]{2,5}$/.test(v)) : [];
             checkpointSource = parsed.source ?? null;
             qualityIssues = [];
             nextAttemptBySlot = parsed?.schema === 'sico-authenticated-quality-drafts-v7'
@@ -337,7 +367,7 @@
     function nextQualitySlot() {
         const plan = validCoveragePlanForScope();
         if (!plan) return null;
-        const planned = nextGenerationSlot(plan.generation_queue, qualityDrafts);
+        const planned = nextGenerationSlot(plan.generation_queue, qualityDrafts, deferredAssetRefs);
         return planned ? { step: planned.activity_number, index: planned.draft_index, planned } : null;
     }
     function hasPendingGeneration(): boolean {
@@ -351,6 +381,8 @@
             return;
         }
         if (restart) {
+            assetBatchSize = 2; deferredAssetRefs = [];
+            modelCallsCompleted = 0; aiRecordsRejected = 0; generationElapsedSeconds = 0;
             qualityDrafts = []; qualityIssues = []; loadedOlderCheckpoint = false; checkpointSource = null;
             nextAttemptBySlot = {}; attemptHistory = []; lastAttemptInfo = '';
             draftedCaseStages = []; draftedCaseScope = qualityScopeKey();
@@ -360,6 +392,8 @@
             draftedCaseError = 'The three inputs changed. Restore original inputs or start a new draft case.';
             return;
         }
+        // One attempt per pending asset slot in this run; manual resume retries failures.
+        deferredAssetRefs = [];
         draftedCaseBusy = true; draftedCaseError=''; draftedCaseNotice=''; stopAfterPhase=false;
         try {
             if (!authorizedFrameworkSource) await loadSicoAuthorizedFrameworkSource();
@@ -375,6 +409,13 @@
                 const slot = nextQualitySlot();
                 if (!slot) { draftedCaseNotice = 'All scheduled Qwen drafts are ready for review. Evidence, risk ratings and approvals remain pending; the GRC case is not complete.'; break; }
                 currentGeneratingActivity = slot.step;
+                if (slot.planned.execution_mode === 'deterministic' || slot.step === 2) {
+                    const item = deterministicGenerationItem(validCoveragePlanForScope(), slot.planned);
+                    qualityDrafts = [...qualityDrafts, item];
+                    draftedCaseNotice = 'Prepared source-backed setup without a model call. Human review remains required.';
+                    saveLocalDraftCheckpoint();
+                    continue;
+                }
                 const previous = plannedDraftContext(slot.planned, qualityDrafts);
                 // Only a source-backed SICO reference is selected; the backend
                 // independently rechecks authorization before using it.
@@ -384,7 +425,9 @@
                 // response is visible immediately; Resume rotates the focus.
                 const attempt = Math.min(30, nextAttemptBySlot[key] ?? 0);
                 const started = Date.now();
+                activeRequestStarted = started; generationClock = started;
                 draftedCaseNotice = `Generating activity ${slot.step} of 16, draft ${slot.index}. One request at a time; accepted drafts are preserved.`;
+                const batch = slot.step === 4 ? nextAssetBatch(validCoveragePlanForScope()?.generation_queue ?? [], qualityDrafts, slot.planned, assetBatchSize, deferredAssetRefs) : [];
                 try {
                     const response = await sicoPostAction('quality_draft_one', {
                         organization_name: organization.trim(), framework_name: frameworkSearch.trim(),
@@ -393,9 +436,37 @@
                         requirement_reference: chosenRef, previous_drafts: JSON.stringify(previous),
                         focus_requirement_reference: slot.planned.focus_requirement_reference,
                         focus_theme: slot.planned.theme,
-                        focus_attempt: String(attempt)
+                        focus_attempt: String(attempt),
+                        asset_batch_indices: JSON.stringify(batch.map(s => s.draft_index))
                     });
                     const item = (response.data as Record<string, any>)?.quality_draft_one;
+                    modelCallsCompleted += Number(item?.model_calls_completed ?? item?.generation_attempts ?? 0);
+                    if (slot.step === 4 && item?.asset_batch === true) {
+                        const elapsed = Math.round((Date.now() - started) / 1000);
+                        generationElapsedSeconds += elapsed; activeRequestStarted = 0;
+                        const expected = new Set(batch.map(s => s.draft_reference));
+                        const accepted = Array.isArray(item.accepted) ? item.accepted : [];
+                        if (item.business_records_written !== false || item.source_digest !== authorizedFrameworkSource?.source_digest ||
+                            accepted.some((r: any) => r?.quality_contract_checked !== true || r?.business_records_written !== false ||
+                                !expected.has(r?.draft?.draft_reference) || qualityDrafts.some(p => p.draft.draft_reference === r.draft.draft_reference)))
+                            throw new Error('The asset batch failed checkpoint validation.');
+                        qualityDrafts = [...qualityDrafts, ...accepted];
+                        const rejected = Array.isArray(item.rejected) ? item.rejected : [];
+                        aiRecordsRejected += rejected.length;
+                        for (const entry of batch) nextAttemptBySlot[entry.draft_reference] = Math.min(30, (nextAttemptBySlot[entry.draft_reference] ?? 0) + 1);
+                        recordDraftAttempt(4, slot.index, elapsed, rejected.length ? 'rejected' : 'accepted', `${accepted.length} accepted; ${rejected.length} rejected`);
+                        saveLocalDraftCheckpoint();
+                        if (rejected.length) {
+                            qualityIssues = [...qualityIssues.slice(-29), ...rejected.map((r: any) => `Asset ${r.local_id}: ${r.reason_code}`)];
+                            const kept = new Set(accepted.map((r: any) => r.draft.draft_reference));
+                            deferredAssetRefs = [...new Set([...deferredAssetRefs, ...batch.filter(s => !kept.has(s.draft_reference)).map(s => s.draft_reference)])];
+                            assetBatchSize = 1;
+                            draftedCaseError = 'Some asset proposals were rejected. Continuing independent pending assets with one record per request.';
+                            saveLocalDraftCheckpoint();
+                            continue;
+                        }
+                        continue;
+                    }
                     if (!item || item.quality_contract_checked !== true || item.business_records_written !== false ||
                         item.activity_number !== slot.step || !item.draft?.draft_reference ||
                         item.draft.draft_reference !== key) {
@@ -403,6 +474,7 @@
                     }
                     const elapsed = Math.round((Date.now() - started) / 1000);
                     nextAttemptBySlot = { ...nextAttemptBySlot, [key]: Math.min(30, attempt + 1) };
+                    generationElapsedSeconds += elapsed; activeRequestStarted = 0;
                     recordDraftAttempt(slot.step, slot.index, elapsed, 'accepted', 'Draft validated');
                     qualityDrafts = [...qualityDrafts, item];
                     draftedCaseNotice = `Generated ${qualityDrafts.filter(r => r.provenance === 'qwen_quality_single_authenticated_v7').length} new quality-checked drafts. Last request: ${elapsed}s. Source: ${authorizedSourceRows.length} authorized requirements. No records saved.`;
@@ -411,16 +483,25 @@
                     const elapsed = Math.round((Date.now() - started) / 1000);
                     const message = error instanceof Error ? error.message : 'Draft generation request failed.';
                     nextAttemptBySlot = { ...nextAttemptBySlot, [key]: Math.min(30, attempt + 1) };
+                    generationElapsedSeconds += elapsed; activeRequestStarted = 0; aiRecordsRejected += 1;
+                    modelCallsCompleted += Math.max(0, Number((error as any)?.modelCallsCompleted) || 0);
                     recordDraftAttempt(slot.step, slot.index, elapsed, 'rejected', message);
                     qualityIssues = [...qualityIssues.slice(-29), `Activity ${slot.step}: ${message} (${elapsed}s)`];
                     draftedCaseError = `Activity ${slot.step} was not accepted after ${elapsed}s. ${message} The next Resume will try a different focus; previous drafts are preserved.`;
+                    if (slot.step === 4) {
+                        deferredAssetRefs = [...new Set([...deferredAssetRefs, ...batch.map(s => s.draft_reference)])];
+                        assetBatchSize = 1;
+                        draftedCaseNotice = 'Asset request failed. Continuing other independent assets; accepted records are retained.';
+                        saveLocalDraftCheckpoint();
+                        continue;
+                    }
                     saveLocalDraftCheckpoint();
                     break;
                 }
             }
         } catch (error) {
             draftedCaseError = error instanceof Error ? error.message : 'Generation failed; previous drafts remain.';
-        } finally { draftedCaseBusy = false; currentGeneratingActivity = 0; saveLocalDraftCheckpoint(); }
+        } finally { draftedCaseBusy = false; activeRequestStarted = 0; currentGeneratingActivity = 0; saveLocalDraftCheckpoint(); }
     }
 
     function downloadAuthorizedRequirementSource() {
@@ -771,7 +852,7 @@
         const parsed = deserialize(await res.text());
         if (parsed.type !== 'success') {
             const body = parsed.type === 'failure' ? (parsed.data as Record<string, any>) : null;
-            throw new Error(String(body?.coverage_plan_error ?? body?.source_error ?? body?.case_draft_error ?? body?.framework_batch_error ?? body?.control_error ?? body?.ai_sixteen_error ?? body?.lifecycle_error ?? body?.workflow_error ?? 'The requested operation could not finish.'));
+            throw Object.assign(new Error(String(body?.coverage_plan_error ?? body?.source_error ?? body?.case_draft_error ?? body?.framework_batch_error ?? body?.control_error ?? body?.ai_sixteen_error ?? body?.lifecycle_error ?? body?.workflow_error ?? 'The requested operation could not finish.')), { modelCallsCompleted: Number(body?.model_calls_completed ?? 0) });
         }
         return parsed;
     }
@@ -1088,6 +1169,16 @@
                         <span class="footnote">No records saved · No compliance verdict</span>
                     </div>
                     <p class="source-note">{frameworkSourceSummary || 'Framework catalog not loaded yet.'}</p>
+                    <section aria-label="Generation execution status">
+                        <p>Framework requirements loaded: {authorizedSourceRows.length}</p>
+                        <p>Deterministic records produced: {qualityDrafts.filter(r => r.generated_by_model === false).length} setup drafts; {validCoveragePlanForScope()?.requirement_assessment_proposals?.length ?? 0} unassessed requirement placeholders</p>
+                        <p>AI records planned: {validCoveragePlanForScope()?.generation_summary?.ai_records_planned ?? 'Pending'}</p>
+                        <p>AI records accepted: {qualityDrafts.filter(r => r.quality_contract_checked === true).length}; rejected: {aiRecordsRejected}</p>
+                        <p>Model calls planned: {validCoveragePlanForScope()?.generation_summary?.phase1_model_calls_planned ?? 'Pending'}; completed: {modelCallsCompleted}</p>
+                        <p>Elapsed request time: {generationElapsedSeconds + (activeRequestStarted ? Math.max(0, Math.round((generationClock - activeRequestStarted) / 1000)) : 0)}s</p>
+                        <p>Blocked by pending prerequisites: {blockedGenerationCount()}. {draftedCaseError || 'No request failure reported.'}</p>
+                        <p class="footnote">Session 6 remains unresolved. Professional content, risk ratings, evidence and human approval remain launch gates across all 16 activities.</p>
+                    </section>
                     <SicoGeneratedCase items={qualityDrafts} plan={validCoveragePlanForScope()} {organization} framework={frameworkSearch} />
                     {#if validCoveragePlanForScope()}
                         <section class="requirement-coverage-plan" aria-label="Framework requirement review coverage">
@@ -1100,7 +1191,7 @@
                             </p>
                             <p class="footnote">All requirement work items start as Not assessed. Applicability and organization evidence are awaiting review. A work item is not an AI-generated compliance conclusion.</p>
                             <p class="footnote">Risk ratings: pending tenant-authorized risk assessment and configured SICO risk matrix. The AI cannot calculate current or residual risk from a framework name alone.</p>
-                            <p class="footnote">The case board displays accepted Qwen content only. Planned records and an unapproved matrix do not establish implementation or compliance.</p>
+                            <p class="footnote">The case board displays proposed source-prepared setup and accepted Qwen content. Planned records and an unapproved matrix do not establish implementation or compliance.</p>
                             <button type="button" onclick={downloadCoveragePlan}>Download full requirement work plan</button>
                             <details>
                                 <summary>Review requirement work queue ({validCoveragePlanForScope()?.requirement_work_items?.length ?? 0})</summary>
@@ -1126,7 +1217,7 @@
 
                     <p class="footnote">Framework, assessment charter and business scope are inputs to confirm, not model-generated assessment results.</p>
                     <div class="framework-meter"><div class="framework-meter-fill" style={`width: ${Math.round(generationOrder.filter(n => qualityDrafts.some(r => r.activity_number === n)).length / firstPassTarget * 100)}%`}></div></div>
-                    <p class="footnote">Activities with drafts: {generationOrder.filter(n => qualityDrafts.some(r => r.activity_number === n)).length}/{firstPassTarget}. Scheduled Qwen records: {validCoveragePlanForScope()?.generation_summary?.planned_qwen_detail_drafts ?? 'Planning pending'}. Each requirement review remains unassessed until evidence review.</p>
+                    <p class="footnote">Activities with drafts: {generationOrder.filter(n => qualityDrafts.some(r => r.activity_number === n)).length}/{firstPassTarget}. Scheduled Qwen records: {validCoveragePlanForScope()?.generation_summary?.ai_records_planned ?? 'Planning pending'}. Each requirement review remains unassessed until evidence review.</p>
                     <div class="framework-actions">
                         {#if draftedCaseBusy}
                             <span class="footnote">Generating activity {currentGeneratingActivity} of 16 · Reviewing each draft individually.</span>

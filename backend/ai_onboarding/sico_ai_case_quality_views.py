@@ -18,7 +18,7 @@ from .llm_provider import get_advisory_provider_selection
 from .llm_errors import AiProviderError
 from .sico_ai_case_draft_views import DRAFT_ACTIVITIES
 from .sico_ai_framework_batch_v3 import _load_authorized_requirements, _page_and_digest
-from .quality_sico_drafts_v5 import CONTRACTS, generate_quality_draft
+from .quality_sico_drafts_v5 import CONTRACTS, generate_quality_draft, generate_asset_batch
 from .sico_case_coverage import plan_generation_queue
 from .sico_case_record_proposals import enrich_quality_draft_result
 
@@ -28,6 +28,7 @@ DRAFT_REF = re.compile(r'^draft-(?:0[1-9]|1[0-6])-(?:0[1-9]|[1-9][0-9]{1,3}|1000
 MAX_CONTEXT = 45
 
 class PreviousDraft(serializers.Serializer):
+    draft_case_scope_id = serializers.RegexField(regex=r'^draft-case:[a-f0-9]{64}$', required=False)
     draft_reference = serializers.CharField(max_length=14)
     title = serializers.CharField(min_length=5, max_length=110)
     record_type = serializers.CharField(max_length=90)
@@ -53,6 +54,8 @@ class QualityDraftInput(serializers.Serializer):
     focus_requirement_reference = serializers.CharField(required=False, allow_blank=True, max_length=100)
     focus_theme = serializers.RegexField(regex=r'^[a-z_]{1,60}$', required=False, allow_blank=True)
     previous_drafts = PreviousDraft(many=True, required=False)
+    asset_batch_indices = serializers.ListField(child=serializers.IntegerField(min_value=1, max_value=10000),
+                                                required=False, min_length=1, max_length=2)
     focus_attempt = serializers.IntegerField(required=False, min_value=0, max_value=30, default=0)
 
     def validate_previous_drafts(self, rows):
@@ -69,6 +72,11 @@ class QualityDraftInput(serializers.Serializer):
 
     def validate(self, values):
         step = values['activity_number']
+        batch = values.get('asset_batch_indices', [])
+        if batch and (step != 4 or batch[0] != values['draft_index'] or len(set(batch)) != len(batch)):
+            raise serializers.ValidationError('Invalid planned asset batch.')
+        if any(row['draft_reference'] in {f'draft-04-{i:02d}' for i in batch} for row in values.get('previous_drafts', [])):
+            raise serializers.ValidationError('An asset in this batch already exists in the checkpoint.')
         index = values['draft_index']
         if any(row['draft_reference'] == f'draft-{step:02d}-{index:02d}' for row in values.get('previous_drafts', [])):
             raise serializers.ValidationError('This draft already exists in the checkpoint.')
@@ -91,6 +99,8 @@ class SicoQualityDraftOneView(APIView):
         values = form.validated_data
         if not request.user.is_active:
             return Response({'detail': 'Account inactive.'}, status=403)
+        if any(key in request.data for key in ('tenant_id', 'organization_id', 'folder_id', 'selected_organization_id', 'draft_case_scope_id')):
+            return Response({'detail': 'Organization scope must be resolved by SICO.', 'business_records_written': False}, status=403)
         meta, stream = _load_authorized_requirements(request.user, values['framework_name'])
         if meta.get('status') != 'matched':
             return Response({'detail': 'The exact framework is unavailable to this user.',
@@ -107,6 +117,18 @@ class SicoQualityDraftOneView(APIView):
         if digest != values['source_digest'] or not rows or count != count_again or digest != digest_again:
             return Response({'detail': 'The authorized framework source changed or is incomplete. Reload requirements.',
                              'business_records_written': False}, status=409)
+        from .sico_case_coverage_views import _authorized_scaffold_context
+        authorized = _authorized_scaffold_context(
+            request.user, organization=values['organization_name'], framework_name=values['framework_name'],
+            meta=meta, digest=digest, objective=values['problem'])
+        if not authorized:
+            return Response({'detail': 'Case scope could not be authorized.', 'business_records_written': False}, status=403)
+        for previous in values.get('previous_drafts', []):
+            previous_scope = previous.get('draft_case_scope_id')
+            if (previous_scope and previous_scope != authorized['draft_case_scope_id']) or (
+                    authorized['scope_kind'] == 'draft_only_case' and not previous_scope):
+                return Response({'detail': 'Checkpoint belongs to a different or unbound draft case.',
+                                 'business_records_written': False}, status=409)
         step = values['activity_number']; index = values['draft_index']
         code, _, model, _, dependencies, _ = DRAFT_ACTIVITIES[step-1]
         # Never trust client-provided topics or source identities. Look up
@@ -159,6 +181,38 @@ class SicoQualityDraftOneView(APIView):
                 return Response({'detail': 'Generate the planned parent records before this draft.',
                                  'business_records_written': False}, status=409)
             context = [row for row in context if row['draft_reference'] in required]
+        if step in {1, 2, 3, 14, 16}:
+            return Response({'detail': 'Consume source-prepared deterministic drafts from the authorized coverage plan.',
+                             'business_records_written': False, 'model_calls_completed': 0}, status=409)
+        if step == 4:
+            work = plan_generation_queue(authorized_requirements=rows, objective=values['problem'])
+            requested_indices = values.get('asset_batch_indices') or [index]
+            slots = [next((t for t in work['generation_queue'] if t['activity_number'] == 4 and t['draft_index'] == i), None)
+                     for i in requested_indices]
+            if not expected or any(slot is None for slot in slots):
+                return Response({'detail': 'Asset batch does not match the authorized plan.',
+                                 'business_records_written': False}, status=409)
+            selection = None
+            try:
+                config = resolve_advisory_capability_config(CAPABILITY_GRC_CAPABILITY_SELECTION)
+                selection = get_advisory_provider_selection(config)
+                result = generate_asset_batch(
+                    selection, organization=authorized['organization_name'],
+                    framework=authorized['framework_name'], objective=values['problem'], slots=slots,
+                    prior_drafts=prior, authorized_requirements=rows, tenant_id=authorized.get('organization_id'),
+                    draft_case_scope_id=authorized['draft_case_scope_id'])
+            except (AiProviderError, ValueError, TypeError, KeyError):
+                return Response({'detail': 'Asset generation failed; accepted checkpoint records are retained.',
+                                 'business_records_written': False,
+                                 'model_calls_completed': getattr(getattr(selection, 'provider', None), 'model_request_count', 0)}, status=503)
+            for item in result['accepted']:
+                item.update(framework_id=meta['framework_id'], source_digest=digest,
+                            authorized_requirement_count=count, draft_case_scope_id=authorized['draft_case_scope_id'],
+                            case_scope_kind=authorized['scope_kind'],
+                            full_framework_assessed=False, framework_edition_independently_verified=False)
+            result.update(framework_id=meta['framework_id'], source_digest=digest,
+                          draft_case_scope_id=authorized['draft_case_scope_id'])
+            return Response(result)
         # The generator checks category contracts, uniqueness and draft links;
         # saved SICO functions remain uncalled until a separate future approval.
         try:
@@ -197,7 +251,7 @@ class SicoQualityDraftOneView(APIView):
                           else 'invalid_draft_value')
             else:
                 reason = 'draft_processing_error'
-            failure = {'detail': 'One Qwen draft was rejected; previous drafts are retained.',
+            failure = {'model_calls_completed': getattr(getattr(locals().get('selection'), 'provider', None), 'model_request_count', 0), 'detail': 'One Qwen draft was rejected; previous drafts are retained.',
                        'failure_reason': reason, 'business_records_written': False}
             if getattr(exc,'failure_history',None):
                 failure.update(generation_attempts=exc.generation_attempts,
@@ -234,6 +288,9 @@ class SicoQualityDraftOneView(APIView):
             return Response({'detail': 'The draft could not be mapped to the existing SICO model.',
                              'business_records_written': False}, status=422)
         result.update({
+            'model_calls_completed': getattr(selection.provider, 'model_request_count', result.get('generation_attempts', 1)),
+            'draft_case_scope_id': authorized['draft_case_scope_id'],
+            'case_scope_kind': authorized['scope_kind'],
             'framework_id': meta['framework_id'],
             'source_digest': digest,
             'authorized_requirement_count': count,

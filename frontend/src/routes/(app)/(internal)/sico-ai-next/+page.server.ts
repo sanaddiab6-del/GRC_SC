@@ -151,6 +151,12 @@ export const actions = {
         } catch {
             return fail(400, { case_draft_error: 'Invalid prior-draft checkpoint context.' });
         }
+        let asset_batch_indices: number[] = [];
+        try {
+            asset_batch_indices = JSON.parse(String(form.get('asset_batch_indices') ?? '[]'));
+            if (!Array.isArray(asset_batch_indices) || asset_batch_indices.length > 2 ||
+                asset_batch_indices.some(i => !Number.isInteger(i) || i < 1 || i > 10000)) throw new Error();
+        } catch { return fail(400, { case_draft_error: 'Invalid asset batch indices.' }); }
         const payload = {
             organization_name: String(form.get('organization_name') ?? '').trim(),
             framework_name: String(form.get('framework_name') ?? '').trim(),
@@ -162,6 +168,7 @@ export const actions = {
             focus_requirement_reference: String(form.get('focus_requirement_reference') ?? '').trim(),
             focus_theme: String(form.get('focus_theme') ?? '').trim(),
             previous_drafts,
+            ...(asset_batch_indices.length ? { asset_batch_indices } : {}),
             focus_attempt: Number(form.get('focus_attempt') ?? 0)
         };
         if (payload.organization_name.length < 2 || payload.organization_name.length > 150 ||
@@ -179,8 +186,19 @@ export const actions = {
         try {
             const response = await fetchAiOnboardingBackend(event, '/ai/workforce/assistant/case-draft/quality-one/', payload);
             const data = await response.json().catch(() => ({}));
-            if (!response.ok) return fail(response.status, { case_draft_error:
+            if (!response.ok) return fail(response.status, { model_calls_completed: Number(data.model_calls_completed ?? 0), case_draft_error:
                 `${backendMessage(data)} ${typeof data.failure_reason === 'string' ? '(' + data.failure_reason.slice(0, 80) + ')' : ''}` });
+            if (asset_batch_indices.length && data.asset_batch === true) {
+                const expected = new Set(asset_batch_indices.map(i => `draft-04-${String(i).padStart(2, '0')}`));
+                if (payload.activity_number !== 4 || data.business_records_written !== false ||
+                    data.source_digest !== payload.source_digest || !Array.isArray(data.accepted) || !Array.isArray(data.rejected) ||
+                    data.accepted.some((r: any) => r.business_records_written !== false || r.quality_contract_checked !== true ||
+                        r.source_digest !== payload.source_digest || !expected.has(r.draft?.draft_reference) ||
+                        r.draft?.status !== 'new_unsaved_ai_draft_pending_verification') ||
+                    new Set(data.accepted.map((r: any) => r.draft.draft_reference)).size !== data.accepted.length)
+                    return fail(502, { case_draft_error: 'Asset batch response failed validation.' });
+                return { quality_draft_one: data };
+            }
             if (data.business_records_written !== false || data.quality_contract_checked !== true ||
                 data.activity_number !== payload.activity_number ||
                 data.source_digest !== payload.source_digest ||

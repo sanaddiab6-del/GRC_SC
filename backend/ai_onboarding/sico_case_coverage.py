@@ -72,12 +72,14 @@ def make_coverage_plan(*, organization: str, framework: str, objective: str,
                        authorized_requirements: Sequence[Mapping],
                        source_digest: str, framework_id: str,
                        prior_drafts: Sequence[Mapping] = (),
-                       selected_requirement_ids: Sequence[str] | None = None) -> dict:
+                       selected_requirement_ids: Sequence[str] | None = None,
+                       authorized_case_context: Mapping | None = None) -> dict:
     """Plan every in-scope authorized requirement, preserving evidence uncertainty.
 
     `selected_requirement_ids` is an OPTIONAL trusted scope/implementation-group
     determination from the SICO server, NEVER an arbitrary client-selected list.
     If omitted, every authorized source row is included, with applicability TBD.
+    Deterministic drafts require context resolved under live domain membership checks.
     """
     org, fw, goal = _text(organization, limit=150), _text(framework, limit=150), _text(objective)
     if len(org) < 2 or len(fw) < 2 or len(goal) < 20:
@@ -120,10 +122,26 @@ def make_coverage_plan(*, organization: str, framework: str, objective: str,
         })
     # Existing SICO RequirementAssessment fields, left explicitly unresolved.
     # Lazy import avoids a circular module import with the matrix adapter.
-    from .sico_case_record_proposals import prepare_requirement_assessments
+    from .sico_case_record_proposals import (
+        deterministic_draft_scope, prepare_deterministic_drafts, prepare_requirement_assessments,
+    )
+    generation = plan_generation_queue(authorized_requirements=scoped, objective=goal)
+    scoped_drafts = {}
+    draft_scope = None
+    if authorized_case_context is not None:
+        draft_scope = deterministic_draft_scope(
+            authorized_case_context, organization=org,
+            framework_id=str(framework_id), source_digest=str(source_digest),
+        )
+        scoped_drafts['deterministic_drafts'] = prepare_deterministic_drafts(
+            generation_queue=generation['generation_queue'],
+            authorized_context=authorized_case_context, draft_scope=draft_scope,
+            objective=objective, requirement_count=len(scoped),
+            scope_subjects=generation['generation_summary']['explicit_scope_subjects'],
+        )
     requirement_proposals = prepare_requirement_assessments(
         requirement_work_items=items, framework_id=str(framework_id),
-        source_digest=str(source_digest))
+        source_digest=str(source_digest), draft_scope=draft_scope)
     return {
         'schema': SCHEMA,
         'scope': {'organization': org, 'framework': fw, 'objective': goal},
@@ -156,8 +174,8 @@ def make_coverage_plan(*, organization: str, framework: str, objective: str,
             authorized_requirements=scoped, framework_id=str(framework_id),
             source_digest=str(source_digest),
         ),
-        **{key:value for key,value in plan_generation_queue(
-            authorized_requirements=scoped, objective=goal).items() if key != 'schema'},
+        **{key: value for key, value in generation.items() if key != 'schema'},
+        **scoped_drafts,
         'generation_queue_schema': 'sico-ai-dynamic-generation-queue-v1',
     }
 
@@ -197,7 +215,7 @@ ASSET_DOMAINS = frozenset({
 MODEL_BATCH_SIZE = 6
 ACTIVITY_EXECUTION_MODES = {
     1: 'deterministic',  # Framework and edition metadata.
-    2: 'ai_single',  # One case-wide business scope proposal.
+    2: 'deterministic',  # Source-backed business perimeter; specialist processes remain proposed work.
     3: 'deterministic',  # Assessment setup from the selected source and scope.
     4: 'ai_batchable',  # Asset proposals.
     5: 'ai_batchable',  # Threat hypotheses.
@@ -347,7 +365,7 @@ def plan_generation_queue(*, authorized_requirements: Sequence[Mapping],
     # Finish each category's required inventory before moving downstream.
     for activity in range(4,17):
         queue.extend(candidates[activity][:max_slots_per_activity])
-    records_planned = dict.fromkeys(ACTIVITY_EXECUTION_MODES.values(), 0)
+    records_planned = dict.fromkeys(('deterministic', 'ai_batchable', 'ai_single'), 0)
     batchable_by_activity = Counter()
     for slot in queue:
         slot['task_identity'] = hashlib.sha256(repr((slot['activity_number'],slot['draft_index'],
@@ -374,6 +392,12 @@ def plan_generation_queue(*, authorized_requirements: Sequence[Mapping],
             'planned_qwen_detail_drafts': len(queue),
             'records_planned': records_planned,
             'model_calls_planned': model_calls_planned,
+            'ai_records_planned': len(queue) - records_planned['deterministic'],
+            'phase1_model_calls_planned': sum(
+                (count + 1) // 2 if activity == 4 else count
+                for activity, count in batchable_by_activity.items()),
+            'asset_records_per_call': 2,
+            'professional_content_launch_gate': 'pending_human_review_session_6_unresolved',
             'activity_targets': {**{str(step):1 for step in (1,2,3)},
                                  **{str(step): min(len(x), max_slots_per_activity)
                                  for step, x in candidates.items()}},

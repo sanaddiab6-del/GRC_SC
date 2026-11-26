@@ -77,6 +77,7 @@ class LocalAiProvider:
         self.base_url_safe = base_url_safe
         self.base_url_warning = base_url_warning
         self.context_window_max = context_window_max
+        self.model_request_count = 0
 
     def generate_structured(
         self,
@@ -139,6 +140,8 @@ class LocalAiProvider:
         )
 
         try:
+            # Count transport attempts, including timeouts; preflight failures remain zero.
+            self.model_request_count += 1
             with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
                 response_payload = json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
@@ -163,7 +166,13 @@ class LocalAiProvider:
 
         from jsonschema import Draft202012Validator, ValidationError
 
-        validator = Draft202012Validator(json_schema)
+        # Constrain asset generation with the full schema, but validate each row
+        # independently in the existing batch contract so bad peers survive.
+        validation_schema = json_schema
+        if schema_name == 'sico_assets_batch_v1':
+            validation_schema = {'type': 'object', 'additionalProperties': False, 'required': ['records'],
+                                 'properties': {'records': {'type': 'array', 'minItems': 1, 'maxItems': 2}}}
+        validator = Draft202012Validator(validation_schema)
         # Recovery belongs here: the provider rejects malformed output before
         # the GRC generator can see it. Only this one cosmetic error is eligible.
         parsed = _recover_quality_title(parsed, validator, schema_name)
@@ -224,6 +233,7 @@ def _ollama_output_format(schema_name: str, json_schema: dict[str, Any]):
     if schema_name in {
         "sico_capability_selection_v1",
         "sico_capability_batch_v1",
+        "sico_assets_batch_v1",
     }:
         return json_schema
     if schema_name in {"sico_ai_workflow_plan_v1", "sico_ai_agent_decision_v1"}:
@@ -244,6 +254,10 @@ def _build_ollama_prompt(
     json_schema: dict[str, Any],
     schema_name: str,
 ) -> str:
+    if schema_name == 'sico_assets_batch_v1':
+        # The full activity schema is already sent in Ollama format. Keep it
+        # out of the prompt, matching the compact asset generation approach.
+        return system_prompt.strip() + '\nCONTEXT: ' + json.dumps(user_payload, ensure_ascii=False, separators=(',', ':'))
     if schema_name == 'sico_quality_draft_one_v2':
         # The output grammar is enforced through Ollama's JSON schema below;
         # don't send a second nested schema/prompt envelope for one record.
@@ -316,6 +330,7 @@ def _build_ollama_prompt(
     if schema_name in {
         "sico_capability_selection_v1",
         "sico_capability_batch_v1",
+        "sico_assets_batch_v1",
     }:
         instruction.pop("capability", None)
 
@@ -325,6 +340,7 @@ def _build_ollama_prompt(
     if capability == CAPABILITY_CASE_INTAKE and schema_name not in {
         "sico_capability_selection_v1",
         "sico_capability_batch_v1",
+        "sico_assets_batch_v1",
     }:
         instruction["output_contract"]["step1_compact_skeleton"] = {
             "draft_type": "AiCaseIntakeDraft",

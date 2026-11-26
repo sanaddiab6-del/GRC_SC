@@ -70,10 +70,8 @@ def test_sico_call_accounting():
 
     for task in queue:
         activity = task["activity_number"]
-        if activity in {1, 3, 14, 16}:
+        if activity in {1, 2, 3, 14, 16}:
             expected_mode = "deterministic"
-        elif activity == 2:
-            expected_mode = "ai_single"
         else:
             expected_mode = "ai_batchable"
         assert task["execution_mode"] == expected_mode
@@ -87,10 +85,14 @@ def test_sico_call_accounting():
     assert hashlib.sha256(queue_json.encode("utf-8")).hexdigest() == BASELINE_TASK_LIST_SHA256
 
     records = summary["records_planned"]
-    assert records == {"deterministic": 4, "ai_batchable": 253, "ai_single": 1}
+    assert records == {"deterministic": 5, "ai_batchable": 253, "ai_single": 0}
     assert sum(records.values()) == len(queue)
-    # 46 batches across 11 activities, plus one case-wide scope request.
-    assert summary["model_calls_planned"] == 47
+    # Generic six-record estimates remain separate from phase 1 execution:
+    # assets use two-record requests and other AI activities retain single calls.
+    assert summary["model_calls_planned"] == 46
+    assert summary["ai_records_planned"] == 253
+    assert summary["phase1_model_calls_planned"] == 248
+    assert summary["asset_records_per_call"] == 2
 
     print("| Plan | Records | Deterministic | AI batchable | AI single | Model calls |")
     print("| --- | ---: | ---: | ---: | ---: | ---: |")
