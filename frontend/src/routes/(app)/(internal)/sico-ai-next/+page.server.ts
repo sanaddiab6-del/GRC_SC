@@ -630,4 +630,151 @@ export const actions = {
             return { lifecycle_stage_committed: data };
         } catch { return fail(502, { lifecycle_error: 'Could not verify the GRC stage save.' }); }
     },
+    // SICO AI Pre-Assessment: extract facts, judge one fact per request, then commit a new
+    // audit. The backend re-checks everything at commit; these actions only pass data on.
+    pre_assessment_extract: async (event) => {
+        if (!hasAiOnboardingSession(event)) return fail(401, { pre_assessment_error: 'Sign in again.' });
+        const form = await event.request.formData();
+        const payload = {
+            framework_id: String(form.get('framework_id') ?? ''),
+            organization_name: String(form.get('organization_name') ?? '').trim(),
+            objective: String(form.get('objective') ?? '').trim()
+        };
+        if (!PRE_ASSESSMENT_UUID.test(payload.framework_id) || payload.organization_name.length < 2 ||
+            payload.organization_name.length > 150 || payload.objective.length < 20 || payload.objective.length > 4000) {
+            return fail(400, { pre_assessment_error: 'Enter organization, framework and objective first.' });
+        }
+        try {
+            const response = await fetchAiOnboardingBackend(event, '/ai/workforce/assistant/pre-assessment/extract/', payload);
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) return fail(response.status, { pre_assessment_error: preAssessmentMessage(data) });
+            if (data.business_records_written !== false || !Array.isArray(data.facts)) {
+                return fail(502, { pre_assessment_error: 'SICO could not verify the extracted facts.' });
+            }
+            return { pre_assessment_extract: { facts: data.facts.slice(0, 6).map(preAssessmentFact) } };
+        } catch {
+            return fail(502, { pre_assessment_error: 'The AI pre-assessment could not read the objective. Nothing was saved.' });
+        }
+    },
+    pre_assessment_judge: async (event) => {
+        if (!hasAiOnboardingSession(event)) return fail(401, { pre_assessment_error: 'Sign in again.' });
+        const form = await event.request.formData();
+        let fact: Record<string, unknown>;
+        try {
+            const raw = String(form.get('fact') ?? '');
+            if (raw.length > 3000) throw new Error('too long');
+            fact = preAssessmentFact(JSON.parse(raw));
+        } catch {
+            return fail(400, { pre_assessment_error: 'Invalid fact.' });
+        }
+        const payload = {
+            framework_id: String(form.get('framework_id') ?? ''),
+            objective: String(form.get('objective') ?? '').trim(),
+            fact_index: Number(form.get('fact_index')),
+            fact
+        };
+        if (!PRE_ASSESSMENT_UUID.test(payload.framework_id) || payload.objective.length < 20 ||
+            payload.objective.length > 4000 || !Number.isInteger(payload.fact_index) ||
+            payload.fact_index < 0 || payload.fact_index > 5) {
+            return fail(400, { pre_assessment_error: 'Invalid pre-assessment step.' });
+        }
+        try {
+            const response = await fetchAiOnboardingBackend(event, '/ai/workforce/assistant/pre-assessment/judge/', payload);
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) return fail(response.status, { pre_assessment_error: preAssessmentMessage(data) });
+            if (data.business_records_written !== false || data.fact_index !== payload.fact_index ||
+                !Array.isArray(data.judgements)) {
+                return fail(502, { pre_assessment_error: 'SICO could not verify the AI judgement.' });
+            }
+            return { pre_assessment_judge: { fact_index: data.fact_index, judgements: data.judgements.slice(0, 12).map(preAssessmentJudgement) } };
+        } catch {
+            return fail(502, { pre_assessment_error: 'One AI pre-assessment step failed. Nothing was saved.' });
+        }
+    },
+    pre_assessment_commit: async (event) => {
+        if (!hasAiOnboardingSession(event)) return fail(401, { pre_assessment_error: 'Sign in again.' });
+        const form = await event.request.formData();
+        let facts: unknown[];
+        let judgements: unknown[];
+        try {
+            const rawFacts = String(form.get('facts') ?? '[]');
+            const rawJudgements = String(form.get('judgements') ?? '[]');
+            if (rawFacts.length > 20000 || rawJudgements.length > 60000) throw new Error('too long');
+            facts = JSON.parse(rawFacts);
+            judgements = JSON.parse(rawJudgements);
+            if (!Array.isArray(facts) || facts.length < 1 || facts.length > 6 ||
+                !Array.isArray(judgements) || judgements.length > 6) throw new Error('invalid');
+            facts = facts.map(preAssessmentFact);
+            judgements = judgements.map((group: any) => ({
+                fact_index: Number(group?.fact_index),
+                items: (Array.isArray(group?.items) ? group.items : []).slice(0, 12).map(preAssessmentJudgement)
+            }));
+        } catch {
+            return fail(400, { pre_assessment_error: 'Invalid pre-assessment data.' });
+        }
+        const payload = {
+            framework_id: String(form.get('framework_id') ?? ''),
+            organization_name: String(form.get('organization_name') ?? '').trim(),
+            objective: String(form.get('objective') ?? '').trim(),
+            facts,
+            judgements
+        };
+        if (!PRE_ASSESSMENT_UUID.test(payload.framework_id) || payload.organization_name.length < 2 ||
+            payload.organization_name.length > 150 || payload.objective.length < 20 || payload.objective.length > 4000) {
+            return fail(400, { pre_assessment_error: 'Invalid pre-assessment scope.' });
+        }
+        try {
+            const response = await fetchAiOnboardingBackend(event, '/ai/workforce/assistant/pre-assessment/commit/', payload);
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) return fail(response.status, { pre_assessment_error: preAssessmentMessage(data) });
+            if (data.business_records_written !== true || !PRE_ASSESSMENT_UUID.test(String(data.audit?.id ?? ''))) {
+                return fail(502, { pre_assessment_error: 'SICO could not confirm the new audit.' });
+            }
+            const summary = data.summary ?? {};
+            const count = (key: string) => (Number.isInteger(summary[key]) ? summary[key] : 0);
+            return {
+                pre_assessment_commit: {
+                    audit_id: data.audit.id,
+                    ref_id: String(data.audit.ref_id ?? '').slice(0, 100),
+                    name: String(data.audit.name ?? '').slice(0, 200),
+                    version: String(data.audit.version ?? '').slice(0, 20),
+                    summary: {
+                        non_compliant: count('non_compliant'),
+                        partially_compliant: count('partially_compliant'),
+                        potential_gap: count('potential_gap'),
+                        to_be_confirmed: count('to_be_confirmed'),
+                        not_assessed_untouched: count('not_assessed_untouched')
+                    }
+                }
+            };
+        } catch {
+            return fail(502, { pre_assessment_error: 'The pre-assessment could not be saved. Nothing was saved.' });
+        }
+    },
 } satisfies Actions;
+
+const PRE_ASSESSMENT_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function preAssessmentMessage(data: Record<string, any>): string {
+    const reason = typeof data?.failure_reason === 'string' ? ` (${data.failure_reason.slice(0, 80)})` : '';
+    return `${backendMessage(data)}${reason}`;
+}
+
+// Only the fields the backend accepts, with its size limits; it verifies them again.
+function preAssessmentFact(raw: any): Record<string, unknown> {
+    return {
+        quote: String(raw?.quote ?? '').slice(0, 600),
+        claim_en: String(raw?.claim_en ?? '').slice(0, 600),
+        topics: (Array.isArray(raw?.topics) ? raw.topics : []).slice(0, 2).map((t: unknown) => String(t).slice(0, 40)),
+        uncertain: raw?.uncertain === true,
+        judgeable: raw?.judgeable === true
+    };
+}
+
+function preAssessmentJudgement(raw: any): Record<string, string> {
+    return {
+        ref_id: String(raw?.ref_id ?? '').slice(0, 40),
+        relation: String(raw?.relation ?? '').slice(0, 40),
+        violated_clause: String(raw?.violated_clause ?? '').slice(0, 600)
+    };
+}

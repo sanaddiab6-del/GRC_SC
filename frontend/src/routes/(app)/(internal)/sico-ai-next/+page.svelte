@@ -55,6 +55,12 @@
     let authorizedFrameworkSource = $state<Record<string, any> | null>(null);
     let authorizedSourceRows = $state<Record<string, any>[]>([]);
     let frameworkSourceSummary = $state('');
+    // SICO AI Pre-Assessment: a new audit with preliminary results from the objective only.
+    let preAssessBusy = $state(false);
+    let preAssessError = $state('');
+    let preAssessStep = $state(0);
+    let preAssessSteps = $state(0);
+    let preAssessResult = $state<Record<string, any> | null>(null);
 
     // Framework picker: lists every framework in SICO's Libraries and narrows the
     // list on every keystroke. Picking a loaded framework only fills the field with
@@ -407,6 +413,7 @@
             nextAttemptBySlot = {}; lastRejectionBySlot = {}; attemptHistory = []; lastAttemptInfo = '';
             draftedCaseStages = []; draftedCaseScope = qualityScopeKey();
             authorizedFrameworkSource = null; authorizedSourceRows = []; frameworkSourceSummary = '';
+            preAssessResult = null; preAssessError = '';
         } else if (draftedCaseScope !== qualityScopeKey()) {
             draftedCaseError = 'The three inputs changed. Restore original inputs or start a new draft case.';
             return;
@@ -844,12 +851,47 @@
         }
         if (parsed.type !== 'success') {
             const body = parsed.type === 'failure' ? (parsed.data as Record<string, any>) : null;
-            const failure = new Error(String(body?.case_draft_error ?? body?.source_error ?? body?.framework_batch_error ?? body?.control_error ?? body?.ai_sixteen_error ?? body?.lifecycle_error ?? body?.workflow_error ?? 'The requested operation could not finish.'));
+            const failure = new Error(String(body?.case_draft_error ?? body?.source_error ?? body?.framework_batch_error ?? body?.control_error ?? body?.ai_sixteen_error ?? body?.lifecycle_error ?? body?.workflow_error ?? body?.pre_assessment_error ?? 'The requested operation could not finish.'));
             // Allowlisted rejection codes only (quality_draft_one); unused by other actions.
             if (body?.rejection) Object.assign(failure, { rejection: body.rejection });
             throw failure;
         }
         return parsed;
+    }
+
+    // Extract facts (1 request), judge each fact (1 request each), then save one new audit.
+    // Every request makes at most one model call; nothing is saved before the last step.
+    async function runPreAssessment() {
+        const frameworkId = String(authorizedFrameworkSource?.framework_id ?? '');
+        if (preAssessBusy || draftedCaseBusy || !frameworkId) return;
+        preAssessBusy = true; preAssessError = ''; preAssessResult = null;
+        preAssessStep = 0; preAssessSteps = 2;
+        const scope = { framework_id: frameworkId, organization_name: organization.trim(), objective: instruction.trim() };
+        try {
+            const extracted = await sicoPostAction('pre_assessment_extract', scope);
+            const facts = ((extracted.data as Record<string, any>)?.pre_assessment_extract?.facts ?? []) as Record<string, any>[];
+            if (!facts.length) throw new Error('No fact could be quoted from the objective. Nothing was saved.');
+            const toJudge = facts.map((fact, index) => ({ fact, index })).filter((item) => item.fact.judgeable);
+            preAssessStep = 1; preAssessSteps = 2 + toJudge.length;
+            const judgements: { fact_index: number; items: Record<string, string>[] }[] = [];
+            for (const { fact, index } of toJudge) {
+                const judged = await sicoPostAction('pre_assessment_judge', {
+                    framework_id: frameworkId, objective: scope.objective,
+                    fact_index: String(index), fact: JSON.stringify(fact)
+                });
+                judgements.push({ fact_index: index, items: (judged.data as Record<string, any>)?.pre_assessment_judge?.judgements ?? [] });
+                preAssessStep += 1;
+            }
+            const saved = await sicoPostAction('pre_assessment_commit', {
+                ...scope, facts: JSON.stringify(facts), judgements: JSON.stringify(judgements)
+            });
+            preAssessStep = preAssessSteps;
+            preAssessResult = (saved.data as Record<string, any>)?.pre_assessment_commit ?? null;
+        } catch (error) {
+            preAssessError = error instanceof Error ? error.message : 'The AI pre-assessment could not finish. Nothing was saved.';
+        } finally {
+            preAssessBusy = false;
+        }
     }
 
     async function loadSavedControlProgress(caseId = '') {
@@ -1196,6 +1238,27 @@
                         </button>
                     {/if}
                 {/if}
+                {#if (draftedCaseBusy || qualityDrafts.length > 0 || authorizedFrameworkSource) && authorizedFrameworkSource?.framework_id}
+                    <div class="pre-assessment" aria-label="SICO AI Pre-Assessment">
+                        <button type="button" disabled={draftedCaseBusy || preAssessBusy} onclick={() => void runPreAssessment()}>
+                            {preAssessBusy ? 'Running AI Pre-Assessment…' : 'Run AI Pre-Assessment'}
+                        </button>
+                        {#if preAssessBusy}
+                            <div class="framework-meter"><div class="framework-meter-fill" style={`width: ${preAssessSteps ? Math.round(preAssessStep / preAssessSteps * 100) : 0}%`}></div></div>
+                            <p class="footnote">Step {Math.min(preAssessStep + 1, preAssessSteps)} of {preAssessSteps} · Nothing is saved until the last step.</p>
+                        {/if}
+                        {#if preAssessResult}
+                            <p class="message" role="status">
+                                Pre-assessment saved as {preAssessResult.ref_id} (v{preAssessResult.version}):
+                                {preAssessResult.summary.non_compliant} non-compliant · {preAssessResult.summary.partially_compliant} partially compliant ·
+                                {preAssessResult.summary.potential_gap} potential gaps · {preAssessResult.summary.to_be_confirmed} to be confirmed ·
+                                {preAssessResult.summary.not_assessed_untouched} not assessed.
+                                <a href={`/compliance-assessments/${preAssessResult.audit_id}`}>Open the audit</a>
+                            </p>
+                        {/if}
+                        {#if preAssessError}<p class="message error" role="alert">{preAssessError}</p>{/if}
+                    </div>
+                {/if}
                 <label class="checkpoint-upload">Restore an earlier draft session from a JSON checkpoint
                     <input type="file" accept=".json,application/json" disabled={draftedCaseBusy} onchange={(event) => { void importQualityCheckpoint(event); }} />
                 </label>
@@ -1286,6 +1349,7 @@
     .framework-actions button { flex:0 1 auto; }
     .framework-coverage { margin:20px 0 16px; padding:16px; border:1px solid rgba(134,185,174,.25); border-radius:12px; }
     .framework-coverage-title { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+    .pre-assessment { display:grid; gap:8px; }
     .framework-meter { height:12px; border-radius:99px; background:rgba(150,170,185,.23); overflow:hidden; }
     .framework-meter-fill { height:100%; background:#61d8bc; border-radius:99px; transition:width .25s ease; }
     .review-more{margin-top:14px;border:1px solid #46637a;background:#172d42;color:#e6f3fd;padding:12px 16px;border-radius:9px;cursor:pointer}
