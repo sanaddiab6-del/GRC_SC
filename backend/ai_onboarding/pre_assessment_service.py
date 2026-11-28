@@ -454,8 +454,9 @@ def framework_label(name: str, ref_id: str | None) -> str:
     return normalize_text(name)
 
 
-def perimeter_name(organization: str, framework_name: str, framework_ref_id: str | None) -> str:
-    name = f"{normalize_name(organization)} – {framework_label(framework_name, framework_ref_id)} scope"
+def perimeter_name(framework_name: str, framework_ref_id: str | None) -> str:
+    # No organization name: the platform already shows it as "<Domain>/<Perimeter>".
+    name = f"{framework_label(framework_name, framework_ref_id)} scope"
     # The platform refuses "/" in a Perimeter name (PerimeterWriteSerializer.validate_name).
     return name.replace("/", "-")[:NAME_MAX_CHARS]
 
@@ -632,7 +633,7 @@ def commit_pre_assessment(
 
         # Perimeter: one per framework, reused on the next click; its description is
         # never rewritten.
-        wanted_perimeter = perimeter_name(org, str(framework.name), framework.ref_id)
+        wanted_perimeter = perimeter_name(str(framework.name), framework.ref_id)
         perimeter = next(
             (p for p in Perimeter.objects.filter(folder=domain) if name_key(p.name) == name_key(wanted_perimeter)),
             None,

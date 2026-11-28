@@ -116,7 +116,7 @@ class PreAssessmentCommitTests(TestCase):
         self.assertTrue(UserGroup.objects.filter(folder=domain).exists())
 
         perimeter = Perimeter.objects.get(id=reply.data["perimeter"]["id"])
-        self.assertEqual(perimeter.name, f"{ORG} – PA-TEST 1.0 scope")
+        self.assertEqual(perimeter.name, "PA-TEST 1.0 scope")  # the Domain already carries the organization
         self.assertIn('"We do not have a documented cybersecurity strategy."', perimeter.description)
 
         audit = ComplianceAssessment.objects.get(id=reply.data["audit"]["id"])
@@ -166,7 +166,7 @@ class PreAssessmentCommitTests(TestCase):
 
         root = Folder.get_root_folder()
         domain = Folder.objects.create(name=ORG, parent_folder=root, content_type=Folder.ContentType.DOMAIN)
-        perimeter = Perimeter.objects.create(name=f"{ORG} – PA-TEST 1.0 scope", folder=domain,
+        perimeter = Perimeter.objects.create(name="PA-TEST 1.0 scope", folder=domain,
                                              description="Written by a person.")
         year = timezone.localdate().year
         human = ComplianceAssessment.objects.create(

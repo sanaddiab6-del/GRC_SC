@@ -348,22 +348,21 @@ class NameAndIdTests(unittest.TestCase):
         self.assertEqual(rules.name_key("PETRA online  store"), rules.name_key("Petra Online Store"))
 
     def test_perimeter_name(self):
+        # No organization name: the platform already shows "<Domain>/<Perimeter>".
         self.assertEqual(
-            rules.perimeter_name("Petra Online Store",
-                                 "Payment Card Industry Data Security Standard (PCI-DSS) 4.0.1", "PCI DSS 4.0.1"),
-            "Petra Online Store – PCI DSS 4.0.1 scope",
+            rules.perimeter_name("Payment Card Industry Data Security Standard (PCI-DSS) 4.0.1", "PCI DSS 4.0.1"),
+            "PCI DSS 4.0.1 scope",
         )
         self.assertEqual(
-            rules.perimeter_name("Najd Water Services", "Essential Cybersecurity Controls",
-                                 "essential-cybersecurity-controls"),
-            "Najd Water Services – Essential Cybersecurity Controls scope",
+            rules.perimeter_name("Essential Cybersecurity Controls", "essential-cybersecurity-controls"),
+            "Essential Cybersecurity Controls scope",
         )
         self.assertEqual(
-            rules.perimeter_name("ISO CITY", "International standard ISO/IEC 27001:2022", "ISO/IEC 27001:2022"),
-            "ISO CITY – ISO-IEC 27001:2022 scope",  # "/" is refused in a Perimeter name
+            rules.perimeter_name("International standard ISO/IEC 27001:2022", "ISO/IEC 27001:2022"),
+            "ISO-IEC 27001:2022 scope",  # "/" is refused in a Perimeter name
         )
-        self.assertNotIn("/", rules.perimeter_name("A/B Trading", "x", "Y/Z 1.0"))
-        self.assertLessEqual(len(rules.perimeter_name("x" * 250, "y", None)), rules.NAME_MAX_CHARS)
+        self.assertNotIn("/", rules.perimeter_name("x", "Y/Z 1.0"))
+        self.assertLessEqual(len(rules.perimeter_name("y" * 250, None)), rules.NAME_MAX_CHARS)
 
     def test_perimeter_and_audit_descriptions(self):
         sentences = ["Customers pay by card on our website and we also have 3 shops with card machines.",
