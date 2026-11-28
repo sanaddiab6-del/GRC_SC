@@ -36,6 +36,10 @@ TOPICS: dict[str, tuple[str, ...]] = {
         "need to know", "privileged", "administrator*", "admin", "user account*",
         "access review*", "authoriz*", "shared account*", "generic id*", "shared id*",
         "group, shared", "identity and access",
+        # Leavers: "accounts of employees who left the company are not removed" is about
+        # revoking access (ISO A.5.18 "access revocation", A.6.5 "after termination").
+        "left the company", "leaver*", "terminat*", "offboarding", "off-boarding",
+        "removed", "removal", "revok*", "revocation",
     ),
     "sensitive_data_storage": (
         "cardholder data", "account data", "pan", "primary account number*", "card number*",
@@ -471,6 +475,9 @@ ANCHOR_CONCEPTS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
         ("audit*", "review*", "assess*"),
         ("audit*", "review*", "assess*", "check*", "inspect*", "evaluat*"),
     ),
+    # Project management is its own subject: "we have never done a risk assessment" says
+    # nothing about security inside projects (ISO A.5.8 "Measures include risk assessments").
+    "project_management": (("project*",), ("project*",)),
     "firewall_network": (
         ("network security control*", "firewall*", "segmentation"),
         ("firewall*", "network*", "router*", "segment*", "vlan*"),

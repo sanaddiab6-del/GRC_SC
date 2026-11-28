@@ -1,7 +1,7 @@
 """Offline tests: SICO AI Pre-Assessment short lists on the real framework libraries.
 
 Each case is a fact from the gold scenarios (Petra / PCI DSS, ISO CITY / ISO 27001,
-Najd Water Services / ECC) with the requirements a GRC reviewer expects to be checked.
+Najd Water Services / ECC, Zaytouna Medical Labs / ISO 27001) with the requirements a GRC reviewer expects to be checked.
 At least one of them must be in the short list. No DB, Docker or model calls.
 """
 import unittest
@@ -43,6 +43,9 @@ CASES = {
         ("new policy", ["governance_policy"],
          "A new internal data protection policy was approved and must be implemented within 2 months.",
          {"A.5.1", "5.2"}),
+        # Zaytouna (2026-11-28): leavers' accounts are about revoking access rights.
+        ("leavers not removed", ["access_control"],
+         "Accounts of employees who left the company are not removed.", {"A.5.18"}),
     ],
     "ecc-1.yaml": [
         ("no strategy", ["governance_policy"],

@@ -27,6 +27,13 @@ PETRA = (
     "same admin password since 2022. We keep customer orders in a database but not sure if card numbers are "
     "saved there. We need PCI DSS compliance because the bank asked us."
 )
+ZAYTOUNA = (
+    "Zaytouna Medical Labs runs 3 diagnostic labs in Amman with 90 staff. Patient test results are stored in a lab "
+    "system on a local server, and staff use Microsoft 365 for email. We do not have a written information security "
+    "policy. We have never done a risk assessment. Accounts of employees who left the company are not removed. "
+    "Backups are taken daily but have never been tested. We are not sure if staff laptops are encrypted. A hospital "
+    "client asked us to get ISO 27001 certified within 9 months."
+)
 QUOTES = {
     "strategy": "We do not have a documented cybersecurity strategy",
     "it_manager": "Our IT manager is also responsible for cybersecurity because we have no separate cybersecurity team",
@@ -34,6 +41,9 @@ QUOTES = {
     "backups": "We take backups once a week to an external hard drive kept in the same server room",
     "vpn": "Our maintenance vendor connects remotely using one shared VPN account",
     "password": "the developer still uses the same admin password since 2022",
+    "no_policy": "We do not have a written information security policy",
+    "no_risk": "We have never done a risk assessment",
+    "untested_backups": "Backups are taken daily but have never been tested",
 }
 
 # (library, objective, quote key, ref, relation, clause cited, expected kind)
@@ -51,6 +61,21 @@ KEEP = [
      "User authentication based on username and password", rules.KIND_NON_COMPLIANT),
     ("ecc-1.yaml", NAJD, "backups", "2-9-3", "partial_explicit",
      "Ability to perform quick recovery of data and systems after cybersecurity incidents", rules.KIND_PARTIAL),
+    # Zaytouna (ISO 27001:2022, the user's browser test of 2026-11-28).
+    ("iso27001-2022.yaml", ZAYTOUNA, "no_policy", "A.5.1", "gap_explicit",
+     "establishes and maintains information security policies aligned with organizational objectives",
+     rules.KIND_NON_COMPLIANT),
+    ("iso27001-2022.yaml", ZAYTOUNA, "no_policy", "5.2", "gap_explicit",
+     "Establish an information security policy aligned with the organization's objectives and strategic direction",
+     rules.KIND_NON_COMPLIANT),
+    ("iso27001-2022.yaml", ZAYTOUNA, "no_risk", "6.1.2", "gap_explicit",
+     "Establish a process to assess information security risks at planned intervals", rules.KIND_NON_COMPLIANT),
+    ("iso27001-2022.yaml", ZAYTOUNA, "no_risk", "8.2", "gap_explicit",
+     "Implement the risk assessment process to identify, evaluate, and prioritize information security risks",
+     rules.KIND_NON_COMPLIANT),
+    # Accepted by the user: the official A.8.13 text requires backup testing; the library text is short.
+    ("iso27001-2022.yaml", ZAYTOUNA, "untested_backups", "A.8.13", "partial_explicit",
+     "critical information is backed up regularly and securely", rules.KIND_PARTIAL),
     # Conditional requirement: stays a Potential gap.
     ("pcidss-4_0.yaml", PETRA, "password", "8.3.9", "gap_explicit",
      "Passwords/passphrases are changed at least once every 90 days", rules.KIND_POTENTIAL_GAP),
@@ -69,6 +94,8 @@ DROP = [
     ("ecc-1.yaml", NAJD, "it_manager", "1-8-2", "gap_explicit",
      "Cybersecurity audits and reviews must be conducted by independent parties outside the cybersecurity function"),
     ("ecc-1.yaml", NAJD, "awareness", "1-10-5", "gap_explicit", "must be reviewed periodically"),
+    # Project management is another subject (Zaytouna, 2026-11-28).
+    ("iso27001-2022.yaml", ZAYTOUNA, "no_risk", "A.5.8", "partial_explicit", "Measures include risk assessments"),
     # A clause the quote does not contradict.
     ("ecc-1.yaml", NAJD, "awareness", "1-10-1", "gap_explicit", "must be developed and approved"),
     ("ecc-1.yaml", NAJD, "vpn", "2-2-3", "gap_explicit", "Multi-factor authentication for remote access"),
@@ -126,6 +153,14 @@ class SubjectAnchorUnitTests(unittest.TestCase):
                          ["audit_review"])
         self.assertEqual(missing_anchors("", "must be reviewed periodically",
                                          "We have never reviewed our access rights"), [])
+
+    def test_project_management_needs_its_own_evidence(self):
+        self.assertEqual(missing_anchors("information security in project management this control",
+                                         "Measures include risk assessments", "We have never done a risk assessment"),
+                         ["project_management"])
+        self.assertEqual(missing_anchors("information security in project management this control",
+                                         "Measures include risk assessments",
+                                         "Our IT projects never include a risk assessment"), [])
 
     def test_incidents_in_a_clause_are_context_not_subject(self):
         self.assertEqual(missing_anchors("backup and recovery management",
