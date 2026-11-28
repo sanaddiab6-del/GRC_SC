@@ -2,8 +2,9 @@
 
 The page drives the steps (extract -> judge per fact -> commit) so every HTTP request
 makes at most one model call and no request holds a database transaction while the model
-runs. Only the commit endpoint writes, and it makes no model call. The feature is off
-unless the setting or environment variable SICO_AI_PRE_ASSESSMENT_ENABLED is true.
+runs. Only the commit endpoint writes, and it makes no model call. The feature is on by
+default; SICO_AI_PRE_ASSESSMENT_ENABLED=false (setting or environment variable) is the
+emergency off switch.
 """
 from __future__ import annotations
 
@@ -33,19 +34,20 @@ from .pre_assessment_service import (
 from .pre_assessment_topics import TOPIC_ENUM, RequirementCandidate, build_candidates, shortlist_requirements
 
 FEATURE_FLAG = "SICO_AI_PRE_ASSESSMENT_ENABLED"
-_TRUE = {"1", "true", "yes", "on"}
+_FALSE = {"0", "false", "no", "off"}
 _CODE = re.compile(r"[a-z][a-z0-9_]{1,63}")
 PROVENANCE = "sico_ai_pre_assessment_v1"
 
 
 def pre_assessment_enabled() -> bool:
-    """Off by default. A Django setting wins over the environment variable."""
+    """On by default; only an explicit false/0/no/off turns it off (emergency switch).
+    A Django setting wins over the environment variable."""
     value = getattr(settings, FEATURE_FLAG, None)
     if value is None:
         value = os.environ.get(FEATURE_FLAG, "")
     if isinstance(value, bool):
         return value
-    return str(value).strip().lower() in _TRUE
+    return str(value).strip().lower() not in _FALSE
 
 
 def readable_framework(user, framework_id):

@@ -322,7 +322,8 @@ from .sico_ai_case_quality_views import SicoQualityDraftOneView
 urlpatterns += [path('workforce/assistant/case-draft/quality-one/', SicoQualityDraftOneView.as_view(),
                     name='sico-ai-quality-draft-one')]
 
-# SICO AI Pre-Assessment (off unless SICO_AI_PRE_ASSESSMENT_ENABLED). Extract facts, then
+# SICO AI Pre-Assessment (on by default; SICO_AI_PRE_ASSESSMENT_ENABLED=false turns it
+# off in an emergency). Extract facts, then
 # judge one fact per request (no database write), then commit: a new Audit with
 # preliminary results in one transaction (no model call). Approved exception to the
 # "no write without human approval" rule.

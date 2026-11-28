@@ -85,10 +85,20 @@ STRATEGY_FACT = {"quote": "We do not have a documented cybersecurity strategy",
 
 
 class FlagTests(_Base):
-    def test_feature_is_off_by_default(self):
+    def test_feature_is_on_by_default(self):
+        with patch.dict(os.environ, {}):
+            os.environ.pop(views.FEATURE_FLAG, None)
+            self.assertTrue(views.pre_assessment_enabled())
+        for value in ("", "true", "1", "yes"):
+            with self.subTest(value=value), patch.dict(os.environ, {views.FEATURE_FLAG: value}):
+                self.assertTrue(views.pre_assessment_enabled())
+
+    def test_emergency_off_switch(self):
+        for value in ("false", "FALSE", "0", "no", "off", " false "):
+            with self.subTest(value=value), patch.dict(os.environ, {views.FEATURE_FLAG: value}):
+                self.assertFalse(views.pre_assessment_enabled())
         provider = self.use_provider(FakeProvider())
-        with patch.dict(os.environ, {views.FEATURE_FLAG: ""}):
-            self.assertFalse(views.pre_assessment_enabled())
+        with patch.dict(os.environ, {views.FEATURE_FLAG: "false"}):
             reply = self.extract()
         self.assertEqual(reply.status_code, 403)
         self.assertEqual(reply.data["failure_reason"], "pre_assessment_disabled")
